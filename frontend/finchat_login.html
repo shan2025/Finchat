@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinChat — Login</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg: #f5f5f3;
+      --surface: #ffffff;
+      --surface2: #f9f9f8;
+      --border: #e8e8e5;
+      --border2: #d4d4cf;
+      --accent: #1a1a1a;
+      --accent-blue: #2563eb;
+      --accent-green: #16a34a;
+      --accent-amber: #d97706;
+      --accent-red: #dc2626;
+      --text: #1a1a1a;
+      --text2: #6b6b65;
+      --text3: #9b9b93;
+      --sans: 'DM Sans', sans-serif;
+      --mono: 'DM Mono', monospace;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+      padding: 20px;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 420px;
+      position: relative;
+      z-index: 1;
+      animation: screenIn 0.3s ease;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    @keyframes screenIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 36px 32px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ── LOGO ── */
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-text span {
+      font-weight: 400;
+      color: var(--text3);
+    }
+
+    /* ── SCREEN HEADER ── */
+    .screen-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+
+    .screen-sub {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* ── FORM ELEMENTS ── */
+    .field {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 6px;
+      letter-spacing: 0.01em;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      height: 42px;
+      padding: 0 14px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-family: var(--sans);
+      font-size: 13.5px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.06);
+    }
+
+    input.error {
+      border-color: var(--accent-red);
+    }
+
+    input.success {
+      border-color: var(--accent-green);
+    }
+
+    input::placeholder {
+      color: var(--text3);
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 5px;
+    }
+
+    .field-error {
+      font-size: 11px;
+      color: var(--accent-red);
+      margin-top: 5px;
+      display: none;
+    }
+
+    .field-error.show {
+      display: block;
+    }
+
+    /* Password strength */
+    .strength-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .strength-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.3s, background 0.3s;
+      width: 0%;
+    }
+
+    .strength-label {
+      font-size: 10px;
+      font-family: var(--mono);
+      margin-top: 4px;
+      color: var(--text3);
+    }
+
+    /* Role selector */
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .role-option {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      background: var(--surface2);
+      position: relative;
+    }
+
+    .role-option:hover {
+      border-color: var(--border2);
+      background: var(--surface);
+    }
+
+    .role-option.selected {
+      border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.06);
+    }
+
+    .role-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .role-icon {
+      font-size: 22px;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .role-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .role-desc {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 2px;
+    }
+
+    .role-check {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: white;
+    }
+
+    .role-option.selected .role-check {
+      display: flex;
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .divider span {
+      font-size: 11px;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      width: 100%;
+      height: 42px;
+      border-radius: 9px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #333;
+    }
+
+    .btn-primary:disabled {
+      background: var(--border);
+      color: var(--text3);
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      background: var(--surface);
+      color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--border2);
+      background: var(--surface2);
+    }
+
+    .btn-wallet {
+      background: #AB9FF2;
+      color: white;
+      font-size: 13px;
+    }
+
+    .btn-wallet:hover {
+      background: #8B7FD4;
+    }
+
+    .btn-wallet:disabled {
+      background: var(--border);
+      color: var(--text3);
+      cursor: not-allowed;
+    }
+
+    .btn-sm {
+      height: 34px;
+      font-size: 12px;
+      border-radius: 7px;
+      width: auto;
+      padding: 0 16px;
+    }
+
+    /* ── LINKS ── */
+    .link-row {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 18px;
+    }
+
+    .link-row a {
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .link-row a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── WALLET ADDRESS DISPLAY ── */
+    .wallet-display {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #f0fdf4;
+      border: 1.5px solid #bbf7d0;
+      border-radius: 9px;
+      margin-bottom: 14px;
+    }
+
+    .wallet-display.show {
+      display: flex;
+    }
+
+    .wallet-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      flex-shrink: 0;
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.3
+      }
+    }
+
+    .wallet-addr {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent-green);
+      flex: 1;
+    }
+
+    .wallet-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text3);
+      padding: 0;
+      line-height: 1;
+    }
+
+    .wallet-clear:hover {
+      color: var(--accent-red);
+    }
+
+    /* ── OTP FIELD ── */
+    .otp-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .otp-digit {
+      flex: 1;
+      height: 50px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      outline: none;
+      transition: border-color 0.2s;
+      padding: 0;
+    }
+
+    .otp-digit:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.06);
+    }
+
+    /* ── ONBOARDING ── */
+    .onboarding-steps {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 28px;
+    }
+
+    .step-dot {
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+
+    .step-dot.done {
+      background: var(--accent);
+    }
+
+    .step-dot.active {
+      background: var(--accent);
+      opacity: 0.4;
+    }
+
+    .onboard-content {
+      text-align: center;
+      padding: 8px 0 24px;
+    }
+
+    .onboard-icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .onboard-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .onboard-desc {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    .onboard-nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── ROLE BADGE ── */
+    .role-badge-display {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-family: var(--mono);
+    }
+
+    .role-badge-display.admin {
+      background: #fef2f2;
+      color: var(--accent-red);
+      border: 1px solid #fecaca;
+    }
+
+    .role-badge-display.staff {
+      background: #eff6ff;
+      color: var(--accent-blue);
+      border: 1px solid #bfdbfe;
+    }
+
+    .role-badge-display.auditor {
+      background: #f0fdf4;
+      color: var(--accent-green);
+      border: 1px solid #bbf7d0;
+    }
+
+    /* ── BACK BUTTON ── */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text3);
+      cursor: pointer;
+      margin-bottom: 20px;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: var(--sans);
+    }
+
+    .back-btn:hover {
+      color: var(--text);
+    }
+
+    /* ── SUCCESS SCREEN ── */
+    .success-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #f0fdf4;
+      border: 2px solid #bbf7d0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin: 0 auto 20px;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--text);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      opacity: 0;
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+      box-shadow: var(--shadow-md);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.success {
+      background: var(--accent-green);
+    }
+
+    .toast.warn {
+      background: var(--accent-amber);
+    }
+
+    .toast.danger {
+      background: var(--accent-red);
+    }
+
+    /* ── LOADING SPINNER ── */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .spinner.dark {
+      border-color: rgba(0, 0, 0, 0.1);
+      border-top-color: var(--text);
+    }
+
+    /* ── FOOTER ── */
+    .auth-footer {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 20px;
+      font-family: var(--mono);
+    }
+
+    /* Phantom not installed notice */
+    .phantom-notice {
+      background: #fff7ed;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: var(--accent-amber);
+      margin-bottom: 14px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .phantom-notice.show {
+      display: block;
+    }
+
+    .phantom-notice a {
+      color: var(--accent-amber);
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 1: WELCOME / LANDING   -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen active" id="screen-welcome">
+    <div class="card">
+      <div class="logo-mark">
+        <div class="logo-icon">💬</div>
+        <div class="logo-text">FinChat</div>
+      </div>
+
+      <div style="text-align:center;padding:8px 0 28px">
+        <span style="font-size:52px;display:block;margin-bottom:16px">🔐</span>
+        <div class="screen-title" style="text-align:center">Governed Internal Messaging</div>
+        <p class="screen-sub" style="text-align:center;margin-bottom:0">Fraud detection · Proof of conversation ·
+          Tokenomics · Blockchain anchoring</p>
+      </div>
+
+      <button class="btn btn-primary" onclick="goTo('screen-login')" style="margin-bottom:10px">
+        Sign in to workspace
+      </button>
+      <button class="btn btn-outline" onclick="goTo('screen-register')">
+        Create an account
+      </button>
+
+      <div class="divider"><span>or connect wallet directly</span></div>
+
+      <button class="btn btn-wallet" onclick="connectWalletAndLogin()">
+        👻 Continue with Phantom
+      </button>
+
+      <div class="phantom-notice" id="welcomePhantomNotice">
+        Phantom not detected. <a href="https://phantom.app/download" target="_blank">Install Phantom →</a> then
+        reload this page.
+      </div>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 2: LOGIN                -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen" id="screen-login">
+    <div class="card">
+      <button class="back-btn" onclick="goTo('screen-welcome')">← Back</button>
+
+      <div class="logo-mark">
+        <div class="logo-icon">💬</div>
+        <div class="logo-text">FinChat</div>
+      </div>
+
+      <div class="screen-title">Welcome back</div>
+      <p class="screen-sub">Sign in to your workspace account</p>
+
+      <div class="field">
+        <label>Email address</label>
+        <input type="email" id="loginEmail" placeholder="you@acmecorp.com" autocomplete="username"
+          oninput="clearErr('loginEmailErr')">
+        <div class="field-error" id="loginEmailErr">Please enter a valid email.</div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"
+          oninput="clearErr('loginPassErr')">
+        <div class="field-error" id="loginPassErr">Incorrect password.</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <label
+          style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2);font-weight:500;margin-bottom:0">
+          <input type="checkbox" id="rememberMe"
+            style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+          Remember me
+        </label>
+        <a style="font-size:12px;color:var(--text2);cursor:pointer;text-decoration:none;font-weight:500"
+          onclick="goTo('screen-forgot')">Forgot password?</a>
+      </div>
+
+      <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Sign in</button>
+
+      <div class="divider"><span>or</span></div>
+
+      <button class="btn btn-wallet" onclick="connectWalletAndLogin()">
+        👻 Sign in with Phantom
+      </button>
+
+      <div class="phantom-notice" id="loginPhantomNotice">
+        Phantom not detected. <a href="https://phantom.app/download" target="_blank">Install Phantom →</a>
+      </div>
+
+      <div class="link-row">
+        Don't have an account? <a onclick="goTo('screen-register')">Create one</a>
+      </div>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 3: REGISTER             -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen" id="screen-register">
+    <div class="card">
+      <button class="back-btn" onclick="goTo('screen-welcome')">← Back</button>
+
+      <div class="logo-mark">
+        <div class="logo-icon">💬</div>
+        <div class="logo-text">FinChat</div>
+      </div>
+
+      <div class="screen-title">Create account</div>
+      <p class="screen-sub">Register to access the governed workspace</p>
+
+      <div class="field">
+        <label>Full name</label>
+        <input type="text" id="regName" placeholder="Jane Doe" autocomplete="name">
+      </div>
+
+      <div class="field">
+        <label>Work email</label>
+        <input type="email" id="regEmail" placeholder="you@acmecorp.com" autocomplete="username">
+        <div class="field-error" id="regEmailErr">Please enter a valid email.</div>
+      </div>
+
+      <div class="field">
+        <label>Role</label>
+        <div class="role-grid">
+          <div class="role-option" onclick="selectRole(this,'admin')" data-role="admin">
+            <input type="radio" name="role" value="admin">
+            <div class="role-check">✓</div>
+            <span class="role-icon">🛡️</span>
+            <div class="role-name">Admin</div>
+            <div class="role-desc">Full access + governance controls</div>
+          </div>
+          <div class="role-option" onclick="selectRole(this,'auditor')" data-role="auditor">
+            <input type="radio" name="role" value="auditor">
+            <div class="role-check">✓</div>
+            <span class="role-icon">🔍</span>
+            <div class="role-name">Auditor</div>
+            <div class="role-desc">Read-only + proof log access</div>
+          </div>
+          <div class="role-option selected" onclick="selectRole(this,'user')" data-role="user">
+            <input type="radio" name="role" value="user" checked>
+            <div class="role-check">✓</div>
+            <span class="role-icon">💼</span>
+            <div class="role-name">User</div>
+            <div class="role-desc">Standard chat access</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="regPassword" placeholder="Min. 8 characters" autocomplete="new-password"
+          oninput="checkStrength(this.value)">
+        <div class="strength-bar">
+          <div class="strength-fill" id="strengthFill"></div>
+        </div>
+        <div class="strength-label" id="strengthLabel">—</div>
+      </div>
+
+      <div class="field">
+        <label>Confirm password</label>
+        <input type="password" id="regConfirm" placeholder="Re-enter password" autocomplete="new-password">
+        <div class="field-error" id="regConfirmErr">Passwords do not match.</div>
+      </div>
+
+      <div class="divider"><span>also connect wallet (optional)</span></div>
+
+      <div class="wallet-display" id="regWalletDisplay">
+        <div class="wallet-dot"></div>
+        <span class="wallet-addr" id="regWalletAddr">—</span>
+        <button class="wallet-clear" onclick="clearWallet('reg')" title="Disconnect">✕</button>
+      </div>
+
+      <button class="btn btn-wallet" id="regWalletBtn" onclick="connectWalletReg()" style="margin-bottom:14px">
+        👻 Connect Phantom wallet
+      </button>
+
+      <button class="btn btn-primary" onclick="handleRegister()">Create account</button>
+
+      <div class="link-row">
+        Already have an account? <a onclick="goTo('screen-login')">Sign in</a>
+      </div>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 4: FORGOT PASSWORD      -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen" id="screen-forgot">
+    <div class="card">
+      <button class="back-btn" onclick="goTo('screen-login')">← Back to sign in</button>
+
+      <div class="logo-mark">
+        <div class="logo-icon">💬</div>
+        <div class="logo-text">FinChat</div>
+      </div>
+
+      <div class="screen-title">Reset password</div>
+      <p class="screen-sub">Enter your work email and we'll send a 6-digit reset code.</p>
+
+      <div id="forgotStep1">
+        <div class="field">
+          <label>Work email</label>
+          <input type="email" id="forgotEmail" placeholder="you@acmecorp.com">
+          <div class="field-error" id="forgotEmailErr">Email not found in system.</div>
+        </div>
+        <button class="btn btn-primary" onclick="sendResetCode()">Send reset code</button>
+      </div>
+
+      <div id="forgotStep2" style="display:none">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px">
+          Code sent to <strong id="forgotEmailDisplay"></strong>. Check your inbox.
+        </p>
+        <div class="field">
+          <label>6-digit code</label>
+          <div class="otp-row">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,0)">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,1)">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,2)">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,3)">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,4)">
+            <input class="otp-digit" maxlength="1" oninput="otpMove(this,5)">
+          </div>
+          <div class="field-error" id="otpErr">Incorrect code. Try again.</div>
+        </div>
+        <div class="field">
+          <label>New password</label>
+          <input type="password" id="newPassword" placeholder="Min. 8 characters">
+        </div>
+        <button class="btn btn-primary" onclick="verifyResetCode()">Reset password</button>
+      </div>
+
+      <div id="forgotStep3" style="display:none;text-align:center;padding:12px 0">
+        <div class="success-icon">✓</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">Password reset!</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:20px">Your password has been updated. Sign in with
+          your new credentials.</p>
+        <button class="btn btn-primary" onclick="goTo('screen-login')">Go to sign in</button>
+      </div>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 5: WALLET CONNECT       -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen" id="screen-wallet">
+    <div class="card">
+      <div class="logo-mark">
+        <div class="logo-icon">💬</div>
+        <div class="logo-text">FinChat</div>
+      </div>
+
+      <div style="text-align:center;padding:8px 0 24px">
+        <span style="font-size:48px;display:block;margin-bottom:14px" id="walletStateIcon">👻</span>
+        <div class="screen-title" style="text-align:center" id="walletStateTitle">Connecting wallet…</div>
+        <p class="screen-sub" style="text-align:center" id="walletStateSub">Please approve the connection in Phantom
+        </p>
+      </div>
+
+      <div class="wallet-display show" id="walletAddrDisplay" style="display:none!important">
+        <div class="wallet-dot"></div>
+        <span class="wallet-addr" id="walletAddrText">—</span>
+      </div>
+
+      <div id="walletRoleStep" style="display:none">
+        <div class="field" style="margin-top:8px">
+          <label>Select your role to continue</label>
+          <div class="role-grid">
+            <div class="role-option selected" onclick="selectWalletRole(this,'admin')" data-role="admin">
+              <input type="radio" name="walletRole" value="admin" checked>
+              <div class="role-check">✓</div>
+              <span class="role-icon">🛡️</span>
+              <div class="role-name">Admin</div>
+              <div class="role-desc">Full access</div>
+            </div>
+            <div class="role-option" onclick="selectWalletRole(this,'staff')" data-role="staff">
+              <input type="radio" name="walletRole" value="staff">
+              <div class="role-check">✓</div>
+              <span class="role-icon">👤</span>
+              <div class="role-name">Staff</div>
+              <div class="role-desc">Standard access</div>
+            </div>
+            <div class="role-option" onclick="selectWalletRole(this,'auditor')" data-role="auditor">
+              <input type="radio" name="walletRole" value="auditor">
+              <div class="role-check">✓</div>
+              <span class="role-icon">🔍</span>
+              <div class="role-name">Auditor</div>
+              <div class="role-desc">Read-only</div>
+            </div>
+            <div class="role-option" onclick="selectWalletRole(this,'user')" data-role="user">
+              <input type="radio" name="walletRole" value="user">
+              <div class="role-check">✓</div>
+              <span class="role-icon">💼</span>
+              <div class="role-name">User</div>
+              <div class="role-desc">Basic access</div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="confirmWalletLogin()">Enter workspace →</button>
+      </div>
+
+      <button class="btn btn-outline" style="margin-top:10px" onclick="goTo('screen-welcome')"
+        id="walletCancelBtn">Cancel</button>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <!-- ══════════════════════════════ -->
+  <!-- SCREEN 6: ONBOARDING           -->
+  <!-- ══════════════════════════════ -->
+  <div class="screen" id="screen-onboard">
+    <div class="card">
+      <div class="onboarding-steps" id="onboardSteps">
+        <div class="step-dot active"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+      </div>
+
+      <div class="onboard-content" id="onboardContent">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="onboard-nav">
+        <button class="btn btn-outline btn-sm" id="onboardBack" onclick="onboardPrev()" style="display:none">←
+          Back</button>
+        <button class="btn btn-primary" id="onboardNext" onclick="onboardNext()" style="flex:1">Next →</button>
+      </div>
+    </div>
+    <div class="auth-footer">finchat v0.2 · governed protocol</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ─────────────────────────────────
+    // STATE
+    // ─────────────────────────────────
+    let currentUser = null;
+    let connectedWallet = null;
+    let regWallet = null;
+    let selectedRole = 'user';
+    let walletRole = 'admin';
+    let onboardStep = 0;
+    let resetCode = null; // kept for backward compatibility (not used with backend)
+    let resetEmail = null;
+
+    const API_URL = 'http://127.0.0.1:3000';
+
+    // Demo accounts are only used as fallback if the backend is unreachable
+    const DEMO_ACCOUNTS = {
+      'admin@acmecorp.com': { password: 'Admin123!', role: 'admin', name: 'Alex Admin' },
+      'staff@acmecorp.com': { password: 'Staff123!', role: 'staff', name: 'Jane Doe' },
+      'auditor@acmecorp.com': { password: 'Audit123!', role: 'auditor', name: 'Sam Auditor' },
+    };
+
+    const ONBOARD_SLIDES = [
+      {
+        icon: '🔗',
+        title: 'Proof of Conversation',
+        desc: 'Every message you send is cryptographically hashed and chained — creating a tamper-evident audit trail anchored to the blockchain.'
+      },
+      {
+        icon: '🛡️',
+        title: 'AI Fraud Detection',
+        desc: 'All messages are scanned in real time by Qwen 2.5 7B. Suspicious content is flagged, high-risk messages are quarantined automatically.'
+      },
+      {
+        icon: '🪙',
+        title: 'Token Governance',
+        desc: 'You start with 1,000 CHAT tokens. Each message costs 5 tokens. Fraud penalties apply. Your balance keeps you accountable.'
+      }
+    ];
+
+    // ─────────────────────────────────
+    // SCREEN NAVIGATION
+    // ─────────────────────────────────
+    function goTo(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    // ─────────────────────────────────
+    // ROLE SELECTION
+    // ─────────────────────────────────
+    function selectRole(el, role) {
+      document.querySelectorAll('#screen-register .role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedRole = role;
+    }
+
+    function selectWalletRole(el, role) {
+      document.querySelectorAll('#screen-wallet .role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      walletRole = role;
+    }
+
+    // ─────────────────────────────────
+    // LOGIN
+    // ─────────────────────────────────
+    async function handleLogin() {
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('loginPassword').value;
+
+      let valid = true;
+
+      if (!email || !email.includes('@')) {
+        showErr('loginEmailErr'); valid = false;
+      }
+      if (!pass) {
+        showErr('loginPassErr'); valid = false;
+      }
+      if (!valid) return;
+
+      const btn = document.getElementById('loginBtn');
+      setLoading(btn, true, 'Signing in…');
+
+      try {
+        const res = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pass })
+        });
+        const data = await res.json();
+        setLoading(btn, false, 'Sign in');
+
+        if (!res.ok) {
+          showErr('loginPassErr', data.error || 'Invalid email or password.');
+          return;
+        }
+
+        currentUser = {
+          email,
+          name: data.user.name,
+          role: data.user.role,
+          token: data.token,
+          id: data.user.id,
+          token_balance: data.user.token_balance,
+          method: 'password'
+        };
+
+        showToast('Welcome back, ' + data.user.name + '!', 'success');
+        const seen = localStorage.getItem('finchat_onboarded_' + email);
+        if (!seen) {
+          startOnboarding();
+        } else {
+          launchChat();
+        }
+      } catch (err) {
+        // Backend unreachable — fallback to demo accounts
+        setLoading(btn, false, 'Sign in');
+        const account = DEMO_ACCOUNTS[email];
+        if (!account || account.password !== pass) {
+          showErr('loginPassErr', 'Invalid email or password.');
+          return;
+        }
+        currentUser = { email, name: account.name, role: account.role, method: 'password' };
+        showToast('Welcome back, ' + account.name + '! (offline mode)', 'success');
+        const seen = localStorage.getItem('finchat_onboarded_' + email);
+        if (!seen) { startOnboarding(); } else { launchChat(); }
+      }
+    }
+
+    // ─────────────────────────────────
+    // REGISTER
+    // ─────────────────────────────────
+    async function handleRegister() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim().toLowerCase();
+      const pass = document.getElementById('regPassword').value;
+      const confirm = document.getElementById('regConfirm').value;
+
+      if (!email.includes('@')) { showErr('regEmailErr', 'Enter a valid email.'); return; }
+      if (pass.length < 8) { showToast('Password must be at least 8 characters.', 'warn'); return; }
+      if (pass !== confirm) { showErr('regConfirmErr', 'Passwords do not match.'); return; }
+
+      try {
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name || 'New User',
+            email,
+            password: pass,
+            role: selectedRole,
+            walletAddress: regWallet || null
+          })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.error || 'Registration failed.', 'danger');
+          return;
+        }
+
+        currentUser = {
+          email,
+          name: data.user.name,
+          role: data.user.role,
+          token: data.token,
+          id: data.user.id,
+          token_balance: data.user.token_balance,
+          wallet: regWallet,
+          method: regWallet ? 'wallet+password' : 'password'
+        };
+
+        showToast('Account created!', 'success');
+        startOnboarding();
+      } catch (err) {
+        // Backend unreachable — fallback to demo
+        DEMO_ACCOUNTS[email] = { password: pass, role: selectedRole, name: name || 'New User' };
+        currentUser = {
+          email,
+          name: name || 'New User',
+          role: selectedRole,
+          wallet: regWallet,
+          method: regWallet ? 'wallet+password' : 'password'
+        };
+        showToast('Account created! (offline mode)', 'success');
+        startOnboarding();
+      }
+    }
+
+    // ─────────────────────────────────
+    // PHANTOM WALLET
+    // ─────────────────────────────────
+    function getPhantomProvider() {
+      if ('phantom' in window) {
+        const provider = window.phantom?.solana;
+        if (provider?.isPhantom) return provider;
+      }
+      return window.solana?.isPhantom ? window.solana : null;
+    }
+
+    async function connectWalletAndLogin() {
+      const provider = getPhantomProvider();
+      if (!provider) {
+        document.getElementById('welcomePhantomNotice').classList.add('show');
+        document.getElementById('loginPhantomNotice').classList.add('show');
+        showToast('Phantom Wallet not installed.', 'warn');
+        return;
+      }
+
+      goTo('screen-wallet');
+      document.getElementById('walletStateIcon').textContent = '⏳';
+      document.getElementById('walletStateTitle').textContent = 'Waiting for Phantom…';
+      document.getElementById('walletStateSub').textContent = 'Approve the connection request in your Phantom extension.';
+
+      try {
+        const resp = await provider.connect();
+        const addr = resp.publicKey.toString();
+        connectedWallet = addr;
+
+        document.getElementById('walletStateIcon').textContent = '✅';
+        document.getElementById('walletStateTitle').textContent = 'Wallet connected!';
+        document.getElementById('walletStateSub').textContent = shortAddr(addr) + ' · Select your role to continue';
+        document.getElementById('walletAddrDisplay').style.cssText = 'display:flex!important;margin-bottom:16px';
+        document.getElementById('walletAddrText').textContent = shortAddr(addr);
+        document.getElementById('walletRoleStep').style.display = 'block';
+        document.getElementById('walletCancelBtn').style.display = 'none';
+
+      } catch (err) {
+        document.getElementById('walletStateIcon').textContent = '❌';
+        document.getElementById('walletStateTitle').textContent = 'Connection rejected';
+        document.getElementById('walletStateSub').textContent = 'You declined the Phantom request. Try again.';
+        showToast('Wallet connection rejected.', 'danger');
+      }
+    }
+
+    async function connectWalletReg() {
+      const provider = getPhantomProvider();
+      if (!provider) {
+        showToast('Phantom Wallet not installed.', 'warn'); return;
+      }
+      try {
+        const resp = await provider.connect();
+        regWallet = resp.publicKey.toString();
+        document.getElementById('regWalletAddr').textContent = shortAddr(regWallet);
+        document.getElementById('regWalletDisplay').classList.add('show');
+        document.getElementById('regWalletBtn').textContent = '👻 Wallet connected';
+        document.getElementById('regWalletBtn').disabled = true;
+        showToast('Wallet connected: ' + shortAddr(regWallet), 'success');
+      } catch {
+        showToast('Wallet connection cancelled.', 'warn');
+      }
+    }
+
+    function clearWallet(ctx) {
+      if (ctx === 'reg') {
+        regWallet = null;
+        document.getElementById('regWalletDisplay').classList.remove('show');
+        document.getElementById('regWalletBtn').textContent = '👻 Connect Phantom wallet';
+        document.getElementById('regWalletBtn').disabled = false;
+      }
+    }
+
+    async function confirmWalletLogin() {
+      if (!connectedWallet) {
+        showToast('No wallet connected.', 'danger');
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/api/auth/wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress: connectedWallet, role: walletRole })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.error || 'Wallet login failed.', 'danger');
+          return;
+        }
+
+        currentUser = {
+          email: data.user.email || null,
+          name: data.user.name,
+          role: data.user.role,
+          token: data.token,
+          id: data.user.id,
+          token_balance: data.user.token_balance,
+          wallet: data.user.wallet_address,
+          method: 'wallet'
+        };
+
+        showToast('Signed in via MetaMask!', 'success');
+        const key = 'finchat_onboarded_wallet_' + connectedWallet;
+        const seen = localStorage.getItem(key);
+        if (!seen) {
+          startOnboarding();
+        } else {
+          launchChat();
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Wallet login failed (server unreachable).', 'danger');
+      }
+    }
+
+    function shortAddr(addr) {
+      return addr.substring(0, 6) + '…' + addr.substring(addr.length - 4);
+    }
+
+    // ─────────────────────────────────
+    // FORGOT PASSWORD
+    // ─────────────────────────────────
+    async function sendResetCode() {
+      const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+      if (!email.includes('@')) { showErr('forgotEmailErr', 'Enter a valid email.'); return; }
+
+      try {
+        const res = await fetch(`${API_URL}/api/auth/forgot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showErr('forgotEmailErr', data.error || 'Could not send reset code.');
+          return;
+        }
+
+        resetEmail = email;
+        document.getElementById('forgotEmailDisplay').textContent = email;
+        document.getElementById('forgotStep1').style.display = 'none';
+        document.getElementById('forgotStep2').style.display = 'block';
+        showToast('Reset code sent! Check your email.', 'success');
+      } catch (err) {
+        console.error(err);
+        showErr('forgotEmailErr', 'Server unreachable. Try again.');
+      }
+    }
+
+    function otpMove(input, idx) {
+      input.value = input.value.replace(/[^0-9]/g, '');
+      const digits = document.querySelectorAll('.otp-digit');
+      if (input.value && idx < 5) digits[idx + 1].focus();
+    }
+
+    async function verifyResetCode() {
+      const digits = document.querySelectorAll('.otp-digit');
+      const entered = Array.from(digits).map(d => d.value).join('');
+      const newPass = document.getElementById('newPassword').value;
+
+      if (!resetEmail) {
+        showErr('otpErr', 'Start the reset process again.');
+        return;
+      }
+      if (entered.length !== 6) {
+        showErr('otpErr', 'Enter the full 6-digit code.');
+        return;
+      }
+      if (newPass.length < 8) { showToast('Password must be at least 8 characters.', 'warn'); return; }
+
+      try {
+        const res = await fetch(`${API_URL}/api/auth/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: resetEmail, code: entered, newPassword: newPass })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showErr('otpErr', data.error || 'Could not reset password.');
+          return;
+        }
+
+        document.getElementById('forgotStep2').style.display = 'none';
+        document.getElementById('forgotStep3').style.display = 'block';
+        showToast('Password reset successfully!', 'success');
+      } catch (err) {
+        console.error(err);
+        showErr('otpErr', 'Server unreachable. Try again.');
+      }
+    }
+
+    // ─────────────────────────────────
+    // ONBOARDING
+    // ─────────────────────────────────
+    function startOnboarding() {
+      onboardStep = 0;
+      renderOnboardSlide();
+      goTo('screen-onboard');
+    }
+
+    function renderOnboardSlide() {
+      const slide = ONBOARD_SLIDES[onboardStep];
+      const dots = document.querySelectorAll('.step-dot');
+
+      dots.forEach((d, i) => {
+        d.className = 'step-dot' + (i < onboardStep ? ' done' : i === onboardStep ? ' active' : '');
+      });
+
+      document.getElementById('onboardContent').innerHTML = `
+    <span class="onboard-icon">${slide.icon}</span>
+    <div class="onboard-title">${slide.title}</div>
+    <p class="onboard-desc">${slide.desc}</p>
+  `;
+
+      const nextBtn = document.getElementById('onboardNext');
+      const backBtn = document.getElementById('onboardBack');
+      nextBtn.textContent = onboardStep === ONBOARD_SLIDES.length - 1 ? 'Enter workspace →' : 'Next →';
+      backBtn.style.display = onboardStep > 0 ? 'flex' : 'none';
+    }
+
+    function onboardNext() {
+      if (onboardStep < ONBOARD_SLIDES.length - 1) {
+        onboardStep++;
+        renderOnboardSlide();
+      } else {
+        // Mark as seen
+        const key = currentUser?.wallet
+          ? 'finchat_onboarded_wallet_' + currentUser.wallet
+          : 'finchat_onboarded_' + currentUser?.email;
+        localStorage.setItem(key, '1');
+        launchChat();
+      }
+    }
+
+    function onboardPrev() {
+      if (onboardStep > 0) { onboardStep--; renderOnboardSlide(); }
+    }
+
+    // ─────────────────────────────────
+    // LAUNCH CHAT
+    // ─────────────────────────────────
+    function launchChat() {
+      // Store user in sessionStorage so finchat_chat.html can read it
+      sessionStorage.setItem('finchat_user', JSON.stringify(currentUser));
+
+      // If "Remember me" is checked, also persist to localStorage
+      const rememberMe = document.getElementById('rememberMe');
+      if (rememberMe && rememberMe.checked) {
+        localStorage.setItem('finchat_session', JSON.stringify(currentUser));
+      } else {
+        // Clear any previous remembered session
+        localStorage.removeItem('finchat_session');
+      }
+
+      showToast('Loading workspace…', 'success');
+
+      // In a real multi-file setup, redirect to the chat:
+      window.location.href = 'finchat_chat.html';
+
+      // For prototype demo: show a success screen inline
+      showLaunchScreen();
+    }
+
+    function showLaunchScreen() {
+      const roleColors = { admin: 'admin', staff: 'staff', auditor: 'auditor', user: 'staff' };
+      const roleEmoji = { admin: '🛡️', staff: '👤', auditor: '🔍', user: '💼' };
+      const role = currentUser?.role || 'staff';
+      const name = currentUser?.name || 'User';
+      const method = currentUser?.method || 'password';
+      const wallet = currentUser?.wallet;
+
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+      const launch = document.createElement('div');
+      launch.className = 'screen active';
+      launch.innerHTML = `
+    <div class="card" style="text-align:center">
+      <div style="font-size:52px;margin-bottom:16px">${roleEmoji[role]}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:6px;letter-spacing:-0.3px">You're in, ${name.split(' ')[0]}!</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5">
+        Authenticated via <strong>${method}</strong>${wallet ? '<br><span style="font-family:var(--mono);font-size:11px;color:var(--text3)">' + shortAddr(wallet) + '</span>' : ''}
+      </p>
+
+      <div style="display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 20px;margin-bottom:20px">
+        <span style="font-size:18px">${roleEmoji[role]}</span>
+        <div style="text-align:left">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${name}</div>
+          <span class="role-badge-display ${roleColors[role]}">${role.toUpperCase()}</span>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--text3);margin-bottom:20px;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:left;line-height:1.8">
+        <div>✓ 1,000 CHAT tokens granted</div>
+        <div>✓ Fraud detection active</div>
+        <div>✓ Chain proof enabled</div>
+        ${role === 'admin' ? '<div>✓ Governance controls unlocked</div>' : ''}
+        ${role === 'auditor' ? '<div>✓ Full audit log access</div>' : ''}
+      </div>
+
+      <button class="btn btn-primary" onclick="openChat()">Open FinChat →</button>
+      <button class="btn btn-outline" style="margin-top:8px" onclick="goTo('screen-welcome')">← Back to login</button>
+    </div>
+    <div class="auth-footer">session active · finchat v0.2</div>
+  `;
+      document.body.appendChild(launch);
+    }
+
+    function openChat() {
+      // Redirect to chat
+      window.location.href = 'finchat_chat.html';
+    }
+
+    // ─────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────
+    function showErr(id, msg) {
+      const el = document.getElementById(id);
+      if (msg) el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function clearErr(id) {
+      document.getElementById(id)?.classList.remove('show');
+    }
+
+    function setLoading(btn, loading, label) {
+      if (loading) {
+        btn.innerHTML = `<div class="spinner"></div> ${label}`;
+        btn.disabled = true;
+      } else {
+        btn.innerHTML = label;
+        btn.disabled = false;
+      }
+    }
+
+    function checkStrength(val) {
+      const fill = document.getElementById('strengthFill');
+      const label = document.getElementById('strengthLabel');
+      if (!val) { fill.style.width = '0%'; label.textContent = '—'; return; }
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      const map = {
+        0: { w: '15%', c: '#dc2626', l: 'Too weak' },
+        1: { w: '30%', c: '#dc2626', l: 'Weak' },
+        2: { w: '55%', c: '#d97706', l: 'Fair' },
+        3: { w: '78%', c: '#2563eb', l: 'Good' },
+        4: { w: '100%', c: '#16a34a', l: 'Strong ✓' },
+      };
+      const m = map[score];
+      fill.style.width = m.w;
+      fill.style.background = m.c;
+      label.textContent = m.l;
+      label.style.color = m.c;
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast show${type ? ' ' + type : ''}`;
+      setTimeout(() => t.className = 'toast', 3500);
+    }
+
+    // Init onboarding render
+    renderOnboardSlide();
+
+    // ─────────────────────────────────
+    // AUTO-LOGIN: check for remembered session
+    // ─────────────────────────────────
+    (function autoLogin() {
+      const saved = localStorage.getItem('finchat_session');
+      if (saved) {
+        try {
+          const user = JSON.parse(saved);
+          if (user && user.token) {
+            currentUser = user;
+            // Copy into sessionStorage so the chat page can read it
+            sessionStorage.setItem('finchat_user', saved);
+            window.location.href = 'finchat_chat.html';
+          }
+        } catch (e) {
+          localStorage.removeItem('finchat_session');
+        }
+      }
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+dist/
+build/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3-journal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+*.bat
+!start_finchat.bat # Exception for the main start script if desired, or keep it ignored
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Project Specific
+uploads/
+ipconfig_output.txt
+token.txt
+system_explanation.txt
+*.pptx
+{frontend,backend}/
