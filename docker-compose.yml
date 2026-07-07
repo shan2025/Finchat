@@ -1,26 +1,48 @@
+version: '3.8'
+
 services:
-  backend:
-    build: ./backend
-    container_name: finchat-backend
-    ports:
-      - "3000:3000"
+  postgres:
+    image: postgres:15-alpine
+    container_name: finchat-postgres
+    restart: always
     environment:
-      - PORT=3000
-      - JWT_SECRET=${JWT_SECRET:-finchat_super_secret_change_this_in_production_2024}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - DB_PATH=/app/data/finchat.db
-      - UPLOAD_DIR=/app/data/uploads
-      - OLLAMA_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
-      - API_URL=${API_URL:-http://localhost:3000}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5500}
-      - PINATA_API_KEY=${PINATA_API_KEY}
-      - PINATA_SECRET_KEY=${PINATA_SECRET_KEY}
+      POSTGRES_USER: finchat_user
+      POSTGRES_PASSWORD: finchat_password
+      POSTGRES_DB: finchat_db
+    ports:
+      - "5432:5432"
     volumes:
-      - finchat-data:/app/data
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: finchat-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://finchat_user:finchat_password@postgres:5432/finchat_db
+      - SECRET_KEY=super_secret_key_change_me_in_production
+      - OLLAMA_URL=http://host.docker.internal:11434
+    depends_on:
+      - postgres
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: finchat-web
     restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api
 
 volumes:
-  finchat-data:
+  pgdata:

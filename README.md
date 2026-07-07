@@ -2,8 +2,9 @@
 ### Prototype v0.2
 
 A full-stack internal messaging system with:
-- 🔐 MetaMask wallet login + email/password auth
-- 🤖 AI fraud detection via Qwen 2.5 7B (Ollama)
+- 🔐 Phantom wallet login + email/password auth
+- 🤖 AI fraud detection via Qwen 2.5 3B (Ollama)
+- 🧠 **Hybrid Zero-Knowledge Proofs** — Groth16 (audit) + SHA-256 (instant)
 - 🔗 Proof of conversation (SHA-256 hash chaining)
 - 📌 IPFS storage via Pinata
 - ⛓️ Solana devnet blockchain anchoring
@@ -94,7 +95,7 @@ Use these demo accounts or register a new one:
 
 ---
 
-## Optional: Connect Qwen 2.5 7B
+## Optional: Connect Qwen 2.5 3B
 
 For real AI fraud detection using your local model:
 
@@ -103,7 +104,7 @@ For real AI fraud detection using your local model:
 ollama serve
 
 # Terminal 2 — pull model (first time only)
-ollama pull qwen2.5:7b
+ollama pull qwen2.5:3b
 ```
 
 Then in the chat UI, click the 🧠 button in the top toolbar to switch from simulation to Qwen mode.
@@ -189,9 +190,10 @@ Chat with AI personas who secretly monitor for fraud.
 
 | Persona | Description |
 |---------|-------------|
-| Arun | Friendly 28-year-old tech enthusiast from Chennai |
-| Priya | Cheerful 25-year-old compliance analyst from Mumbai |
-| Raj | Experienced 35-year-old senior banker from Delhi |
+| Susheel | History nerd · In love with Sona |
+| Sona | Dog-obsessed puppy mom |
+| Vishnu | Funny crybaby joke-teller |
+| Plato | AI Monitor · Fraud Detection · Governed Protocol |
 
 ### API Usage
 

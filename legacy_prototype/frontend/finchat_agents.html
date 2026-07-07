@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Agent Configuration</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<!-- Google Fonts: Inter & Georgia -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, fontFamily: {headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
+</script>
+<!-- Socket.io -->
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+  :root {
+    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
+    --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
+    --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
+    --mono: ui-monospace, SFMono-Regular, monospace; --sans: 'Inter', sans-serif;
+    --shadow: 0 1px 3px rgba(58,46,35,0.08); --shadow-md: 0 4px 12px rgba(58,46,35,0.12);
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
+
+  /* Custom animations */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(58,46,35,0.25); border:1px solid #4a3828; transform:translateY(20px); }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  /* Range Sliders */
+  input[type=range] { -webkit-appearance:none; width:100%; background:transparent; }
+  input[type=range]:focus { outline:none; }
+  input[type=range]::-webkit-slider-runnable-track { width:100%; height:6px; cursor:pointer; background:#d6ccbc; border-radius:3px; }
+  input[type=range]::-webkit-slider-thumb { height:18px; width:18px; border-radius:50%; background:#3a2e23; cursor:pointer; -webkit-appearance:none; margin-top:-6px; box-shadow:0 2px 5px rgba(58,46,35,0.3); border:2px solid #efe8de; transition:transform 0.15s; }
+  input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.15); }
+
+  /* Agent Selector Card */
+  .agent-card { transition:all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .agent-card:hover { transform:translateY(-2px); }
+</style>
+</head>
+
+<body class="bg-background text-on-surface h-screen overflow-hidden flex">
+
+<!-- ═══════════════════════════════════ -->
+<!-- LEFT SIDEBAR NAV                    -->
+<!-- ═══════════════════════════════════ -->
+<nav class="fixed left-0 top-0 h-full flex flex-col gap-lg p-md z-40 bg-[#3a2e23] text-[#efe8de] w-64 border-r border-[#4a3828] hidden md:flex">
+  <!-- Header -->
+  <div class="px-sm py-1">
+    <h1 class="text-3xl tracking-normal text-[#efe8de]" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat</h1>
+  </div>
+
+  <!-- Navigation Section -->
+  <div class="flex flex-col gap-xs">
+    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Navigation</span>
+    <a href="finchat_chat.html" class="flex items-center gap-md text-[#efe8de] px-md py-sm rounded-full font-bold text-label-md transition-all hover:bg-[#4a3828]">
+      <span class="material-symbols-outlined text-[18px]">chat</span> Chat
+    </a>
+    <a href="finchat_agents.html" class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] px-md py-sm rounded-full font-bold text-label-md border border-[#4a3828] shadow-sm transition-all">
+      <span class="material-symbols-outlined text-[18px] text-[#3a2e23]">tune</span> Agents
+    </a>
+  </div>
+
+  <!-- Spacer -->
+  <div class="flex-1"></div>
+
+  <!-- Nav Links -->
+  <div class="flex flex-col gap-xs border-t border-outline-variant pt-md">
+    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
+      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
+    </a>
+    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
+      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
+    </a>
+  </div>
+
+  <!-- User Profile Footer -->
+  <div class="flex items-center gap-sm px-sm py-sm border-t border-outline-variant pt-md">
+    <div class="w-9 h-9 rounded-full bg-[#efe8de] border border-[#d6ccbc] shrink-0 relative flex items-center justify-center font-bold text-[#4a3828] text-xs shadow-sm" id="sidebarAvatar">
+      <span id="sidebarAvatarText">JD</span>
+      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-[12px] font-semibold text-[#efe8de] truncate" id="sidebarName">Jane Doe</div>
+      <div class="text-[10px] text-[#c9c0b0] font-mono" id="sidebarRole">Staff · Internal</div>
+    </div>
+    <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">1000</div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════ -->
+<!-- MAIN CONTENT WRAPPER                -->
+<!-- ═══════════════════════════════════ -->
+<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+
+  <!-- Top App Bar -->
+  <header class="flex justify-between items-center w-full px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
+    <div class="flex items-center gap-md">
+      <h1 class="text-3xl tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat | Agent Configuration</h1>
+    </div>
+    <div class="flex items-center gap-lg">
+      <div class="hidden md:flex items-center gap-xs px-3 py-1.5 rounded-full border border-[#3a2e23] bg-[#efe8de] text-[#3a2e23] text-label-md font-bold shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span>
+        <span id="topbarTokenDisplay">1000</span> CHAT
+      </div>
+      <div class="flex items-center gap-sm">
+        <button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest transition-colors relative">
+          <span class="material-symbols-outlined">notifications</span>
+          <span class="absolute top-2 right-2 w-2 h-2 bg-[#dc2626] rounded-full border border-surface-container-low"></span>
+        </button>
+      </div>
+      <div class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-[#efe8de]">
+        <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Canvas -->
+  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-8">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+      
+      <!-- LEFT COLUMN: AI AGENTS LIST -->
+      <div class="lg:col-span-1 flex flex-col">
+        <h2 class="text-lg font-bold text-[#3a2e23] mb-4">AI Agents</h2>
+        <div class="flex flex-col gap-3">
+          
+          <!-- Plato -->
+          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-plato" onclick="selectAgent('plato')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
+            <div>
+              <div class="font-bold text-base">Plato</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+            </div>
+          </div>
+
+          <!-- Susheel (Active by default) -->
+          <div class="agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4" id="card-susheel" onclick="selectAgent('susheel')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
+            <div>
+              <div class="font-bold text-base">Susheel</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+            </div>
+          </div>
+
+          <!-- Sona -->
+          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-sona" onclick="selectAgent('sona')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
+            <div>
+              <div class="font-bold text-base">Sona</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+            </div>
+          </div>
+
+          <!-- Vishnu -->
+          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-vishnu" onclick="selectAgent('vishnu')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg></span>
+            <div>
+              <div class="font-bold text-base">Vishnu</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: CONFIGURATION PANEL -->
+      <div class="lg:col-span-3 flex flex-col relative">
+        
+        <!-- Main Card -->
+        <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-3xl p-8 shadow-sm flex flex-col gap-8 relative" style="animation:fadeUp 0.3s ease">
+          
+          <!-- Waving Mascot positioned top right -->
+          <div class="absolute -top-12 -right-4 w-36 h-36 pointer-events-none drop-shadow-xl z-20 hidden sm:block">
+            <svg viewBox="0 0 140 140" class="w-full h-full overflow-visible">
+              <!-- Left Ear -->
+              <rect x="26" y="54" width="12" height="20" rx="6" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+              <!-- Right Ear -->
+              <rect x="102" y="54" width="12" height="20" rx="6" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+              <!-- Antenna Top -->
+              <line x1="70" y1="32" x2="70" y2="44" stroke="#3a2e23" stroke-width="4" stroke-linecap="round"/>
+              <circle cx="70" cy="32" r="6" fill="#3a2e23" stroke="#efe8de" stroke-width="2.5"/>
+              <!-- Waving Right Arm (raised high and tilted) -->
+              <g transform="rotate(35 110 85)">
+                <path d="M106 80 C106 65 128 60 128 75 L124 100 C124 105 106 105 106 100 Z" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+                <!-- Waving hand details -->
+                <circle cx="120" cy="66" r="6" fill="#efe8de" opacity="0.9"/>
+              </g>
+              <!-- Left Arm (resting down) -->
+              <path d="M30 85 C30 95 18 100 18 90 L22 75 C22 70 30 70 30 75 Z" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+              <!-- Body / Chest -->
+              <rect x="36" y="94" width="68" height="42" rx="20" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+              <circle cx="70" cy="115" r="12" fill="#efe8de" opacity="0.9"/>
+              <!-- Head -->
+              <rect x="34" y="42" width="72" height="52" rx="22" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
+              <!-- Eyes (Happy curved eyes / winking) -->
+              <path d="M48 64 Q54 58 60 64" stroke="#efe8de" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+              <ellipse cx="80" cy="62" rx="6.5" ry="6.5" fill="#efe8de"/>
+              <!-- Smile -->
+              <path d="M54 74 Q70 86 86 74" stroke="#efe8de" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+            </svg>
+          </div>
+
+          <!-- Title -->
+          <h2 class="text-3xl font-serif font-bold text-[#3a2e23]" id="configTitle" style="font-family: Georgia, 'Times New Roman', Times, serif;">Agent Configuration: Susheel</h2>
+
+          <!-- Risk Level Box -->
+          <div class="flex flex-col">
+            <h3 class="text-lg font-bold text-[#3a2e23] mb-3">Risk Level</h3>
+            <div class="inline-flex bg-[#f3eee3] border border-[#d6ccbc] rounded-full p-1.5 gap-1 shadow-inner w-fit mb-3" id="riskToggleContainer">
+              <button class="risk-btn active px-6 py-1.5 rounded-full font-bold text-sm bg-[#3a2e23] text-[#efe8de] shadow-sm transition-all" onclick="selectRisk('Low', this)">Low</button>
+              <button class="risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all" onclick="selectRisk('Medium', this)">Medium</button>
+              <button class="risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all" onclick="selectRisk('High', this)">High</button>
+            </div>
+            <p class="text-xs text-[#5c4a38] leading-relaxed max-w-2xl" id="riskDesc">
+              Integrated risk level for brain, medium, high effect and relieves it. Risk signal: custom configuration using a pre-due and guidelines.
+            </p>
+          </div>
+
+          <!-- Bottom 2-Column Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Left Box: Audit Logs -->
+            <div class="flex flex-col">
+              <h3 class="text-lg font-bold text-[#3a2e23] mb-4">Audit Logs</h3>
+              <div class="bg-[#f3eee3] border border-[#d6ccbc] rounded-2xl p-4 flex flex-col gap-3 max-h-[260px] overflow-y-auto shadow-inner" id="auditLogsList">
+                
+                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
+                  <div>
+                    <div class="text-xs font-bold text-[#3a2e23]">Verify Chain Integrity - Low Risk</div>
+                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
+                  </div>
+                  <div class="flex items-center gap-2 text-[#8c7a6b]">
+                    <span class="material-symbols-outlined text-[16px] cursor-help" title="Cryptographic verification pass">info</span>
+                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
+                      <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
+                  <div>
+                    <div class="text-xs font-bold text-[#3a2e23]">Message Sent - Low Risk</div>
+                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
+                  </div>
+                  <div class="flex items-center gap-2 text-[#8c7a6b]">
+                    <span class="material-symbols-outlined text-[16px] cursor-help" title="ZKP Hash anchored">chat_bubble</span>
+                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
+                      <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
+                  <div>
+                    <div class="text-xs font-bold text-[#3a2e23]">Message Sent - Low Risk</div>
+                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
+                  </div>
+                  <div class="flex items-center gap-2 text-[#8c7a6b]">
+                    <span class="material-symbols-outlined text-[16px] cursor-help" title="ZKP Hash anchored">schedule</span>
+                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
+                      <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Right Box: Persona Traits -->
+            <div class="flex flex-col">
+              <h3 class="text-lg font-bold text-[#3a2e23] mb-4">Persona Traits</h3>
+              <div class="bg-[#f3eee3] border border-[#d6ccbc] rounded-2xl p-6 flex flex-col gap-6 shadow-inner">
+                
+                <div class="flex flex-col gap-2">
+                  <div class="flex justify-between text-xs font-bold text-[#3a2e23]"><span>Formal</span><span>Casual</span></div>
+                  <input type="range" min="0" max="100" value="35" class="w-full accent-[#3a2e23] cursor-pointer h-2 bg-[#d6ccbc] rounded-lg" id="sliderFormal" oninput="onTraitChange()">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                  <div class="flex justify-between text-xs font-bold text-[#3a2e23]"><span>Brief</span><span>Detailed</span></div>
+                  <input type="range" min="0" max="100" value="45" class="w-full accent-[#3a2e23] cursor-pointer h-2 bg-[#d6ccbc] rounded-lg" id="sliderBrief" oninput="onTraitChange()">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                  <div class="flex justify-between text-xs font-bold text-[#3a2e23]"><span>Serious</span><span>Playful</span></div>
+                  <input type="range" min="0" max="100" value="70" class="w-full accent-[#3a2e23] cursor-pointer h-2 bg-[#d6ccbc] rounded-lg" id="sliderSerious" oninput="onTraitChange()">
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Action Buttons Footer -->
+          <div class="flex justify-end gap-4 mt-2 pt-4 border-t border-[#d6ccbc]">
+            <button class="bg-transparent text-[#3a2e23] border border-[#3a2e23] px-6 py-2.5 rounded-xl font-bold hover:bg-[#e8dfd1] transition-all" onclick="discardChanges()">Discard</button>
+            <button class="bg-[#3a2e23] text-[#efe8de] px-6 py-2.5 rounded-xl font-bold hover:bg-[#4a3828] shadow-md transition-all flex items-center gap-2" onclick="saveChanges()">
+              <span>Save Changes</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- JAVASCRIPT -->
+<script>
+  // Load session
+  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  if (!_session) {
+    window.location.href = 'finchat_login.html';
+  } else if (!sessionStorage.getItem('finchat_user') && _session) {
+    sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+  }
+  const SESSION_USER = _session || { name: 'User', role: 'user', email: '' };
+
+  // Pre-fill user info
+  if (SESSION_USER.name) {
+    const names = SESSION_USER.name.split(' ');
+    const initials = (names[0]?.[0] || 'U') + (names[1]?.[0] || '');
+    document.getElementById('sidebarName').textContent = SESSION_USER.name;
+    const avatarSpan = document.getElementById('sidebarAvatarText');
+    if (avatarSpan) avatarSpan.textContent = initials.toUpperCase();
+    else document.getElementById('sidebarAvatar').textContent = initials.toUpperCase();
+  }
+
+  // State
+  let currentAgent = 'susheel';
+  let agentConfigs = JSON.parse(localStorage.getItem('finchat_agent_configs') || 'null');
+  if (!agentConfigs) {
+    agentConfigs = {
+      susheel: { risk: 'Low', formal: 35, brief: 45, serious: 70 },
+      plato: { risk: 'High', formal: 85, brief: 20, serious: 15 },
+      sona: { risk: 'Low', formal: 25, brief: 80, serious: 90 },
+      vishnu: { risk: 'Medium', formal: 60, brief: 50, serious: 50 }
+    };
+    localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
+  }
+
+  // Token balances
+  const LOCAL_BAL_KEY = 'finchat_persona_bal_' + (SESSION_USER.id || 'default');
+  let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
+  if (!personaBalances) {
+    personaBalances = { susheel: 1000, sona: 1000, vishnu: 1000, plato: 1000 };
+  }
+  document.getElementById('sidebarToken').textContent = personaBalances.susheel || 1000;
+  document.getElementById('topbarTokenDisplay').textContent = personaBalances.susheel || 1000;
+
+  function selectAgent(agent) {
+    currentAgent = agent;
+    const capitalized = agent.charAt(0).toUpperCase() + agent.slice(1);
+    document.getElementById('configTitle').textContent = `Agent Configuration: ${capitalized}`;
+
+    // Update left card styles
+    ['plato', 'susheel', 'sona', 'vishnu'].forEach(a => {
+      const card = document.getElementById('card-' + a);
+      if (a === agent) {
+        card.className = "agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4";
+      } else {
+        card.className = "agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4";
+      }
+    });
+
+    // Load sliders and risk
+    const cfg = agentConfigs[agent] || { risk: 'Low', formal: 50, brief: 50, serious: 50 };
+    document.getElementById('sliderFormal').value = cfg.formal;
+    document.getElementById('sliderBrief').value = cfg.brief;
+    document.getElementById('sliderSerious').value = cfg.serious;
+
+    // Set risk button
+    const btns = document.getElementById('riskToggleContainer').getElementsByTagName('button');
+    for (let btn of btns) {
+      if (btn.textContent === cfg.risk) {
+        btn.className = "risk-btn active px-6 py-1.5 rounded-full font-bold text-sm bg-[#3a2e23] text-[#efe8de] shadow-sm transition-all";
+      } else {
+        btn.className = "risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all";
+      }
+    }
+
+    showToast(`🤖 Switched configuration to ${capitalized}`);
+  }
+
+  function selectRisk(level, btnElem) {
+    const btns = document.getElementById('riskToggleContainer').getElementsByTagName('button');
+    for (let btn of btns) {
+      btn.className = "risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all";
+    }
+    btnElem.className = "risk-btn active px-6 py-1.5 rounded-full font-bold text-sm bg-[#3a2e23] text-[#efe8de] shadow-sm transition-all";
+    agentConfigs[currentAgent].risk = level;
+    
+    // Update desc
+    if (level === 'Low') {
+      document.getElementById('riskDesc').textContent = "Integrated risk level for brain, medium, high effect and relieves it. Risk signal: custom configuration using a pre-due and guidelines.";
+    } else if (level === 'Medium') {
+      document.getElementById('riskDesc').textContent = "Balanced verification threshold. Flags potential anomalies while maintaining high message throughput and moderate token staking requirements.";
+    } else {
+      document.getElementById('riskDesc').textContent = "Strict cryptographic ZKP verification enforced on every message. Maximum security protocol active with immediate zero-tolerance quarantine.";
+    }
+  }
+
+  function onTraitChange() {
+    // Optional live feedback
+  }
+
+  function saveChanges() {
+    agentConfigs[currentAgent].formal = parseInt(document.getElementById('sliderFormal').value);
+    agentConfigs[currentAgent].brief = parseInt(document.getElementById('sliderBrief').value);
+    agentConfigs[currentAgent].serious = parseInt(document.getElementById('sliderSerious').value);
+    localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
+
+    const capitalized = currentAgent.charAt(0).toUpperCase() + currentAgent.slice(1);
+    showToast(`✨ ${capitalized} configuration saved successfully!`);
+  }
+
+  function discardChanges() {
+    selectAgent(currentAgent); // Reset sliders to saved state
+    showToast("↩️ Changes discarded");
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show';
+    setTimeout(() => { t.className = 'toast'; }, 3000);
+  }
+</script>
+</body>
+</html>
