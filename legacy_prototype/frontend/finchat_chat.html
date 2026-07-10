@@ -678,73 +678,79 @@
 <!-- SETTINGS MODAL                      -->
 <!-- ═══════════════════════════════════ -->
 <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
-  <div class="bg-surface-container-low border border-outline-variant rounded-2xl w-[480px] max-h-[85vh] overflow-y-auto shadow-2xl" style="animation:modalSlideUp 0.25s ease">
+  <div style="background:#3a2e23; border:1px solid #4a3828; border-radius:20px; width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.5); animation:modalSlideUp 0.25s ease;">
     <!-- Header -->
-    <div class="flex items-center justify-between p-lg border-b border-outline-variant">
-      <h2 class="text-label-md font-bold text-on-surface flex items-center gap-sm">
-        <span class="material-symbols-outlined text-primary-fixed">settings</span> Settings
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #4a3828;">
+      <h2 style="font-size:16px; font-weight:700; color:#efe8de; display:flex; align-items:center; gap:10px;">
+        <span class="material-symbols-outlined" style="font-size:22px; color:#c9c0b0;">settings</span> Settings
       </h2>
-      <button class="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-md" onclick="closeSettings()">
-        <span class="material-symbols-outlined">close</span>
+      <button onclick="closeSettings()" style="background:none; border:none; cursor:pointer; padding:4px; border-radius:8px; transition:background 0.2s;" onmouseover="this.style.background='#4a3828'" onmouseout="this.style.background='none'">
+        <span class="material-symbols-outlined" style="color:#8c7a6b; font-size:20px;">close</span>
       </button>
     </div>
-    <div class="p-lg flex flex-col gap-lg">
+
+    <div style="padding:24px; display:flex; flex-direction:column; gap:24px;">
       <!-- Unfreeze Banner -->
       <div class="unfreeze-banner" id="unfreezeBanner">
         ⚠️ Your account is frozen due to depleted tokens.
         <br><button class="unfreeze-btn" onclick="unfreezeAccount()">Unfreeze Account (+50 tokens)</button>
       </div>
+
       <!-- Profile -->
       <div>
-        <h3 class="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant mb-2">Profile</h3>
-        <div class="flex gap-md items-center p-md bg-surface-container-highest rounded-xl border border-outline-variant">
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#7c3aed] text-white text-lg font-bold flex items-center justify-center" id="settingsAvatar">JD</div>
-          <div>
-            <h4 class="text-[14px] font-semibold text-[#efe8de]" id="settingsName">Jane Doe</h4>
-            <p class="text-[11px] text-[#d6ccbc] font-mono" id="settingsEmail">jane@example.com</p>
-            <p class="text-[11px] text-[#c2b2a3] font-mono" id="settingsRole">Staff · Internal</p>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Profile</h3>
+        <div style="display:flex; gap:14px; align-items:center; padding:16px; background:#4a3828; border-radius:14px; border:1px solid #5c4a38;">
+          <div id="settingsAvatar" style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; font-size:18px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:2px solid #5c4a38;">JD</div>
+          <div style="min-width:0;">
+            <h4 id="settingsName" style="font-size:15px; font-weight:700; color:#efe8de; margin:0;">Jane Doe</h4>
+            <p id="settingsEmail" style="font-size:11px; color:#c9c0b0; font-family:ui-monospace, monospace; margin:2px 0 0 0;">jane@example.com</p>
+            <p id="settingsRole" style="font-size:11px; color:#8c7a6b; font-family:ui-monospace, monospace; margin:2px 0 0 0;">Staff · FinChat</p>
           </div>
         </div>
       </div>
+
       <!-- Token Balance -->
       <div>
-        <h3 class="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant mb-2">Token Balance</h3>
-        <div class="bg-gradient-to-br from-[#0e0e0d] to-[#1c1b1a] border border-outline-variant rounded-xl p-md text-on-surface">
-          <div class="text-[28px] font-extrabold tracking-tight text-[#efe8de]" id="settingsBalance">1000</div>
-          <div class="text-[10px] uppercase tracking-widest text-[#c2b2a3] mt-1">CHAT Tokens</div>
-          <div class="flex gap-lg mt-3 pt-3 border-t border-outline-variant text-[11px] text-[#c2b2a3]">
-            <span>💸 Spent: <strong class="text-[#efe8de]" id="settingsSpent">0</strong></span>
-            <span>🚨 Penalties: <strong class="text-[#efe8de]" id="settingsPenalties">0</strong></span>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Token Balance</h3>
+        <div style="background:linear-gradient(135deg, #1a1410, #2a2118); border:1px solid #4a3828; border-radius:14px; padding:20px;">
+          <div id="settingsBalance" style="font-size:32px; font-weight:800; color:#efe8de; letter-spacing:-1px;">1000</div>
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#8c7a6b; margin-top:2px;">CHAT Tokens</div>
+          <div style="display:flex; gap:24px; margin-top:14px; padding-top:14px; border-top:1px solid #4a3828; font-size:11px; color:#8c7a6b;">
+            <span>💸 Spent: <strong style="color:#efe8de;" id="settingsSpent">0</strong></span>
+            <span>🚨 Penalties: <strong style="color:#efe8de;" id="settingsPenalties">0</strong></span>
           </div>
         </div>
       </div>
+
       <!-- Phantom Wallet -->
       <div>
-        <h3 class="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant mb-2">Buy Tokens — Phantom Wallet</h3>
-        <div class="flex flex-col gap-sm">
-          <button class="wallet-btn phantom" id="connectWalletBtn" onclick="connectPhantom()">👻 Connect Phantom Wallet</button>
-          <div id="walletInfo" style="display:none;font-size:11px;color:var(--text2);font-family:var(--mono);text-align:center;"></div>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Buy Tokens — Phantom Wallet</h3>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="wallet-btn phantom" id="connectWalletBtn" onclick="connectPhantom()" style="background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; border-radius:12px; border:1px solid #5c4a38;">👻 Connect Phantom Wallet</button>
+          <div id="walletInfo" style="display:none;font-size:11px;color:#8c7a6b;font-family:ui-monospace, monospace;text-align:center;"></div>
           <div id="tierSection" style="display:none;">
             <div class="tier-grid">
-              <div class="tier-card" data-tier="small" onclick="selectTier('small')"><div class="tier-tokens">100</div><div class="tier-price">0.01 SOL</div><div class="tier-label">Starter</div></div>
-              <div class="tier-card" data-tier="medium" onclick="selectTier('medium')"><div class="tier-tokens">500</div><div class="tier-price">0.05 SOL</div><div class="tier-label">Popular</div></div>
-              <div class="tier-card" data-tier="large" onclick="selectTier('large')"><div class="tier-tokens">1000</div><div class="tier-price">0.10 SOL</div><div class="tier-label">Best Value</div></div>
+              <div class="tier-card" data-tier="small" onclick="selectTier('small')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">100</div><div class="tier-price" style="color:#8c7a6b;">0.01 SOL</div><div class="tier-label" style="color:#c9c0b0;">Starter</div></div>
+              <div class="tier-card" data-tier="medium" onclick="selectTier('medium')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">500</div><div class="tier-price" style="color:#8c7a6b;">0.05 SOL</div><div class="tier-label" style="color:#c9c0b0;">Popular</div></div>
+              <div class="tier-card" data-tier="large" onclick="selectTier('large')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">1000</div><div class="tier-price" style="color:#8c7a6b;">0.10 SOL</div><div class="tier-label" style="color:#c9c0b0;">Best Value</div></div>
             </div>
-            <button class="buy-btn" id="buyTokensBtn" onclick="buyTokens()" disabled>Select a tier to purchase</button>
+            <button class="buy-btn" id="buyTokensBtn" onclick="buyTokens()" disabled style="background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; border:1px solid #5c4a38;">Select a tier to purchase</button>
           </div>
         </div>
       </div>
+
       <!-- Transaction History -->
       <div>
-        <h3 class="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant mb-2">Recent Transactions</h3>
-        <div class="tx-list-settings" id="txListSettings">
-          <div style="text-align:center;color:var(--text3);font-size:11px;padding:12px;">Loading...</div>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Recent Transactions</h3>
+        <div class="tx-list-settings" id="txListSettings" style="max-height:160px; overflow-y:auto; background:#4a3828; border-radius:12px; padding:4px 14px; border:1px solid #5c4a38;">
+          <div style="text-align:center;color:#8c7a6b;font-size:11px;padding:12px;">Loading...</div>
         </div>
       </div>
-      <!-- Logout -->
-      <div class="flex flex-col gap-sm">
-        <button id="adminSettingsBtn" class="logout-btn" style="margin-bottom:0;background:#4f46e5;color:white;display:none" onclick="openAdminModal();closeSettings()">🛡️ Admin Dashboard</button>
-        <button class="logout-btn" onclick="logoutUser()">🚪 Logout</button>
+
+      <!-- Buttons -->
+      <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
+        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:#4a3828; color:#efe8de; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='#5c4a38'" onmouseout="this.style.background='#4a3828'">🛡️ Admin Dashboard</button>
+        <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:transparent; color:#dc6b5a; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#4a2828'; this.style.borderColor='#6b3a3a'" onmouseout="this.style.background='transparent'; this.style.borderColor='#5c4a38'">🚪 Logout</button>
       </div>
     </div>
   </div>
