@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Agent Operations Dashboard</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<!-- Google Fonts: Inter & Georgia -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "serif": ["Playfair Display", "serif"],
+display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+</script>
+<!-- Socket.io -->
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+  :root {
+    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
+    --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
+    --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
+
+  @keyframes pulseGlow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.05); } }
+  .pulse-working { animation: pulseGlow 2s infinite ease-in-out; }
+  
+  .agent-card-working {
+    border-color: #3b82f6 !important;
+    background: linear-gradient(135deg, #efe8de 0%, #ebf5ff 100%) !important;
+    box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3) !important;
+  }
+  .agent-card-waiting {
+    border-color: #d97706 !important;
+    background: linear-gradient(135deg, #efe8de 0%, #fffbeb 100%) !important;
+    box-shadow: 0 10px 30px -10px rgba(217, 119, 6, 0.3) !important;
+  }
+  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(58,46,35,0.25); border:1px solid #4a3828; transform:translateY(20px); }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
+     narrow screens. */
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+</style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
+</head>
+
+<body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
+
+<!-- Backdrop behind the drawer nav on narrow screens -->
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- ═══════════════════════════════════ -->
+    <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+        <div class="mb-10 px-2">
+            <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+                FinChat
+            </h1>
+            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                <span class="font-body-sm font-medium">Operations</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+                <span class="material-symbols-outlined text-[20px]" >smart_toy</span>
+                <span class="font-body-sm font-medium">Agents</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >chat</span>
+                <span class="font-body-sm font-medium">Chat</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+                <span class="material-symbols-outlined text-[20px]" >hub</span>
+                <span class="font-body-sm font-medium">Neural Map</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >assessment</span>
+                <span class="font-body-sm font-medium">Reports</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >menu_book</span>
+                <span class="font-body-sm font-medium">Knowledge</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >account_balance</span>
+                <span class="font-body-sm font-medium">Governance</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >account_tree</span>
+                <span class="font-body-sm font-medium">Blockchain</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >policy</span>
+                <span class="font-body-sm font-medium">Audit Logs</span>
+            </a>
+            <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >settings</span>
+                <span class="font-body-sm font-medium">Settings</span>
+            </a>
+        </div>
+        <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+                <span class="material-symbols-outlined text-[20px]" >help</span>
+                <span class="font-body-sm font-medium">Support</span>
+            </a>
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+                <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                    BT
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                    <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+<!-- ═══════════════════════════════════ -->
+<!-- MAIN CONTENT WRAPPER                -->
+<!-- ═══════════════════════════════════ -->
+<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+
+  <!-- Top App Bar -->
+  <header class="flex justify-between items-center w-full px-8 py-4 h-16 z-50 bg-cream-bg border-b border-border-color shrink-0">
+    <div class="flex items-center gap-4">
+      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
+        <span class="material-symbols-outlined text-[20px]">menu</span>
+      </button>
+      <h1 class="text-2xl tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;">Agent Operations Dashboard</h1>
+      <span class="px-3 py-1 rounded-full text-xs font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] flex items-center gap-1.5" id="liveStatusBadge">
+        <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span> LIVE PULSE
+      </span>
+    </div>
+    <div class="flex items-center gap-4">
+      <button onclick="triggerManualRefresh(this)" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#f3eee3] hover:bg-[#e8dfd1] border border-border-color rounded-xl text-xs font-bold transition-all text-[#3a2e23]">
+        <span id="refreshIcon" class="material-symbols-outlined text-[16px]">refresh</span> Refresh Pulse
+      </button>
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-border-color overflow-hidden flex items-center justify-center bg-[#f3eee3]" onclick="window.location.href='finchat_chat.html'">
+        <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Canvas -->
+  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-8">
+    <div class="max-w-7xl mx-auto flex flex-col gap-8">
+
+      <!-- SYSTEM INTEGRITY STRIP -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
+          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Proof Chain</div>
+          <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="intBlocks">—</div>
+          <div class="text-[10px] text-[#8c7a6b] font-mono">messages hashed</div>
+        </div>
+        <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
+          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Solana Anchors</div>
+          <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="intAnchors">—</div>
+          <div class="text-[10px] text-[#8c7a6b] font-mono">checkpoints on devnet</div>
+        </div>
+        <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
+          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Devnet Status</div>
+          <div class="text-sm font-bold mt-2 flex items-center gap-1.5 text-[#3a2e23]" id="intSolana"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> checking…</div>
+        </div>
+        <div class="bg-cream-bg border border-border-color rounded-2xl p-4 min-w-0">
+          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Last Anchor</div>
+          <div class="text-xs font-mono text-[#3a2e23] mt-2 truncate" id="intLastAnchor">—</div>
+        </div>
+      </div>
+
+      <!-- KNOWLEDGE MEMORY (Graph-RAG + Skill Recipes) -->
+      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#8c7a6b]">hub</span> Knowledge Memory
+          </h3>
+          <span class="text-xs text-[#8c7a6b] font-mono">Graph-RAG · Procedural chaining</span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Entities</div>
+            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memEntities">—</div>
+            <div class="text-[10px] text-[#8c7a6b] font-mono">nodes in graph</div>
+          </div>
+          <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Edges</div>
+            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memEdges">—</div>
+            <div class="text-[10px] text-[#8c7a6b] font-mono">learned relationships</div>
+          </div>
+          <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Skill Recipes</div>
+            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memRecipes">—</div>
+            <div class="text-[10px] text-[#8c7a6b] font-mono">reusable plans</div>
+          </div>
+          <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Recipe Reuses</div>
+            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memReuses">—</div>
+            <div class="text-[10px] text-[#8c7a6b] font-mono">times injected as context</div>
+          </div>
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <span class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Top entities:</span>
+          <span id="memTopEntities" class="text-xs text-[#5c4a38]">—</span>
+        </div>
+      </div>
+
+      <!-- SECTION 1: LIVE AGENT STATUS GRID -->
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-[#3a2e23] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#8c7a6b]">groups</span> Specialist Executive Team Pulse
+          </h2>
+          <span class="text-xs text-[#8c7a6b] font-mono">Status updated in real-time</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="agentsGrid">
+          <!-- Loading placeholders -->
+          <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
+          <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
+          <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
+          <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: QUEUE & BACKGROUND METRICS AND SCHEDULES -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Queue Stats Card -->
+        <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wider text-[#8c7a6b] mb-4 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[18px]">memory</span> Cognitive Worker Pool
+            </h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+                <div class="text-xs text-[#8c7a6b] font-mono">ACTIVE JOBS</div>
+                <div class="text-2xl font-bold font-mono text-[#3b82f6] mt-1" id="qActive">0</div>
+              </div>
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+                <div class="text-xs text-[#8c7a6b] font-mono">WAITING IN QUEUE</div>
+                <div class="text-2xl font-bold font-mono text-[#d97706] mt-1" id="qWaiting">0</div>
+              </div>
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+                <div class="text-xs text-[#8c7a6b] font-mono">COMPLETED TODAY</div>
+                <div class="text-2xl font-bold font-mono text-[#16a34a] mt-1" id="qCompleted">0</div>
+              </div>
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
+                <div class="text-xs text-[#8c7a6b] font-mono">FAILED</div>
+                <div class="text-2xl font-bold font-mono text-[#dc2626] mt-1" id="qFailed">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="text-[11px] text-[#8c7a6b] mt-4 font-mono">Powered by BullMQ & Redis Upstash Engine</div>
+        </div>
+
+        <!-- Morning Executive Briefing Trigger Card -->
+        <div class="lg:col-span-2 bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-[#e8dfd1] to-transparent pointer-events-none opacity-50"></div>
+          <div>
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="text-xs font-bold uppercase tracking-wider text-[#d97706] font-mono bg-[#fef3c7] border border-[#fde68a] px-2.5 py-1 rounded-full">Automated Cron Routine</span>
+                <h3 class="text-xl font-bold text-[#3a2e23] font-serif mt-2" style="font-family: Georgia, serif;">Daily Morning Executive Briefing</h3>
+              </div>
+              <span class="material-symbols-outlined text-[#8c7a6b] text-[36px]">wb_twilight</span>
+            </div>
+            <p class="text-xs text-[#5c4a38] mt-2 max-w-xl leading-relaxed">
+              Every morning at 8:00 AM (<code class="bg-[#f3eee3] px-1.5 py-0.5 rounded border border-border-color font-mono text-[11px]">0 8 * * *</code>), Plato triggers all three specialist agents to analyze live crypto/stock markets (Aurelius), career trends (Rasha), and academic arXiv papers (Nova), depositing the synthesized executive brief directly to your inbox.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 mt-6 pt-4 border-t border-border-color">
+            <button onclick="scheduleBriefing(true)" class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-[#facc15]">bolt</span> Trigger Instant Executive Briefing Now
+            </button>
+            <button onclick="scheduleBriefing(false)" class="bg-[#f3eee3] text-[#3a2e23] hover:bg-[#e8dfd1] border border-border-color px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">schedule</span> Re-Verify Daily Cron
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SECTION 2.5: COUNCIL DEBATE -->
+      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#8c7a6b]">forum</span> Council Debate
+          </h3>
+          <span class="text-xs text-[#8c7a6b] font-mono">Multi-agent deliberation → Plato consensus</span>
+        </div>
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col md:flex-row gap-3">
+            <input id="debateGoal" type="text" placeholder="Pose a decision for the council to debate (e.g. 'Should we bet the roadmap on Solana?')…"
+              onkeydown="if(event.key==='Enter')conveneDebate()"
+              class="flex-1 px-4 py-2.5 rounded-xl border border-border-color bg-[#f7f4ed] text-sm text-[#3a2e23] focus:outline-none focus:border-[#3a2e23]">
+            <button id="debateBtn" onclick="conveneDebate()"
+              class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 justify-center whitespace-nowrap">
+              <span class="material-symbols-outlined text-[16px]">gavel</span> Convene Debate
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 text-xs text-[#5c4a38]">
+            <span class="font-bold text-[#8c7a6b] uppercase tracking-wider text-[10px]">Panel:</span>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="aurelius" checked> Aurelius <span class="text-[#8c7a6b]">(finance)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="nova" checked> Nova <span class="text-[#8c7a6b]">(research)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="rasha"> Rasha <span class="text-[#8c7a6b]">(career)</span></label>
+            <span class="ml-auto font-mono text-[10px] text-[#d97706]" id="debateProgress"></span>
+          </div>
+          <div id="debateResult" class="hidden mt-2"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: RECENT COGNITIVE ACTIVITY STREAM -->
+      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
+            <span class="material-symbols-outlined text-[#8c7a6b]">stream</span> Live Cognitive Activity Feed
+          </h3>
+          <span class="text-xs text-[#8c7a6b] font-mono">Last 15 executions</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-border-color text-[11px] font-bold uppercase tracking-wider text-[#8c7a6b] font-mono">
+                <th class="py-3 px-4">Agent</th>
+                <th class="py-3 px-4">Goal / Task</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Tools Invoked</th>
+                <th class="py-3 px-4">Iterations</th>
+                <th class="py-3 px-4">Time</th>
+              </tr>
+            </thead>
+            <tbody id="activityTableBody" class="text-xs divide-y divide-[#d6ccbc]/60">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-[#8c7a6b] font-mono">Loading activity stream...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- JAVASCRIPT -->
+<script>
+  // Auth check
+  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  if (!_session) {
+    window.location.href = 'finchat_login.html';
+  } else if (!sessionStorage.getItem('finchat_user') && _session) {
+    sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+  }
+  const SESSION_USER = _session || { name: 'User', role: 'user', id: 'system' };
+
+  if (SESSION_USER.name) {
+    const names = SESSION_USER.name.split(' ');
+    const initials = (names[0]?.[0] || 'U') + (names[1]?.[0] || '');
+    document.getElementById('sidebarName').textContent = SESSION_USER.name;
+    document.getElementById('sidebarAvatarText').textContent = initials.toUpperCase();
+    const roleEl = document.getElementById('sidebarRole');
+    if (roleEl && SESSION_USER.role) {
+      roleEl.textContent = `${SESSION_USER.role.charAt(0).toUpperCase() + SESSION_USER.role.slice(1)} · FinChat`;
+    }
+  }
+  if (SESSION_USER.avatar_url) {
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+    const topbarUserIcon = document.getElementById('topbarUserIcon');
+    if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  }
+
+  // Socket.io connection for live pulse
+  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || '';
+
+  // Token display — real balance from backend (not localStorage)
+  async function refreshUserBalance() {
+    try {
+      const res = await fetch('/api/tokens/balance', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.balance === 'number') {
+        document.getElementById('sidebarToken').textContent = data.balance;
+      }
+    } catch { /* keep last known */ }
+  }
+  refreshUserBalance();
+  const socket = io({ auth: { token } });
+
+  socket.on('connect', () => {
+    console.log('⚡ Connected to real-time status stream');
+  });
+
+  socket.on('agent_status_pulse', (data) => {
+    // Live progress for an in-flight council debate
+    if (data.type && data.type.indexOf('debate_') === 0) {
+      const prog = document.getElementById('debateProgress');
+      if (prog && window.debateRunning) {
+        const map = {
+          debate_started: 'Convening the council…',
+          debate_positions: 'Opening positions gathered…',
+          debate_conflict: data.conflict ? 'Conflict found — opening rebuttals…' : 'Council aligned — synthesizing…',
+          debate_round: `Rebuttal round ${data.roundNumber}…`,
+          debate_completed: 'Finalizing consensus…'
+        };
+        if (map[data.type]) prog.textContent = map[data.type];
+      }
+      return; // don't hammer fetchStatus on debate chatter
+    }
+    console.log('📡 Pulse received:', data);
+    // Instant refresh when any execution event fires
+    fetchStatus();
+  });
+
+  // Fetch status API
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/api/agents/status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('API failed');
+      const data = await res.json();
+      renderDashboard(data);
+    } catch (err) {
+      console.warn('Could not fetch status:', err);
+    }
+  }
+
+  function renderDashboard(data) {
+    // 1. Render Agents Grid
+    const grid = document.getElementById('agentsGrid');
+    grid.innerHTML = '';
+
+    const avatars = {
+      plato: 'plato_avatar.png',
+      aurelius: 'aurelius_avatar.png',
+      rasha: 'rasha_avatar.png',
+      nova: 'nova_avatar.png'
+    };
+
+    const colors = {
+      plato: '#3a2e23',
+      aurelius: '#2d3748',
+      rasha: '#4a3828',
+      nova: '#1e293b'
+    };
+
+    data.agents.forEach(agent => {
+      const isWorking = agent.status === 'WORKING';
+      const isWaiting = agent.status === 'WAITING';
+      const cardClass = isWorking
+        ? 'agent-card-working border-2'
+        : isWaiting
+          ? 'agent-card-waiting border-2'
+          : 'border border-border-color bg-cream-bg';
+
+      const statusBadge = isWorking
+        ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#dbafe9] text-[#1e40af] border border-[#bfdbfe] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#3b82f6]"></span> WORKING / BUSY</span>`
+        : isWaiting
+          ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#fef3c7] text-[#92400e] border border-[#fde68a] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#d97706]"></span> WAITING (HITL)</span>`
+          : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span> AT REST / IDLE</span>`;
+
+      let taskContent = `<div class="text-xs text-[#8c7a6b] italic py-4">Currently at rest. Standing by for incoming cognitive tasks.</div>`;
+      if (agent.activeTask) {
+        const t = agent.activeTask;
+        const elapsed = typeof t.elapsedSeconds === 'number'
+          ? t.elapsedSeconds
+          : Math.round((Date.now() - new Date(t.startedAt).getTime()) / 1000);
+        const etaLabel = t.etaSeconds === null || t.etaSeconds === undefined
+          ? (isWaiting ? 'awaiting you' : '—')
+          : `~${t.etaSeconds}s left`;
+        taskContent = `
+          <div class="mt-3 pt-3 border-t border-border-color/80 flex flex-col gap-2">
+            <div class="text-[11px] font-bold text-[#3a2e23] line-clamp-2">"${t.goal}"</div>
+            <div class="flex justify-between items-center text-[10px] font-mono text-[#8c7a6b]">
+              <span>Steps: ${t.iterations}</span>
+              <span>Tools: ${t.toolCalls}</span>
+              <span>Time: ${elapsed}s</span>
+            </div>
+            <div class="flex justify-between items-center text-[10px] font-mono">
+              <span class="text-[#b45309] font-bold" title="LLM tokens burned on this task so far">🔥 ${(t.tokensUsed || 0).toLocaleString()} tok</span>
+              <span class="${isWaiting ? 'text-[#d97706]' : 'text-[#16a34a]'} font-bold" title="Estimated time remaining, based on this agent's average task duration">⏳ ${etaLabel}</span>
+            </div>
+            ${isWaiting ? `<button onclick="resumeTask('${t.executionId}')" class="mt-1 w-full bg-[#d97706] hover:bg-[#b45309] text-white font-bold py-1.5 rounded-lg text-xs transition-all shadow-sm">Approve & Resume Task</button>` : ''}
+          </div>
+        `;
+      }
+
+      const cardHtml = `
+        <div class="${cardClass} rounded-3xl p-6 shadow-sm flex flex-col justify-between transition-all duration-300">
+          <div>
+            <div class="flex justify-between items-start">
+              <div class="flex items-center gap-3">
+                <span class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border border-border-color shrink-0" style="background-color: ${colors[agent.id] || '#3a2e23'}">
+                  <img src="${avatars[agent.id] || 'plato_avatar.png'}" class="w-full h-full object-cover">
+                </span>
+                <div>
+                  <h3 class="font-bold text-base text-[#3a2e23]">${agent.name}</h3>
+                  <p class="text-[11px] text-[#8c7a6b] font-mono">${agent.role}</p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 flex items-center justify-between">
+              ${statusBadge}
+            </div>
+            ${taskContent}
+          </div>
+          <div class="mt-4 pt-3 border-t border-border-color/60 flex justify-between items-center text-[11px] font-mono text-[#8c7a6b]">
+            <span title="Total tasks handled by this agent">${(agent.burn?.tasks || 0)} tasks · ${(agent.burn?.toolCalls || 0)} tool calls</span>
+            <span class="text-[#b45309] font-bold" title="Lifetime LLM tokens burned by this agent">🔥 ${(agent.burn?.tokens || 0).toLocaleString()} tok</span>
+          </div>
+        </div>
+      `;
+      grid.innerHTML += cardHtml;
+    });
+
+    // 2. Render Queue Stats
+    if (data.queueStatus) {
+      document.getElementById('qActive').textContent = data.queueStatus.active || 0;
+      document.getElementById('qWaiting').textContent = data.queueStatus.waiting || 0;
+      document.getElementById('qCompleted').textContent = data.queueStatus.completed || 0;
+      document.getElementById('qFailed').textContent = data.queueStatus.failed || 0;
+    }
+
+    // 3. Render Activity Table
+    const tbody = document.getElementById('activityTableBody');
+    if (!data.recentActivity || data.recentActivity.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-[#8c7a6b] font-mono">No recent tasks recorded yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = '';
+    data.recentActivity.forEach(act => {
+      let stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#f3eee3] text-[#5c4a38]">${act.state.toUpperCase()}</span>`;
+      if (act.state === 'completed') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#dcfce7] text-[#166534]">COMPLETED</span>`;
+      if (act.state === 'running' || act.state === 'ready') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#bfdbfe] text-[#1e40af] animate-pulse">RUNNING</span>`;
+      if (act.state === 'waiting') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#fef3c7] text-[#92400e]">WAITING</span>`;
+      if (act.state === 'failed') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#fee2e2] text-[#991b1b]">FAILED</span>`;
+
+      const toolsList = act.toolsInvoked && act.toolsInvoked.length > 0
+        ? act.toolsInvoked.map(t => `<span class="bg-[#f3eee3] border border-border-color px-1.5 py-0.5 rounded text-[10px] font-mono">${t.tool}</span>`).join(' ')
+        : `<span class="text-[#8c7a6b] italic text-[11px]">—</span>`;
+
+      tbody.innerHTML += `
+        <tr class="hover:bg-[#f3eee3]/50 transition-colors">
+          <td class="py-3.5 px-4 font-bold text-[#3a2e23] capitalize">${act.agentId}</td>
+          <td class="py-3.5 px-4 max-w-md truncate text-[#3a2e23]" title="${act.goal}">${act.goal}</td>
+          <td class="py-3.5 px-4">${stateBadge}</td>
+          <td class="py-3.5 px-4 flex flex-wrap gap-1">${toolsList}</td>
+          <td class="py-3.5 px-4 font-mono text-[#5c4a38]">${act.iterationsUsed} step(s)</td>
+          <td class="py-3.5 px-4 font-mono text-[#8c7a6b] text-[11px]">${new Date(act.updatedAt).toLocaleTimeString()} (${act.durationSeconds}s)</td>
+        </tr>
+      `;
+    });
+  }
+
+  async function scheduleBriefing(instant) {
+    try {
+      showToast(instant ? '⚡ Triggering instant executive briefing...' : '⏰ Confirming daily cron schedule...');
+      const res = await fetch('/api/ai-chat/schedule-briefing', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ instant, cron: '0 8 * * *' })
+      });
+      if (res.ok) {
+        const result = await res.json();
+        showToast(instant ? '✅ Executive Briefing triggered! Watch Plato organize the team!' : '✅ Daily cron verified for 8:00 AM');
+        fetchStatus();
+      } else {
+        showToast('❌ Failed to schedule briefing');
+      }
+    } catch (err) {
+      showToast('❌ Network error');
+    }
+  }
+
+  async function resumeTask(executionId) {
+    try {
+      showToast('⚡ Resuming task...');
+      const res = await fetch(`/api/executions/${executionId}/resume`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ resumptionMessage: 'Approved via Executive Dashboard' })
+      });
+      if (res.ok) {
+        showToast('✅ Task resumed!');
+        fetchStatus();
+      }
+    } catch (err) {
+      showToast('❌ Failed to resume task');
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show';
+    setTimeout(() => { t.className = 'toast'; }, 4000);
+  }
+
+  // ── Council Debate ─────────────────────────────────────────
+  window.debateRunning = false;
+
+  async function conveneDebate() {
+    if (window.debateRunning) return;
+    const goal = document.getElementById('debateGoal').value.trim();
+    if (!goal) { showToast('Enter a question for the council to debate'); return; }
+    const participants = [...document.querySelectorAll('.debate-participant:checked')].map(c => c.value);
+    if (participants.length < 2) { showToast('Pick at least 2 panel members'); return; }
+
+    window.debateRunning = true;
+    const btn = document.getElementById('debateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]" style="animation:spin 1s linear infinite">progress_activity</span> Debating…';
+    document.getElementById('debateProgress').textContent = 'Convening the council…';
+    const result = document.getElementById('debateResult');
+    result.classList.remove('hidden');
+    result.innerHTML = '<div class="text-center text-[#8c7a6b] text-xs py-8">🏛️ The council is deliberating — gathering tool-grounded positions, detecting genuine conflict, then running rebuttal rounds. This can take up to a minute…</div>';
+
+    try {
+      const res = await fetch('/api/agents/debate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ goal, participants, maxRounds: 2 })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Debate failed');
+      renderDebate(data.debate);
+    } catch (e) {
+      result.innerHTML = `<div class="text-center text-[#dc2626] text-xs py-8">Debate failed: ${e.message}</div>`;
+    } finally {
+      window.debateRunning = false;
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">gavel</span> Convene Debate';
+      document.getElementById('debateProgress').textContent = '';
+    }
+  }
+
+  function renderDebate(d) {
+    const result = document.getElementById('debateResult');
+    const esc = (s) => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const nameOf = {};
+    (d.participants || []).forEach(p => { nameOf[p.agentId] = p.name; });
+    const rounds = {};
+    (d.transcript || []).forEach(t => { (rounds[t.round] = rounds[t.round] || []).push(t); });
+    const roundKeys = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+
+    let html = '<div class="flex flex-col gap-4">';
+    html += `<div class="flex items-center gap-2 flex-wrap">
+      <span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${d.conflictDetected ? 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]' : 'bg-[#dcfce7] text-[#166534] border border-[#bbf7d0]'}">${d.conflictDetected ? '⚔ CONFLICT — ' + d.roundsRun + ' round(s)' : '✓ CONSENSUS'}</span>
+      <span class="text-[11px] text-[#8c7a6b]">${(d.participants || []).map(p => p.name).join(' · ')}</span>
+    </div>`;
+    if (d.conflictSummary) html += `<div class="text-xs text-[#5c4a38] italic">"${esc(d.conflictSummary)}"</div>`;
+
+    roundKeys.forEach(rk => {
+      const label = rk === 0 ? 'Opening Positions' : `Rebuttal Round ${rk}`;
+      html += `<div><div class="text-[10px] font-bold uppercase tracking-wider text-[#8c7a6b] mb-2">${label}</div><div class="grid grid-cols-1 md:grid-cols-2 gap-2">`;
+      rounds[rk].forEach(t => {
+        html += `<div class="bg-[#f3eee3] border border-border-color rounded-xl p-3">
+          <div class="text-xs font-bold text-[#3a2e23] mb-1">${esc(t.name || nameOf[t.agentId] || t.agentId)}</div>
+          <div class="text-[11px] text-[#5c4a38] leading-relaxed">${esc(t.position)}</div>
+        </div>`;
+      });
+      html += '</div></div>';
+    });
+
+    html += `<div class="rounded-xl p-4" style="background:linear-gradient(135deg,#3a2e23,#4a3828);color:#efe8de">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-[#d4af37] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">verified</span> Plato's Consensus</div>
+      <div class="text-xs leading-relaxed" style="white-space:pre-wrap">${esc(d.consensus)}</div>
+    </div>`;
+    html += '</div>';
+    result.innerHTML = html;
+  }
+
+  // ── System Integrity strip (proof chain + Solana anchoring) ──
+  async function loadIntegrity() {
+    try {
+      const r = await fetch('/api/agents/integrity', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      document.getElementById('intBlocks').textContent = (d.totalBlocks || 0).toLocaleString();
+      document.getElementById('intAnchors').textContent = (d.anchoredBlocks || 0).toLocaleString();
+      const sol = document.getElementById('intSolana');
+      sol.innerHTML = `<span class="w-2 h-2 rounded-full ${d.solanaOnline ? 'bg-[#16a34a]' : 'bg-[#dc2626]'}"></span> ${d.solanaOnline ? 'Connected' : 'Offline'}`;
+      const la = document.getElementById('intLastAnchor');
+      if (d.lastAnchor && d.lastAnchor.solana_tx) {
+        const tx = d.lastAnchor.solana_tx;
+        const short = tx.length > 16 ? tx.slice(0, 8) + '…' + tx.slice(-6) : tx;
+        if (tx.indexOf('sim_') === 0) la.textContent = short + ' (sim)';
+        else la.innerHTML = `<a href="https://explorer.solana.com/tx/${tx}?cluster=devnet" target="_blank" rel="noopener" class="text-[#9945FF] hover:underline" title="View on Solana Explorer">block #${d.lastAnchor.chain_height} ↗</a>`;
+      } else {
+        la.textContent = 'awaiting checkpoint';
+      }
+    } catch (e) { }
+  }
+
+  let statusInterval = null;
+  let integrityInterval = null;
+
+  async function triggerManualRefresh(btn) {
+    const icon = document.getElementById('refreshIcon');
+    if (icon) icon.classList.add('animate-spin');
+    showToast('⚡ Refreshing live agent pulse & integrity checks...');
+
+    // Reset polling timers to prevent race conditions
+    if (statusInterval) clearInterval(statusInterval);
+    if (integrityInterval) clearInterval(integrityInterval);
+
+    await Promise.all([fetchStatus(), loadIntegrity(), loadMemoryGraph()]);
+
+    if (icon) icon.classList.remove('animate-spin');
+    showToast('✅ Pulse synced successfully!');
+
+    statusInterval = setInterval(fetchStatus, 5000);
+    integrityInterval = setInterval(loadIntegrity, 20000);
+    memGraphInterval = setInterval(loadMemoryGraph, 20000);
+  }
+
+  // ── Knowledge Memory tile (Sprint 5C: Graph-RAG + skill recipes) ──
+  let memGraphInterval = null;
+  async function loadMemoryGraph() {
+    try {
+      const r = await fetch('/api/agents/memory-graph', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      document.getElementById('memEntities').textContent = (d.entities || 0).toLocaleString();
+      document.getElementById('memEdges').textContent = (d.edges || 0).toLocaleString();
+      document.getElementById('memRecipes').textContent = (d.recipes || 0).toLocaleString();
+      document.getElementById('memReuses').textContent = (d.recipeReuses || 0).toLocaleString();
+      const top = document.getElementById('memTopEntities');
+      if (d.topEntities && d.topEntities.length) {
+        top.innerHTML = d.topEntities.map(e =>
+          `<span style="display:inline-block;padding:2px 8px;margin:2px;border-radius:9999px;background:#f3eee3;border:1px solid #d6ccbc;font-size:11px" title="${e.entity_type} · seen ${e.mention_count}×">${e.canonical_name}</span>`
+        ).join(' ');
+      } else {
+        top.textContent = 'no entities extracted yet — run agent tasks or complete a debate';
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  // Initial fetch and auto-refresh every 5 seconds just in case
+  fetchStatus();
+  loadIntegrity();
+  loadMemoryGraph();
+  statusInterval = setInterval(fetchStatus, 5000);
+  integrityInterval = setInterval(loadIntegrity, 20000);
+  memGraphInterval = setInterval(loadMemoryGraph, 20000);
+</script>
+<script>
+  // Drawer nav on narrow screens.
+  (function () {
+    const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop'), btn = document.getElementById('navToggle');
+    if (!nav || !bd || !btn) return;
+    const toggle = (open) => {
+      const show = open === undefined ? !nav.classList.contains('open') : open;
+      nav.classList.toggle('open', show);
+      bd.classList.toggle('hidden', !show);
+    };
+    btn.onclick = () => toggle();
+    bd.onclick = () => toggle(false);
+    nav.querySelectorAll('a[href]').forEach(a => a.addEventListener('click', () => toggle(false)));
+  })();
+  (function () {
+    const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+    function toast(msg) {
+      let t = document.getElementById('nmSoonToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'nmSoonToast';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+      clearTimeout(t._h);
+      t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
+    }
+    document.querySelectorAll('#sideNav a').forEach(a => {
+      const labelEl = a.querySelector('.font-body-sm');
+      const label = labelEl ? labelEl.textContent.trim() : '';
+      if (!SOON.includes(label)) return;
+      a.setAttribute('href', 'javascript:void(0)');
+      a.style.opacity = '0.55';
+      a.style.cursor = 'not-allowed';
+      if (!a.querySelector('.soon-badge')) {
+        const b = document.createElement('span');
+        b.className = 'soon-badge';
+        b.textContent = 'Soon';
+        b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
+        a.appendChild(b);
+      }
+      a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
+    });
+  })();
+</script>
+</body>
+</html>

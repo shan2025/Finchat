@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const { getDB } = require('./database');
+const { getDB, query } = require('./database');
 
 const app = express();
 const server = http.createServer(app);
@@ -53,14 +53,70 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/ai-chat', require('./routes/aiChat'));
 app.use('/api/tokens', require('./routes/tokens'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/executions', require('./routes/executions'));
+app.use('/api/agents', require('./routes/agents'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/neural-map', require('./routes/neuralMap'));
+
+// ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
+const { eventBus } = require('./services/cognitive/EventBus');
+const { stateMachineEvents } = require('./services/cognitive/StateMachine');
+
+stateMachineEvents.on('execution:created', (data) => {
+  io.emit('agent_status_pulse', { type: 'created', ...data });
+});
+
+eventBus.on('execution:waiting', (data) => {
+  io.emit('agent_status_pulse', { type: 'waiting', ...data });
+});
+
+eventBus.on('execution:completed', (data) => {
+  io.emit('agent_status_pulse', { type: 'completed', ...data });
+});
+
+eventBus.on('execution:resumed', (data) => {
+  io.emit('agent_status_pulse', { type: 'resumed', ...data });
+});
+
+eventBus.on('briefing:completed', (data) => {
+  io.emit('agent_status_pulse', { type: 'briefing_completed', ...data });
+});
+
+// ── Sprint 5 · Phase 5A — Multi-Agent Debate pulses ──────────
+eventBus.on('debate:started', (data) => {
+  io.emit('agent_status_pulse', { type: 'debate_started', ...data });
+});
+
+eventBus.on('debate:positions_gathered', (data) => {
+  io.emit('agent_status_pulse', { type: 'debate_positions', ...data });
+});
+
+eventBus.on('debate:conflict', (data) => {
+  io.emit('agent_status_pulse', { type: 'debate_conflict', ...data });
+});
+
+eventBus.on('debate:round', (data) => {
+  io.emit('agent_status_pulse', { type: 'debate_round', ...data });
+});
+
+eventBus.on('debate:completed', (data) => {
+  io.emit('agent_status_pulse', { type: 'debate_completed', ...data });
+});
+
+// ── Live notification bell push ──────────────────────────────
+eventBus.on('notification:new', (row) => {
+  // Deliver to the owning user's sockets (fallback: broadcast so open tabs refresh)
+  io.emit('notification:new', row);
+});
 
 // Health check
 app.get('/health', async (req, res) => {
-  const db = getDB();
   const { isReachable } = require('./services/solana');
   const solanaConnected = await isReachable();
-  const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
-  const msgCount = db.prepare('SELECT COUNT(*) as c FROM messages').get().c;
+  const resUsers = await query('SELECT COUNT(*) as c FROM users');
+  const resMsgs = await query('SELECT COUNT(*) as c FROM messages');
+  const userCount = resUsers.rows[0].c;
+  const msgCount = resMsgs.rows[0].c;
   res.json({
     status: 'ok',
     service: 'FinChat Backend',
@@ -87,14 +143,14 @@ app.use((err, req, res, next) => {
 const onlineUsers = new Map(); // socketId → { userId, name, role, channelId }
 
 // JWT auth for socket connections
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
   if (!token) return next(new Error('Authentication required'));
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const db = getDB();
-    const user = db.prepare('SELECT id, name, role, token_balance FROM users WHERE id = ?').get(decoded.userId);
+    const resUser = await query('SELECT user_id as id, name, role, token_balance FROM users WHERE user_id = $1', [decoded.userId]);
+    const user = resUser.rows[0];
     if (!user) return next(new Error('User not found'));
 
     socket.user = user;
@@ -178,6 +234,13 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, async () => {
   // Init DB on startup
   getDB();
+
+  // Ensure avatar_url column exists in users table
+  try {
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;');
+  } catch (err) {
+    console.error('Note: could not ensure avatar_url column:', err.message);
+  }
 
   // Init Solana devnet connection + auto-airdrop
   const { initSolana } = require('./services/solana');

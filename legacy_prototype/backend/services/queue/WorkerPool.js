@@ -1,0 +1,342 @@
+// services/queue/WorkerPool.js — BullMQ Background Workers for Cognitive Core
+const { Queue, Worker, QueueEvents } = require('bullmq');
+const Redis = require('ioredis');
+const { chatWithPersona } = require('../aiChat');
+const { eventBus } = require('../cognitive/EventBus');
+
+const QUEUE_NAME = 'cognitive-executions';
+
+/**
+ * Build connection URL from environment variables.
+ * Automatically converts Upstash REST credentials to TCP rediss:// URL if no local REDIS_URL exists.
+ */
+function getRedisConnectionConfig() {
+  if (process.env.QUEUE_REDIS_URL) return process.env.QUEUE_REDIS_URL;
+  if (process.env.REDIS_URL) return process.env.REDIS_URL;
+
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const host = process.env.UPSTASH_REDIS_REST_URL.replace(/https?:\/\//, '').replace(/\/$/, '');
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    return `rediss://default:${token}@${host}:6379`;
+  }
+
+  return 'redis://127.0.0.1:6379';
+}
+
+function getConnectionOptions(url) {
+  const isTls = typeof url === 'string' && url.startsWith('rediss://');
+  return {
+    maxRetriesPerRequest: null, // Required by BullMQ
+    enableReadyCheck: false,
+    tls: isTls ? { rejectUnauthorized: false } : undefined
+  };
+}
+
+let queue = null;
+let worker = null;
+let queueEvents = null;
+let connection = null;
+
+/**
+ * Get or initialize the BullMQ Queue instance.
+ */
+function getQueue() {
+  if (!queue) {
+    const redisUrl = getRedisConnectionConfig();
+    connection = new Redis(redisUrl, getConnectionOptions(redisUrl));
+    queue = new Queue(QUEUE_NAME, { connection });
+    queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+
+    queueEvents.on('completed', ({ jobId, returnvalue }) => {
+      eventBus.emit('worker:job_completed', { jobId, returnvalue, timestamp: new Date().toISOString() });
+    });
+
+    queueEvents.on('failed', ({ jobId, failedReason }) => {
+      eventBus.emit('worker:job_failed', { jobId, failedReason, timestamp: new Date().toISOString() });
+    });
+  }
+  return queue;
+}
+
+/**
+ * Enqueue a cognitive execution request into BullMQ.
+ */
+async function enqueueExecutionJob(jobData, jobOptions = {}) {
+  const q = getQueue();
+  const job = await q.add('execute-cognitive-chat', jobData, {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 2000
+    },
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 },
+    ...jobOptions
+  });
+
+  return {
+    jobId: job.id,
+    queueName: QUEUE_NAME,
+    state: await job.getState(),
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Check the status and outcome of a queued job.
+ */
+async function getJobStatus(jobId) {
+  const q = getQueue();
+  const job = await q.getJob(jobId);
+  if (!job) return null;
+
+  const state = await job.getState();
+  return {
+    jobId: job.id,
+    state,
+    progress: job.progress,
+    result: job.returnvalue || null,
+    failedReason: job.failedReason || null,
+    attemptsMade: job.attemptsMade,
+    createdAt: new Date(job.timestamp).toISOString(),
+    processedOn: job.processedOn ? new Date(job.processedOn).toISOString() : null,
+    finishedOn: job.finishedOn ? new Date(job.finishedOn).toISOString() : null
+  };
+}
+
+/**
+ * Start the BullMQ Worker pool to process jobs in the background.
+ * Handles both cognitive execution jobs and morning briefing jobs.
+ */
+function startWorkerPool(concurrency = 5) {
+  if (worker) return worker;
+
+  const redisUrl = getRedisConnectionConfig();
+  const workerConnection = new Redis(redisUrl, getConnectionOptions(redisUrl));
+
+  worker = new Worker(QUEUE_NAME, async (job) => {
+    // Route to appropriate processor based on job name
+    if (job.name === 'morning-executive-briefing') {
+      return await processMorningBriefing(job);
+    }
+
+    // Default: cognitive execution chat
+    const { personaId, userMessage, history = [], options = {} } = job.data;
+    console.log(`[WorkerPool] Processing job #${job.id} for persona "${personaId}"...`);
+
+    const start = Date.now();
+    const result = await chatWithPersona(personaId, userMessage, history, {
+      ...options,
+      jobId: job.id
+    });
+    const durationMs = Date.now() - start;
+
+    console.log(`[WorkerPool] Completed job #${job.id} in ${durationMs}ms.`);
+    return {
+      ...result,
+      processedByWorker: true,
+      workerDurationMs: durationMs
+    };
+  }, {
+    connection: workerConnection,
+    concurrency
+  });
+
+  worker.on('failed', (job, err) => {
+    console.error(`[WorkerPool] Job #${job?.id} failed:`, err.message);
+  });
+
+  return worker;
+}
+
+// ─── Morning Executive Briefing System ───
+
+const BRIEFING_GOAL = `Generate our Daily Morning Executive Briefing. You MUST use your tools to gather REAL, LIVE data for each section:
+
+1. 📈 MARKET & CRYPTO PULSE (Aurelius domain): Use the "crypto" tool to look up current prices for Bitcoin, Ethereum, and Solana. Use the "stocks" tool to check TSLA and AAPL. Summarize the market conditions.
+
+2. 💼 CAREER & HIRING PULSE (Rasha domain): Use the "search" tool to find the latest trends in tech hiring, AI jobs, and remote work opportunities. Provide 2-3 actionable career insights.
+
+3. 🔬 FRONTIER SCIENCE & TECH (Nova domain): Use the "paper" tool to search for recent breakthroughs in "artificial intelligence" or "neural interfaces". Highlight 2-3 notable papers or discoveries.
+
+Format the briefing as a clean, executive-style daily report with clear section headers. Include actual numbers and data from your tool results. End with a "🎯 Key Action Items" section with 3 bullet points.`;
+
+/**
+ * Process a morning executive briefing job.
+ * Routes through PlatoOrchestrator which delegates to specialist agents with their tools.
+ */
+async function processMorningBriefing(job) {
+  const { userId = 'system', requestedAt } = job.data;
+  console.log(`\n🌅 [MorningBriefing] Starting executive briefing for user "${userId}" (requested: ${requestedAt || 'scheduled'})...`);
+
+  const start = Date.now();
+
+  try {
+    // Lazy-load to avoid circular dependency issues at startup
+    const { route } = require('../agents/PlatoOrchestrator');
+    const { query: dbQuery } = require('../../database');
+
+    const result = await route({
+      goal: BRIEFING_GOAL,
+      userId,
+      targetAgentId: 'plato' // Force Plato to orchestrate
+    });
+
+    const durationMs = Date.now() - start;
+    const briefingText = result.cleanResponse || result.response || 'Briefing generation failed — no content returned.';
+
+    console.log(`🌅 [MorningBriefing] Completed in ${durationMs}ms (${briefingText.length} chars)`);
+
+    // Store briefing as a message from Plato to the user
+    try {
+      const msgId = `msg_briefing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await dbQuery(`
+        INSERT INTO messages (message_id, sender_id, receiver_id, content, message_type, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [msgId, 'plato', userId, briefingText, 'briefing']);
+    } catch (msgErr) {
+      console.warn(`⚠️ [MorningBriefing] Failed to store briefing message: ${msgErr.message}`);
+    }
+
+    // Store notification so it shows on the notification bell (live via notification:new)
+    const { createNotification } = require('../notifications');
+    await createNotification({
+      userId,
+      type: 'briefing',
+      title: '🌅 Morning Executive Briefing Ready',
+      content: `Your daily briefing is ready! ${briefingText.substring(0, 200)}...`
+    });
+
+    eventBus.emit('briefing:completed', {
+      userId,
+      durationMs,
+      contentLength: briefingText.length,
+      timestamp: new Date().toISOString()
+    });
+
+    return {
+      success: true,
+      userId,
+      briefing: briefingText,
+      durationMs,
+      processedByWorker: true,
+      executionId: result.executionId
+    };
+
+  } catch (err) {
+    console.error(`❌ [MorningBriefing] Failed for user "${userId}":`, err.message);
+    throw err; // Let BullMQ retry with exponential backoff
+  }
+}
+
+/**
+ * Schedule recurring morning executive briefings via BullMQ repeatable jobs.
+ *
+ * @param {object} options
+ * @param {string} options.userId - User to generate the briefing for
+ * @param {string} [options.cron='0 8 * * *'] - Cron schedule (default: 8:00 AM daily)
+ * @param {boolean} [options.instant=false] - If true, run immediately instead of waiting for cron
+ * @returns {Promise<{ jobId, scheduled, cron, nextRun }>}
+ */
+async function scheduleMorningBriefing({ userId = 'system', cron = '0 8 * * *', instant = false } = {}) {
+  const q = getQueue();
+
+  if (instant) {
+    // Run immediately as a one-shot job
+    const job = await q.add('morning-executive-briefing', {
+      userId,
+      requestedAt: new Date().toISOString(),
+      instant: true
+    }, {
+      attempts: 2,
+      backoff: { type: 'exponential', delay: 3000 },
+      removeOnComplete: { count: 100 },
+      removeOnFail: { count: 500 }
+    });
+
+    console.log(`🌅 [MorningBriefing] Instant briefing queued → Job #${job.id}`);
+    return {
+      jobId: job.id,
+      scheduled: false,
+      instant: true,
+      state: await job.getState(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // Schedule recurring briefing via BullMQ repeatable job
+  const job = await q.add('morning-executive-briefing', {
+    userId,
+    requestedAt: 'scheduled'
+  }, {
+    repeat: {
+      pattern: cron
+    },
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: { count: 30 }, // Keep last 30 briefings
+    removeOnFail: { count: 100 }
+  });
+
+  console.log(`🌅 [MorningBriefing] Recurring briefing scheduled → Cron: "${cron}" for user "${userId}"`);
+  return {
+    jobId: job.id,
+    scheduled: true,
+    cron,
+    userId,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Cancel all scheduled morning briefings for a user.
+ */
+async function cancelMorningBriefings() {
+  const q = getQueue();
+  const repeatable = await q.getRepeatableJobs();
+  let cancelled = 0;
+
+  for (const job of repeatable) {
+    if (job.name === 'morning-executive-briefing') {
+      await q.removeRepeatableByKey(job.key);
+      cancelled++;
+    }
+  }
+
+  console.log(`🌅 [MorningBriefing] Cancelled ${cancelled} scheduled briefing(s)`);
+  return { cancelled };
+}
+
+/**
+ * Gracefully shut down queue, worker, and Redis connections.
+ */
+async function shutdownWorkerPool() {
+  if (worker) {
+    await worker.close();
+    worker = null;
+  }
+  if (queue) {
+    await queue.close();
+    queue = null;
+  }
+  if (queueEvents) {
+    await queueEvents.close();
+    queueEvents = null;
+  }
+  if (connection) {
+    await connection.quit();
+    connection = null;
+  }
+}
+
+module.exports = {
+  getQueue,
+  enqueueExecutionJob,
+  getJobStatus,
+  startWorkerPool,
+  shutdownWorkerPool,
+  getRedisConnectionConfig,
+  scheduleMorningBriefing,
+  cancelMorningBriefings,
+  QUEUE_NAME
+};

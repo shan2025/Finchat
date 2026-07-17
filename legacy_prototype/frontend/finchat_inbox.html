@@ -13,7 +13,18 @@
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, fontFamily: {headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "serif": ["Playfair Display", "serif"],
+headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
 </script>
 <!-- Socket.io -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -273,97 +284,78 @@
 
   #fileInput { display:none; }
 </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
-<body class="bg-background text-on-surface h-screen overflow-hidden flex">
+<body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
 
 <!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV                    -->
 <!-- ═══════════════════════════════════ -->
-<nav class="fixed left-0 top-0 h-full flex flex-col gap-lg p-md z-40 bg-[#3a2e23] text-[#efe8de] w-64 border-r border-[#4a3828] hidden md:flex">
-  <!-- Header -->
-  <div class="px-sm py-1">
-    <h1 class="text-3xl tracking-normal text-[#efe8de]" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat</h1>
-  </div>
-
-  <!-- Navigation Section -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Navigation</span>
-    <a href="finchat_chat.html" class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] px-md py-sm rounded-full font-bold text-label-md border border-[#4a3828] shadow-sm transition-all hover:bg-[#e8dfd1]">
-      <span class="material-symbols-outlined text-[18px] text-[#3a2e23]">chat</span> Chat
-    </a>
-    <a href="finchat_agents.html" class="flex items-center gap-md text-[#efe8de] px-md py-sm rounded-full font-bold text-label-md transition-all hover:bg-[#4a3828]">
-      <span class="material-symbols-outlined text-[18px]">tune</span> Agents
-    </a>
-  </div>
-
-  <!-- System Section -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">System</span>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-plato" onclick="switchChat('plato')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-plato"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
-      Plato
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-plato">idle</span>
-    </div>
-  </div>
-
-  <!-- AI Personas / Agents -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Agents</span>
-    <div class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] font-bold rounded-full px-md py-sm cursor-pointer text-label-md shadow-sm" id="ch-susheel" onclick="switchChat('susheel')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-susheel"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
-      Susheel
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-susheel">idle</span>
-    </div>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-sona" onclick="switchChat('sona')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-sona"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
-      Sona
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-sona">idle</span>
-    </div>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-vishnu" onclick="switchChat('vishnu')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-vishnu"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg></span>
-      Vishnu
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-vishnu">idle</span>
-    </div>
-  </div>
-
-  <!-- Admin Section (hidden by default) -->
-  <div class="flex flex-col gap-xs" id="adminSidebarSection" style="display:none;">
-    <span class="text-[10px] font-semibold tracking-widest uppercase text-on-surface-variant px-md">Admin</span>
-    <div class="flex items-center gap-md px-md py-sm rounded-lg cursor-pointer text-[12px] font-semibold text-[#c4b5fd] bg-[#1e1533] border border-[#3b2d63] hover:bg-[#2a1f4e] transition-all" onclick="openAdminPanel()">
-      🛡️ User Management
-    </div>
-  </div>
-
-  <!-- Spacer -->
-  <div class="flex-1"></div>
-
-  <!-- Nav Links -->
-  <div class="flex flex-col gap-xs border-t border-outline-variant pt-md">
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
-    </a>
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
-    </a>
-  </div>
-
-  <!-- User Profile Footer -->
-  <div class="flex items-center gap-sm px-sm py-sm border-t border-outline-variant pt-md">
-    <div class="w-9 h-9 rounded-full bg-[#efe8de] border border-outline-variant shrink-0 relative flex items-center justify-center font-bold text-[#4a3828] text-xs shadow-sm" id="sidebarAvatar">
-      <span id="sidebarAvatarText">JD</span>
-      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>
-    </div>
-    <div class="flex-1 min-w-0">
-      <div class="text-[12px] font-semibold text-[#efe8de] truncate" id="sidebarName">Jane Doe</div>
-      <div class="text-[10px] text-[#c2b2a3] font-mono" id="sidebarRole">Staff · Internal</div>
-    </div>
-    <div class="token-pill" id="sidebarToken">1000</div>
-    <button class="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-md hover:bg-surface-container-highest" onclick="openSettings()" title="Settings">
-      <span class="material-symbols-outlined text-[18px]">settings</span>
-    </button>
-  </div>
-</nav>
+    <nav class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+        <div class="mb-10 px-2">
+            <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+                FinChat
+            </h1>
+            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+                <span class="material-symbols-outlined text-[20px]" >dashboard</span>
+                <span class="font-body-sm font-medium">Mission Control</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+                <span class="material-symbols-outlined text-[20px]" >smart_toy</span>
+                <span class="font-body-sm font-medium">Agents</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">task_alt</span>
+                <span class="font-body-sm font-medium">Tasks</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >assessment</span>
+                <span class="font-body-sm font-medium">Reports</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >menu_book</span>
+                <span class="font-body-sm font-medium">Knowledge</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >account_balance</span>
+                <span class="font-body-sm font-medium">Governance</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >account_tree</span>
+                <span class="font-body-sm font-medium">Blockchain</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >policy</span>
+                <span class="font-body-sm font-medium">Audit Logs</span>
+            </a>
+            <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >settings</span>
+                <span class="font-body-sm font-medium">Settings</span>
+            </a>
+        </div>
+        <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+                <span class="material-symbols-outlined text-[20px]" >help</span>
+                <span class="font-body-sm font-medium">Support</span>
+            </a>
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+                <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                    BT
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                    <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+                </div>
+            </div>
+        </div>
+    </nav>
 
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
@@ -385,19 +377,19 @@
         <span id="topbarTokenDisplay">1000</span> CHAT
       </div>
       <div class="flex items-center gap-sm">
-        <button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest transition-colors relative">
+        <button class="p-2 rounded-full text-text-primary-variant hover:bg-surface-container-highest transition-colors relative">
           <span class="material-symbols-outlined">notifications</span>
           <span class="absolute top-2 right-2 w-2 h-2 bg-[#dc2626] rounded-full border border-surface-container-low"></span>
         </button>
       </div>
-      <div class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-[#efe8de]" onclick="openSettings()">
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="openSettings()">
         <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
       </div>
     </div>
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 flex overflow-hidden bg-background">
+  <main class="flex-1 flex overflow-hidden bg-cream-bg">
 
     <!-- ═══════════════════════════════ -->
     <!-- CENTRAL CHAT AREA               -->
@@ -406,25 +398,25 @@
       <!-- Channel Header -->
       <div class="px-lg py-md border-b border-outline-variant bg-surface-container-low flex justify-between items-center shrink-0">
         <div class="flex items-center gap-md">
-          <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="topbarAvatar"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></div>
+          <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant" id="topbarAvatar"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
           <div>
-            <h2 class="text-label-md font-bold text-primary flex items-center gap-sm" id="topbarName">Susheel</h2>
-            <p class="text-label-sm text-on-surface-variant mt-0.5" id="topbarDesc">History nerd · In love with Sona · AI Persona Chat</p>
+            <h2 class="text-label-md font-bold text-primary flex items-center gap-sm" id="topbarName">Plato</h2>
+            <p class="text-label-sm text-text-primary-variant mt-0.5" id="topbarDesc">Chief AI Officer & System Supervisor</p>
           </div>
         </div>
         <div class="flex items-center gap-sm">
           <!-- Solana Status -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-on-surface-variant" id="solanaStatusBadge" title="Checking Solana connection...">
+          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant" id="solanaStatusBadge" title="Checking Solana connection...">
             <span class="w-[5px] h-[5px] rounded-full" id="solanaStatusDot" style="background:var(--text3)"></span>
             <span id="solanaStatusText">Checking...</span>
           </div>
           <!-- Chain Badge -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-on-surface-variant">
+          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant">
             <span class="w-[5px] h-[5px] rounded-full bg-[#16a34a]" style="animation:blink 2s infinite"></span>
             <span id="topbarChain">Block #0</span>
           </div>
           <!-- Actions -->
-          <button class="p-2 rounded-md border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest transition-colors text-sm" title="Export JSON" onclick="exportJSON()">
+          <button class="p-2 rounded-md border border-outline-variant text-text-primary-variant hover:bg-surface-container-highest transition-colors text-sm" title="Export JSON" onclick="exportJSON()">
             <span class="material-symbols-outlined text-[18px]">download</span>
           </button>
         </div>
@@ -465,19 +457,19 @@
       <div class="p-lg border-t border-outline-variant bg-surface-container-low shrink-0">
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-2 flex flex-col gap-2 focus-within:border-primary-fixed transition-colors">
           <div class="attach-preview" id="attachPreview"></div>
-          <textarea class="w-full bg-transparent border-none text-body-md text-on-surface resize-none focus:ring-0 p-2 placeholder-on-surface-variant min-h-[40px] max-h-[120px] outline-none" id="msgInput" placeholder="Message Susheel..." rows="1"></textarea>
+          <textarea class="w-full bg-transparent border-none text-body-md text-text-primary resize-none focus:ring-0 p-2 placeholder-on-surface-variant min-h-[40px] max-h-[120px] outline-none" id="msgInput" placeholder="Message Plato..." rows="1"></textarea>
           <div class="flex justify-between items-center px-2 pb-1 border-t border-outline-variant pt-2">
             <div class="flex gap-sm">
-              <button class="text-on-surface-variant hover:text-primary-fixed transition-colors" onclick="document.getElementById('fileInput').click()" title="Attach file">
+              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors" onclick="document.getElementById('fileInput').click()" title="Attach file">
                 <span class="material-symbols-outlined">attach_file</span>
               </button>
               <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
-              <button class="text-on-surface-variant hover:text-primary-fixed transition-colors">
+              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors">
                 <span class="material-symbols-outlined">mood</span>
               </button>
             </div>
             <div class="flex items-center gap-md">
-              <span class="text-label-sm text-on-surface-variant font-mono" id="govHint">5 tokens / message</span>
+              <span class="text-label-sm text-text-primary-variant font-mono" id="govHint">5 tokens / message</span>
               <button class="bg-[#3a2e23] text-[#efe8de] px-4 py-1.5 rounded-full font-label-md text-label-md font-bold flex items-center gap-sm hover:bg-[#4a3828] transition-colors shadow-sm" id="sendBtn" onclick="sendMessage()">
                 Send
                 <span class="material-symbols-outlined text-[18px]">send</span>
@@ -498,7 +490,7 @@
           <span class="material-symbols-outlined text-primary-fixed text-[18px]">receipt_long</span>
           System Monitor
         </h3>
-        <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded" id="modelLabel">TALKING: SUSHEEL</span>
+        <span class="text-[10px] font-mono text-text-primary-variant bg-surface-container px-2 py-0.5 rounded" id="modelLabel">TALKING: PLATO</span>
       </div>
 
       <!-- Panel Tabs -->
@@ -646,7 +638,7 @@
         <div class="admin-stat-card"><div class="admin-stat-val" id="adminActiveUsers" style="color:var(--accent-green)">0</div><div class="admin-stat-label">Active</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span class="text-[11px] text-on-surface-variant font-mono">Registered accounts</span>
+        <span class="text-[11px] text-text-primary-variant font-mono">Registered accounts</span>
         <button class="unblock-all-btn" id="unblockAllBtn" onclick="adminUnblockAll()">🔓 Unblock All Frozen</button>
       </div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -784,16 +776,16 @@
     // ─────────────────────────────────
     const LOCAL_BAL_KEY = 'finchat_persona_bal_' + SESSION_USER.id;
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
-    if (!personaBalances) {
+    if (!personaBalances || !personaBalances.plato || !personaBalances.aurelius) {
       personaBalances = {
-        susheel: 1000,
-        sona: 1000,
-        vishnu: 1000,
-        plato: 1000
+        plato: 1000,
+        aurelius: 1000,
+        rasha: 1000,
+        nova: 1000
       };
       localStorage.setItem(LOCAL_BAL_KEY, JSON.stringify(personaBalances));
     }
-    let tokenBalance = personaBalances.susheel || 1000;
+    let tokenBalance = personaBalances.plato || 1000;
 
     function savePersonaBalances() {
       localStorage.setItem(LOCAL_BAL_KEY, JSON.stringify(personaBalances));
@@ -843,12 +835,12 @@
 
     // Persona state
     const PERSONAS = {
-      susheel: { name: 'Susheel', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg>', desc: 'History nerd · In love with Sona · AI Persona Chat', color: '#4f46e5' },
-      sona: { name: 'Sona', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg>', desc: 'Dog-obsessed puppy mom · AI Persona Chat', color: '#ec4899' },
-      vishnu: { name: 'Vishnu', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg>', desc: 'Funny crybaby joke-teller · AI Persona Chat', color: '#059669' },
-      plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'AI Monitor · Fraud Detection · Governed Protocol', color: '#6366f1' }
+      plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Chief AI Officer & System Supervisor', color: '#6366f1' },
+      aurelius: { name: 'Aurelius', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#2d3748"/><circle cx="50" cy="50" r="46" fill="none" stroke="#d4af37" stroke-width="2"/><path d="M35 65 L45 45 L55 55 L68 32" stroke="#d4af37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="68" cy="32" r="4" fill="#d4af37"/></svg>', desc: 'Finance & Investment Strategist', color: '#4f46e5' },
+      rasha: { name: 'Rasha', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#4a3828"/><circle cx="50" cy="50" r="46" fill="none" stroke="#efe8de" stroke-width="2"/><rect x="30" y="32" width="40" height="46" rx="4" fill="#efe8de"/><line x1="38" y1="44" x2="62" y2="44" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/><line x1="38" y1="54" x2="62" y2="54" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/><line x1="38" y1="64" x2="52" y2="64" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/></svg>', desc: 'Executive Career Strategist', color: '#ec4899' },
+      nova: { name: 'Nova', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#1e293b"/><circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2"/><circle cx="50" cy="50" r="18" fill="none" stroke="#38bdf8" stroke-width="3"/><circle cx="50" cy="20" r="5" fill="#38bdf8"/><circle cx="78" cy="62" r="5" fill="#38bdf8"/><circle cx="22" cy="62" r="5" fill="#38bdf8"/><line x1="50" y1="38" x2="50" y2="25" stroke="#38bdf8" stroke-width="2"/><line x1="62" y1="56" x2="73" y2="60" stroke="#38bdf8" stroke-width="2"/><line x1="38" y1="56" x2="27" y2="60" stroke="#38bdf8" stroke-width="2"/></svg>', desc: 'Frontier Science & Technology Researcher', color: '#059669' }
     };
-    let activePersona = 'susheel';
+    let activePersona = 'plato';
     let personaSessions = {};   // { personaId: sessionId }
     let personaHistories = {};  // { personaId: [messagesHTML] }
 
@@ -941,12 +933,12 @@
 
       // Update active state in sidebar
       document.querySelectorAll('[id^="ch-"]').forEach(el => {
-        el.classList.remove('bg-[#efe8de]', 'text-[#3a2e23]', 'font-bold', 'shadow-sm', 'bg-primary-container', 'text-on-primary-container');
+        el.classList.remove('bg-cream-bg', 'text-[#3a2e23]', 'font-bold', 'shadow-sm', 'bg-primary-container', 'text-on-primary-container');
         el.classList.add('text-[#efe8de]', 'hover:bg-[#4a3828]');
       });
       const ch = document.getElementById('ch-' + personaId);
       if (ch) {
-        ch.classList.add('bg-[#efe8de]', 'text-[#3a2e23]', 'font-bold', 'shadow-sm');
+        ch.classList.add('bg-cream-bg', 'text-[#3a2e23]', 'font-bold', 'shadow-sm');
         ch.classList.remove('text-[#efe8de]', 'hover:bg-[#4a3828]');
       }
 
@@ -1357,7 +1349,7 @@
       renderAttachPreview();
       document.getElementById('sendBtn').disabled = true;
 
-      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato'].includes(activePersona);
+      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
 
       if (isPersonaChat) {
         // ── AI Persona Chat via Backend API ──
@@ -1648,10 +1640,18 @@
       const avatarEl = document.getElementById('sidebarAvatar');
 
       if (nameEl) nameEl.textContent = name;
+      const topbarUserIcon = document.getElementById('topbarUserIcon');
+      if (topbarUserIcon && SESSION_USER.avatar_url) {
+        topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      }
       if (avatarEl) {
-        const textSpan = document.getElementById('sidebarAvatarText');
-        if (textSpan) textSpan.textContent = initials;
-        else avatarEl.textContent = initials;
+        if (SESSION_USER.avatar_url) {
+          avatarEl.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        } else {
+          const textSpan = document.getElementById('sidebarAvatarText');
+          if (textSpan) textSpan.textContent = initials;
+          else avatarEl.textContent = initials;
+        }
       }
     })();
 
@@ -1685,13 +1685,13 @@
           if (sessRes.ok) {
             const sessData = await sessRes.json();
             const newBalances = {
-              susheel: 1000,
-              sona: 1000,
-              vishnu: 1000,
-              plato: 1000
+              plato: 1000,
+              aurelius: 1000,
+              rasha: 1000,
+              nova: 1000
             };
 
-            for (const personaId of ['susheel', 'sona', 'vishnu', 'plato']) {
+            for (const personaId of ['plato', 'aurelius', 'rasha', 'nova']) {
               const personaSess = sessData.sessions?.find(s => s.persona === personaId);
               if (personaSess) {
                 const histRes = await fetch(`${API_URL}/api/ai-chat/history/${personaSess.session_id}`, {
@@ -1905,8 +1905,15 @@
     let selectedTier = null;
 
     function openSettings() {
-      document.getElementById('settingsAvatar').textContent =
-        SESSION_USER.name ? SESSION_USER.name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2) : 'U';
+      const initials = SESSION_USER.name ? SESSION_USER.name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2) : 'U';
+      const settingsAvatar = document.getElementById('settingsAvatar');
+      if (settingsAvatar) {
+        if (SESSION_USER.avatar_url) {
+          settingsAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        } else {
+          settingsAvatar.textContent = initials;
+        }
+      }
       document.getElementById('settingsName').textContent = SESSION_USER.name || 'User';
       document.getElementById('settingsEmail').textContent = SESSION_USER.email || '';
       document.getElementById('settingsRole').textContent = `${SESSION_USER.role || 'user'} · FinChat`;

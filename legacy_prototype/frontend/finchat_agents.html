@@ -13,7 +13,18 @@
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, fontFamily: {headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "serif": ["Playfair Display", "serif"],
+headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
 </script>
 <!-- Socket.io -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -48,57 +59,95 @@
   /* Agent Selector Card */
   .agent-card { transition:all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
   .agent-card:hover { transform:translateY(-2px); }
+
+  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
+     narrow screens. */
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
-<body class="bg-background text-on-surface h-screen overflow-hidden flex">
+<body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
+
+<!-- Backdrop behind the drawer nav on narrow screens -->
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV                    -->
+<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-<nav class="fixed left-0 top-0 h-full flex flex-col gap-lg p-md z-40 bg-[#3a2e23] text-[#efe8de] w-64 border-r border-[#4a3828] hidden md:flex">
-  <!-- Header -->
-  <div class="px-sm py-1">
-    <h1 class="text-3xl tracking-normal text-[#efe8de]" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat</h1>
-  </div>
-
-  <!-- Navigation Section -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Navigation</span>
-    <a href="finchat_chat.html" class="flex items-center gap-md text-[#efe8de] px-md py-sm rounded-full font-bold text-label-md transition-all hover:bg-[#4a3828]">
-      <span class="material-symbols-outlined text-[18px]">chat</span> Chat
-    </a>
-    <a href="finchat_agents.html" class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] px-md py-sm rounded-full font-bold text-label-md border border-[#4a3828] shadow-sm transition-all">
-      <span class="material-symbols-outlined text-[18px] text-[#3a2e23]">tune</span> Agents
-    </a>
-  </div>
-
-  <!-- Spacer -->
-  <div class="flex-1"></div>
-
-  <!-- Nav Links -->
-  <div class="flex flex-col gap-xs border-t border-outline-variant pt-md">
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
-    </a>
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
-    </a>
-  </div>
-
-  <!-- User Profile Footer -->
-  <div class="flex items-center gap-sm px-sm py-sm border-t border-outline-variant pt-md">
-    <div class="w-9 h-9 rounded-full bg-[#efe8de] border border-[#d6ccbc] shrink-0 relative flex items-center justify-center font-bold text-[#4a3828] text-xs shadow-sm" id="sidebarAvatar">
-      <span id="sidebarAvatarText">JD</span>
-      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>
-    </div>
-    <div class="flex-1 min-w-0">
-      <div class="text-[12px] font-semibold text-[#efe8de] truncate" id="sidebarName">Jane Doe</div>
-      <div class="text-[10px] text-[#c9c0b0] font-mono" id="sidebarRole">Staff · Internal</div>
-    </div>
-    <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">1000</div>
-  </div>
-</nav>
+    <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+        <div class="mb-10 px-2">
+            <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+                FinChat
+            </h1>
+            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+                <span class="material-symbols-outlined text-[20px]" >dashboard</span>
+                <span class="font-body-sm font-medium">Operations</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_agents.html">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+                <span class="font-body-sm font-medium">Agents</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >chat</span>
+                <span class="font-body-sm font-medium">Chat</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+                <span class="material-symbols-outlined text-[20px]" >hub</span>
+                <span class="font-body-sm font-medium">Neural Map</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >assessment</span>
+                <span class="font-body-sm font-medium">Reports</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >menu_book</span>
+                <span class="font-body-sm font-medium">Knowledge</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >account_balance</span>
+                <span class="font-body-sm font-medium">Governance</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >account_tree</span>
+                <span class="font-body-sm font-medium">Blockchain</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >policy</span>
+                <span class="font-body-sm font-medium">Audit Logs</span>
+            </a>
+            <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >settings</span>
+                <span class="font-body-sm font-medium">Settings</span>
+            </a>
+        </div>
+        <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+                <span class="material-symbols-outlined text-[20px]" >help</span>
+                <span class="font-body-sm font-medium">Support</span>
+            </a>
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+                <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                    BT
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                    <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+                </div>
+            </div>
+        </div>
+    </nav>
 
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
@@ -108,20 +157,30 @@
   <!-- Top App Bar -->
   <header class="flex justify-between items-center w-full px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
     <div class="flex items-center gap-md">
+      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant bg-cream-bg text-[#3a2e23]">
+        <span class="material-symbols-outlined text-[20px]">menu</span>
+      </button>
       <h1 class="text-3xl tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat | Agent Configuration</h1>
     </div>
     <div class="flex items-center gap-lg">
-      <div class="hidden md:flex items-center gap-xs px-3 py-1.5 rounded-full border border-[#3a2e23] bg-[#efe8de] text-[#3a2e23] text-label-md font-bold shadow-sm">
+      <div class="hidden md:flex items-center gap-xs px-3 py-1.5 rounded-full border border-[#3a2e23] bg-cream-bg text-[#3a2e23] text-label-md font-bold shadow-sm">
         <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span>
         <span id="topbarTokenDisplay">1000</span> CHAT
       </div>
-      <div class="flex items-center gap-sm">
-        <button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest transition-colors relative">
+      <div class="flex items-center gap-sm relative">
+        <button id="notifBell" onclick="toggleNotifications(event)" class="p-2 rounded-full text-text-primary-variant hover:bg-surface-container-highest transition-colors relative">
           <span class="material-symbols-outlined">notifications</span>
-          <span class="absolute top-2 right-2 w-2 h-2 bg-[#dc2626] rounded-full border border-surface-container-low"></span>
+          <span id="notifBadge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center border border-surface-container-low"></span>
         </button>
+        <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-border-color sticky top-0 bg-cream-bg">
+            <span class="text-sm font-bold text-[#3a2e23]">Notifications</span>
+            <button onclick="markAllNotifsRead()" class="text-[11px] text-[#8c7a6b] hover:text-[#3a2e23] font-semibold">Mark all read</button>
+          </div>
+          <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
+        </div>
       </div>
-      <div class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-[#efe8de]">
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="window.location.href='finchat_chat.html'">
         <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
       </div>
     </div>
@@ -137,38 +196,38 @@
         <div class="flex flex-col gap-3">
           
           <!-- Plato -->
-          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-plato" onclick="selectAgent('plato')">
-            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
+          <div class="agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4" id="card-plato" onclick="selectAgent('plato')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
             <div>
               <div class="font-bold text-base">Plato</div>
-              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+              <div class="text-xs text-[#d4af37] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Chief AI Officer</div>
             </div>
           </div>
 
-          <!-- Susheel (Active by default) -->
-          <div class="agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4" id="card-susheel" onclick="selectAgent('susheel')">
-            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
+          <!-- Aurelius -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-aurelius" onclick="selectAgent('aurelius')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#2d3748] shrink-0 border border-outline-variant"><img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
             <div>
-              <div class="font-bold text-base">Susheel</div>
-              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+              <div class="font-bold text-base">Aurelius</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Finance & Startups</div>
             </div>
           </div>
 
-          <!-- Sona -->
-          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-sona" onclick="selectAgent('sona')">
-            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
+          <!-- Rasha -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-rasha" onclick="selectAgent('rasha')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#4a3828] shrink-0 border border-outline-variant"><img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
             <div>
-              <div class="font-bold text-base">Sona</div>
-              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+              <div class="font-bold text-base">Rasha</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Career Strategist</div>
             </div>
           </div>
 
-          <!-- Vishnu -->
-          <div class="agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-vishnu" onclick="selectAgent('vishnu')">
-            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#f3eee3] shrink-0 border border-[#d6ccbc]"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg></span>
+          <!-- Nova -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-nova" onclick="selectAgent('nova')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#1e293b] shrink-0 border border-outline-variant"><img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
             <div>
-              <div class="font-bold text-base">Vishnu</div>
-              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> Idle</div>
+              <div class="font-bold text-base">Nova</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Frontier Research</div>
             </div>
           </div>
 
@@ -179,7 +238,7 @@
       <div class="lg:col-span-3 flex flex-col relative">
         
         <!-- Main Card -->
-        <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-3xl p-8 shadow-sm flex flex-col gap-8 relative" style="animation:fadeUp 0.3s ease">
+        <div class="bg-cream-bg border border-border-color rounded-3xl p-8 shadow-sm flex flex-col gap-8 relative" style="animation:fadeUp 0.3s ease">
           
           <!-- Waving Mascot positioned top right -->
           <div class="absolute -top-12 -right-4 w-36 h-36 pointer-events-none drop-shadow-xl z-20 hidden sm:block">
@@ -213,12 +272,12 @@
           </div>
 
           <!-- Title -->
-          <h2 class="text-3xl font-serif font-bold text-[#3a2e23]" id="configTitle" style="font-family: Georgia, 'Times New Roman', Times, serif;">Agent Configuration: Susheel</h2>
+          <h2 class="text-3xl font-serif font-bold text-[#3a2e23]" id="configTitle" style="font-family: Georgia, 'Times New Roman', Times, serif;">Agent Configuration: Plato</h2>
 
           <!-- Risk Level Box -->
           <div class="flex flex-col">
             <h3 class="text-lg font-bold text-[#3a2e23] mb-3">Risk Level</h3>
-            <div class="inline-flex bg-[#f3eee3] border border-[#d6ccbc] rounded-full p-1.5 gap-1 shadow-inner w-fit mb-3" id="riskToggleContainer">
+            <div class="inline-flex bg-[#f3eee3] border border-border-color rounded-full p-1.5 gap-1 shadow-inner w-fit mb-3" id="riskToggleContainer">
               <button class="risk-btn active px-6 py-1.5 rounded-full font-bold text-sm bg-[#3a2e23] text-[#efe8de] shadow-sm transition-all" onclick="selectRisk('Low', this)">Low</button>
               <button class="risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all" onclick="selectRisk('Medium', this)">Medium</button>
               <button class="risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all" onclick="selectRisk('High', this)">High</button>
@@ -228,60 +287,35 @@
             </p>
           </div>
 
+          <!-- Model Selection -->
+          <div class="flex flex-col">
+            <h3 class="text-lg font-bold text-[#3a2e23] mb-3">LLM Model</h3>
+            <select id="modelPicker" onchange="onModelChange()" class="border border-border-color rounded-xl bg-[#f3eee3] text-sm text-[#3a2e23] px-4 py-2 w-fit min-w-[280px] focus:outline-none focus:border-[#3a2e23]">
+              <option value="">Default (Llama 3.3 70B — balanced)</option>
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (versatile · default)</option>
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (fast, cheap)</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS 120B (deep reasoning)</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B (balanced reasoning)</option>
+              <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 Distill 70B (reasoning-heavy)</option>
+            </select>
+            <p class="text-xs text-[#5c4a38] mt-2 max-w-2xl">Pick a per-agent LLM. Fast models (8B) suit chatty agents; larger reasoning models suit research and finance calls.</p>
+          </div>
+
           <!-- Bottom 2-Column Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <!-- Left Box: Audit Logs -->
             <div class="flex flex-col">
               <h3 class="text-lg font-bold text-[#3a2e23] mb-4">Audit Logs</h3>
-              <div class="bg-[#f3eee3] border border-[#d6ccbc] rounded-2xl p-4 flex flex-col gap-3 max-h-[260px] overflow-y-auto shadow-inner" id="auditLogsList">
-                
-                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  <div>
-                    <div class="text-xs font-bold text-[#3a2e23]">Verify Chain Integrity - Low Risk</div>
-                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
-                  </div>
-                  <div class="flex items-center gap-2 text-[#8c7a6b]">
-                    <span class="material-symbols-outlined text-[16px] cursor-help" title="Cryptographic verification pass">info</span>
-                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
-                      <span class="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  <div>
-                    <div class="text-xs font-bold text-[#3a2e23]">Message Sent - Low Risk</div>
-                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
-                  </div>
-                  <div class="flex items-center gap-2 text-[#8c7a6b]">
-                    <span class="material-symbols-outlined text-[16px] cursor-help" title="ZKP Hash anchored">chat_bubble</span>
-                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
-                      <span class="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="bg-[#efe8de] border border-[#d6ccbc] rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  <div>
-                    <div class="text-xs font-bold text-[#3a2e23]">Message Sent - Low Risk</div>
-                    <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">Timesday at 12:33 PM</div>
-                  </div>
-                  <div class="flex items-center gap-2 text-[#8c7a6b]">
-                    <span class="material-symbols-outlined text-[16px] cursor-help" title="ZKP Hash anchored">schedule</span>
-                    <button class="hover:text-[#dc2626] transition-colors" onclick="this.parentElement.parentElement.remove(); showToast('🗑️ Log item deleted')">
-                      <span class="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
-                  </div>
-                </div>
-
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-4 flex flex-col gap-3 max-h-[260px] overflow-y-auto shadow-inner" id="auditLogsList">
+                <div class="text-center text-[#8c7a6b] text-[11px] py-4">Loading audit trail…</div>
               </div>
             </div>
 
             <!-- Right Box: Persona Traits -->
             <div class="flex flex-col">
               <h3 class="text-lg font-bold text-[#3a2e23] mb-4">Persona Traits</h3>
-              <div class="bg-[#f3eee3] border border-[#d6ccbc] rounded-2xl p-6 flex flex-col gap-6 shadow-inner">
+              <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-6 flex flex-col gap-6 shadow-inner">
                 
                 <div class="flex flex-col gap-2">
                   <div class="flex justify-between text-xs font-bold text-[#3a2e23]"><span>Formal</span><span>Casual</span></div>
@@ -304,7 +338,7 @@
           </div>
 
           <!-- Action Buttons Footer -->
-          <div class="flex justify-end gap-4 mt-2 pt-4 border-t border-[#d6ccbc]">
+          <div class="flex justify-end gap-4 mt-2 pt-4 border-t border-border-color">
             <button class="bg-transparent text-[#3a2e23] border border-[#3a2e23] px-6 py-2.5 rounded-xl font-bold hover:bg-[#e8dfd1] transition-all" onclick="discardChanges()">Discard</button>
             <button class="bg-[#3a2e23] text-[#efe8de] px-6 py-2.5 rounded-xl font-bold hover:bg-[#4a3828] shadow-md transition-all flex items-center gap-2" onclick="saveChanges()">
               <span>Save Changes</span>
@@ -341,16 +375,22 @@
     if (avatarSpan) avatarSpan.textContent = initials.toUpperCase();
     else document.getElementById('sidebarAvatar').textContent = initials.toUpperCase();
   }
+  if (SESSION_USER.avatar_url) {
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+    const topbarUserIcon = document.getElementById('topbarUserIcon');
+    if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  }
 
   // State
-  let currentAgent = 'susheel';
+  let currentAgent = 'plato';
   let agentConfigs = JSON.parse(localStorage.getItem('finchat_agent_configs') || 'null');
-  if (!agentConfigs) {
+  if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato) {
     agentConfigs = {
-      susheel: { risk: 'Low', formal: 35, brief: 45, serious: 70 },
-      plato: { risk: 'High', formal: 85, brief: 20, serious: 15 },
-      sona: { risk: 'Low', formal: 25, brief: 80, serious: 90 },
-      vishnu: { risk: 'Medium', formal: 60, brief: 50, serious: 50 }
+      plato: { risk: 'High', formal: 85, brief: 20, serious: 90 },
+      aurelius: { risk: 'Low', formal: 70, brief: 40, serious: 80 },
+      rasha: { risk: 'Low', formal: 65, brief: 30, serious: 75 },
+      nova: { risk: 'Low', formal: 80, brief: 15, serious: 95 }
     };
     localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
   }
@@ -358,34 +398,20 @@
   // Token balances
   const LOCAL_BAL_KEY = 'finchat_persona_bal_' + (SESSION_USER.id || 'default');
   let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
-  if (!personaBalances) {
-    personaBalances = { susheel: 1000, sona: 1000, vishnu: 1000, plato: 1000 };
+  if (!personaBalances || !personaBalances.plato) {
+    personaBalances = { plato: 1000, aurelius: 1000, rasha: 1000, nova: 1000 };
   }
-  document.getElementById('sidebarToken').textContent = personaBalances.susheel || 1000;
-  document.getElementById('topbarTokenDisplay').textContent = personaBalances.susheel || 1000;
+  document.getElementById('sidebarToken').textContent = personaBalances.plato || 1000;
+  document.getElementById('topbarTokenDisplay').textContent = personaBalances.plato || 1000;
 
-  function selectAgent(agent) {
-    currentAgent = agent;
-    const capitalized = agent.charAt(0).toUpperCase() + agent.slice(1);
-    document.getElementById('configTitle').textContent = `Agent Configuration: ${capitalized}`;
+  const AUTH_HDR = () => ({ 'Authorization': 'Bearer ' + (SESSION_USER.token || _session?.token || localStorage.getItem('finchat_token') || '') });
 
-    // Update left card styles
-    ['plato', 'susheel', 'sona', 'vishnu'].forEach(a => {
-      const card = document.getElementById('card-' + a);
-      if (a === agent) {
-        card.className = "agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4";
-      } else {
-        card.className = "agent-card bg-[#efe8de] text-[#3a2e23] border border-[#d6ccbc] rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4";
-      }
-    });
-
-    // Load sliders and risk
-    const cfg = agentConfigs[agent] || { risk: 'Low', formal: 50, brief: 50, serious: 50 };
+  function applyConfigToUI(cfg) {
     document.getElementById('sliderFormal').value = cfg.formal;
     document.getElementById('sliderBrief').value = cfg.brief;
     document.getElementById('sliderSerious').value = cfg.serious;
-
-    // Set risk button
+    const mp = document.getElementById('modelPicker');
+    if (mp) mp.value = cfg.model || '';
     const btns = document.getElementById('riskToggleContainer').getElementsByTagName('button');
     for (let btn of btns) {
       if (btn.textContent === cfg.risk) {
@@ -394,8 +420,79 @@
         btn.className = "risk-btn px-6 py-1.5 rounded-full font-bold text-sm text-[#8c7a6b] hover:text-[#3a2e23] transition-all";
       }
     }
+  }
 
-    showToast(`🤖 Switched configuration to ${capitalized}`);
+  async function selectAgent(agent, isInit) {
+    currentAgent = agent;
+    const capitalized = agent.charAt(0).toUpperCase() + agent.slice(1);
+    document.getElementById('configTitle').textContent = `Agent Configuration: ${capitalized}`;
+
+    // Update left card styles
+    ['plato', 'aurelius', 'rasha', 'nova'].forEach(a => {
+      const card = document.getElementById('card-' + a);
+      if (card) {
+        if (a === agent) {
+          card.className = "agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4";
+        } else {
+          card.className = "agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4";
+        }
+      }
+    });
+
+    // Load config from the backend (fall back to local cache if offline)
+    let cfg = agentConfigs[agent] || { risk: 'Low', formal: 50, brief: 50, serious: 50 };
+    applyConfigToUI(cfg); // instant paint from cache
+    try {
+      const r = await fetch(`/api/agents/${agent}/config`, { headers: AUTH_HDR() });
+      if (r.ok) {
+        const d = await r.json();
+        const s = d.settings || {};
+        if (Object.keys(s).length) {
+          cfg = {
+            risk: s.risk || cfg.risk,
+            formal: s.formal != null ? s.formal : cfg.formal,
+            brief: s.brief != null ? s.brief : cfg.brief,
+            serious: s.serious != null ? s.serious : cfg.serious,
+            model: s.model != null ? s.model : (cfg.model || '')
+          };
+          agentConfigs[agent] = cfg;
+          localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
+          applyConfigToUI(cfg);
+        }
+      }
+    } catch (e) { /* keep cached values */ }
+
+    loadAuditLogs(agent);
+    if (!isInit) showToast(`🤖 Loaded ${capitalized}'s live configuration`);
+  }
+
+  async function loadAuditLogs(agent) {
+    const box = document.getElementById('auditLogsList');
+    if (!box) return;
+    box.innerHTML = '<div class="text-center text-[#8c7a6b] text-[11px] py-4">Loading audit trail…</div>';
+    try {
+      const r = await fetch(`/api/agents/${agent}/audit?limit=12`, { headers: AUTH_HDR() });
+      const d = await r.json();
+      const logs = d.logs || [];
+      if (!logs.length) {
+        box.innerHTML = '<div class="text-center text-[#8c7a6b] text-[11px] py-6">No audit entries yet for this agent.<br>Run a task with it in Chat to populate the trail.</div>';
+        return;
+      }
+      box.innerHTML = logs.map(l => {
+        const t = new Date(l.created_at).toLocaleString();
+        const trace = (l.details && l.details.traceHash) ? l.details.traceHash.substring(0, 10) + '…' : '';
+        const action = (l.action || 'execution').replace(/_/g, ' ').toLowerCase();
+        return `<div class="bg-cream-bg border border-border-color rounded-xl p-3 flex justify-between items-center shadow-sm">
+            <div>
+              <div class="text-xs font-bold text-[#3a2e23] capitalize">${action}</div>
+              <div class="text-[10px] text-[#8c7a6b] font-mono mt-0.5">${t}${trace ? ' · ' + trace : ''}</div>
+            </div>
+            <span class="material-symbols-outlined text-[16px] text-[#8c7a6b] cursor-help" title="SHA-256 cryptographic audit trace">verified_user</span>
+          </div>`;
+      }).join('');
+    } catch (e) {
+      box.innerHTML = '<div class="text-center text-[#dc2626] text-[11px] py-4">Failed to load audit trail</div>';
+    }
   }
 
   function selectRisk(level, btnElem) {
@@ -420,14 +517,39 @@
     // Optional live feedback
   }
 
-  function saveChanges() {
-    agentConfigs[currentAgent].formal = parseInt(document.getElementById('sliderFormal').value);
-    agentConfigs[currentAgent].brief = parseInt(document.getElementById('sliderBrief').value);
-    agentConfigs[currentAgent].serious = parseInt(document.getElementById('sliderSerious').value);
+  function onModelChange() {
+    if (!agentConfigs[currentAgent]) agentConfigs[currentAgent] = { risk: 'Low' };
+    agentConfigs[currentAgent].model = document.getElementById('modelPicker').value;
+  }
+
+  async function saveChanges() {
+    const cur = agentConfigs[currentAgent] || { risk: 'Low' };
+    const modelSel = document.getElementById('modelPicker');
+    const payload = {
+      risk: cur.risk || 'Low',
+      formal: parseInt(document.getElementById('sliderFormal').value),
+      brief: parseInt(document.getElementById('sliderBrief').value),
+      serious: parseInt(document.getElementById('sliderSerious').value),
+      model: modelSel ? modelSel.value : (cur.model || '')
+    };
+    agentConfigs[currentAgent] = payload;
     localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
 
     const capitalized = currentAgent.charAt(0).toUpperCase() + currentAgent.slice(1);
-    showToast(`✨ ${capitalized} configuration saved successfully!`);
+    try {
+      const r = await fetch(`/api/agents/${currentAgent}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...AUTH_HDR() },
+        body: JSON.stringify(payload)
+      });
+      if (r.ok) {
+        showToast(`✨ ${capitalized} saved — now live. Risk sets response temperature; traits reshape its tone.`);
+      } else {
+        showToast(`⚠️ Saved locally — backend returned ${r.status}`);
+      }
+    } catch (e) {
+      showToast('⚠️ Saved locally — backend unreachable');
+    }
   }
 
   function discardChanges() {
@@ -441,6 +563,121 @@
     t.className = 'toast show';
     setTimeout(() => { t.className = 'toast'; }, 3000);
   }
+
+  // ── Notification bell (backend-wired) ──────────────────────
+  (function () {
+    const tok = () => localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
+      (JSON.parse(sessionStorage.getItem('finchat_user') || 'null') || {}).token || '';
+    const $ = (id) => document.getElementById(id);
+    let open = false;
+
+    function timeAgo(ts) {
+      const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + 'm ago';
+      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+      return Math.floor(s / 86400) + 'd ago';
+    }
+    async function refreshBadge() {
+      try {
+        const r = await fetch('/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + tok() } });
+        if (!r.ok) return;
+        const d = await r.json();
+        const badge = $('notifBadge'); if (!badge) return;
+        if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+      } catch (e) { }
+    }
+    async function loadList() {
+      const list = $('notifList'); if (!list) return;
+      list.innerHTML = '<div style="padding:16px;text-align:center;color:#8c7a6b;font-size:12px">Loading…</div>';
+      try {
+        const r = await fetch('/api/notifications?limit=20', { headers: { Authorization: 'Bearer ' + tok() } });
+        const d = await r.json();
+        const items = d.notifications || [];
+        if (!items.length) { list.innerHTML = '<div style="padding:24px;text-align:center;color:#8c7a6b;font-size:12px">No notifications yet</div>'; return; }
+        list.innerHTML = items.map(n => `
+          <div onclick="__notifClick('${n.notification_id}')" style="padding:12px 16px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${n.is_read ? 'opacity:0.55' : 'background:rgba(212,175,55,0.08)'}">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700;color:#3a2e23">${n.title}</div>
+              <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${(n.content || '').slice(0, 120)}</div>
+              <div style="font-size:10px;color:#8c7a6b;font-family:ui-monospace,monospace;margin-top:3px">${timeAgo(n.created_at)}</div>
+            </div>
+            ${n.is_read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:4px"></span>'}
+          </div>`).join('');
+      } catch (e) { list.innerHTML = '<div style="padding:16px;text-align:center;color:#dc2626;font-size:12px">Failed to load</div>'; }
+    }
+    window.__notifClick = async function (id) {
+      try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+      await loadList(); refreshBadge();
+    };
+    window.markAllNotifsRead = async function () {
+      try { await fetch('/api/notifications/read-all', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+      await loadList(); refreshBadge();
+    };
+    window.toggleNotifications = function (e) {
+      if (e) e.stopPropagation();
+      const dd = $('notifDropdown'); if (!dd) return;
+      open = !open; dd.classList.toggle('hidden', !open);
+      if (open) loadList();
+    };
+    document.addEventListener('click', (e) => {
+      const dd = $('notifDropdown'), bell = $('notifBell');
+      if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
+    });
+    refreshBadge();
+    setInterval(refreshBadge, 12000);
+  })();
+
+  // Load the initially-selected agent's live config + audit trail from the backend
+  selectAgent('plato', true);
+</script>
+<script>
+  // Drawer nav on narrow screens.
+  (function () {
+    const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop'), btn = document.getElementById('navToggle');
+    if (!nav || !bd || !btn) return;
+    const toggle = (open) => {
+      const show = open === undefined ? !nav.classList.contains('open') : open;
+      nav.classList.toggle('open', show);
+      bd.classList.toggle('hidden', !show);
+    };
+    btn.onclick = () => toggle();
+    bd.onclick = () => toggle(false);
+    nav.querySelectorAll('a[href]').forEach(a => a.addEventListener('click', () => toggle(false)));
+  })();
+  (function () {
+    const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+    function toast(msg) {
+      let t = document.getElementById('nmSoonToast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'nmSoonToast';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+      clearTimeout(t._h);
+      t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
+    }
+    document.querySelectorAll('#sideNav a').forEach(a => {
+      const labelEl = a.querySelector('.font-body-sm');
+      const label = labelEl ? labelEl.textContent.trim() : '';
+      if (!SOON.includes(label)) return;
+      a.setAttribute('href', 'javascript:void(0)');
+      a.style.opacity = '0.55';
+      a.style.cursor = 'not-allowed';
+      if (!a.querySelector('.soon-badge')) {
+        const b = document.createElement('span');
+        b.className = 'soon-badge';
+        b.textContent = 'Soon';
+        b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
+        a.appendChild(b);
+      }
+      a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
+    });
+  })();
 </script>
 </body>
 </html>

@@ -1,9 +1,9 @@
 // middleware/auth.js — JWT verification + role guard
 const jwt = require('jsonwebtoken');
-const { getDB } = require('../database');
+const { query } = require('../database');
 
 // Verify JWT token on every protected route
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' });
@@ -12,14 +12,14 @@ function requireAuth(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const db = getDB();
 
     // Check user still exists
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+    const resUser = await query('SELECT *, user_id as id FROM users WHERE user_id = $1', [decoded.userId]);
+    const user = resUser.rows[0];
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     req.user = {
-      id: user.id,
+      id: user.user_id || user.id,
       name: user.name,
       email: user.email,
       role: user.role,

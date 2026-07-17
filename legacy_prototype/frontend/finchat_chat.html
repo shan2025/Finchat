@@ -13,7 +13,18 @@
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, fontFamily: {headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "serif": ["Playfair Display", "serif"],
+headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
 </script>
 <!-- Socket.io -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -87,10 +98,12 @@
   .user .file-icon { background:#4d4c44; }
 
   /* Typing */
-  .typing-bubble { padding:12px 16px; background:var(--bot-bubble); border:1px solid var(--border); border-radius:16px; border-bottom-left-radius:4px; display:flex; gap:4px; align-items:center; box-shadow:var(--shadow); }
+  .typing-bubble { padding:10px 16px; background:var(--bot-bubble); border:1px solid var(--border); border-radius:16px; border-bottom-left-radius:4px; display:inline-flex; gap:10px; align-items:center; box-shadow:var(--shadow); max-width:420px; }
+  .typing-dots { display:flex; gap:4px; align-items:center; flex-shrink:0; }
   .typing-dot { width:5px; height:5px; border-radius:50%; background:var(--text3); animation:typingAnim 1.3s infinite; }
   .typing-dot:nth-child(2) { animation-delay:0.2s; }
   .typing-dot:nth-child(3) { animation-delay:0.4s; }
+  .typing-phrase { font-size:12px; color:var(--text2); font-style:italic; font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.25s ease; }
 
   /* Date divider */
   .date-divider { display:flex; align-items:center; gap:12px; margin:16px 0; }
@@ -272,98 +285,95 @@
   .logout-btn:hover { background:#2d1215; border-color:#7f1d1d; }
 
   #fileInput { display:none; }
+
+  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
+     narrow screens (was `hidden md:flex` — no nav at all under 768px). */
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
-<body class="bg-background text-on-surface h-screen overflow-hidden flex">
+<body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
+
+<!-- Backdrop behind the drawer nav on narrow screens -->
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV                    -->
+<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-<nav class="fixed left-0 top-0 h-full flex flex-col gap-lg p-md z-40 bg-[#3a2e23] text-[#efe8de] w-64 border-r border-[#4a3828] hidden md:flex">
-  <!-- Header -->
-  <div class="px-sm py-1">
-    <h1 class="text-3xl tracking-normal text-[#efe8de]" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat</h1>
-  </div>
-
-  <!-- Navigation Section -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Navigation</span>
-    <a href="finchat_chat.html" class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] px-md py-sm rounded-full font-bold text-label-md border border-[#4a3828] shadow-sm transition-all hover:bg-[#e8dfd1]">
-      <span class="material-symbols-outlined text-[18px] text-[#3a2e23]">chat</span> Chat
-    </a>
-    <a href="finchat_agents.html" class="flex items-center gap-md text-[#efe8de] px-md py-sm rounded-full font-bold text-label-md transition-all hover:bg-[#4a3828]">
-      <span class="material-symbols-outlined text-[18px]">tune</span> Agents
-    </a>
-  </div>
-
-  <!-- System Section -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">System</span>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-plato" onclick="switchChat('plato')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-plato"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
-      Plato
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-plato">idle</span>
-    </div>
-  </div>
-
-  <!-- AI Personas / Agents -->
-  <div class="flex flex-col gap-xs">
-    <span class="text-[11px] font-bold tracking-widest uppercase text-[#e8dfd1] px-md">Agents</span>
-    <div class="flex items-center gap-md bg-[#efe8de] text-[#3a2e23] font-bold rounded-full px-md py-sm cursor-pointer text-label-md shadow-sm" id="ch-susheel" onclick="switchChat('susheel')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-susheel"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
-      Susheel
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-susheel">idle</span>
-    </div>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-sona" onclick="switchChat('sona')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-sona"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></span>
-      Sona
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-sona">idle</span>
-    </div>
-    <div class="flex items-center gap-md px-md py-sm rounded-full cursor-pointer text-label-md text-[#efe8de] hover:bg-[#4a3828] transition-all" id="ch-vishnu" onclick="switchChat('vishnu')">
-      <span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="sb-av-vishnu"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg></span>
-      Vishnu
-      <span class="text-[9px] text-[#8c7a6b] ml-auto font-mono" id="sb-status-vishnu">idle</span>
-    </div>
-  </div>
-
-  <!-- Admin Section (hidden by default) -->
-  <div class="flex flex-col gap-xs" id="adminSidebarSection" style="display:none;">
-    <span class="text-[10px] font-semibold tracking-widest uppercase text-on-surface-variant px-md">Admin</span>
-    <div class="flex items-center gap-md px-md py-sm rounded-lg cursor-pointer text-[12px] font-semibold text-[#c4b5fd] bg-[#1e1533] border border-[#3b2d63] hover:bg-[#2a1f4e] transition-all" onclick="openAdminPanel()">
-      🛡️ User Management
-    </div>
-  </div>
-
-  <!-- Spacer -->
-  <div class="flex-1"></div>
-
-  <!-- Nav Links -->
-  <div class="flex flex-col gap-xs border-t border-outline-variant pt-md">
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
-    </a>
-    <a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-highest rounded-full transition-all text-label-md" href="#">
-      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
-    </a>
-  </div>
-
-  <!-- User Profile Footer -->
-  <div class="flex items-center gap-sm px-sm py-sm border-t border-outline-variant pt-md">
-    <div class="w-9 h-9 rounded-full bg-[#efe8de] border border-outline-variant shrink-0 relative flex items-center justify-center font-bold text-[#4a3828] text-xs shadow-sm" id="sidebarAvatar">
-      <span id="sidebarAvatarText">JD</span>
-      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>
-    </div>
-    <div class="flex-1 min-w-0">
-      <div class="text-[12px] font-semibold text-[#efe8de] truncate" id="sidebarName">Jane Doe</div>
-      <div class="text-[10px] text-[#c2b2a3] font-mono" id="sidebarRole">Staff · Internal</div>
-    </div>
-    <div class="token-pill" id="sidebarToken">1000</div>
-    <button class="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-md hover:bg-surface-container-highest" onclick="openSettings()" title="Settings">
-      <span class="material-symbols-outlined text-[18px]">settings</span>
-    </button>
-  </div>
-</nav>
+    <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+        <div class="mb-10 px-2">
+            <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+                FinChat
+            </h1>
+            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+                <span class="material-symbols-outlined text-[20px]" >dashboard</span>
+                <span class="font-body-sm font-medium">Operations</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+                <span class="material-symbols-outlined text-[20px]" >smart_toy</span>
+                <span class="font-body-sm font-medium">Agents</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+                <span class="font-body-sm font-medium">Chat</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+                <span class="material-symbols-outlined text-[20px]" >hub</span>
+                <span class="font-body-sm font-medium">Neural Map</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >assessment</span>
+                <span class="font-body-sm font-medium">Reports</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >menu_book</span>
+                <span class="font-body-sm font-medium">Knowledge</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >account_balance</span>
+                <span class="font-body-sm font-medium">Governance</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >account_tree</span>
+                <span class="font-body-sm font-medium">Blockchain</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+                <span class="material-symbols-outlined text-[20px]" >policy</span>
+                <span class="font-body-sm font-medium">Audit Logs</span>
+            </a>
+            <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >settings</span>
+                <span class="font-body-sm font-medium">Settings</span>
+            </a>
+        </div>
+        <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+                <span class="material-symbols-outlined text-[20px]" >help</span>
+                <span class="font-body-sm font-medium">Support</span>
+            </a>
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+                <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                    BT
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                    <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+                </div>
+            </div>
+        </div>
+    </nav>
 
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
@@ -373,6 +383,9 @@
   <!-- Top App Bar -->
   <header class="flex justify-between items-center w-full px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
     <div class="flex items-center gap-md">
+      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant bg-surface-container-highest text-primary-fixed">
+        <span class="material-symbols-outlined text-[20px]">menu</span>
+      </button>
       <h1 class="text-headline-md font-bold text-primary-fixed md:hidden block">FinChat</h1>
       <div class="relative hidden sm:block">
         <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c7a6b] text-[18px]">search</span>
@@ -384,20 +397,27 @@
         <span class="w-2 h-2 rounded-full bg-primary-fixed animate-pulse"></span>
         <span id="topbarTokenDisplay">1000</span> CHAT
       </div>
-      <div class="flex items-center gap-sm">
-        <button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest transition-colors relative">
+      <div class="flex items-center gap-sm relative">
+        <button id="notifBell" onclick="toggleNotifications(event)" class="p-2 rounded-full text-text-primary-variant hover:bg-surface-container-highest transition-colors relative">
           <span class="material-symbols-outlined">notifications</span>
-          <span class="absolute top-2 right-2 w-2 h-2 bg-[#dc2626] rounded-full border border-surface-container-low"></span>
+          <span id="notifBadge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center border border-surface-container-low"></span>
         </button>
+        <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-border-color sticky top-0 bg-cream-bg">
+            <span class="text-sm font-bold text-[#3a2e23]">Notifications</span>
+            <button onclick="markAllNotifsRead()" class="text-[11px] text-[#8c7a6b] hover:text-[#3a2e23] font-semibold">Mark all read</button>
+          </div>
+          <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
+        </div>
       </div>
-      <div class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-[#efe8de]" onclick="openSettings()">
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="openSettings()">
         <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
       </div>
     </div>
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 flex overflow-hidden bg-background">
+  <main class="flex-1 flex overflow-hidden bg-cream-bg">
 
     <!-- ═══════════════════════════════ -->
     <!-- CENTRAL CHAT AREA               -->
@@ -406,29 +426,32 @@
       <!-- Channel Header -->
       <div class="px-lg py-md border-b border-outline-variant bg-surface-container-low flex justify-between items-center shrink-0">
         <div class="flex items-center gap-md">
-          <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] shrink-0 border border-outline-variant" id="topbarAvatar"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg></div>
+          <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant" id="topbarAvatar"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
           <div>
-            <h2 class="text-label-md font-bold text-primary flex items-center gap-sm" id="topbarName">Susheel</h2>
-            <p class="text-label-sm text-on-surface-variant mt-0.5" id="topbarDesc">History nerd · In love with Sona · AI Persona Chat</p>
+            <h2 class="text-label-md font-bold text-primary flex items-center gap-sm" id="topbarName">Plato</h2>
+            <p class="text-label-sm text-text-primary-variant mt-0.5" id="topbarDesc">Chief AI Officer & System Supervisor</p>
           </div>
         </div>
         <div class="flex items-center gap-sm">
           <!-- Solana Status -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-on-surface-variant" id="solanaStatusBadge" title="Checking Solana connection...">
+          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant" id="solanaStatusBadge" title="Checking Solana connection...">
             <span class="w-[5px] h-[5px] rounded-full" id="solanaStatusDot" style="background:var(--text3)"></span>
             <span id="solanaStatusText">Checking...</span>
           </div>
           <!-- Chain Badge -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-on-surface-variant">
+          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant">
             <span class="w-[5px] h-[5px] rounded-full bg-[#16a34a]" style="animation:blink 2s infinite"></span>
             <span id="topbarChain">Block #0</span>
           </div>
           <!-- Actions -->
-          <button class="p-2 rounded-md border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest transition-colors text-sm" title="Export JSON" onclick="exportJSON()">
+          <button class="p-2 rounded-md border border-outline-variant text-text-primary-variant hover:bg-surface-container-highest transition-colors text-sm" title="Export JSON" onclick="exportJSON()">
             <span class="material-symbols-outlined text-[18px]">download</span>
           </button>
         </div>
       </div>
+
+      <!-- Persona selector — pick which agent you're talking to -->
+      <div id="personaBar" class="flex items-center gap-2 px-lg py-2 border-b border-outline-variant bg-surface-container-low overflow-x-auto shrink-0"></div>
 
       <!-- Peeking Robot Mascot resting on messages container top border -->
       <div class="relative w-full h-0 flex justify-center z-30 pointer-events-none">
@@ -465,19 +488,19 @@
       <div class="p-lg border-t border-outline-variant bg-surface-container-low shrink-0">
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-2 flex flex-col gap-2 focus-within:border-primary-fixed transition-colors">
           <div class="attach-preview" id="attachPreview"></div>
-          <textarea class="w-full bg-transparent border-none text-body-md text-on-surface resize-none focus:ring-0 p-2 placeholder-on-surface-variant min-h-[40px] max-h-[120px] outline-none" id="msgInput" placeholder="Message Susheel..." rows="1"></textarea>
+          <textarea class="w-full bg-transparent border-none text-body-md text-text-primary resize-none focus:ring-0 p-2 placeholder-on-surface-variant min-h-[40px] max-h-[120px] outline-none" id="msgInput" placeholder="Message Plato..." rows="1"></textarea>
           <div class="flex justify-between items-center px-2 pb-1 border-t border-outline-variant pt-2">
             <div class="flex gap-sm">
-              <button class="text-on-surface-variant hover:text-primary-fixed transition-colors" onclick="document.getElementById('fileInput').click()" title="Attach file">
+              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors" onclick="document.getElementById('fileInput').click()" title="Attach file">
                 <span class="material-symbols-outlined">attach_file</span>
               </button>
               <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
-              <button class="text-on-surface-variant hover:text-primary-fixed transition-colors">
+              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors">
                 <span class="material-symbols-outlined">mood</span>
               </button>
             </div>
             <div class="flex items-center gap-md">
-              <span class="text-label-sm text-on-surface-variant font-mono" id="govHint">5 tokens / message</span>
+              <span class="text-label-sm text-text-primary-variant font-mono" id="govHint">5 tokens / message</span>
               <button class="bg-[#3a2e23] text-[#efe8de] px-4 py-1.5 rounded-full font-label-md text-label-md font-bold flex items-center gap-sm hover:bg-[#4a3828] transition-colors shadow-sm" id="sendBtn" onclick="sendMessage()">
                 Send
                 <span class="material-symbols-outlined text-[18px]">send</span>
@@ -498,7 +521,7 @@
           <span class="material-symbols-outlined text-primary-fixed text-[18px]">receipt_long</span>
           System Monitor
         </h3>
-        <span class="text-[10px] font-mono text-on-surface-variant bg-surface-container px-2 py-0.5 rounded" id="modelLabel">TALKING: SUSHEEL</span>
+        <span class="text-[10px] font-mono text-text-primary-variant bg-surface-container px-2 py-0.5 rounded" id="modelLabel">TALKING: PLATO</span>
       </div>
 
       <!-- Panel Tabs -->
@@ -646,7 +669,7 @@
         <div class="admin-stat-card"><div class="admin-stat-val" id="adminActiveUsers" style="color:var(--accent-green)">0</div><div class="admin-stat-label">Active</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span class="text-[11px] text-on-surface-variant font-mono">Registered accounts</span>
+        <span class="text-[11px] text-text-primary-variant font-mono">Registered accounts</span>
         <button class="unblock-all-btn" id="unblockAllBtn" onclick="adminUnblockAll()">🔓 Unblock All Frozen</button>
       </div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -678,14 +701,14 @@
 <!-- SETTINGS MODAL                      -->
 <!-- ═══════════════════════════════════ -->
 <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
-  <div style="background:#3a2e23; border:1px solid #4a3828; border-radius:20px; width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.5); animation:modalSlideUp 0.25s ease;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 24px 64px rgba(58,46,35,0.28); animation:modalSlideUp 0.25s ease;">
     <!-- Header -->
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #4a3828;">
-      <h2 style="font-size:16px; font-weight:700; color:#efe8de; display:flex; align-items:center; gap:10px;">
-        <span class="material-symbols-outlined" style="font-size:22px; color:#c9c0b0;">settings</span> Settings
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--border);">
+      <h2 style="font-size:16px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:10px;">
+        <span class="material-symbols-outlined" style="font-size:22px; color:var(--text2);">settings</span> Settings
       </h2>
-      <button onclick="closeSettings()" style="background:none; border:none; cursor:pointer; padding:4px; border-radius:8px; transition:background 0.2s;" onmouseover="this.style.background='#4a3828'" onmouseout="this.style.background='none'">
-        <span class="material-symbols-outlined" style="color:#8c7a6b; font-size:20px;">close</span>
+      <button onclick="closeSettings()" style="background:none; border:none; cursor:pointer; padding:4px; border-radius:8px; transition:background 0.2s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+        <span class="material-symbols-outlined" style="color:var(--text3); font-size:20px;">close</span>
       </button>
     </div>
 
@@ -698,24 +721,32 @@
 
       <!-- Profile -->
       <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Profile</h3>
-        <div style="display:flex; gap:14px; align-items:center; padding:16px; background:#4a3828; border-radius:14px; border:1px solid #5c4a38;">
-          <div id="settingsAvatar" style="width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; font-size:18px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:2px solid #5c4a38;">JD</div>
-          <div style="min-width:0;">
-            <h4 id="settingsName" style="font-size:15px; font-weight:700; color:#efe8de; margin:0;">Jane Doe</h4>
-            <p id="settingsEmail" style="font-size:11px; color:#c9c0b0; font-family:ui-monospace, monospace; margin:2px 0 0 0;">jane@example.com</p>
-            <p id="settingsRole" style="font-size:11px; color:#8c7a6b; font-family:ui-monospace, monospace; margin:2px 0 0 0;">Staff · FinChat</p>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Profile</h3>
+        <div style="display:flex; gap:14px; align-items:center; padding:16px; background:var(--surface2); border-radius:14px; border:1px solid var(--border); justify-content:space-between;">
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div id="settingsAvatar" style="width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; font-size:18px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:2px solid var(--border2); overflow:hidden; position:relative;">JD</div>
+            <div style="min-width:0;">
+              <h4 id="settingsName" style="font-size:15px; font-weight:700; color:var(--text); margin:0;">Jane Doe</h4>
+              <p id="settingsEmail" style="font-size:11px; color:var(--text2); font-family:ui-monospace, monospace; margin:2px 0 0 0;">jane@example.com</p>
+              <p id="settingsRole" style="font-size:11px; color:var(--text3); font-family:ui-monospace, monospace; margin:2px 0 0 0;">Staff · FinChat</p>
+            </div>
+          </div>
+          <div>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="uploadProfileAvatar(this.files)">
+            <button onclick="document.getElementById('avatarFileInput').click()" style="padding:6px 12px; border-radius:8px; border:1px solid var(--border2); background:var(--surface); color:var(--text); font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface)'">
+              <span class="material-symbols-outlined" style="font-size:16px;">photo_camera</span> Change Photo
+            </button>
           </div>
         </div>
       </div>
 
       <!-- Token Balance -->
       <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Token Balance</h3>
-        <div style="background:linear-gradient(135deg, #1a1410, #2a2118); border:1px solid #4a3828; border-radius:14px; padding:20px;">
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Token Balance</h3>
+        <div style="background:linear-gradient(135deg, #3a2e23, #4a3828); border:1px solid var(--border); border-radius:14px; padding:20px;">
           <div id="settingsBalance" style="font-size:32px; font-weight:800; color:#efe8de; letter-spacing:-1px;">1000</div>
-          <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#8c7a6b; margin-top:2px;">CHAT Tokens</div>
-          <div style="display:flex; gap:24px; margin-top:14px; padding-top:14px; border-top:1px solid #4a3828; font-size:11px; color:#8c7a6b;">
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#c9c0b0; margin-top:2px;">CHAT Tokens</div>
+          <div style="display:flex; gap:24px; margin-top:14px; padding-top:14px; border-top:1px solid #5c4a38; font-size:11px; color:#c9c0b0;">
             <span>💸 Spent: <strong style="color:#efe8de;" id="settingsSpent">0</strong></span>
             <span>🚨 Penalties: <strong style="color:#efe8de;" id="settingsPenalties">0</strong></span>
           </div>
@@ -724,33 +755,33 @@
 
       <!-- Phantom Wallet -->
       <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Buy Tokens — Phantom Wallet</h3>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Buy Tokens — Phantom Wallet</h3>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="wallet-btn phantom" id="connectWalletBtn" onclick="connectPhantom()" style="background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; border-radius:12px; border:1px solid #5c4a38;">👻 Connect Phantom Wallet</button>
-          <div id="walletInfo" style="display:none;font-size:11px;color:#8c7a6b;font-family:ui-monospace, monospace;text-align:center;"></div>
+          <button class="wallet-btn phantom" id="connectWalletBtn" onclick="connectPhantom()" style="background:#3a2e23; color:#efe8de; border-radius:12px; border:1px solid var(--border2);">👻 Connect Phantom Wallet</button>
+          <div id="walletInfo" style="display:none;font-size:11px;color:var(--text3);font-family:ui-monospace, monospace;text-align:center;"></div>
           <div id="tierSection" style="display:none;">
             <div class="tier-grid">
-              <div class="tier-card" data-tier="small" onclick="selectTier('small')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">100</div><div class="tier-price" style="color:#8c7a6b;">0.01 SOL</div><div class="tier-label" style="color:#c9c0b0;">Starter</div></div>
-              <div class="tier-card" data-tier="medium" onclick="selectTier('medium')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">500</div><div class="tier-price" style="color:#8c7a6b;">0.05 SOL</div><div class="tier-label" style="color:#c9c0b0;">Popular</div></div>
-              <div class="tier-card" data-tier="large" onclick="selectTier('large')" style="background:#4a3828; border-color:#5c4a38; color:#efe8de;"><div class="tier-tokens" style="color:#efe8de;">1000</div><div class="tier-price" style="color:#8c7a6b;">0.10 SOL</div><div class="tier-label" style="color:#c9c0b0;">Best Value</div></div>
+              <div class="tier-card" data-tier="small" onclick="selectTier('small')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">100</div><div class="tier-price" style="color:var(--text3);">0.01 SOL</div><div class="tier-label" style="color:var(--text2);">Starter</div></div>
+              <div class="tier-card" data-tier="medium" onclick="selectTier('medium')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">500</div><div class="tier-price" style="color:var(--text3);">0.05 SOL</div><div class="tier-label" style="color:var(--text2);">Popular</div></div>
+              <div class="tier-card" data-tier="large" onclick="selectTier('large')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">1000</div><div class="tier-price" style="color:var(--text3);">0.10 SOL</div><div class="tier-label" style="color:var(--text2);">Best Value</div></div>
             </div>
-            <button class="buy-btn" id="buyTokensBtn" onclick="buyTokens()" disabled style="background:linear-gradient(135deg, #6b5a48, #8c7a6b); color:#efe8de; border:1px solid #5c4a38;">Select a tier to purchase</button>
+            <button class="buy-btn" id="buyTokensBtn" onclick="buyTokens()" disabled style="background:#3a2e23; color:#efe8de; border:1px solid var(--border2);">Select a tier to purchase</button>
           </div>
         </div>
       </div>
 
       <!-- Transaction History -->
       <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:#8c7a6b; margin-bottom:10px;">Recent Transactions</h3>
-        <div class="tx-list-settings" id="txListSettings" style="max-height:160px; overflow-y:auto; background:#4a3828; border-radius:12px; padding:4px 14px; border:1px solid #5c4a38;">
-          <div style="text-align:center;color:#8c7a6b;font-size:11px;padding:12px;">Loading...</div>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Recent Transactions</h3>
+        <div class="tx-list-settings" id="txListSettings" style="max-height:160px; overflow-y:auto; background:var(--surface2); border-radius:12px; padding:4px 14px; border:1px solid var(--border);">
+          <div style="text-align:center;color:var(--text3);font-size:11px;padding:12px;">Loading...</div>
         </div>
       </div>
 
       <!-- Buttons -->
       <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
-        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:#4a3828; color:#efe8de; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='#5c4a38'" onmouseout="this.style.background='#4a3828'">🛡️ Admin Dashboard</button>
-        <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:transparent; color:#dc6b5a; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#4a2828'; this.style.borderColor='#6b3a3a'" onmouseout="this.style.background='transparent'; this.style.borderColor='#5c4a38'">🚪 Logout</button>
+        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">🛡️ Admin Dashboard</button>
+        <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:#b91c1c; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fbeaea'; this.style.borderColor='#e7b7b7'" onmouseout="this.style.background='transparent'; this.style.borderColor='var(--border)'">🚪 Logout</button>
       </div>
     </div>
   </div>
@@ -784,24 +815,41 @@
     // ─────────────────────────────────
     const LOCAL_BAL_KEY = 'finchat_persona_bal_' + SESSION_USER.id;
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
-    if (!personaBalances) {
+    if (!personaBalances || !personaBalances.plato || !personaBalances.aurelius) {
       personaBalances = {
-        susheel: 1000,
-        sona: 1000,
-        vishnu: 1000,
-        plato: 1000
+        plato: 1000,
+        aurelius: 1000,
+        rasha: 1000,
+        nova: 1000
       };
       localStorage.setItem(LOCAL_BAL_KEY, JSON.stringify(personaBalances));
     }
-    let tokenBalance = personaBalances.susheel || 1000;
+    let tokenBalance = personaBalances.plato || 1000;
+
+    // Sync the displayed balance with the authoritative backend value on load
+    (async function syncRealBalance() {
+      try {
+        const t = SESSION_USER.token || _session?.token || localStorage.getItem('finchat_token') || '';
+        const r = await fetch(`${API_URL}/api/tokens/balance`, { headers: { Authorization: 'Bearer ' + t } });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (typeof d.balance === 'number') {
+          tokenBalance = d.balance;
+          personaBalances.plato = d.balance;
+          if (typeof updateTokenUI === 'function') updateTokenUI();
+        }
+      } catch (e) { /* keep local value */ }
+    })();
 
     function savePersonaBalances() {
       localStorage.setItem(LOCAL_BAL_KEY, JSON.stringify(personaBalances));
     }
 
     function updateTokenUI() {
-      document.getElementById('tokenBig').textContent = `${tokenBalance} CHAT`;
-      document.getElementById('sidebarToken').textContent = tokenBalance;
+      const tokenBig = document.getElementById('tokenBig');
+      if (tokenBig) tokenBig.textContent = `${tokenBalance} CHAT`;
+      const sidebarTokenEl = document.getElementById('sidebarToken');
+      if (sidebarTokenEl) sidebarTokenEl.textContent = tokenBalance;
       const settingsBalance = document.getElementById('settingsBalance');
       if (settingsBalance) settingsBalance.textContent = tokenBalance;
       const topbarTokenDisplay = document.getElementById('topbarTokenDisplay');
@@ -843,12 +891,12 @@
 
     // Persona state
     const PERSONAS = {
-      susheel: { name: 'Susheel', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><ellipse cx="38" cy="46" rx="6" ry="5" fill="#efe8de"/><ellipse cx="62" cy="46" rx="6" ry="5" fill="#efe8de"/><path d="M38 58 Q50 68 62 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg>', desc: 'History nerd · In love with Sona · AI Persona Chat', color: '#4f46e5' },
-      sona: { name: 'Sona', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><path d="M33 48 Q38 42 43 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M57 48 Q62 42 67 48" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="34" cy="55" r="4" fill="#f472b6" opacity="0.8"/><circle cx="66" cy="55" r="4" fill="#f472b6" opacity="0.8"/><path d="M42 58 Q50 65 58 58" stroke="#efe8de" stroke-width="4" stroke-linecap="round" fill="none"/></svg>', desc: 'Dog-obsessed puppy mom · AI Persona Chat', color: '#ec4899' },
-      vishnu: { name: 'Vishnu', avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#efe8de"/><rect x="16" y="42" width="10" height="16" rx="5" fill="#4a3828"/><rect x="74" y="42" width="10" height="16" rx="5" fill="#4a3828"/><line x1="50" y1="20" x2="50" y2="30" stroke="#4a3828" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="18" r="5" fill="#4a3828"/><rect x="24" y="30" width="52" height="42" rx="16" fill="#4a3828"/><line x1="34" y1="46" x2="44" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><line x1="56" y1="46" x2="66" y2="46" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/><path d="M35 52 Q35 56 38 56 Q41 56 41 52 Q38 48 35 52 Z" fill="#38bdf8"/><path d="M65 52 Q65 56 62 56 Q59 56 59 52 Q62 48 65 52 Z" fill="#38bdf8"/><ellipse cx="50" cy="60" rx="6" ry="5" fill="#efe8de"/></svg>', desc: 'Funny crybaby joke-teller · AI Persona Chat', color: '#059669' },
-      plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'AI Monitor · Fraud Detection · Governed Protocol', color: '#6366f1' }
+      plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Chief AI Officer & System Supervisor', color: '#6366f1' },
+      aurelius: { name: 'Aurelius', avatar: '<img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Finance & Investment Strategist', color: '#4f46e5' },
+      rasha: { name: 'Rasha', avatar: '<img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Executive Career Strategist', color: '#ec4899' },
+      nova: { name: 'Nova', avatar: '<img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Frontier Science & Technology Researcher', color: '#059669' }
     };
-    let activePersona = 'susheel';
+    let activePersona = 'plato';
     let personaSessions = {};   // { personaId: sessionId }
     let personaHistories = {};  // { personaId: [messagesHTML] }
 
@@ -941,12 +989,12 @@
 
       // Update active state in sidebar
       document.querySelectorAll('[id^="ch-"]').forEach(el => {
-        el.classList.remove('bg-[#efe8de]', 'text-[#3a2e23]', 'font-bold', 'shadow-sm', 'bg-primary-container', 'text-on-primary-container');
+        el.classList.remove('bg-cream-bg', 'text-[#3a2e23]', 'font-bold', 'shadow-sm', 'bg-primary-container', 'text-on-primary-container');
         el.classList.add('text-[#efe8de]', 'hover:bg-[#4a3828]');
       });
       const ch = document.getElementById('ch-' + personaId);
       if (ch) {
-        ch.classList.add('bg-[#efe8de]', 'text-[#3a2e23]', 'font-bold', 'shadow-sm');
+        ch.classList.add('bg-cream-bg', 'text-[#3a2e23]', 'font-bold', 'shadow-sm');
         ch.classList.remove('text-[#efe8de]', 'hover:bg-[#4a3828]');
       }
 
@@ -975,6 +1023,30 @@
         loadChatHistory(personaId);
       }
       msgs.scrollTop = 999999;
+      updatePersonaBarActive();
+      const mi = document.getElementById('msgInput');
+      if (mi) mi.placeholder = 'Message ' + p.name + '...';
+    }
+
+    // Persona selector bar — lets you switch between Plato, Aurelius, Rasha, Nova.
+    function renderPersonaBar() {
+      const bar = document.getElementById('personaBar');
+      if (!bar) return;
+      bar.innerHTML = Object.entries(PERSONAS).map(([id, p]) => `
+        <button data-persona="${id}" class="persona-pill flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border shrink-0 text-[13px] font-semibold transition-colors" style="cursor:pointer;">
+          <span class="w-6 h-6 rounded-full inline-flex items-center justify-center text-white text-[11px] font-bold shrink-0" style="background:${p.color};">${p.name.charAt(0)}</span>
+          <span>${p.name}</span>
+        </button>`).join('');
+      bar.querySelectorAll('[data-persona]').forEach(b => b.onclick = () => { if (b.dataset.persona !== activePersona) switchChat(b.dataset.persona); });
+      updatePersonaBarActive();
+    }
+    function updatePersonaBarActive() {
+      document.querySelectorAll('#personaBar [data-persona]').forEach(b => {
+        const on = b.dataset.persona === activePersona;
+        b.style.background = on ? '#3a2e23' : 'transparent';
+        b.style.color = on ? '#efe8de' : '#3a2e23';
+        b.style.borderColor = on ? '#3a2e23' : '#d6ccbc';
+      });
     }
 
     async function loadChatHistory(personaId) {
@@ -1089,7 +1161,9 @@
       document.getElementById('statSpent').textContent = totalSpent;
       document.getElementById('statPenalties').textContent = totalPenalties;
 
-      txLog.unshift({ label, amount, type });
+      if (amount !== 0 || label !== 'Sync with server') {
+        txLog.unshift({ label, amount, type, timestamp: new Date().toISOString() });
+      }
       renderTxList();
 
       if (tokenBalance === 0) {
@@ -1098,9 +1172,10 @@
     }
 
     function renderTxList() {
-      document.getElementById('txList').innerHTML = txLog.slice(0, 30).map(t =>
-        `<li class="tx-row"><span class="tx-row-label">${t.label}</span><span class="tx-row-amount ${t.type}">${t.amount > 0 ? '+' : ''}${t.amount}</span></li>`
-      ).join('');
+      document.getElementById('txList').innerHTML = txLog.slice(0, 30).map(t => {
+        const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now';
+        return `<li class="tx-row py-1.5 flex items-center justify-between"><div class="flex flex-col min-w-0 flex-1 pr-2"><span class="tx-row-label font-semibold text-[#3a2e23] truncate" title="${escHtml(t.label)}">${escHtml(t.label)}</span><span class="text-[10px] font-mono text-[#8c7a6b]">${timeStr}</span></div><span class="tx-row-amount ${t.type} shrink-0 font-mono font-bold">${t.amount > 0 ? '+' : ''}${t.amount}</span></li>`;
+      }).join('');
     }
 
     // ─────────────────────────────────
@@ -1287,10 +1362,72 @@
           if (r) { r.textContent = '✓✓'; r.className = 'read-receipt read'; }
         }, 1500);
       }
+
+      return wrapper;
     }
     // ─────────────────────────────────
     // TYPING INDICATOR
     // ─────────────────────────────────
+    const PERSONA_THINKING_PHRASES = {
+      aurelius: [
+        "🏛️ Contemplating the impermanence of bull markets...",
+        "📜 Consulting the Stoic texts on portfolio diversification...",
+        "⚖️ Weighing risk vs. reward with Roman precision...",
+        "🛡️ Fortifying your balance sheet against the chaos of the cosmos...",
+        "🤔 Meditating on compound interest and virtue...",
+        "📈 Analyzing financial cycles through the lens of Stoic philosophy...",
+        "🏛️ Applying discipline to market volatility...",
+        "💭 \"You have power over your mind — not outside events... or market dips.\"",
+        "⚡ Calculating optimal asset allocation while maintaining inner peace...",
+        "🔍 Investigating financial anomalies with philosophical rigor..."
+      ],
+      plato: [
+        "🤔 Planning 14,000,605 possible system responses...",
+        "🏛️ Philosophizing on AI governance and ethics...",
+        "🔍 Investigating agent outputs across the network...",
+        "🧠 Connecting core cognitive concepts across multi-agent space...",
+        "⚡ Orchestrating executive sub-agents at 4.2 GHz...",
+        "🛡️ Running SHA-256 integrity checks & verifying truth...",
+        "🧐 Cross-checking system supervisor directives...",
+        "💡 Synthesizing pure executive intelligence...",
+        "💎 Crystallizing Chief AI Officer directives into text...",
+        "🚀 Finalizing supervisory assessment..."
+      ],
+      rasha: [
+        "💼 Strategizing next-level executive career trajectory...",
+        "📈 Analyzing boardroom dynamics & leadership leverage...",
+        "🔍 Investigating market demand for high-impact talent...",
+        "🤝 Crafting negotiation frameworks for optimal compensation...",
+        "🎯 Positioning career milestones for exponential growth...",
+        "⚖️ Evaluating organizational hierarchy & strategic influence...",
+        "✨ Polishing executive presence & corporate narrative...",
+        "📝 Drafting career master plan with 99.9% confidence..."
+      ],
+      nova: [
+        "🔬 Hypothesizing breakthrough scientific models...",
+        "⚛️ Simulating quantum states & frontier technology shifts...",
+        "🌐 Searching decentralized research grids...",
+        "📡 Analyzing multi-dimensional data vectors...",
+        "⚡ Processing technological forecasts at petaflop speeds...",
+        "🌌 Reflecting on advanced computational horizons...",
+        "🚀 Crystallizing frontier research insights into actionable data..."
+      ]
+    };
+
+    const GENERAL_THINKING_PHRASES = [
+      "🤔 Planning possible responses...",
+      "🔍 Investigating your query...",
+      "🌐 Searching the web for validation...",
+      "📂 Reading repository & analyzing structures...",
+      "💭 Reading memory & recovering context...",
+      "🕵️ Collecting evidence from the blockchain...",
+      "⚡ Reasoning at peak capacity...",
+      "🛡️ Verifying facts & running integrity checks...",
+      "✨ Polishing grammar & refining output..."
+    ];
+
+    window.typingTimers = window.typingTimers || {};
+
     function showTyping() {
       updatePersonaStatusUI(activePersona, true);
       const id = 'typing' + Date.now();
@@ -1298,24 +1435,51 @@
       const div = document.createElement('div');
       div.className = 'msg-group bot';
       div.id = id;
+
+      const phrases = PERSONA_THINKING_PHRASES[activePersona] || GENERAL_THINKING_PHRASES;
+      let phraseIdx = Math.floor(Math.random() * phrases.length);
+      const initialPhrase = phrases[phraseIdx];
+
       div.innerHTML = `
     <div class="msg-row">
       <div class="msg-avatar-space"><div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div></div>
       <div class="msg-content">
         <div class="msg-sender">${p.name}</div>
         <div class="typing-bubble">
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
+          <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+          <span class="typing-phrase" id="${id}-phrase">${initialPhrase}</span>
         </div>
       </div>
     </div>`;
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 999999;
+
+      window.typingTimers[id] = setInterval(() => {
+        phraseIdx = (phraseIdx + 1) % phrases.length;
+        const phraseEl = document.getElementById(`${id}-phrase`);
+        if (phraseEl) {
+          phraseEl.style.opacity = '0';
+          setTimeout(() => {
+            if (phraseEl) {
+              phraseEl.textContent = phrases[phraseIdx];
+              phraseEl.style.opacity = '1';
+            }
+          }, 250);
+        }
+      }, 1400);
+
       return id;
     }
     function removeTyping(id) {
       updatePersonaStatusUI(activePersona, false);
+      if (window.typingTimers && window.typingTimers[id]) {
+        clearInterval(window.typingTimers[id]);
+        delete window.typingTimers[id];
+      }
       document.getElementById(id)?.remove();
     }
     function updatePersonaStatusUI(personaId, isTalking) {
@@ -1357,10 +1521,22 @@
       renderAttachPreview();
       document.getElementById('sendBtn').disabled = true;
 
-      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato'].includes(activePersona);
+      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
 
       if (isPersonaChat) {
         // ── AI Persona Chat via Backend API ──
+        // Optimistic render: show the user's message INSTANTLY, before the LLM round-trip.
+        // The real proof hash is reconciled onto this same bubble when the server responds.
+        const userFraudOpt = { risk: 'LOW', reason: 'Scanned by AI persona', indicators: ['AI persona monitoring'] };
+        const pendingProof = {
+          hash: 'pending-anchor', prevHash: prevHash || '0'.repeat(64),
+          height: 'pending_' + Date.now(), sender: 'USER', ts: new Date().toISOString()
+        };
+        const userMsgEl = renderMessage('USER', text, pendingProof, userFraudOpt, files);
+        // mark its chain badge as "anchoring…" until the server proof returns
+        const pendingChainEl = userMsgEl ? userMsgEl.querySelector('.chain-status') : null;
+        if (pendingChainEl) { pendingChainEl.textContent = '⏳'; pendingChainEl.title = 'Anchoring to proof chain…'; }
+
         const typingId = showTyping();
 
         try {
@@ -1384,6 +1560,8 @@
           removeTyping(typingId);
 
           if (!res.ok) {
+            // Leave the user's message visible but flag that it failed to anchor
+            if (pendingChainEl) { pendingChainEl.textContent = '⚠️'; pendingChainEl.title = 'Failed to anchor — server error'; }
             const errProof = await createProof(data.error || 'Error', 'SYSTEM');
             const errFraud = { risk: 'LOW', reason: 'System error', indicators: ['API error'] };
             renderMessage('BOT', data.error || 'Failed to get response', errProof, errFraud, null);
@@ -1406,9 +1584,19 @@
               ts: serverUserProof.timestamp
             };
             const userIsCheckpoint = userProof.height > 0 && userProof.height % CHECKPOINT_INTERVAL === 0;
-            const userFraud = { risk: 'LOW', reason: 'Scanned by AI persona', indicators: ['AI persona monitoring'] };
+            const userFraud = userFraudOpt;
+            // Reconcile the optimistic user bubble with the real server proof (do NOT render a second bubble)
+            if (userMsgEl) {
+              const ht = userMsgEl.querySelector('.hash-tag');
+              if (ht) { ht.title = `Full hash: ${userProof.hash}`; ht.textContent = `🔗 ${userProof.hash.substring(0, 10)}…`; }
+              const cs = userMsgEl.querySelector('.chain-status');
+              if (cs) {
+                cs.className = userIsCheckpoint ? 'chain-status confirmed' : 'chain-status';
+                cs.textContent = userIsCheckpoint ? '⚓' : '🔗';
+                cs.title = userIsCheckpoint ? 'Anchored to Solana checkpoint' : 'Chained to proof-of-conversation';
+              }
+            }
             addProofCard(userProof, userFraud, userIsCheckpoint);
-            renderMessage('USER', text, userProof, userFraud, files);
             if (userIsCheckpoint) insertCheckpointBanner(userProof.height);
 
             if (socket) {
@@ -1436,10 +1624,48 @@
             const botFraud = { risk: 'LOW', reason: 'AI persona response', indicators: ['Trusted AI source'] };
             addProofCard(botProof, botFraud, botIsCheckpoint);
             renderMessage('BOT', data.response, botProof, botFraud, null);
+            if (data.evaluation) {
+              const evalHTML = `
+                <div class="mx-auto my-3 p-4 rounded-xl border border-[#d4af37] bg-[#2a1f18] text-[#efe8de] max-w-lg shadow-lg">
+                  <div class="flex items-center justify-between border-b border-[#4a3828] pb-2 mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#d4af37] flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px]">verified_user</span> Plato Supervision Evaluation
+                    </span>
+                    <span class="text-xs font-mono bg-[#16a34a] text-white px-2 py-0.5 rounded font-bold">SCORE: ${data.evaluation.overall_score}/10</span>
+                  </div>
+                  <div class="text-xs text-[#e8dfd1] mb-3">Evaluated Agent: <strong class="text-white">${data.evaluation.evaluated_agent}</strong></div>
+                  <div class="grid grid-cols-3 gap-2 mb-3 text-center">
+                    <div class="bg-[#3a2e23] p-2 rounded border border-[#4a3828]">
+                      <div class="text-[10px] text-[#8c7a6b] uppercase">Accuracy</div>
+                      <div class="text-sm font-bold text-[#d4af37]">${data.evaluation.accuracy_score}/10</div>
+                    </div>
+                    <div class="bg-[#3a2e23] p-2 rounded border border-[#4a3828]">
+                      <div class="text-[10px] text-[#8c7a6b] uppercase">Relevance</div>
+                      <div class="text-sm font-bold text-[#d4af37]">${data.evaluation.relevance_score}/10</div>
+                    </div>
+                    <div class="bg-[#3a2e23] p-2 rounded border border-[#4a3828]">
+                      <div class="text-[10px] text-[#8c7a6b] uppercase">Efficiency</div>
+                      <div class="text-sm font-bold text-[#d4af37]">${data.evaluation.efficiency_score}/10</div>
+                    </div>
+                  </div>
+                  <div class="text-xs italic text-[#c9c0b0]">"${data.evaluation.feedback}"</div>
+                </div>
+              `;
+              const chatBox = document.getElementById('chatMessages');
+              if (chatBox) {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = evalHTML;
+                chatBox.appendChild(wrap);
+                chatBox.scrollTop = chatBox.scrollHeight;
+              }
+            }
             if (botIsCheckpoint) insertCheckpointBanner(botProof.height);
 
             applyTokens(-(data.tokenCost || 5), `AI chat with ${data.persona.name}`, 'neg');
             tokenBalance = data.tokenBalance;
+            // keep the global (per-persona mirror) balance in step with the backend
+            personaBalances.plato = personaBalances.aurelius = personaBalances.rasha = personaBalances.nova = tokenBalance;
+            savePersonaBalances();
 
             if (data.fraud && data.fraud.detected) {
               flagCount++;
@@ -1463,6 +1689,7 @@
           }
         } catch (err) {
           removeTyping(typingId);
+          if (pendingChainEl) { pendingChainEl.textContent = '⚠️'; pendingChainEl.title = 'Failed to anchor — network error'; }
           console.error('AI Service Error:', err);
           showToast('AI Service Error: ' + (err.message || 'Unknown error'), 'danger');
         }
@@ -1565,6 +1792,81 @@
       return d.innerHTML;
     }
 
+    // ── Notification bell (backend-wired) ──────────────────────
+    (function () {
+      const tok = () => localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
+        (JSON.parse(sessionStorage.getItem('finchat_user') || 'null') || {}).token || '';
+      const $ = (id) => document.getElementById(id);
+      let open = false;
+
+      function timeAgo(ts) {
+        const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return Math.floor(s / 60) + 'm ago';
+        if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+        return Math.floor(s / 86400) + 'd ago';
+      }
+
+      async function refreshBadge() {
+        try {
+          const r = await fetch('/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + tok() } });
+          if (!r.ok) return;
+          const d = await r.json();
+          const badge = $('notifBadge');
+          if (!badge) return;
+          if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.classList.remove('hidden'); }
+          else badge.classList.add('hidden');
+        } catch (e) { }
+      }
+
+      async function loadList() {
+        const list = $('notifList');
+        if (!list) return;
+        list.innerHTML = '<div style="padding:16px;text-align:center;color:#8c7a6b;font-size:12px">Loading…</div>';
+        try {
+          const r = await fetch('/api/notifications?limit=20', { headers: { Authorization: 'Bearer ' + tok() } });
+          const d = await r.json();
+          const items = d.notifications || [];
+          if (!items.length) { list.innerHTML = '<div style="padding:24px;text-align:center;color:#8c7a6b;font-size:12px">No notifications yet</div>'; return; }
+          list.innerHTML = items.map(n => `
+            <div onclick="__notifClick('${n.notification_id}')" style="padding:12px 16px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${n.is_read ? 'opacity:0.55' : 'background:rgba(212,175,55,0.08)'}">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:700;color:#3a2e23">${n.title}</div>
+                <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${(n.content || '').slice(0, 120)}</div>
+                <div style="font-size:10px;color:#8c7a6b;font-family:ui-monospace,monospace;margin-top:3px">${timeAgo(n.created_at)}</div>
+              </div>
+              ${n.is_read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:4px"></span>'}
+            </div>`).join('');
+        } catch (e) { list.innerHTML = '<div style="padding:16px;text-align:center;color:#dc2626;font-size:12px">Failed to load</div>'; }
+      }
+
+      window.__notifClick = async function (id) {
+        try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+        await loadList(); refreshBadge();
+      };
+      window.markAllNotifsRead = async function () {
+        try { await fetch('/api/notifications/read-all', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+        await loadList(); refreshBadge();
+      };
+      window.toggleNotifications = function (e) {
+        if (e) e.stopPropagation();
+        const dd = $('notifDropdown'); if (!dd) return;
+        open = !open; dd.classList.toggle('hidden', !open);
+        if (open) loadList();
+      };
+      document.addEventListener('click', (e) => {
+        const dd = $('notifDropdown'), bell = $('notifBell');
+        if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
+      });
+      function bindSocket() {
+        const s = window.socket || (typeof socket !== 'undefined' ? socket : null);
+        if (s && !window.__notifSockBound) { s.on('notification:new', () => { refreshBadge(); if (open) loadList(); }); window.__notifSockBound = true; }
+      }
+      refreshBadge();
+      setInterval(() => { refreshBadge(); bindSocket(); }, 12000);
+      setTimeout(bindSocket, 2000);
+    })();
+
     async function verifyChainUI() {
       const btn = document.getElementById('verifyChainBtn');
       const banner = document.getElementById('verifyStatusBanner');
@@ -1648,10 +1950,18 @@
       const avatarEl = document.getElementById('sidebarAvatar');
 
       if (nameEl) nameEl.textContent = name;
+      const topbarUserIcon = document.getElementById('topbarUserIcon');
+      if (topbarUserIcon && SESSION_USER.avatar_url) {
+        topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      }
       if (avatarEl) {
-        const textSpan = document.getElementById('sidebarAvatarText');
-        if (textSpan) textSpan.textContent = initials;
-        else avatarEl.textContent = initials;
+        if (SESSION_USER.avatar_url) {
+          avatarEl.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        } else {
+          const textSpan = document.getElementById('sidebarAvatarText');
+          if (textSpan) textSpan.textContent = initials;
+          else avatarEl.textContent = initials;
+        }
       }
     })();
 
@@ -1678,43 +1988,17 @@
           totalPenalties = 0;
           txLog = [];
 
-          // Sync Persona Balances from Session Message Counts & Penalties
-          const sessRes = await fetch(`${API_URL}/api/ai-chat/sessions`, {
+          // Token balance is a single authoritative value on the backend — show that
+          // real number for every persona instead of inventing per-persona counters.
+          const balRes = await fetch(`${API_URL}/api/tokens/balance`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          if (sessRes.ok) {
-            const sessData = await sessRes.json();
-            const newBalances = {
-              susheel: 1000,
-              sona: 1000,
-              vishnu: 1000,
-              plato: 1000
-            };
-
-            for (const personaId of ['susheel', 'sona', 'vishnu', 'plato']) {
-              const personaSess = sessData.sessions?.find(s => s.persona === personaId);
-              if (personaSess) {
-                const histRes = await fetch(`${API_URL}/api/ai-chat/history/${personaSess.session_id}`, {
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (histRes.ok) {
-                  const histData = await histRes.json();
-                  const userMsgCount = histData.messages?.filter(m => m.role === 'user').length || 0;
-                  let penaltyCost = 0;
-                  histData.messages?.forEach(m => {
-                    if (m.role === 'user') {
-                      if (m.risk_level === 'HIGH') penaltyCost += 20;
-                      else if (m.risk_level === 'MEDIUM') penaltyCost += 10;
-                    }
-                  });
-                  newBalances[personaId] = Math.max(0, 1000 - (userMsgCount * 5) - penaltyCost);
-                }
-              }
-            }
-
-            personaBalances = newBalances;
+          if (balRes.ok) {
+            const balData = await balRes.json();
+            const realBal = typeof balData.balance === 'number' ? balData.balance : (personaBalances[activePersona] || 1000);
+            personaBalances = { plato: realBal, aurelius: realBal, rasha: realBal, nova: realBal };
             savePersonaBalances();
-            tokenBalance = personaBalances[activePersona] || 1000;
+            tokenBalance = realBal;
             updateTokenUI();
           }
 
@@ -1731,19 +2015,8 @@
               });
             });
 
-            const txListEl = document.getElementById('txList');
-            if (txListEl) {
-              txListEl.innerHTML = '';
-              txLog.slice().reverse().forEach(tx => {
-                const li = document.createElement('li');
-                li.className = 'tx-row';
-                li.innerHTML = `
-                  <span class="tx-row-label">${escHtml(tx.label)}</span>
-                  <span class="tx-row-amount ${tx.type}">${tx.amount > 0 ? '+' : ''}${tx.amount}</span>
-                `;
-                txListEl.appendChild(li);
-              });
-            }
+            txLog.reverse();
+            renderTxList();
           }
 
           applyTokens(0, 'Sync with server', 'pos');
@@ -1756,8 +2029,14 @@
         let generalChannelId = 'general';
         if (channelsRes.ok) {
           const channelsData = await channelsRes.json();
-          const generalChannel = channelsData.channels?.find(c => c.name === 'general');
-          generalChannelId = generalChannel?.id || 'general';
+          // The proof chain lives under whatever channel the backend uses
+          // (currently "system_channel"), not a hardcoded "general". Prefer a
+          // channel literally named general, else fall back to the first one.
+          const list = channelsData.channels || [];
+          const generalChannel = list.find(c => c.name === 'general')
+            || list.find(c => (c.id || c.channel_id) === 'system_channel')
+            || list[0];
+          generalChannelId = generalChannel?.id || generalChannel?.channel_id || 'general';
           currentChannelId = generalChannelId;
 
           const proofRes = await fetch(`${API_URL}/api/messages/${generalChannelId}/proof`, {
@@ -1904,26 +2183,97 @@
     let phantomWallet = null;
     let selectedTier = null;
 
+    function uploadProfileAvatar(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file.', 'warning');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Url = e.target.result;
+        try {
+          showToast('Uploading profile photo...', 'info');
+          const token = _session?.token;
+          const r = await fetch(`${API_URL}/api/auth/profile/avatar`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ avatarUrl: base64Url })
+          });
+          if (!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            throw new Error(errData.error || 'Upload failed');
+          }
+          const data = await r.json();
+          SESSION_USER.avatar_url = data.user?.avatar_url || base64Url;
+          _session.avatar_url = SESSION_USER.avatar_url;
+          sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+          if (localStorage.getItem('finchat_session')) {
+            localStorage.setItem('finchat_session', JSON.stringify(_session));
+          }
+
+          // Update settings & sidebar avatars
+          const settingsAvatar = document.getElementById('settingsAvatar');
+          if (settingsAvatar) settingsAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+          const sidebarAvatar = document.getElementById('sidebarAvatar');
+          if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+          const topbarUserIcon = document.getElementById('topbarUserIcon');
+          if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+
+          showToast('Profile photo updated successfully!', 'success');
+        } catch (err) {
+          showToast(`Photo update error: ${err.message}`, 'danger');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
     function openSettings() {
-      document.getElementById('settingsAvatar').textContent =
-        SESSION_USER.name ? SESSION_USER.name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2) : 'U';
+      const initials = SESSION_USER.name ? SESSION_USER.name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2) : 'U';
+      const settingsAvatar = document.getElementById('settingsAvatar');
+      if (settingsAvatar) {
+        if (SESSION_USER.avatar_url) {
+          settingsAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        } else {
+          settingsAvatar.textContent = initials;
+        }
+      }
       document.getElementById('settingsName').textContent = SESSION_USER.name || 'User';
       document.getElementById('settingsEmail').textContent = SESSION_USER.email || '';
       document.getElementById('settingsRole').textContent = `${SESSION_USER.role || 'user'} · FinChat`;
 
+      // Instant local values, then overwrite with backend truth
       document.getElementById('settingsBalance').textContent = tokenBalance;
       document.getElementById('settingsSpent').textContent = totalSpent;
       document.getElementById('settingsPenalties').textContent = totalPenalties;
 
       const banner = document.getElementById('unfreezeBanner');
-      if (tokenBalance === 0) {
-        banner.classList.add('show');
-      } else {
-        banner.classList.remove('show');
-      }
+      if (tokenBalance === 0) banner.classList.add('show'); else banner.classList.remove('show');
 
+      refreshSettingsBalance();
       loadTxHistory();
       document.getElementById('settingsOverlay').classList.add('show');
+    }
+
+    // Pull the authoritative token balance + frozen state from the backend
+    async function refreshSettingsBalance() {
+      try {
+        const token = _session?.token;
+        const r = await fetch(`${API_URL}/api/tokens/balance`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (typeof d.balance === 'number') {
+          document.getElementById('settingsBalance').textContent = d.balance;
+          const banner = document.getElementById('unfreezeBanner');
+          if (d.frozen) banner.classList.add('show'); else banner.classList.remove('show');
+        }
+      } catch { /* keep local fallback */ }
     }
 
     function closeSettings() {
@@ -1945,14 +2295,29 @@
           return;
         }
 
-        container.innerHTML = data.transactions.map(tx => `
-          <div class="tx-item-s">
-            <span class="tx-reason">${tx.reason || tx.type}</span>
-            <span class="tx-amt ${tx.amount >= 0 ? 'positive' : 'negative'}">
+        // Derive spent / penalties from real backend ledger rows
+        let spent = 0, penalties = 0;
+        for (const tx of data.transactions) {
+          const isPenalty = tx.type === 'penalty' || /penalt|fraud|freeze/i.test(tx.reason || '');
+          if (isPenalty) penalties += Math.abs(tx.amount);
+          else if (tx.amount < 0) spent += Math.abs(tx.amount);
+        }
+        document.getElementById('settingsSpent').textContent = spent;
+        document.getElementById('settingsPenalties').textContent = penalties;
+
+        container.innerHTML = data.transactions.map(tx => {
+          const timeStr = tx.created_at ? new Date(tx.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+          return `
+          <div class="tx-item-s py-2 flex items-center justify-between border-b border-border-color/40 last:border-none">
+            <div class="flex flex-col min-w-0 flex-1 pr-2">
+              <span class="tx-reason font-semibold text-[#3a2e23] truncate" title="${escHtml(tx.reason || tx.type)}">${escHtml(tx.reason || tx.type)}</span>
+              ${timeStr ? `<span class="text-[10px] font-mono text-[#8c7a6b]">${timeStr}</span>` : ''}
+            </div>
+            <span class="tx-amt shrink-0 font-mono font-bold ${tx.amount >= 0 ? 'positive' : 'negative'}">
               ${tx.amount >= 0 ? '+' : ''}${tx.amount}
             </span>
           </div>
-        `).join('');
+        `}).join('');
       } catch (e) {
         container.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:11px;padding:12px;">Could not load history</div>';
       }
@@ -2357,6 +2722,61 @@
         container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--accent-red);font-size:12px;">Error: ${err.message}</div>`;
       }
     }
+
+    // Build the persona selector now that PERSONAS and the DOM are ready.
+    renderPersonaBar();
+  </script>
+  <script>
+    // Drawer nav on narrow screens (below the md breakpoint the sidebar is
+    // otherwise hidden with no way to navigate).
+    (function () {
+      const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop'), btn = document.getElementById('navToggle');
+      if (!nav || !bd || !btn) return;
+      const toggle = (open) => {
+        const show = open === undefined ? !nav.classList.contains('open') : open;
+        nav.classList.toggle('open', show);
+        bd.classList.toggle('hidden', !show);
+      };
+      btn.onclick = () => toggle();
+      bd.onclick = () => toggle(false);
+      // Close the drawer once a destination is chosen.
+      nav.querySelectorAll('a[href]').forEach(a => a.addEventListener('click', () => toggle(false)));
+    })();
+
+    // Mark not-yet-built nav destinations as "Coming soon" instead of silently
+    // opening the chat page.
+    (function () {
+      const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+      function toast(msg) {
+        let t = document.getElementById('nmSoonToast');
+        if (!t) {
+          t = document.createElement('div');
+          t.id = 'nmSoonToast';
+          t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
+          document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+        clearTimeout(t._h);
+        t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
+      }
+      document.querySelectorAll('#sideNav a').forEach(a => {
+        const labelEl = a.querySelector('.font-body-sm');
+        const label = labelEl ? labelEl.textContent.trim() : '';
+        if (!SOON.includes(label)) return;
+        a.setAttribute('href', 'javascript:void(0)');
+        a.style.opacity = '0.55';
+        a.style.cursor = 'not-allowed';
+        if (!a.querySelector('.soon-badge')) {
+          const b = document.createElement('span');
+          b.className = 'soon-badge';
+          b.textContent = 'Soon';
+          b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
+          a.appendChild(b);
+        }
+        a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
+      });
+    })();
   </script>
 </body>
 </html>

@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Neural Map</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+</script>
+<style>
+  /* ── Two themes. Warm is FinChat's house palette; dark comes from the
+        Neural Map design (#0b1220 field, #5fd0e6 accent). ───────────── */
+  :root, [data-nm-theme="warm"] {
+    --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
+    --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
+    --danger: #b0472e; --rail: #3a2e23; --rail-txt: #efe8de; --rail-hover: #4a3828;
+    --rail-muted: #c9c0b0; --grid: rgba(58,46,35,.06); --edge: #d6ccbc; --edge-hi: #c67139;
+    --label: #3a2e23; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
+    --cat-agent: #c67139; --cat-tool: #7a8a5e; --cat-chain: #5b4a3a;
+    --cat-entity: #d0973f; --cat-doc: #9c8f7d; --cat-idea: #b0472e;
+  }
+  [data-nm-theme="dark"] {
+    --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
+    --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
+    --danger: #e8867a; --rail: #131c2e; --rail-txt: #e8eef8; --rail-hover: #1c2942;
+    --rail-muted: #7f93b3; --grid: rgba(255,255,255,.04); --edge: #2c3d57; --edge-hi: #5fd0e6;
+    --label: #dbe6f5; --marquee: rgba(95,208,230,.12); --marquee-line: #5fd0e6;
+    --cat-agent: #f2f6fc; --cat-tool: #4f86c6; --cat-chain: #3f597f;
+    --cat-entity: #5fd0e6; --cat-doc: #5a6b88; --cat-idea: #a7c4ec;
+  }
+
+  /* Do NOT transition background-color here. Its value is var(--bg), and when
+     the theme flips that var on <html>, Chrome refuses to re-resolve a
+     background-color that has a transition on it — the page stays stuck on the
+     old theme. Transitioning `color` is unaffected, so it stays. */
+  body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
+
+  /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
+     navigation is reachable on narrow screens. */
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+
+  #graphCanvas { display: block; touch-action: none; }
+  @keyframes nmpop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+  .nm-panel { animation: nmpop .22s cubic-bezier(.2,.8,.2,1); }
+  .nm-chip { cursor: pointer; transition: transform .12s ease; }
+  .nm-chip:hover { transform: translateX(2px); }
+  input::placeholder, textarea::placeholder { opacity: .55; }
+
+  /* Themed primitives — used instead of hard-coded Tailwind hex so both
+     themes flow from the variables above. */
+  .nm-rail    { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
+  .nm-chrome  { background: var(--chrome); border-color: var(--border); }
+  .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
+  .nm-field   { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
+  .nm-field:focus { outline: none; border-color: var(--accent); }
+  .nm-sub     { color: var(--sub); }
+  .nm-btn     { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; }
+  .nm-btn:hover { filter: brightness(.96); }
+  [data-nm-theme="dark"] .nm-btn:hover { filter: brightness(1.35); }
+  .nm-btn-primary { background: var(--accent); border: none; transition: filter .12s ease; }
+  .nm-btn-primary:hover { filter: brightness(1.1); }
+  [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
+  [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
+  .nm-rail-link:hover { background: var(--rail-hover); }
+  .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
+  .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
+  .toast.show { opacity:1; transform:translateY(0); }
+</style>
+</head>
+
+<body class="h-screen overflow-hidden flex">
+
+<!-- Backdrop behind the drawer nav on narrow screens -->
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- ═══════════════════════════════════ -->
+<nav id="sideNav" class="nm-rail fixed left-0 top-0 h-full flex flex-col gap-6 p-4 z-40 w-64 border-r">
+  <div class="px-2 py-1">
+    <h1 class="text-3xl tracking-normal" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--rail-txt);">FinChat</h1>
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <span class="text-[11px] font-bold tracking-widest uppercase px-3 mb-1" style="color: var(--rail-muted);">Navigation</span>
+    <a href="finchat_chat.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
+      <span class="material-symbols-outlined text-[18px]">chat</span> Chat
+    </a>
+    <a href="finchat_agents.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
+      <span class="material-symbols-outlined text-[18px]">tune</span> Agents
+    </a>
+    <a href="finchat_dashboard.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
+      <span class="material-symbols-outlined text-[18px]">space_dashboard</span> Operations
+    </a>
+    <a href="finchat_neuralmap.html" class="nm-rail-active flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm shadow-sm transition-all">
+      <span class="material-symbols-outlined text-[18px]">hub</span> Neural Map
+    </a>
+  </div>
+
+  <div class="flex-1"></div>
+
+  <div class="flex flex-col gap-1 border-t pt-4" style="border-color: var(--rail-hover);">
+    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="#">
+      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
+    </a>
+    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="finchat_audit.html">
+      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
+    </a>
+  </div>
+
+  <div class="flex items-center gap-2 px-2 py-2 border-t pt-4" style="border-color: var(--rail-hover);">
+    <div class="w-9 h-9 rounded-full shrink-0 relative flex items-center justify-center font-bold text-xs shadow-sm" style="background: var(--chrome); border: 1px solid var(--border); color: var(--txt);">
+      <span id="sidebarAvatarText">JD</span>
+      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2" style="border-color: var(--rail);"></div>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-[12px] font-semibold truncate" id="sidebarName" style="color: var(--rail-txt);">Jane Doe</div>
+      <div class="text-[10px] font-mono" id="sidebarRole" style="color: var(--rail-muted);">Staff · Internal</div>
+    </div>
+    <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════ -->
+<!-- MAIN                                -->
+<!-- ═══════════════════════════════════ -->
+<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+
+  <!-- Top App Bar -->
+  <header class="nm-chrome flex items-center gap-3 w-full px-6 py-3 h-16 z-50 border-b shrink-0">
+    <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[18px]">menu</span>
+    </button>
+    <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--accent-soft);">Neural Map</h1>
+    <span class="text-[10px] uppercase tracking-widest font-mono shrink-0 hidden xl:inline nm-sub" id="mapStats">loading…</span>
+
+    <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
+
+    <!-- Search -->
+    <div class="relative flex-1 min-w-[110px] max-w-[210px]">
+      <span class="material-symbols-outlined text-[18px] nm-sub absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
+      <input id="searchInput" placeholder="Search nodes…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" />
+    </div>
+
+    <!-- Recognize -->
+    <div class="relative flex-1 min-w-[130px] max-w-[210px] hidden lg:block">
+      <span class="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--accent-soft);">smart_toy</span>
+      <input id="recognizeInput" list="nm-known" placeholder="Jump to a node…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" style="border-style: dashed; border-color: var(--accent-soft);" />
+      <datalist id="nm-known"></datalist>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <button id="addNodeBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+      <span class="material-symbols-outlined text-[16px]">add</span> New node
+    </button>
+    <button id="selectAllBtn" title="Select all nodes (Ctrl+A) — then drag any of them to move the whole set" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[16px]">select_all</span>
+    </button>
+    <button id="resetViewBtn" title="Reset view" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[16px]">recenter</span>
+    </button>
+    <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
+    </button>
+    <button id="reloadBtn" title="Rebuild from live system state" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[16px]">sync</span>
+    </button>
+  </header>
+
+  <!-- Map switcher — like a tab strip of chats: the built-in System Map, then
+       every map you've created, then a button to start a new one. -->
+  <div class="nm-chrome flex items-center gap-2 w-full px-4 py-2 border-b shrink-0 overflow-x-auto" id="mapTabs" style="scrollbar-width: thin;"></div>
+
+  <!-- Canvas stage -->
+  <main class="flex-1 relative min-h-0" style="background: var(--bg);">
+    <canvas id="graphCanvas" class="w-full h-full"></canvas>
+
+    <!-- Hints -->
+    <div class="absolute left-4 bottom-3 flex flex-col gap-1 text-[11px] nm-sub pointer-events-none leading-relaxed">
+      <div>drag a node to move it · let go and it settles back · hover to trace its chain</div>
+      <div>scroll to zoom · drag background to pan · shift-drag to box-select · double-click to reshuffle</div>
+    </div>
+
+    <!-- Legend -->
+    <div id="legend" class="nm-surface absolute right-4 bottom-3 flex gap-3 text-[11px] px-4 py-2 rounded-full"></div>
+
+    <!-- Selection banner -->
+    <div id="selBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30 flex items-center gap-3">
+      <span id="selCount">0 selected</span>
+      <span class="opacity-60">·</span>
+      <span id="selPin" class="underline cursor-pointer opacity-90">pin where they are</span>
+      <span class="opacity-60">·</span>
+      <span id="selRelease" class="underline cursor-pointer opacity-90">let them float</span>
+      <span class="opacity-60">·</span>
+      <span id="selClear" class="underline cursor-pointer opacity-90">clear</span>
+    </div>
+
+    <!-- Link-mode banner -->
+    <div id="linkBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30">
+      Click another node to connect · <span id="cancelLink" class="opacity-80 underline cursor-pointer">cancel</span>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingVeil" class="absolute inset-0 flex items-center justify-center z-40" style="background: var(--bg);">
+      <div class="flex items-center gap-3 nm-sub text-sm font-mono">
+        <span class="material-symbols-outlined animate-spin">progress_activity</span> Building the map from live system state…
+      </div>
+    </div>
+
+    <div id="nodePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
+    <div id="edgePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
+  </main>
+</div>
+
+<!-- New Map picker — the "what kind of map" question, like picking a model
+     before starting a new chat. -->
+<div id="newMapModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6" style="background: rgba(0,0,0,.45);">
+  <div class="nm-panel nm-surface w-full max-w-[560px] rounded-2xl shadow-2xl overflow-hidden">
+    <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
+      <div>
+        <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">New map</div>
+        <div class="text-[12px] nm-sub mt-0.5">What do you want to build?</div>
+      </div>
+      <button id="newMapClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
+    </div>
+    <div class="p-5 flex flex-col gap-3">
+      <button id="pickKnowledge" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
+        <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-entity); color: var(--bg)">
+          <span class="material-symbols-outlined text-[20px]">hub</span>
+        </span>
+        <span>
+          <span class="block text-[15px] font-bold" style="color: var(--txt)">Knowledge map</span>
+          <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">A blank node-and-edge canvas. Add your own nodes, connect them, and take notes — like the System Map, but yours from scratch.</span>
+        </span>
+      </button>
+      <button id="pickNetwork" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
+        <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-agent); color: var(--bg)">
+          <span class="material-symbols-outlined text-[20px]">network_intelligence</span>
+        </span>
+        <span>
+          <span class="block text-[15px] font-bold" style="color: var(--txt)">ML neural network</span>
+          <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">Configure and train a real feed-forward network — layers, learning rate, activation — and watch it fit a curve with live loss, R², bias/variance, and generalisation metrics.</span>
+        </span>
+      </button>
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5 mt-1">Name it</div>
+        <input id="newMapName" placeholder="e.g. Portfolio ideas, or Sine regressor" class="nm-field w-full px-3 py-2.5 rounded-xl text-[14px]" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// Theme — warm (FinChat house) ⇄ dark (from the Neural Map design)
+// ══════════════════════════════════════════════════════════
+const THEME_KEY = 'finchat_nm_theme';
+let theme = localStorage.getItem(THEME_KEY) || 'warm';
+// Set the attribute immediately so the page paints in the right theme with no
+// flash. The rest of applyTheme touches state declared further down, so the
+// full call happens once everything exists (see "Go" at the bottom).
+document.documentElement.setAttribute('data-nm-theme', theme);
+
+function applyTheme(next) {
+  theme = next;
+  document.documentElement.setAttribute('data-nm-theme', next);
+  localStorage.setItem(THEME_KEY, next);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+  refreshPalette();
+  renderLegend();
+  // Panels bake colours in at render time, so re-render whichever is open.
+  if (selectedNode) openNode(selectedNode);
+  else if (selectedEdge) openEdge(selectedEdge);
+}
+
+// ══════════════════════════════════════════════════════════
+// Auth
+// ══════════════════════════════════════════════════════════
+const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+if (!_session) window.location.href = 'finchat_login.html';
+const SESSION_USER = _session || { name: 'User', role: 'user' };
+const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (_session && _session.token) || '';
+const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+
+// ══════════════════════════════════════════════════════════
+// Which map is open — like which chat thread is open. The System Map is the
+// default; picking or creating another map updates the URL so it's bookmarkable
+// and survives a reload.
+// ══════════════════════════════════════════════════════════
+let currentMapId = new URLSearchParams(location.search).get('mapId') || 'system';
+let currentMapName = 'System Map';
+let myMaps = [];   // cache from GET /maps, refreshed on load and after create/rename/delete
+const withMap = (url) => url + (url.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(currentMapId);
+function setUrlMapId(mapId) {
+  const u = new URL(location.href);
+  if (mapId === 'system') u.searchParams.delete('mapId'); else u.searchParams.set('mapId', mapId);
+  history.replaceState(null, '', u);
+}
+
+(function initSidebar() {
+  const name = SESSION_USER.name || SESSION_USER.username || 'User';
+  document.getElementById('sidebarName').textContent = name;
+  document.getElementById('sidebarAvatarText').textContent =
+    name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
+  fetch('/api/tokens/balance', { headers: AUTH })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; })
+    .catch(() => {});
+})();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ══════════════════════════════════════════════════════════
+// Palette — read straight from the CSS variables so the canvas
+// and the DOM can never drift apart.
+// ══════════════════════════════════════════════════════════
+let T = {};
+function refreshPalette() {
+  const s = getComputedStyle(document.documentElement);
+  const v = n => s.getPropertyValue(n).trim();
+  T = {
+    bg: v('--bg'), label: v('--label'), sub: v('--sub'), accent: v('--accent'),
+    edge: v('--edge'), edgeHi: v('--edge-hi'), grid: v('--grid'),
+    marquee: v('--marquee'), marqueeLine: v('--marquee-line'), match: v('--cat-tool'),
+    cat: {
+      agent: v('--cat-agent'), tool: v('--cat-tool'), chain: v('--cat-chain'),
+      entity: v('--cat-entity'), doc: v('--cat-doc'), idea: v('--cat-idea')
+    }
+  };
+}
+refreshPalette();
+
+const TYPE_LABEL = {
+  agent: 'AI Agent', tool: 'Wired Tool', chain: 'On-chain',
+  entity: 'Learned Concept', doc: 'Document', idea: 'My note / idea'
+};
+function renderLegend() {
+  document.getElementById('legend').innerHTML = Object.entries(TYPE_LABEL)
+    .map(([k, v]) => `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${T.cat[k]}"></span>${v.replace(' / idea', '')}</span>`)
+    .join('');
+}
+renderLegend();
+
+// ══════════════════════════════════════════════════════════
+// Graph state
+// ══════════════════════════════════════════════════════════
+let nodes = [], edges = [];
+const view = { scale: 1, panX: 0, panY: 0 };
+let hoverId = null, dragging = null, panning = null, marquee = null, centered = false;
+let selectedNode = null, selectedEdge = null, linkMode = false;
+let selection = new Set();   // node keys picked via box-select / select-all
+let searchQuery = '';
+
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+let cw = 0, ch = 0, dpr = 1;
+
+const byKey = k => nodes.find(n => n.key === k);
+const radiusOf = n => n.key === 'user:me' ? 20 : n.type === 'agent' ? 17 : n.type === 'chain' ? 14 : n.type === 'idea' ? 13 : 12;
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+  cw = r.width; ch = r.height;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!centered && cw > 0) { view.panX = cw / 2; view.panY = ch / 2; centered = true; }
+}
+window.addEventListener('resize', resize);
+
+// ══════════════════════════════════════════════════════════
+// Load real graph from the backend
+// ══════════════════════════════════════════════════════════
+async function loadGraph() {
+  try {
+    const res = await fetch(withMap('/api/neural-map'), { headers: AUTH });
+    if (res.status === 400) {
+      // Someone navigated straight to a network map's id on this page — send
+      // them to the page that actually renders it.
+      window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(currentMapId);
+      return;
+    }
+    if (res.status === 404) {
+      showToast('That map no longer exists — back to the System Map.');
+      currentMapId = 'system'; setUrlMapId('system');
+      return loadGraph();
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    currentMapName = data.map?.name || 'System Map';
+    nodes = data.nodes.map(n => ({
+      ...n,
+      x: Number.isFinite(n.x) ? n.x : (Math.random() - .5) * 520,
+      y: Number.isFinite(n.y) ? n.y : (Math.random() - .5) * 380,
+      pinned: Number.isFinite(n.x) && Number.isFinite(n.y),
+      vx: 0, vy: 0
+    }));
+    edges = data.edges.slice();
+    selection.clear(); syncSelBanner(); closePanels();
+    centered = false; view.scale = 1;
+
+    const s = data.stats || {};
+    document.getElementById('mapStats').textContent = data.map?.builtIn
+      ? `${s.agents || 0} agents · ${s.tools || 0} tools · ${s.entities || 0} learned · chain ${s.chainHeight || 0}`
+      : `${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} connection${edges.length === 1 ? '' : 's'}`;
+    document.getElementById('nm-known').innerHTML =
+      nodes.map(n => `<option value="${n.label.replace(/"/g, '&quot;')}"></option>`).join('');
+
+    document.getElementById('loadingVeil').classList.add('hidden');
+    resize();
+  } catch (err) {
+    document.getElementById('loadingVeil').classList.remove('hidden');
+    document.getElementById('loadingVeil').innerHTML =
+      `<div class="text-center text-sm font-mono px-6" style="color: var(--danger)">Couldn't load the map: ${err.message}<br><span class="nm-sub">Is the backend running?</span></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// Map switcher — the "new chat" style picker: System Map first, then every
+// map you've made, then a button to create another.
+// ══════════════════════════════════════════════════════════
+async function loadMapList() {
+  try {
+    const res = await fetch('/api/neural-map/maps', { headers: AUTH });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    myMaps = (await res.json()).maps;
+    renderMapTabs();
+  } catch (err) {
+    showToast(`⚠️ Couldn't load your maps: ${err.message}`);
+  }
+}
+
+function renderMapTabs() {
+  const bar = document.getElementById('mapTabs');
+  const tab = (m) => {
+    const active = m.mapId === currentMapId;
+    const icon = m.builtIn ? 'hub' : (m.kind === 'network' ? 'network_intelligence' : 'hub');
+    // Custom (non-built-in) maps get a × to delete them. The System Map can't
+    // be deleted, so it never shows one.
+    const del = m.builtIn ? '' : `
+      <span class="nm-tab-del inline-flex items-center justify-center rounded-full -mr-1" data-del="${m.mapId}" data-name="${esc(m.name)}"
+        title="Delete this map" style="width:16px;height:16px;">
+        <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+      </span>`;
+    return `
+      <span class="nm-tab inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 whitespace-nowrap"
+        data-map="${m.mapId}" data-kind="${m.kind}"
+        style="cursor:pointer; ${active
+          ? 'background: var(--accent); color: var(--bg); border: none'
+          : 'background: var(--field); color: var(--txt); border: 1px solid var(--border)'}">
+        <span class="material-symbols-outlined text-[14px]">${icon}</span>
+        <span class="nm-tab-label">${esc(m.name)}</span>${del}
+      </span>`;
+  };
+  bar.innerHTML = myMaps.map(tab).join('') + `
+    <button id="newMapBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 nm-btn">
+      <span class="material-symbols-outlined text-[14px]">add</span> New map
+    </button>`;
+
+  bar.querySelectorAll('.nm-tab').forEach(btn => {
+    btn.onclick = (e) => {
+      if (e.target.closest('[data-del]')) return; // handled below
+      switchToMap(btn.dataset.map, btn.dataset.kind);
+    };
+  });
+  bar.querySelectorAll('[data-del]').forEach(x => {
+    x.onclick = (e) => { e.stopPropagation(); deleteMap(x.dataset.del, x.dataset.name); };
+  });
+  document.getElementById('newMapBtn').onclick = openNewMapModal;
+}
+
+async function deleteMap(mapId, name) {
+  if (!confirm(`Delete “${name}”? This removes the map and everything in it. This can’t be undone.`)) return;
+  try {
+    const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(mapId)}`, { method: 'DELETE', headers: AUTH });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    // If we were viewing the deleted map, fall back to the System Map.
+    if (currentMapId === mapId) {
+      currentMapId = 'system'; setUrlMapId('system');
+      document.getElementById('loadingVeil').classList.remove('hidden');
+      await loadGraph();
+    }
+    await loadMapList();
+    showToast(`Deleted “${name}”.`);
+  } catch (err) { showToast(`⚠️ Couldn't delete map: ${err.message}`); }
+}
+
+function switchToMap(mapId, kind) {
+  if (mapId === currentMapId) return;
+  if (kind === 'network') {
+    window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(mapId);
+    return;
+  }
+  currentMapId = mapId;
+  setUrlMapId(mapId);
+  document.getElementById('loadingVeil').classList.remove('hidden');
+  loadGraph().then(renderMapTabs);
+}
+
+function openNewMapModal() {
+  document.getElementById('newMapName').value = '';
+  document.getElementById('newMapModal').classList.remove('hidden');
+  document.getElementById('newMapName').focus();
+}
+function closeNewMapModal() { document.getElementById('newMapModal').classList.add('hidden'); }
+
+async function createMap(kind) {
+  const name = document.getElementById('newMapName').value.trim();
+  try {
+    const res = await fetch('/api/neural-map/maps', {
+      method: 'POST', headers: AUTH, body: JSON.stringify({ name, kind })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    closeNewMapModal();
+    await loadMapList();
+    if (kind === 'network') {
+      window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(d.mapId);
+    } else {
+      switchToMap(d.mapId, 'knowledge');
+    }
+  } catch (err) {
+    showToast(`⚠️ Couldn't create map: ${err.message}`);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// Force layout
+//
+// A node is held still only while it is actually being dragged, or if it has
+// been explicitly pinned. Otherwise it stays in the simulation — so letting go
+// of a node lets it drift back to the rest of the graph, which is the whole
+// feel of the thing.
+// ══════════════════════════════════════════════════════════
+const isHeld = n => n.pinned || (dragging && (dragging.key === n.key || (dragging.keys && dragging.keys.includes(n.key))));
+
+function step() {
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    for (let j = i + 1; j < nodes.length; j++) {
+      const b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+      if (d2 < 1) { d2 = 1; dx = Math.random(); dy = Math.random(); }
+      const f = 5200 / d2, d = Math.sqrt(d2);
+      const fx = (dx / d) * f, fy = (dy / d) * f;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    }
+    a.vx -= a.x * 0.008; a.vy -= a.y * 0.008;
+  }
+  for (const e of edges) {
+    const a = byKey(e.from), b = byKey(e.to);
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const f = (d - 118) * 0.015;
+    const fx = (dx / d) * f, fy = (dy / d) * f;
+    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+  }
+  for (const n of nodes) {
+    if (isHeld(n)) { n.vx = 0; n.vy = 0; continue; }
+    n.vx *= 0.86; n.vy *= 0.86;
+    n.vx = Math.max(-40, Math.min(40, n.vx));
+    n.vy = Math.max(-40, Math.min(40, n.vy));
+    n.x += n.vx * 0.1; n.y += n.vy * 0.1;
+  }
+}
+
+function neighborSet(key) {
+  const ns = new Set([key]), es = new Set();
+  for (const e of edges) {
+    if (e.from === key) { ns.add(e.to); es.add(e.key); }
+    if (e.to === key) { ns.add(e.from); es.add(e.key); }
+  }
+  return { nodes: ns, edges: es };
+}
+
+function draw() {
+  if (!ctx || cw === 0) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, cw, ch);
+
+  ctx.fillStyle = T.grid;
+  const gs = 34 * view.scale;
+  if (gs > 8) {
+    const ox = view.panX % gs, oy = view.panY % gs;
+    for (let x = ox; x < cw; x += gs) for (let y = oy; y < ch; y += gs) {
+      ctx.beginPath(); ctx.arc(x, y, 1, 0, 7); ctx.fill();
+    }
+  }
+
+  ctx.save();
+  ctx.translate(view.panX, view.panY);
+  ctx.scale(view.scale, view.scale);
+
+  const q = searchQuery.trim().toLowerCase();
+  const focus = hoverId || (selectedNode && selectedNode.key);
+  const hi = focus ? neighborSet(focus) : null;
+  // When searching, everything that doesn't match fades back so the hits stand
+  // out — this is what makes typing in the search box visibly "do something".
+  const searchHits = q ? new Set(nodes.filter(n => n.label.toLowerCase().includes(q)).map(n => n.key)) : null;
+  const dimmed = n => (hi && !hi.nodes.has(n.key)) || (searchHits && !searchHits.has(n.key));
+
+  for (const e of edges) {
+    const a = byKey(e.from), b = byKey(e.to);
+    if (!a || !b) continue;
+    const active = hi ? hi.edges.has(e.key) : true;
+    const sel = selectedEdge && selectedEdge.key === e.key;
+    const faded = (hi && !active) || (searchHits && !(searchHits.has(e.from) && searchHits.has(e.to)));
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = sel ? T.edgeHi : (hi && active ? T.edgeHi : T.edge);
+    ctx.globalAlpha = faded ? 0.1 : (sel ? 1 : (hi ? 0.9 : 0.55));
+    ctx.lineWidth = (sel ? 3 : (hi && active ? 2 : 1.2)) / view.scale;
+    if (!e.derived) ctx.setLineDash([5 / view.scale, 4 / view.scale]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha = 1;
+
+  for (const n of nodes) {
+    const r = radiusOf(n);
+    const dim = dimmed(n);
+    const match = q && n.label.toLowerCase().includes(q);
+    const picked = selection.has(n.key);
+    const col = T.cat[n.type] || T.accent;
+    ctx.globalAlpha = dim ? 0.2 : 1;
+
+    if (match || n.key === focus) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 7, 0, 7);
+      ctx.fillStyle = match ? T.match : col;
+      ctx.globalAlpha = dim ? 0.2 : 0.22; ctx.fill();
+      ctx.globalAlpha = dim ? 0.2 : 1;
+    }
+
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 7);
+    ctx.fillStyle = col; ctx.fill();
+    if (selectedNode && n.key === selectedNode.key) {
+      ctx.lineWidth = 3 / view.scale; ctx.strokeStyle = T.accent;
+    } else {
+      ctx.lineWidth = 2 / view.scale; ctx.strokeStyle = T.bg;
+    }
+    ctx.stroke();
+
+    // box-selected → dashed accent ring
+    if (picked) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4.5, 0, 7);
+      ctx.setLineDash([3 / view.scale, 2.5 / view.scale]);
+      ctx.lineWidth = 1.8 / view.scale; ctx.strokeStyle = T.marqueeLine;
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    // pinned → small dot, so "held in place" is visible
+    if (n.pinned) {
+      ctx.beginPath(); ctx.arc(n.x + r * 0.78, n.y - r * 0.78, 2.6 / view.scale + 1.4, 0, 7);
+      ctx.fillStyle = T.accent; ctx.fill();
+    }
+
+    if (view.scale > 0.45) {
+      ctx.globalAlpha = dim ? 0.25 : 1;
+      ctx.fillStyle = T.label;
+      const bold = n.type === 'agent' || n.key === 'user:me';
+      ctx.font = `${bold ? '700' : '600'} ${bold ? 13 : 12}px Inter, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(n.label, n.x, n.y + r + 4);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // marquee box (screen space)
+  if (marquee) {
+    const x = Math.min(marquee.x0, marquee.x1), y = Math.min(marquee.y0, marquee.y1);
+    const w = Math.abs(marquee.x1 - marquee.x0), h = Math.abs(marquee.y1 - marquee.y0);
+    ctx.fillStyle = T.marquee; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = T.marqueeLine; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+  }
+}
+
+let running = true;
+function loop() { if (!running) return; step(); draw(); requestAnimationFrame(loop); }
+
+// ══════════════════════════════════════════════════════════
+// Hit testing / interaction
+// ══════════════════════════════════════════════════════════
+const toWorld = (x, y) => ({ x: (x - view.panX) / view.scale, y: (y - view.panY) / view.scale });
+const localXY = ev => { const r = canvas.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
+
+function hitNode(wx, wy) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i], r = radiusOf(n) + 4;
+    if ((n.x - wx) ** 2 + (n.y - wy) ** 2 <= r * r) return n;
+  }
+  return null;
+}
+function hitEdge(wx, wy) {
+  let best = null, bd = 7 / view.scale;
+  for (const e of edges) {
+    const a = byKey(e.from), b = byKey(e.to);
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+    let t = ((wx - a.x) * dx + (wy - a.y) * dy) / L2;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(wx - (a.x + t * dx), wy - (a.y + t * dy));
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+
+canvas.addEventListener('mousedown', ev => {
+  const { x, y } = localXY(ev), w = toWorld(x, y);
+  const n = hitNode(w.x, w.y);
+
+  if (n) {
+    if (linkMode) { finishLink(n); return; }
+    // Grabbing a node that's part of a selection drags the whole set.
+    if (selection.has(n.key) && selection.size > 1) {
+      dragging = {
+        keys: [...selection], moved: false, group: true, anchor: n.key,
+        start: { x: w.x, y: w.y },
+        orig: [...selection].map(k => { const m = byKey(k); return { key: k, x: m.x, y: m.y }; })
+      };
+    } else {
+      dragging = { key: n.key, moved: false };
+    }
+    return;
+  }
+
+  // Shift-drag on empty space draws a selection box.
+  if (ev.shiftKey) { marquee = { x0: x, y0: y, x1: x, y1: y }; return; }
+
+  const e = hitEdge(w.x, w.y);
+  if (e) { openEdge(e); return; }
+  panning = { x: ev.clientX, y: ev.clientY, px: view.panX, py: view.panY };
+});
+
+window.addEventListener('mousemove', ev => {
+  if (marquee) {
+    const { x, y } = localXY(ev);
+    marquee.x1 = x; marquee.y1 = y;
+    return;
+  }
+  if (dragging) {
+    const { x, y } = localXY(ev), w = toWorld(x, y);
+    if (dragging.group) {
+      const dx = w.x - dragging.start.x, dy = w.y - dragging.start.y;
+      for (const o of dragging.orig) {
+        const m = byKey(o.key);
+        if (m) { m.x = o.x + dx; m.y = o.y + dy; m.vx = 0; m.vy = 0; }
+      }
+      if (Math.abs(dx) + Math.abs(dy) > 1) dragging.moved = true;
+    } else {
+      const n = byKey(dragging.key);
+      if (n) { n.x = w.x; n.y = w.y; n.vx = 0; n.vy = 0; dragging.moved = true; }
+    }
+    return;
+  }
+  if (panning) {
+    view.panX = panning.px + (ev.clientX - panning.x);
+    view.panY = panning.py + (ev.clientY - panning.y);
+    return;
+  }
+  const r = canvas.getBoundingClientRect();
+  if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) {
+    hoverId = null; return;
+  }
+  const { x, y } = localXY(ev), w = toWorld(x, y);
+  const hn = hitNode(w.x, w.y);
+  hoverId = hn ? hn.key : null;
+  canvas.style.cursor = hn ? 'pointer' : (hitEdge(w.x, w.y) ? 'pointer' : 'grab');
+});
+
+window.addEventListener('mouseup', () => {
+  if (marquee) {
+    const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
+    const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
+    if (Math.abs(x1 - x0) > 4 && Math.abs(y1 - y0) > 4) {
+      const a = toWorld(x0, y0), b = toWorld(x1, y1);
+      selection.clear();
+      for (const n of nodes) {
+        if (n.x >= a.x && n.x <= b.x && n.y >= a.y && n.y <= b.y) selection.add(n.key);
+      }
+      syncSelBanner();
+    }
+    marquee = null;
+    return;
+  }
+
+  if (dragging) {
+    if (dragging.group) {
+      if (dragging.moved) {
+        // Moving a set is a deliberate arrangement — hold it and remember it.
+        const positions = dragging.orig.map(o => {
+          const m = byKey(o.key);
+          if (m) m.pinned = true;
+          return m ? { key: o.key, x: Math.round(m.x), y: Math.round(m.y) } : null;
+        }).filter(Boolean);
+        savePositions(positions);
+      }
+    } else if (!dragging.moved) {
+      openNode(byKey(dragging.key));
+    }
+    // A single dragged node is deliberately NOT pinned — it settles back into
+    // the graph on release. Use the panel's pin button to hold one in place.
+    dragging = null;
+    return;
+  }
+  panning = null;
+});
+
+canvas.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const { x, y } = localXY(ev);
+  const before = toWorld(x, y);
+  view.scale = Math.max(0.25, Math.min(3, view.scale * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  const after = toWorld(x, y);
+  view.panX += (after.x - before.x) * view.scale;
+  view.panY += (after.y - before.y) * view.scale;
+}, { passive: false });
+
+canvas.addEventListener('dblclick', ev => {
+  const { x, y } = localXY(ev), w = toWorld(x, y);
+  if (hitNode(w.x, w.y) || hitEdge(w.x, w.y)) return;
+  for (const n of nodes) {
+    if (n.pinned) continue; // a pinned node stays where you put it
+    n.x = (Math.random() - .5) * 520; n.y = (Math.random() - .5) * 380; n.vx = 0; n.vy = 0;
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// Selection
+// ══════════════════════════════════════════════════════════
+function syncSelBanner() {
+  const b = document.getElementById('selBanner');
+  if (!selection.size) { b.classList.add('hidden'); return; }
+  document.getElementById('selCount').textContent =
+    `${selection.size} node${selection.size === 1 ? '' : 's'} selected`;
+  b.classList.remove('hidden');
+}
+function selectAll() {
+  selection = new Set(nodes.map(n => n.key));
+  syncSelBanner();
+  showToast(`${selection.size} nodes selected — drag any one to move them all.`);
+}
+async function pinSelection() {
+  const positions = [...selection].map(k => {
+    const n = byKey(k);
+    if (n) n.pinned = true;
+    return n ? { key: k, x: Math.round(n.x), y: Math.round(n.y) } : null;
+  }).filter(Boolean);
+  await savePositions(positions);
+  showToast(`Pinned ${positions.length} nodes — they'll be here next time.`);
+}
+async function releaseSelection() {
+  const keys = [...selection];
+  for (const k of keys) { const n = byKey(k); if (n) n.pinned = false; }
+  await savePositions([], keys);
+  showToast('Released — they’ll drift back into the layout.');
+}
+async function savePositions(positions, unpin = []) {
+  if (!positions.length && !unpin.length) return;
+  try {
+    const res = await fetch(withMap('/api/neural-map/positions'), {
+      method: 'POST', headers: AUTH, body: JSON.stringify({ positions, unpin })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) { showToast(`⚠️ Couldn't save positions: ${err.message}`); }
+}
+
+// ══════════════════════════════════════════════════════════
+// Persistence (single node / edge)
+// ══════════════════════════════════════════════════════════
+const debouncers = {};
+function debounce(id, fn, ms = 600) {
+  clearTimeout(debouncers[id]);
+  debouncers[id] = setTimeout(fn, ms);
+}
+async function saveNode(key, body) {
+  try {
+    const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(key)}`), {
+      method: 'PUT', headers: AUTH, body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) { showToast(`⚠️ Couldn't save node: ${err.message}`); }
+}
+async function saveEdge(key, body) {
+  try {
+    const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(key)}`), {
+      method: 'PUT', headers: AUTH, body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) { showToast(`⚠️ Couldn't save connection: ${err.message}`); }
+}
+
+// ══════════════════════════════════════════════════════════
+// Panels
+// ══════════════════════════════════════════════════════════
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nodePanel = document.getElementById('nodePanel');
+const edgePanel = document.getElementById('edgePanel');
+
+function closePanels() {
+  selectedNode = null; selectedEdge = null; linkMode = false;
+  nodePanel.classList.add('hidden'); edgePanel.classList.add('hidden');
+  document.getElementById('linkBanner').classList.add('hidden');
+}
+
+function openNode(n) {
+  if (!n) return;
+  selectedNode = n; selectedEdge = null;
+  edgePanel.classList.add('hidden');
+  const col = T.cat[n.type] || T.accent;
+  const conns = edges.filter(e => e.from === n.key || e.to === n.key)
+    .map(e => ({ edge: e, other: byKey(e.from === n.key ? e.to : e.from) }))
+    .filter(c => c.other);
+
+  nodePanel.innerHTML = `
+    <div class="p-4 border-b" style="border-color: var(--border)">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-[15px]" style="background:${col}; color: var(--bg)">${esc(n.label.charAt(0).toUpperCase())}</span>
+          <div class="min-w-0">
+            <input id="npLabel" value="${esc(n.label)}" class="w-full border-0 bg-transparent text-[19px] font-bold outline-none p-0" style="font-family: Georgia, serif; color: var(--txt)" />
+            <div class="text-[10px] uppercase tracking-widest mt-0.5" style="color:${col}">${esc(TYPE_LABEL[n.type] || n.type)}${n.derived ? '' : ' · yours'}</div>
+          </div>
+        </div>
+        <button id="npClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
+      </div>
+    </div>
+    <div class="p-4 flex flex-col gap-4">
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Note</div>
+        <textarea id="npNote" placeholder="Add your own note about this node…" class="nm-field w-full min-h-[78px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(n.note)}</textarea>
+        <div class="text-[10px] nm-sub mt-1 font-mono" id="npSaved">saves automatically</div>
+      </div>
+
+      ${(n.meta && n.meta.length) ? `
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Live metadata</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          ${n.meta.map(m => `
+            <div class="nm-field rounded-lg px-2.5 py-1.5">
+              <div class="text-[9px] uppercase tracking-wider nm-sub">${esc(m[0])}</div>
+              <div class="text-[13px] font-semibold" style="color: var(--txt)">${esc(m[1])}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      ${(n.apis && n.apis.length) ? `
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Linked APIs / namespaces</div>
+        <div class="flex flex-col gap-1.5">
+          ${n.apis.map(a => `
+            <div class="nm-field flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-mono break-all">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--cat-tool)"></span>${esc(a)}
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[10px] font-bold tracking-widest uppercase nm-sub">Connections (${conns.length})</span>
+          <button id="npLink" class="flex items-center gap-1 text-[12px] font-semibold hover:underline" style="color: var(--accent-soft)">
+            <span class="material-symbols-outlined text-[13px]">add</span>connect
+          </button>
+        </div>
+        <div class="flex flex-col gap-1">
+          ${conns.map((c, i) => `
+            <div class="nm-chip nm-field flex items-center gap-2 rounded-xl px-2.5 py-2" data-conn="${i}">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${T.cat[c.other.type] || T.accent}"></span>
+              <span class="text-[13px] font-semibold flex-1 truncate" style="color: var(--txt)">${esc(c.other.label)}</span>
+              <span class="material-symbols-outlined text-[14px] nm-sub">chevron_right</span>
+            </div>`).join('') || '<div class="text-[12px] nm-sub italic">No connections yet.</div>'}
+        </div>
+      </div>
+
+      <button id="npPin" class="nm-btn flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold">
+        <span class="material-symbols-outlined text-[14px]">${n.pinned ? 'push_pin' : 'radio_button_unchecked'}</span>
+        ${n.pinned ? 'Pinned here — click to let it float' : 'Pin this node where it is'}
+      </button>
+
+      <button id="npDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
+        <span class="material-symbols-outlined text-[14px]">${n.derived ? 'visibility_off' : 'delete'}</span>
+        ${n.derived ? 'Hide from my map' : 'Delete node'}
+      </button>
+      ${n.derived ? '<div class="text-[10px] nm-sub text-center -mt-2">This node is derived from real system state, so it can be hidden but not deleted.</div>' : ''}
+    </div>`;
+
+  nodePanel.classList.remove('hidden');
+
+  document.getElementById('npClose').onclick = closePanels;
+  document.getElementById('npLabel').oninput = e => {
+    n.label = e.target.value;
+    debounce('label' + n.key, () => saveNode(n.key, { label: n.label }));
+  };
+  document.getElementById('npNote').oninput = e => {
+    n.note = e.target.value;
+    document.getElementById('npSaved').textContent = 'saving…';
+    debounce('note' + n.key, async () => {
+      await saveNode(n.key, { note: n.note });
+      const el = document.getElementById('npSaved');
+      if (el) el.textContent = 'saved ✓';
+    });
+  };
+  document.getElementById('npPin').onclick = async () => {
+    n.pinned = !n.pinned;
+    if (n.pinned) await savePositions([{ key: n.key, x: Math.round(n.x), y: Math.round(n.y) }]);
+    else await savePositions([], [n.key]);
+    openNode(n);
+    showToast(n.pinned ? 'Pinned.' : 'Released — it’ll settle back into the graph.');
+  };
+  document.getElementById('npLink').onclick = () => {
+    linkMode = true;
+    document.getElementById('linkBanner').classList.remove('hidden');
+  };
+  document.getElementById('npDelete').onclick = () => deleteNode(n);
+  nodePanel.querySelectorAll('[data-conn]').forEach(el => {
+    el.onclick = () => openNode(conns[parseInt(el.dataset.conn)].other);
+  });
+}
+
+function openEdge(e) {
+  selectedEdge = e; selectedNode = null;
+  nodePanel.classList.add('hidden');
+  const a = byKey(e.from), b = byKey(e.to);
+
+  edgePanel.innerHTML = `
+    <div class="p-4 border-b flex items-start justify-between gap-2" style="border-color: var(--border)">
+      <div>
+        <div class="text-[10px] uppercase tracking-widest nm-sub">Connection${e.derived ? '' : ' · yours'}</div>
+        <div class="flex items-center gap-2 mt-1 text-[16px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">
+          <span>${esc(a ? a.label : '?')}</span>
+          <span class="material-symbols-outlined text-[18px]" style="color: var(--accent-soft)">arrow_forward</span>
+          <span>${esc(b ? b.label : '?')}</span>
+        </div>
+      </div>
+      <button id="epClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
+    </div>
+    <div class="p-4 flex flex-col gap-4">
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Your note on this link</div>
+        <textarea id="epNote" placeholder="How are these connected? Why does this link exist?" class="nm-field w-full min-h-[70px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(e.note)}</textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Endpoint</div>
+          <input id="epApi" value="${esc(e.api)}" placeholder="/api/…" class="nm-field w-full px-2.5 py-2 rounded-lg font-mono text-[12px]" />
+        </div>
+        <div>
+          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Data flow</div>
+          <input id="epFlow" value="${esc(e.flow)}" placeholder="bidirectional" class="nm-field w-full px-2.5 py-2 rounded-lg text-[12px]" />
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">JSON payload / schema</div>
+        <textarea id="epJson" placeholder="{ }" class="nm-field w-full min-h-[90px] resize-y rounded-xl font-mono text-[12px] leading-relaxed p-2.5">${esc(e.payload)}</textarea>
+      </div>
+      ${e.derived ? '' : `
+      <button id="epDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
+        <span class="material-symbols-outlined text-[14px]">close</span> Remove connection
+      </button>`}
+    </div>`;
+
+  edgePanel.classList.remove('hidden');
+  document.getElementById('epClose').onclick = closePanels;
+
+  const bind = (id, field) => {
+    document.getElementById(id).oninput = ev => {
+      e[field] = ev.target.value;
+      debounce(field + e.key, () => saveEdge(e.key, { [field]: e[field] }));
+    };
+  };
+  bind('epNote', 'note'); bind('epApi', 'api'); bind('epFlow', 'flow'); bind('epJson', 'payload');
+  const del = document.getElementById('epDelete');
+  if (del) del.onclick = () => deleteEdge(e);
+}
+
+// ══════════════════════════════════════════════════════════
+// Mutations
+// ══════════════════════════════════════════════════════════
+async function addNode() {
+  try {
+    const res = await fetch(withMap('/api/neural-map/nodes'), {
+      method: 'POST', headers: AUTH, body: JSON.stringify({ label: 'New node', type: 'idea' })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    const w = toWorld(cw / 2, ch / 2);
+    const n = {
+      key: d.key, label: d.label, type: d.type, note: '', meta: [], apis: [], derived: false,
+      x: w.x + (Math.random() - .5) * 40, y: w.y + (Math.random() - .5) * 40, vx: 0, vy: 0, pinned: false
+    };
+    nodes.push(n);
+    openNode(n);
+    showToast('Node created — it will be here when you come back.');
+  } catch (err) { showToast(`⚠️ Couldn't create node: ${err.message}`); }
+}
+
+async function finishLink(target) {
+  const src = selectedNode;
+  linkMode = false;
+  document.getElementById('linkBanner').classList.add('hidden');
+  if (!src || target.key === src.key) return;
+  if (edges.find(e => (e.from === src.key && e.to === target.key) || (e.to === src.key && e.from === target.key))) {
+    showToast('Those two are already connected.');
+    return;
+  }
+  try {
+    const res = await fetch(withMap('/api/neural-map/edges'), {
+      method: 'POST', headers: AUTH, body: JSON.stringify({ from: src.key, to: target.key })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    const e = { key: d.key, from: src.key, to: target.key, note: '', api: '', flow: '', payload: '', derived: false };
+    edges.push(e);
+    openEdge(e);
+    showToast(`Connected ${src.label} → ${target.label}`);
+  } catch (err) { showToast(`⚠️ ${err.message}`); }
+}
+
+async function deleteNode(n) {
+  try {
+    const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(n.key)}`), { method: 'DELETE', headers: AUTH });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    nodes = nodes.filter(x => x.key !== n.key);
+    edges = edges.filter(e => e.from !== n.key && e.to !== n.key);
+    selection.delete(n.key); syncSelBanner();
+    closePanels();
+    showToast(d.mode === 'hidden' ? `${n.label} hidden from your map.` : `${n.label} deleted.`);
+  } catch (err) { showToast(`⚠️ ${err.message}`); }
+}
+
+async function deleteEdge(e) {
+  try {
+    const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(e.key)}`), { method: 'DELETE', headers: AUTH });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    edges = edges.filter(x => x.key !== e.key);
+    closePanels();
+    showToast('Connection removed.');
+  } catch (err) { showToast(`⚠️ ${err.message}`); }
+}
+
+// ══════════════════════════════════════════════════════════
+// Toolbar
+// ══════════════════════════════════════════════════════════
+const searchInput = document.getElementById('searchInput');
+searchInput.oninput = e => { searchQuery = e.target.value; };
+searchInput.onkeydown = e => {
+  if (e.key !== 'Enter') return;
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return;
+  // Jump to (and open) the first matching node.
+  const hit = nodes.find(n => n.label.toLowerCase() === q) || nodes.find(n => n.label.toLowerCase().includes(q));
+  if (hit) {
+    view.panX = cw / 2 - hit.x * view.scale;
+    view.panY = ch / 2 - hit.y * view.scale;
+    openNode(hit);
+  } else {
+    showToast(`No node matches “${searchQuery.trim()}”.`);
+  }
+};
+document.getElementById('addNodeBtn').onclick = addNode;
+document.getElementById('selectAllBtn').onclick = selectAll;
+document.getElementById('themeBtn').onclick = () => applyTheme(theme === 'dark' ? 'warm' : 'dark');
+
+// Drawer nav on narrow screens
+function toggleNav(open) {
+  const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop');
+  const show = open === undefined ? !nav.classList.contains('open') : open;
+  nav.classList.toggle('open', show);
+  bd.classList.toggle('hidden', !show);
+}
+document.getElementById('navToggle').onclick = () => toggleNav();
+document.getElementById('navBackdrop').onclick = () => toggleNav(false);
+document.getElementById('selPin').onclick = pinSelection;
+document.getElementById('selRelease').onclick = releaseSelection;
+document.getElementById('selClear').onclick = () => { selection.clear(); syncSelBanner(); };
+document.getElementById('cancelLink').onclick = () => {
+  linkMode = false;
+  document.getElementById('linkBanner').classList.add('hidden');
+};
+document.getElementById('resetViewBtn').onclick = () => {
+  view.scale = 1; view.panX = cw / 2; view.panY = ch / 2;
+};
+document.getElementById('reloadBtn').onclick = async () => {
+  closePanels();
+  document.getElementById('loadingVeil').classList.remove('hidden');
+  await loadGraph();
+  showToast(currentMapId === 'system' ? 'Map rebuilt from live system state.' : 'Map reloaded.');
+};
+document.getElementById('newMapClose').onclick = closeNewMapModal;
+document.getElementById('newMapModal').addEventListener('click', e => { if (e.target.id === 'newMapModal') closeNewMapModal(); });
+document.getElementById('pickKnowledge').onclick = () => createMap('knowledge');
+document.getElementById('pickNetwork').onclick = () => createMap('network');
+document.getElementById('recognizeInput').onchange = e => {
+  const v = e.target.value.trim().toLowerCase();
+  const n = nodes.find(x => x.label.toLowerCase() === v);
+  if (!n) return;
+  view.panX = cw / 2 - n.x * view.scale;
+  view.panY = ch / 2 - n.y * view.scale;
+  openNode(n);
+  e.target.value = '';
+};
+
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
+  if (e.key === 'Escape') {
+    if (!document.getElementById('newMapModal').classList.contains('hidden')) { closeNewMapModal(); return; }
+    if (selection.size) { selection.clear(); syncSelBanner(); }
+    closePanels();
+    return;
+  }
+  if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault(); selectAll();
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// Go
+// ══════════════════════════════════════════════════════════
+applyTheme(theme);   // now that palette, legend and panel state all exist
+resize();
+loadGraph().then(() => { resize(); });
+loadMapList();
+loop();
+</script>
+</body>
+</html>

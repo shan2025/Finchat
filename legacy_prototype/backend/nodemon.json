@@ -1,0 +1,15 @@
+{
+  "watch": ["routes", "services", "circuits", "server.js"],
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "*.test.js",
+    "*.json",
+    "*.db",
+    "*.log",
+    "node_modules",
+    "tmp",
+    "logs",
+    ".env*"
+  ],
+  "delay": 1500
+}
