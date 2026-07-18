@@ -950,31 +950,78 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // PERSONA SWITCHING & HERO
     // ─────────────────────────────────
     function renderHeroHTML(personaId) {
-      const p = PERSONAS[personaId || activePersona] || PERSONAS['plato'];
+      const pid = personaId || activePersona || 'plato';
+      const p = PERSONAS[pid] || PERSONAS['plato'];
+
+      const heroConfigs = {
+        plato: {
+          title: 'How can I help today?',
+          subtitle: 'Ask anything — planning, synthesis, or coordinating the other agents on a task.',
+          cards: [
+            { icon: 'show_chart', title: 'Summarize system activity', desc: 'Give me a rundown of what the agents handled in the last 24 hours.', prompt: 'Summarize system activity. Give me a rundown of what the agents handled in the last 24 hours.' },
+            { icon: 'gps_fixed', title: "Plan this week's priorities", desc: 'Draft a focused plan across operations, analysis and compliance.', prompt: "Plan this week's priorities. Draft a focused plan across operations, analysis and compliance." },
+            { icon: 'route', title: 'Route a complex task', desc: 'Break this request down and assign the right agent to each part.', prompt: 'Route a complex task. Break this request down and assign the right agent to each part.' },
+            { icon: 'auto_awesome', title: 'Draft an update', desc: 'Write a short status update I can share with the team.', prompt: 'Draft an update. Write a short status update I can share with the team.' }
+          ]
+        },
+        aurelius: {
+          title: 'Ready for financial analysis.',
+          subtitle: 'Ask anything — portfolio strategy, yield modeling, or macroeconomic risk synthesis.',
+          cards: [
+            { icon: 'analytics', title: 'Analyze market volatility', desc: 'Synthesize current macro trends and impact on crypto & equities.', prompt: 'Analyze market volatility. Synthesize current macro trends and impact on crypto & equities.' },
+            { icon: 'pie_chart', title: 'Optimize treasury allocation', desc: 'Evaluate capital efficiency and recommend yield strategy.', prompt: 'Optimize treasury allocation. Evaluate capital efficiency and recommend yield strategy.' },
+            { icon: 'balance', title: 'Evaluate risk exposure', desc: 'Perform stress testing across decentralized liquidity pools.', prompt: 'Evaluate risk exposure. Perform stress testing across decentralized liquidity pools.' },
+            { icon: 'trending_up', title: 'Forecast yield curves', desc: 'Model 30-day returns and risk-adjusted growth vectors.', prompt: 'Forecast yield curves. Model 30-day returns and risk-adjusted growth vectors.' }
+          ]
+        },
+        rasha: {
+          title: 'How can we accelerate your career?',
+          subtitle: 'Ask anything — leadership positioning, negotiation strategy, or executive branding.',
+          cards: [
+            { icon: 'work', title: 'Review leadership presence', desc: 'Analyze executive communication and stakeholder alignment.', prompt: 'Review leadership presence. Analyze executive communication and stakeholder alignment.' },
+            { icon: 'handshake', title: 'Prepare negotiation strategy', desc: 'Structure high-stakes compensation or partnership terms.', prompt: 'Prepare negotiation strategy. Structure high-stakes compensation or partnership terms.' },
+            { icon: 'psychology', title: 'Map stakeholder influence', desc: 'Identify key decision-makers and build rapport pathways.', prompt: 'Map stakeholder influence. Identify key decision-makers and build rapport pathways.' },
+            { icon: 'stars', title: 'Refine executive profile', desc: 'Enhance professional narrative for board and advisory roles.', prompt: 'Refine executive profile. Enhance professional narrative for board and advisory roles.' }
+          ]
+        },
+        nova: {
+          title: 'Exploring frontier research.',
+          subtitle: 'Ask anything — emerging technologies, scientific literature, or complex technical synthesis.',
+          cards: [
+            { icon: 'science', title: 'Synthesize research papers', desc: 'Summarize latest breakthroughs in zero-knowledge cryptography.', prompt: 'Synthesize research papers. Summarize latest breakthroughs in zero-knowledge cryptography.' },
+            { icon: 'hub', title: 'Map technology dependencies', desc: 'Trace architectural vectors across AI and decentralized protocols.', prompt: 'Map technology dependencies. Trace architectural vectors across AI and decentralized protocols.' },
+            { icon: 'biotech', title: 'Evaluate technical feasibility', desc: 'Analyze algorithmic complexity and hardware constraints.', prompt: 'Evaluate technical feasibility. Analyze algorithmic complexity and hardware constraints.' },
+            { icon: 'biotech', title: 'Run literature review', desc: 'Gather comparative benchmarks across modern consensus mechanisms.', prompt: 'Run literature review. Gather comparative benchmarks across modern consensus mechanisms.' }
+          ]
+        }
+      };
+
+      const cfg = heroConfigs[pid] || heroConfigs.plato;
+
+      const cardsHTML = cfg.cards.map(c => {
+        const safePrompt = c.prompt.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `
+            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('${safePrompt}')">
+              <div>
+                <div class="w-9 h-9 rounded-xl bg-[#f5e8d8] text-[#8c491a] flex items-center justify-center mb-3 shrink-0 transition-transform group-hover:scale-105">
+                  <span class="material-symbols-outlined text-[20px]">${c.icon}</span>
+                </div>
+                <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">${c.title}</div>
+              </div>
+              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4; margin-top:2px;">${c.desc}</div>
+            </div>
+        `;
+      }).join('');
+
       return `
         <div class="chat-hero flex flex-col items-center justify-center text-center my-6 max-w-[760px] mx-auto px-4 shrink-0" style="animation:fadeUp 0.25s ease;">
           <div class="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] border border-[#e3d3ba] shadow-sm mb-4">
             ${p.avatar}
           </div>
-          <h1 style="font-family:var(--serif); font-size:36px; line-height:1.2; color:#2a1f18; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px;">How can I help today?</h1>
-          <p style="font-size:14.5px; color:#8a7d6a; max-width:520px; line-height:1.5; margin-bottom:28px;">Ask anything — financial synthesis, neural mapping, or coordinating executive domain agents.</p>
+          <h1 style="font-family:var(--serif); font-size:36px; line-height:1.2; color:#2a1f18; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px;">${cfg.title}</h1>
+          <p style="font-size:14.5px; color:#8a7d6a; max-width:520px; line-height:1.5; margin-bottom:28px;">${cfg.subtitle}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full text-left">
-            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Give me a rundown of what the agents handled across all channels today.')">
-              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Summarize system activity</div>
-              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Give me a rundown of what the agents handled across all channels today.</div>
-            </div>
-            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Draft a focused weekly plan across operations, analysis, and compliance.')">
-              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Plan this week's priorities</div>
-              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Draft a focused weekly plan across operations, analysis, and compliance.</div>
-            </div>
-            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Verify recent zero-knowledge proofs and Solana anchor slots.')">
-              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Audit blockchain anchors</div>
-              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Verify recent zero-knowledge proofs and Solana anchor slots.</div>
-            </div>
-            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('/graphify Solana ecosystem risks and agent governance flow')">
-              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Generate Neural Map</div>
-              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Run /graphify to extract key concepts and update the knowledge graph.</div>
-            </div>
+            ${cardsHTML}
           </div>
         </div>
       `;
