@@ -262,8 +262,8 @@ router.get('/', requireAuth, async (req, res) => {
                FROM proof_chain`),
         query(`SELECT node_key, label, node_type, note, meta, apis FROM neural_map_nodes WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
         query(`SELECT edge_key, from_key, to_key FROM neural_map_edges WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
-        query(`SELECT node_key, note, label_override, pos_x, pos_y, hidden FROM neural_map_node_meta WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
-        query(`SELECT edge_key, note, api, flow, payload FROM neural_map_edge_meta WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
+        query(`SELECT node_key, note, label_override, pos_x, pos_y, hidden, color FROM neural_map_node_meta WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
+        query(`SELECT edge_key, note, api, flow, payload, style FROM neural_map_edge_meta WHERE user_id = $1 AND map_id = $2`, [userId, mapId]),
         query(`SELECT name, role, token_balance FROM users WHERE user_id = $1`, [userId])
       ]);
 
@@ -424,6 +424,7 @@ router.get('/', requireAuth, async (req, res) => {
         if (m.note != null) n.note = m.note;
         if (m.label_override) n.label = m.label_override;
         if (m.pos_x != null && m.pos_y != null) { n.x = m.pos_x; n.y = m.pos_y; }
+        if (m.color) n.color = m.color;
       }
       visible.push(n);
     }
@@ -438,7 +439,13 @@ router.get('/', requireAuth, async (req, res) => {
       if (m.api != null) e.api = m.api;
       if (m.flow != null) e.flow = m.flow;
       if (m.payload != null) e.payload = m.payload;
+      if (m.style) e.style = m.style;
     }
+
+    // Per-type counts of what is actually visible, computed server-side so the
+    // legend can't drift from the data (and so tests can assert the math).
+    const typeCounts = {};
+    for (const n of visible) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
 
     res.json({
       nodes: visible,
@@ -449,7 +456,10 @@ router.get('/', requireAuth, async (req, res) => {
         tools: toolsSeen.size,
         entities: isSystem ? entsQ.rows.length : 0,
         chainHeight: isSystem ? (parseInt(ch.max_height) || 0) : 0,
-        custom: customNodesQ.rows.length
+        custom: customNodesQ.rows.length,
+        nodes: visible.length,
+        edges: liveEdges.length,
+        typeCounts
       }
     });
   } catch (err) {
@@ -478,19 +488,25 @@ router.put('/nodes/:key', requireAuth, async (req, res) => {
   try {
     const mapId = await requireOwnedMap(req, res);
     if (!mapId) return;
-    const { note, label, x, y, hidden } = req.body || {};
+    const { note, label, x, y, hidden, color } = req.body || {};
+    // color: undefined → untouched, '' → reset to the type palette, '#rrggbb' → set.
+    if (color !== undefined && color !== '' && !/^#[0-9a-fA-F]{6}$/.test(String(color))) {
+      return res.status(400).json({ error: 'color must be a #rrggbb hex value' });
+    }
     await query(
-      `INSERT INTO neural_map_node_meta (user_id, map_id, node_key, note, label_override, pos_x, pos_y, hidden, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+      `INSERT INTO neural_map_node_meta (user_id, map_id, node_key, note, label_override, pos_x, pos_y, hidden, color, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, now())
        ON CONFLICT (user_id, map_id, node_key) DO UPDATE SET
          note           = COALESCE(EXCLUDED.note, neural_map_node_meta.note),
          label_override = COALESCE(EXCLUDED.label_override, neural_map_node_meta.label_override),
          pos_x          = COALESCE(EXCLUDED.pos_x, neural_map_node_meta.pos_x),
          pos_y          = COALESCE(EXCLUDED.pos_y, neural_map_node_meta.pos_y),
          hidden         = EXCLUDED.hidden,
+         color          = CASE WHEN $9::boolean THEN EXCLUDED.color ELSE neural_map_node_meta.color END,
          updated_at     = now()`,
       [req.user.id, mapId, req.params.key, note ?? null, label ?? null,
-        Number.isFinite(x) ? x : null, Number.isFinite(y) ? y : null, hidden ? 1 : 0]
+        Number.isFinite(x) ? x : null, Number.isFinite(y) ? y : null, hidden ? 1 : 0,
+        color !== undefined, color ? String(color) : null]
     );
     // Keep a custom node's own row in sync so it survives independently of the annotation.
     if (req.params.key.startsWith('custom:') && (label != null || note != null)) {
@@ -556,6 +572,27 @@ router.post('/positions', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Neural map bulk position error:', err);
     res.status(500).json({ error: 'Failed to save positions' });
+  }
+});
+
+/**
+ * GET /api/neural-map/documents — the signed-in user's uploaded files, so they
+ * can be dropped onto the map as Document nodes and then connected like any node.
+ */
+router.get('/documents', requireAuth, async (req, res) => {
+  try {
+    const r = await query(
+      `SELECT file_id AS id, filename, mimetype, size_bytes AS size, created_at
+         FROM files
+        WHERE uploader_id = $1
+        ORDER BY created_at DESC
+        LIMIT 100`,
+      [req.user.id]
+    );
+    res.json({ documents: r.rows });
+  } catch (err) {
+    console.error('Neural map documents error:', err);
+    res.status(500).json({ error: 'Failed to load documents' });
   }
 });
 
@@ -634,17 +671,23 @@ router.put('/edges/:key', requireAuth, async (req, res) => {
   try {
     const mapId = await requireOwnedMap(req, res);
     if (!mapId) return;
-    const { note, api, flow, payload } = req.body || {};
+    const { note, api, flow, payload, style } = req.body || {};
+    // style: undefined → untouched, '' → reset to default (solid), else solid|dashed.
+    if (style !== undefined && style !== '' && !['solid', 'dashed'].includes(style)) {
+      return res.status(400).json({ error: 'style must be "solid" or "dashed"' });
+    }
     await query(
-      `INSERT INTO neural_map_edge_meta (user_id, map_id, edge_key, note, api, flow, payload, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+      `INSERT INTO neural_map_edge_meta (user_id, map_id, edge_key, note, api, flow, payload, style, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $9, now())
        ON CONFLICT (user_id, map_id, edge_key) DO UPDATE SET
          note    = COALESCE(EXCLUDED.note, neural_map_edge_meta.note),
          api     = COALESCE(EXCLUDED.api, neural_map_edge_meta.api),
          flow    = COALESCE(EXCLUDED.flow, neural_map_edge_meta.flow),
          payload = COALESCE(EXCLUDED.payload, neural_map_edge_meta.payload),
+         style   = CASE WHEN $8::boolean THEN EXCLUDED.style ELSE neural_map_edge_meta.style END,
          updated_at = now()`,
-      [req.user.id, mapId, req.params.key, note ?? null, api ?? null, flow ?? null, payload ?? null]
+      [req.user.id, mapId, req.params.key, note ?? null, api ?? null, flow ?? null, payload ?? null,
+        style !== undefined, style ? style : null]
     );
     res.json({ ok: true });
   } catch (err) {

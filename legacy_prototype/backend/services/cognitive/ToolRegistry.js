@@ -4,6 +4,7 @@
 const TOOLS = {
   search: {
     name: 'search',
+    web: true, // open-web tool — gated by the chat composer's WEB toggle
     description: 'Search the web for current information. Use this when you need up-to-date facts, news, or data that you do not already know.',
     inputSchema: {
       type: 'object',
@@ -132,6 +133,116 @@ const TOOLS = {
     rateLimitPerMinute: 15
   },
 
+  fetch: {
+    name: 'fetch',
+    web: true,
+    description: 'Fetch a specific URL and extract its readable text content, title, and links. Use this AFTER search/jobs/news gave you a URL and you need the actual page content. Input: {"url": "https://..."}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The full URL to fetch' }
+      },
+      required: ['url']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' }, title: { type: 'string' },
+        text: { type: 'string', description: 'Clean readable page text' },
+        links: { type: 'array' }
+      }
+    },
+    cacheTTLSeconds: 300,
+    rateLimitPerMinute: 10
+  },
+
+  crawl: {
+    name: 'crawl',
+    web: true,
+    description: 'Crawl a website starting from a URL: fetches the page plus same-site linked pages (depth ≤ 2, max 10 pages, robots.txt respected). Use for research digests when one page is not enough. Input: {"url":"https://...","depth":1}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Starting URL' },
+        depth: { type: 'number', description: 'Link depth to follow (1 or 2, default 1)' },
+        maxPages: { type: 'number', description: 'Page cap (max 10)' }
+      },
+      required: ['url']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        pages: { type: 'array', description: 'Crawled pages with url, title, excerpt' }
+      }
+    },
+    cacheTTLSeconds: 600,
+    rateLimitPerMinute: 3
+  },
+
+  news: {
+    name: 'news',
+    web: true,
+    description: 'Get recent (last 48h) crypto, finance, and tech headlines from trusted RSS feeds (CoinDesk, Cointelegraph, CNBC, MIT Tech Review). Input a symbol or topic like "BTC", "solana", "AI"; optional category: crypto|markets|tech.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Symbol or topic to match, e.g. "BTC", "AI"' },
+        category: { type: 'string', description: 'Optional: crypto | markets | tech' }
+      },
+      required: ['query']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        results: { type: 'array', description: 'Headlines with title, url, feed, publishedAt' }
+      }
+    },
+    cacheTTLSeconds: 600,
+    rateLimitPerMinute: 6
+  },
+
+  watchlist: {
+    name: 'watchlist',
+    description: 'Read or modify the user\'s market watchlist (crypto/stock/commodity symbols they track). Input: {"action":"list"} or {"action":"add","symbol":"BTC"} or {"action":"remove","symbol":"BTC"}. Use "list" before market briefs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | add | remove' },
+        symbol: { type: 'string', description: 'Symbol for add/remove, e.g. BTC, TSLA, gold' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        watchlist: { type: 'array', description: 'Current watchlist entries' }
+      }
+    },
+    cacheTTLSeconds: 0, // stateful — never cache
+    rateLimitPerMinute: 20
+  },
+
+  apply_draft: {
+    name: 'apply_draft',
+    description: 'Draft a tailored job application package (cover letter + fit analysis + checklist) for a specific job posting. DRAFT ONLY — never submits anything. Input: {"job":{"title":"...","company":"...","url":"...","description":"..."},"resumeText":"optional"}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job: { type: 'object', description: 'The job posting (title, company, url, description)' },
+        resumeText: { type: 'string', description: 'Candidate resume text (optional)' }
+      },
+      required: ['job']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        draft: { type: 'string', description: 'Markdown application package' }
+      }
+    },
+    cacheTTLSeconds: 0, // every draft is unique
+    rateLimitPerMinute: 6
+  },
+
   crypto: {
     name: 'crypto',
     description: 'Look up the current price, 24h change, and market cap of a cryptocurrency. Use this when the user asks about crypto prices, DeFi tokens, or digital asset performance.',
@@ -166,13 +277,17 @@ function getToolMeta(toolName) {
 
 /**
  * List all registered tools (for injecting into system prompts).
+ * Pass { allowWeb: false } to hide open-web tools (composer WEB toggle off).
  */
-function listTools() {
-  return Object.values(TOOLS).map(t => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema
-  }));
+function listTools({ allowWeb = true } = {}) {
+  return Object.values(TOOLS)
+    .filter(t => allowWeb || !t.web)
+    .map(t => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+      web: !!t.web
+    }));
 }
 
 /**

@@ -112,9 +112,12 @@ const api = async (path, opts = {}, token) => {
   // ── cleanup ──
   const delNode = await api('/nodes/' + encodeURIComponent(ckey), { method: 'DELETE' }, t);
   ok(delNode.ok && delNode.body.mode === 'deleted', 'custom node deletes for real');
-  await query(`DELETE FROM neural_map_node_meta WHERE user_id = $1`, [UID]);
-  await query(`DELETE FROM neural_map_edge_meta WHERE user_id = $1`, [UID]);
-  const leftover = await query(`SELECT COUNT(*)::int c FROM neural_map_edges WHERE user_id = $1`, [UID]);
+  // Scope cleanup + the leftover check to the System Map: the user's own maps
+  // may legitimately hold their edges/annotations, and wiping or counting them
+  // here destroyed real data and produced false failures.
+  await query(`DELETE FROM neural_map_node_meta WHERE user_id = $1 AND map_id = 'system'`, [UID]);
+  await query(`DELETE FROM neural_map_edge_meta WHERE user_id = $1 AND map_id = 'system'`, [UID]);
+  const leftover = await query(`SELECT COUNT(*)::int c FROM neural_map_edges WHERE user_id = $1 AND map_id = 'system'`, [UID]);
   ok(leftover.rows[0].c === 0, 'deleting a node cascades to its edges');
 
   console.log(`\n══════════════════════════════════\n  ${pass} passed, ${fail} failed\n══════════════════════════════════`);

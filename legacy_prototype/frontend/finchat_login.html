@@ -295,6 +295,8 @@
         };
   
         sessionStorage.setItem('finchat_user', JSON.stringify(currentUser));
+        sessionStorage.setItem('finchat_token', data.token);
+        localStorage.setItem('finchat_token', data.token);
         window.location.href = 'finchat_chat.html';
       } catch (err) {
         console.error(err);

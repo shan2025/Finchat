@@ -11,8 +11,28 @@ const TOOL_IMPLEMENTATIONS = {
   resume: require('../../tools/ResumeTool'),
   crypto: require('../../tools/CryptoTool'),
   jobs: require('../../tools/JobsTool'),
-  commodities: require('../../tools/CommoditiesTool')
+  commodities: require('../../tools/CommoditiesTool'),
+  fetch: require('../../tools/FetchTool'),
+  crawl: require('../../tools/CrawlTool'),
+  news: require('../../tools/NewsTool'),
+  watchlist: require('../../tools/WatchlistTool'),
+  apply_draft: require('../../tools/ApplyDraftTool')
 };
+
+/**
+ * Thrown when a tool marked `requires_approval` in its registry manifest is
+ * invoked without prior human approval. The Cognitive Core catches this,
+ * parks the execution in WAITING (human_approval) and notifies the user;
+ * POST /api/executions/:id/approve resumes with the tool whitelisted.
+ */
+class ApprovalRequiredError extends Error {
+  constructor(toolName, input) {
+    super(`Tool "${toolName}" requires human approval before it can run.`);
+    this.name = 'ApprovalRequiredError';
+    this.toolName = toolName;
+    this.toolInput = input;
+  }
+}
 
 /**
  * Generate a unique ID for tool call/result records.
@@ -90,10 +110,20 @@ async function checkRateLimit(toolName, limitPerMinute) {
  * @param {string} options.input - Input string for the tool
  * @returns {Promise<{ output: any, cached: boolean, durationMs: number, callId: string }>}
  */
-async function executeTool({ executionId, agentId, toolName, input }) {
+async function executeTool({ executionId, agentId, toolName, input, allowWeb = true, approvedTools = [], context = {} }) {
   const meta = getToolMeta(toolName);
   if (!meta) {
     throw new Error(`Unknown tool: "${toolName}". Available tools: ${Object.keys(TOOL_IMPLEMENTATIONS).join(', ')}`);
+  }
+
+  // Composer WEB toggle: hard-block open-web tools when the user disabled web access
+  if (meta.web && !allowWeb) {
+    throw new Error(`Tool "${toolName}" needs web access, which the user has turned OFF for this conversation. Answer from your other tools or ask the user to enable the WEB toggle.`);
+  }
+
+  // Human-in-the-loop gate: irreversible tools park the execution for approval
+  if (meta.requires_approval && !approvedTools.includes(toolName)) {
+    throw new ApprovalRequiredError(toolName, input);
   }
 
   const impl = TOOL_IMPLEMENTATIONS[toolName];
@@ -133,7 +163,8 @@ async function executeTool({ executionId, agentId, toolName, input }) {
   let error = null;
 
   try {
-    output = await impl.execute(input);
+    // Context (userId etc.) is a second arg — existing single-arg tools ignore it.
+    output = await impl.execute(input, context);
   } catch (execErr) {
     error = execErr.message;
   }
@@ -199,4 +230,4 @@ async function logToolResult(callId, output, error, cached, durationMs) {
   }
 }
 
-module.exports = { executeTool, checkPermission, checkRateLimit };
+module.exports = { executeTool, checkPermission, checkRateLimit, ApprovalRequiredError };

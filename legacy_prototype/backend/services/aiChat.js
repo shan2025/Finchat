@@ -54,7 +54,8 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       userId: options.userId || 'system',
       conversationId: options.sessionId || 'default_session',
       conversationHistory: history,
-      targetAgentId
+      targetAgentId,
+      allowWeb: options.webAccess !== false
     });
 
     // Check if the LLM flagged fraud during generation
@@ -68,7 +69,9 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       executionId: result.executionId,
       delegatedAgent: result.delegatedTo || 'plato',
       isDirect: result.isDirect,
-      auditTraceHash: result.auditTraceHash
+      auditTraceHash: result.auditTraceHash,
+      provider: result.provider || null, // 'groq' | 'ollama' (local qwen fallback)
+      model: result.model || null
     };
   } catch (err) {
     console.error('⚠️ CognitiveCore Route Error:', err.message);

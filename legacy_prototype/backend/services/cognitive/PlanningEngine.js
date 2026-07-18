@@ -1,8 +1,17 @@
 // services/cognitive/PlanningEngine.js — Generates structured multi-step plans for complex goals
 const { runInference } = require('../inference');
 const { query } = require('../../database');
+const { listTools } = require('./ToolRegistry');
 
-const PLANNING_PROMPT = `You are a planning specialist. Given a complex goal, break it down into an ordered list of concrete steps.
+// The tool list is built from the live ToolRegistry, so new tools are plannable
+// the moment they're registered (this prompt once hardcoded search+stocks only,
+// which silently crippled every multi-tool plan).
+function buildPlanningPrompt() {
+  const toolLines = listTools()
+    .map(t => `  - "${t.name}": ${t.description.split('.')[0]}.`)
+    .join('\n');
+
+  return `You are a planning specialist. Given a complex goal, break it down into an ordered list of concrete steps.
 
 You MUST respond with valid JSON matching this exact shape:
 {
@@ -15,10 +24,13 @@ You MUST respond with valid JSON matching this exact shape:
 
 RULES:
 - Each step must have a "step" number, "action" type, and "description".
-- Use "tool" action when external data is needed. Use "respond" for the final synthesis step.
-- Keep plans concise: 2-5 steps maximum.
-- Available tools: "search" (web search), "stocks" (stock price lookup by ticker).
+- Use "tool" action when external data is needed. The LAST step must be action "respond" for the final synthesis.
+- Keep plans concise: 2-8 steps maximum. One tool call per step; repeat a tool with different inputs as separate steps (e.g. one "crypto" step per symbol).
+- "input" must be the exact input string/JSON for that tool.
+AVAILABLE TOOLS:
+${toolLines}
 - Respond with ONLY the JSON object. No markdown, no code fences.`;
+}
 
 /**
  * Generate a structured multi-step plan for a complex goal.
@@ -31,7 +43,7 @@ RULES:
  */
 async function plan({ executionId, goal }) {
   const messages = [
-    { role: 'system', content: PLANNING_PROMPT },
+    { role: 'system', content: buildPlanningPrompt() },
     { role: 'user', content: `Goal: "${goal}"` }
   ];
 
@@ -66,6 +78,28 @@ async function plan({ executionId, goal }) {
       { step: 1, action: 'respond', description: 'Respond directly to the goal', tool: null, input: null }
     ];
   }
+
+  // Normalize malformed steps — smaller models often emit the tool name AS the
+  // action ({"action":"watchlist","tool":null}), which would silently execute
+  // zero steps. Coerce anything tool-shaped into {action:'tool', tool:<name>}.
+  const toolNames = listTools().map(t => t.name);
+  planData.steps = planData.steps.map(s => {
+    const step = { ...s };
+    if (step.action !== 'tool' && step.action !== 'respond') {
+      if (toolNames.includes(String(step.action))) {
+        step.tool = String(step.action);
+        step.action = 'tool';
+      } else if (step.tool && toolNames.includes(String(step.tool))) {
+        step.action = 'tool';
+      } else {
+        step.action = 'respond';
+      }
+    }
+    if (step.action === 'tool' && !step.tool && toolNames.includes(String(s.action))) {
+      step.tool = String(s.action);
+    }
+    return step;
+  });
 
   // Store plan in executions.current_plan
   let stored = false;

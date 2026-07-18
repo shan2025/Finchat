@@ -1,4 +1,4 @@
-// server.js — FinChat Backend
+// server.js — FinChat Backend Server
 // Express REST API + Socket.io real-time chat
 require('dotenv').config();
 
@@ -57,6 +57,8 @@ app.use('/api/executions', require('./routes/executions'));
 app.use('/api/agents', require('./routes/agents'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/neural-map', require('./routes/neuralMap'));
+app.use('/api/search', require('./routes/search'));
+app.use('/api/missions', require('./routes/missions'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');
@@ -242,9 +244,40 @@ server.listen(PORT, async () => {
     console.error('Note: could not ensure avatar_url column:', err.message);
   }
 
+  // Ensure system persona rows exist to satisfy foreign key constraints on messages table
+  const personasToSeed = ['PLATO', 'AURELIUS', 'RASHA', 'NOVA', 'SYSTEM', 'plato', 'aurelius', 'rasha', 'nova', 'system'];
+  for (const pid of personasToSeed) {
+    try {
+      await query(`
+        INSERT INTO users (user_id, email, name, role, token_balance)
+        VALUES ($1, $2, $3, 'system', 999999)
+        ON CONFLICT (user_id) DO NOTHING
+      `, [pid, `${pid}_${Date.now()}_sys@system.finchat.local`, pid.toUpperCase()]);
+    } catch (e) {}
+  }
+
   // Init Solana devnet connection + auto-airdrop
   const { initSolana } = require('./services/solana');
   await initSolana();
+
+  // Sweep executions orphaned in 'running'/'ready' (e.g. by a crash) so agent
+  // status doesn't report WORKING forever; repeat every 5 minutes.
+  const { sweepStaleExecutions } = require('./services/cognitive/ExecutionManager');
+  try { await sweepStaleExecutions(); } catch (e) { console.error('Stale-execution sweep failed:', e.message); }
+  setInterval(() => sweepStaleExecutions().catch(e => console.error('Stale-execution sweep failed:', e.message)), 5 * 60 * 1000);
+
+  // Sprint 7: start the BullMQ worker (missions + briefings + queued chats) and
+  // register one repeatable job per ENABLED mission. Seeds ship disabled, so
+  // nothing burns tokens until the user flips a mission on.
+  try {
+    const { startWorkerPool } = require('./services/queue/WorkerPool');
+    startWorkerPool();
+    const { syncMissionSchedules } = require('./services/agents/MissionScheduler');
+    const sync = await syncMissionSchedules();
+    console.log(`🗓️ Mission scheduler ready — ${sync.scheduled} enabled mission(s) scheduled`);
+  } catch (e) {
+    console.error('⚠️ Mission scheduler init failed (missions will not fire until restart):', e.message);
+  }
 
   console.log('');
   console.log('╔══════════════════════════════════════╗');

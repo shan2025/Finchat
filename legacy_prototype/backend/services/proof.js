@@ -119,7 +119,15 @@ async function verifyChain(channelId) {
       issues.push(`Block #${entry.chain_height}: Content Tampered! Message content does not match stored content hash.`);
     }
 
-    const rawData = `${entry.prev_hash}|${entry.chain_height}|${entry.sender_id}|${entry.content_hash}|${entry.timestamp}`;
+    // The block hash was created over the ISO-8601 string form of the
+    // timestamp (see createProof), but node-pg hands timestamptz columns back
+    // as JS Date objects — interpolating those raw yields "Fri Jul 18 2026 …"
+    // and every recomputed hash fails. Canonicalize back to the exact ISO
+    // string that was hashed at creation time.
+    const tsIso = entry.timestamp instanceof Date
+      ? entry.timestamp.toISOString()
+      : new Date(entry.timestamp).toISOString();
+    const rawData = `${entry.prev_hash}|${entry.chain_height}|${entry.sender_id}|${entry.content_hash}|${tsIso}`;
     const calculatedHash = sha256(rawData);
 
     if (calculatedHash !== entry.hash) {

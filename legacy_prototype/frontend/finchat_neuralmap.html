@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
 </script>
 <style>
   /* ── Two themes. Warm is FinChat's house palette; dark comes from the
@@ -23,8 +23,8 @@
     --danger: #b0472e; --rail: #3a2e23; --rail-txt: #efe8de; --rail-hover: #4a3828;
     --rail-muted: #c9c0b0; --grid: rgba(58,46,35,.06); --edge: #d6ccbc; --edge-hi: #c67139;
     --label: #3a2e23; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
-    --cat-agent: #c67139; --cat-tool: #7a8a5e; --cat-chain: #5b4a3a;
-    --cat-entity: #d0973f; --cat-doc: #9c8f7d; --cat-idea: #b0472e;
+    --cat-agent: #d2691e; --cat-tool: #4f8a52; --cat-chain: #46536b;
+    --cat-entity: #e0a01e; --cat-doc: #6d8ab0; --cat-idea: #c0392b;
   }
   [data-nm-theme="dark"] {
     --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
@@ -32,8 +32,8 @@
     --danger: #e8867a; --rail: #131c2e; --rail-txt: #e8eef8; --rail-hover: #1c2942;
     --rail-muted: #7f93b3; --grid: rgba(255,255,255,.04); --edge: #2c3d57; --edge-hi: #5fd0e6;
     --label: #dbe6f5; --marquee: rgba(95,208,230,.12); --marquee-line: #5fd0e6;
-    --cat-agent: #f2f6fc; --cat-tool: #4f86c6; --cat-chain: #3f597f;
-    --cat-entity: #5fd0e6; --cat-doc: #5a6b88; --cat-idea: #a7c4ec;
+    --cat-agent: #f2f6fc; --cat-tool: #4fb06a; --cat-chain: #c79a52;
+    --cat-entity: #5fd0e6; --cat-doc: #9a86e0; --cat-idea: #e8867a;
   }
 
   /* Do NOT transition background-color here. Its value is var(--bg), and when
@@ -91,49 +91,74 @@
 <!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-<nav id="sideNav" class="nm-rail fixed left-0 top-0 h-full flex flex-col gap-6 p-4 z-40 w-64 border-r">
-  <div class="px-2 py-1">
-    <h1 class="text-3xl tracking-normal" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--rail-txt);">FinChat</h1>
-  </div>
-
-  <div class="flex flex-col gap-1">
-    <span class="text-[11px] font-bold tracking-widest uppercase px-3 mb-1" style="color: var(--rail-muted);">Navigation</span>
-    <a href="finchat_chat.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">chat</span> Chat
-    </a>
-    <a href="finchat_agents.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">tune</span> Agents
-    </a>
-    <a href="finchat_dashboard.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">space_dashboard</span> Operations
-    </a>
-    <a href="finchat_neuralmap.html" class="nm-rail-active flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm shadow-sm transition-all">
-      <span class="material-symbols-outlined text-[18px]">hub</span> Neural Map
-    </a>
-  </div>
-
-  <div class="flex-1"></div>
-
-  <div class="flex flex-col gap-1 border-t pt-4" style="border-color: var(--rail-hover);">
-    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="#">
-      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
-    </a>
-    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="finchat_audit.html">
-      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
-    </a>
-  </div>
-
-  <div class="flex items-center gap-2 px-2 py-2 border-t pt-4" style="border-color: var(--rail-hover);">
-    <div class="w-9 h-9 rounded-full shrink-0 relative flex items-center justify-center font-bold text-xs shadow-sm" style="background: var(--chrome); border: 1px solid var(--border); color: var(--txt);">
-      <span id="sidebarAvatarText">JD</span>
-      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2" style="border-color: var(--rail);"></div>
+<nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+    <div class="mb-10 px-2">
+        <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+            FinChat
+        </h1>
+        <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
     </div>
-    <div class="flex-1 min-w-0">
-      <div class="text-[12px] font-semibold truncate" id="sidebarName" style="color: var(--rail-txt);">Jane Doe</div>
-      <div class="text-[10px] font-mono" id="sidebarRole" style="color: var(--rail-muted);">Staff · Internal</div>
+    <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+            <span class="material-symbols-outlined text-[20px]">dashboard</span>
+            <span class="font-body-sm font-medium">Operations</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+            <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+            <span class="font-body-sm font-medium">Agents</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">chat</span>
+            <span class="font-body-sm font-medium">Chat</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+            <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
+            <span class="font-body-sm font-medium">Neural Map</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">assessment</span>
+            <span class="font-body-sm font-medium">Reports</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">menu_book</span>
+            <span class="font-body-sm font-medium">Knowledge</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">account_balance</span>
+            <span class="font-body-sm font-medium">Governance</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+            <span class="material-symbols-outlined text-[20px]">account_tree</span>
+            <span class="font-body-sm font-medium">Blockchain</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+            <span class="material-symbols-outlined text-[20px]">policy</span>
+            <span class="font-body-sm font-medium">Audit Logs</span>
+        </a>
+        <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">settings</span>
+            <span class="font-body-sm font-medium">Settings</span>
+        </a>
     </div>
-    <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
-  </div>
+    <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+            <span class="material-symbols-outlined text-[20px]">help</span>
+            <span class="font-body-sm font-medium">Support</span>
+        </a>
+        <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
+            <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                <span id="sidebarAvatarText">BT</span>
+            </div>
+            <div class="flex-1 overflow-hidden">
+                <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+            </div>
+            <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
+        </div>
+    </div>
 </nav>
 
 <!-- ═══════════════════════════════════ -->
@@ -142,12 +167,12 @@
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top App Bar -->
-  <header class="nm-chrome flex items-center gap-3 w-full px-6 py-3 h-16 z-50 border-b shrink-0">
+  <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
     <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[18px]">menu</span>
     </button>
     <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--accent-soft);">Neural Map</h1>
-    <span class="text-[10px] uppercase tracking-widest font-mono shrink-0 hidden xl:inline nm-sub" id="mapStats">loading…</span>
+    <span class="text-[10px] uppercase tracking-widest font-mono hidden xl:inline-block nm-sub truncate min-w-0" style="max-width:220px" id="mapStats">loading…</span>
 
     <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
 
@@ -169,6 +194,9 @@
     <button id="addNodeBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
       <span class="material-symbols-outlined text-[16px]">add</span> New node
     </button>
+    <button id="addDocBtn" title="Add one of your uploaded documents to the map" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+      <span class="material-symbols-outlined text-[16px]">description</span> Add document
+    </button>
     <button id="selectAllBtn" title="Select all nodes (Ctrl+A) — then drag any of them to move the whole set" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[16px]">select_all</span>
     </button>
@@ -181,6 +209,22 @@
     <button id="reloadBtn" title="Rebuild from live system state" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[16px]">sync</span>
     </button>
+    <!-- Notification bell -->
+    <div class="relative shrink-0">
+      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
+        <span class="material-symbols-outlined text-[16px]">notifications</span>
+        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+      </button>
+      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </div>
+    <!-- Profile -->
+    <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;" data-profile-initials></div>
   </header>
 
   <!-- Map switcher — like a tab strip of chats: the built-in System Map, then
@@ -266,6 +310,22 @@
   </div>
 </div>
 
+<!-- Document picker — drop one of your uploaded files onto the map as a node. -->
+<div id="docModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6" style="background: rgba(0,0,0,.45);">
+  <div class="nm-panel nm-surface w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col" style="max-height:80vh;">
+    <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
+      <div>
+        <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">Add a document</div>
+        <div class="text-[12px] nm-sub mt-0.5">Pick one of your uploaded files — it joins the map as a Document node you can connect.</div>
+      </div>
+      <button id="docModalClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
+    </div>
+    <div id="docList" class="p-4 flex flex-col gap-2 overflow-y-auto">
+      <div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -318,10 +378,16 @@ function setUrlMapId(mapId) {
 
 (function initSidebar() {
   const name = SESSION_USER.name || SESSION_USER.username || 'User';
+  const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
   document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarAvatarText').textContent =
-    name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('sidebarAvatarText').textContent = initials;
   document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
+  // Topbar profile: avatar if set, else initials.
+  const topProfile = document.getElementById('topbarUserIcon');
+  if (topProfile) {
+    if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
+    else topProfile.textContent = initials;
+  }
   fetch('/api/tokens/balance', { headers: AUTH })
     .then(r => r.ok ? r.json() : null)
     .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; })
@@ -358,12 +424,20 @@ const TYPE_LABEL = {
   agent: 'AI Agent', tool: 'Wired Tool', chain: 'On-chain',
   entity: 'Learned Concept', doc: 'Document', idea: 'My note / idea'
 };
+// Legend shows live counts of what is actually on the CURRENT map — only the
+// types present, each with its count — instead of a static list of all six.
 function renderLegend() {
-  document.getElementById('legend').innerHTML = Object.entries(TYPE_LABEL)
-    .map(([k, v]) => `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${T.cat[k]}"></span>${v.replace(' / idea', '')}</span>`)
-    .join('');
+  const counts = {};
+  for (const n of nodes) counts[n.type] = (counts[n.type] || 0) + 1;
+  const present = Object.entries(TYPE_LABEL).filter(([k]) => counts[k]);
+  document.getElementById('legend').innerHTML = present.length
+    ? present.map(([k, v]) =>
+        `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${T.cat[k]}"></span>${v.replace(' / idea', '')} × ${counts[k]}</span>`
+      ).join('')
+    : `<span style="color: var(--sub)">Empty map — add your first node</span>`;
 }
-renderLegend();
+// (First render happens in applyTheme() at the bottom, after `nodes` exists —
+// calling it here would hit the temporal dead zone of `let nodes`.)
 
 // ══════════════════════════════════════════════════════════
 // Graph state
@@ -380,7 +454,7 @@ const ctx = canvas.getContext('2d');
 let cw = 0, ch = 0, dpr = 1;
 
 const byKey = k => nodes.find(n => n.key === k);
-const radiusOf = n => n.key === 'user:me' ? 20 : n.type === 'agent' ? 17 : n.type === 'chain' ? 14 : n.type === 'idea' ? 13 : 12;
+const radiusOf = n => n.key === 'user:me' ? 30 : n.type === 'agent' ? 19 : n.type === 'chain' ? 14 : n.type === 'idea' ? 13 : 12;
 
 function resize() {
   const r = canvas.getBoundingClientRect();
@@ -425,12 +499,16 @@ async function loadGraph() {
     centered = false; view.scale = 1;
 
     const s = data.stats || {};
-    document.getElementById('mapStats').textContent = data.map?.builtIn
+    const statsText = data.map?.builtIn
       ? `${s.agents || 0} agents · ${s.tools || 0} tools · ${s.entities || 0} learned · chain ${s.chainHeight || 0}`
       : `${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} connection${edges.length === 1 ? '' : 's'}`;
+    const statsEl = document.getElementById('mapStats');
+    statsEl.textContent = statsText;
+    statsEl.title = statsText; // full text on hover when truncated
     document.getElementById('nm-known').innerHTML =
       nodes.map(n => `<option value="${n.label.replace(/"/g, '&quot;')}"></option>`).join('');
 
+    renderLegend();
     document.getElementById('loadingVeil').classList.add('hidden');
     resize();
   } catch (err) {
@@ -460,8 +538,11 @@ function renderMapTabs() {
   const tab = (m) => {
     const active = m.mapId === currentMapId;
     const icon = m.builtIn ? 'hub' : (m.kind === 'network' ? 'network_intelligence' : 'hub');
-    // Custom (non-built-in) maps get a × to delete them. The System Map can't
-    // be deleted, so it never shows one.
+    const edit = m.builtIn ? '' : `
+      <span class="nm-tab-edit inline-flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity ml-0.5" data-edit="${m.mapId}"
+        title="Rename map" style="width:16px;height:16px;cursor:pointer;">
+        <span class="material-symbols-outlined" style="font-size:13px;">edit</span>
+      </span>`;
     const del = m.builtIn ? '' : `
       <span class="nm-tab-del inline-flex items-center justify-center rounded-full -mr-1" data-del="${m.mapId}" data-name="${esc(m.name)}"
         title="Delete this map" style="width:16px;height:16px;">
@@ -474,7 +555,7 @@ function renderMapTabs() {
           ? 'background: var(--accent); color: var(--bg); border: none'
           : 'background: var(--field); color: var(--txt); border: 1px solid var(--border)'}">
         <span class="material-symbols-outlined text-[14px]">${icon}</span>
-        <span class="nm-tab-label">${esc(m.name)}</span>${del}
+        <span class="nm-tab-label" title="${m.builtIn ? '' : 'Double-click to rename'}">${esc(m.name)}</span>${edit}${del}
       </span>`;
   };
   bar.innerHTML = myMaps.map(tab).join('') + `
@@ -484,14 +565,92 @@ function renderMapTabs() {
 
   bar.querySelectorAll('.nm-tab').forEach(btn => {
     btn.onclick = (e) => {
-      if (e.target.closest('[data-del]')) return; // handled below
+      if (e.target.closest('[data-del]') || e.target.closest('[data-edit]') || btn.querySelector('.nm-tab-label').isContentEditable) return;
       switchToMap(btn.dataset.map, btn.dataset.kind);
     };
   });
   bar.querySelectorAll('[data-del]').forEach(x => {
     x.onclick = (e) => { e.stopPropagation(); deleteMap(x.dataset.del, x.dataset.name); };
   });
+  bar.querySelectorAll('[data-edit]').forEach(x => {
+    x.onclick = (e) => { e.stopPropagation(); startRenameMap(x.dataset.edit); };
+  });
+  bar.querySelectorAll('.nm-tab-label').forEach(lbl => {
+    const btn = lbl.closest('.nm-tab');
+    if (btn && btn.dataset.map !== 'system') {
+      lbl.ondblclick = (e) => {
+        e.stopPropagation();
+        startRenameMap(btn.dataset.map);
+      };
+    }
+  });
   document.getElementById('newMapBtn').onclick = openNewMapModal;
+}
+
+function startRenameMap(mapId) {
+  const bar = document.getElementById('mapTabs');
+  const btn = bar.querySelector(`.nm-tab[data-map="${mapId}"]`);
+  if (!btn) return;
+  const lbl = btn.querySelector('.nm-tab-label');
+  if (!lbl || lbl.isContentEditable) return;
+
+  const oldName = lbl.textContent.trim();
+  lbl.contentEditable = true;
+  lbl.style.outline = '1px solid currentColor';
+  lbl.style.padding = '0 4px';
+  lbl.style.borderRadius = '4px';
+  lbl.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(lbl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  const finish = async () => {
+    if (!lbl.isContentEditable) return;
+    lbl.contentEditable = false;
+    lbl.style.outline = 'none';
+    lbl.style.padding = '0';
+    const newName = lbl.textContent.trim();
+    if (!newName || newName === oldName) {
+      lbl.textContent = oldName;
+      return;
+    }
+    try {
+      const token = typeof _session !== 'undefined' ? _session?.token : null;
+      const r = await fetch(`/api/neural-map/maps/${mapId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : AUTH) },
+        body: JSON.stringify({ name: newName })
+      });
+      if (r.ok) {
+        const m = myMaps.find(m => m.mapId === mapId);
+        if (m) m.name = newName;
+        if (currentMapId === mapId) currentMapName = newName;
+        showToast('Renamed map to “' + newName + '”');
+      } else {
+        lbl.textContent = oldName;
+        showToast('Failed to rename map', 'danger');
+      }
+    } catch {
+      lbl.textContent = oldName;
+      showToast('Network error while renaming map', 'danger');
+    }
+  };
+
+  lbl.onblur = finish;
+  lbl.onkeydown = (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      finish();
+    } else if (ev.key === 'Escape') {
+      lbl.contentEditable = false;
+      lbl.style.outline = 'none';
+      lbl.style.padding = '0';
+      lbl.textContent = oldName;
+    }
+  };
 }
 
 async function deleteMap(mapId, name) {
@@ -634,10 +793,13 @@ function draw() {
     const sel = selectedEdge && selectedEdge.key === e.key;
     const faded = (hi && !active) || (searchHits && !(searchHits.has(e.from) && searchHits.has(e.to)));
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    // Every edge draws as a straight SOLID line unless the user explicitly set
+    // this edge to dashed. Your own edges read slightly stronger than derived
+    // ones so the distinction survives without the old broken-line look.
+    if (e.style === 'dashed') ctx.setLineDash([5 / view.scale, 4 / view.scale]);
     ctx.strokeStyle = sel ? T.edgeHi : (hi && active ? T.edgeHi : T.edge);
-    ctx.globalAlpha = faded ? 0.1 : (sel ? 1 : (hi ? 0.9 : 0.55));
+    ctx.globalAlpha = faded ? 0.1 : (sel ? 1 : (hi ? 0.9 : (e.derived ? 0.55 : 0.75)));
     ctx.lineWidth = (sel ? 3 : (hi && active ? 2 : 1.2)) / view.scale;
-    if (!e.derived) ctx.setLineDash([5 / view.scale, 4 / view.scale]);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -648,7 +810,7 @@ function draw() {
     const dim = dimmed(n);
     const match = q && n.label.toLowerCase().includes(q);
     const picked = selection.has(n.key);
-    const col = T.cat[n.type] || T.accent;
+    const col = n.color || T.cat[n.type] || T.accent;
     ctx.globalAlpha = dim ? 0.2 : 1;
 
     if (match || n.key === focus) {
@@ -934,7 +1096,12 @@ function openNode(n) {
   if (!n) return;
   selectedNode = n; selectedEdge = null;
   edgePanel.classList.add('hidden');
-  const col = T.cat[n.type] || T.accent;
+  const col = n.color || T.cat[n.type] || T.accent;
+  // Swatch row: the six type colours plus a few extras; custom picker beside it.
+  const SWATCHES = [...new Set([
+    T.cat.agent, T.cat.tool, T.cat.chain, T.cat.entity, T.cat.doc, T.cat.idea,
+    '#7c3aed', '#0ea5e9', '#ec4899', '#64748b'
+  ])];
   const conns = edges.filter(e => e.from === n.key || e.to === n.key)
     .map(e => ({ edge: e, other: byKey(e.from === n.key ? e.to : e.from) }))
     .filter(c => c.other);
@@ -957,6 +1124,20 @@ function openNode(n) {
         <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Note</div>
         <textarea id="npNote" placeholder="Add your own note about this node…" class="nm-field w-full min-h-[78px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(n.note)}</textarea>
         <div class="text-[10px] nm-sub mt-1 font-mono" id="npSaved">saves automatically</div>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Colour</div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          ${SWATCHES.map(c => `
+            <button class="np-swatch w-6 h-6 rounded-full shrink-0" data-color="${esc(c)}" title="${esc(c)}"
+              style="background:${esc(c)}; border: 2px solid ${n.color && n.color.toLowerCase() === c.toLowerCase() ? 'var(--txt)' : 'var(--border)'}; cursor:pointer"></button>`).join('')}
+          <label class="w-6 h-6 rounded-full shrink-0 overflow-hidden relative" title="Custom colour"
+            style="border: 2px dashed var(--border); cursor:pointer; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red)">
+            <input id="npColorPick" type="color" value="${esc(n.color || col)}" style="position:absolute; inset:-6px; opacity:0; cursor:pointer;">
+          </label>
+          ${n.color ? `<button id="npColorReset" class="text-[11px] font-semibold nm-sub hover:underline ml-1" style="cursor:pointer">reset</button>` : ''}
+        </div>
       </div>
 
       ${(n.meta && n.meta.length) ? `
@@ -992,7 +1173,7 @@ function openNode(n) {
         <div class="flex flex-col gap-1">
           ${conns.map((c, i) => `
             <div class="nm-chip nm-field flex items-center gap-2 rounded-xl px-2.5 py-2" data-conn="${i}">
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${T.cat[c.other.type] || T.accent}"></span>
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${c.other.color || T.cat[c.other.type] || T.accent}"></span>
               <span class="text-[13px] font-semibold flex-1 truncate" style="color: var(--txt)">${esc(c.other.label)}</span>
               <span class="material-symbols-outlined text-[14px] nm-sub">chevron_right</span>
             </div>`).join('') || '<div class="text-[12px] nm-sub italic">No connections yet.</div>'}
@@ -1027,6 +1208,15 @@ function openNode(n) {
       if (el) el.textContent = 'saved ✓';
     });
   };
+  const setColor = async (c) => {
+    n.color = c || null;
+    await saveNode(n.key, { color: c ?? '' });
+    openNode(n); // re-render swatch selection + header dot
+  };
+  nodePanel.querySelectorAll('.np-swatch').forEach(b => { b.onclick = () => setColor(b.dataset.color); });
+  document.getElementById('npColorPick').onchange = e => setColor(e.target.value);
+  const npReset = document.getElementById('npColorReset');
+  if (npReset) npReset.onclick = () => setColor('');
   document.getElementById('npPin').onclick = async () => {
     n.pinned = !n.pinned;
     if (n.pinned) await savePositions([{ key: n.key, x: Math.round(n.x), y: Math.round(n.y) }]);
@@ -1080,6 +1270,13 @@ function openEdge(e) {
         <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">JSON payload / schema</div>
         <textarea id="epJson" placeholder="{ }" class="nm-field w-full min-h-[90px] resize-y rounded-xl font-mono text-[12px] leading-relaxed p-2.5">${esc(e.payload)}</textarea>
       </div>
+      <div>
+        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Line style</div>
+        <div class="flex gap-2">
+          <button id="epSolid" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${(e.style || 'solid') === 'solid' ? 'border-color: var(--accent); color: var(--accent)' : ''}">— Solid</button>
+          <button id="epDashed" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${e.style === 'dashed' ? 'border-color: var(--accent); color: var(--accent)' : ''}">- - Dashed</button>
+        </div>
+      </div>
       ${e.derived ? '' : `
       <button id="epDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
         <span class="material-symbols-outlined text-[14px]">close</span> Remove connection
@@ -1096,6 +1293,13 @@ function openEdge(e) {
     };
   };
   bind('epNote', 'note'); bind('epApi', 'api'); bind('epFlow', 'flow'); bind('epJson', 'payload');
+  const setStyle = async (s) => {
+    e.style = s;
+    await saveEdge(e.key, { style: s });
+    openEdge(e); // re-render the toggle highlight
+  };
+  document.getElementById('epSolid').onclick = () => setStyle('solid');
+  document.getElementById('epDashed').onclick = () => setStyle('dashed');
   const del = document.getElementById('epDelete');
   if (del) del.onclick = () => deleteEdge(e);
 }
@@ -1116,9 +1320,67 @@ async function addNode() {
       x: w.x + (Math.random() - .5) * 40, y: w.y + (Math.random() - .5) * 40, vx: 0, vy: 0, pinned: false
     };
     nodes.push(n);
+    renderLegend();
     openNode(n);
     showToast('Node created — it will be here when you come back.');
   } catch (err) { showToast(`⚠️ Couldn't create node: ${err.message}`); }
+}
+
+// ── Documents → map nodes ─────────────────────────────────────
+async function openDocPicker() {
+  const modal = document.getElementById('docModal');
+  const list = document.getElementById('docList');
+  modal.classList.remove('hidden');
+  list.innerHTML = '<div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>';
+  const esc = s => (s || '').toString().replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const size = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  try {
+    const res = await fetch('/api/neural-map/documents', { headers: AUTH });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const docs = (await res.json()).documents || [];
+    if (!docs.length) {
+      list.innerHTML = '<div class="text-center text-sm nm-sub py-8">No uploaded documents yet.<br><span class="text-[12px]">Attach a file in Chat and it’ll show up here.</span></div>';
+      return;
+    }
+    list.innerHTML = docs.map(doc => `
+      <button class="nm-field text-left rounded-xl p-3 flex items-center gap-3 transition-all doc-pick" style="cursor:pointer"
+              data-name="${esc(doc.filename)}" data-mime="${esc(doc.mimetype || '')}">
+        <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-doc); color: var(--bg)">
+          <span class="material-symbols-outlined text-[18px]">description</span>
+        </span>
+        <span class="min-w-0">
+          <span class="block text-[13px] font-bold truncate" style="color: var(--txt)">${esc(doc.filename)}</span>
+          <span class="block text-[11px] nm-sub">${esc(doc.mimetype || 'file')} · ${size(Number(doc.size) || 0)}</span>
+        </span>
+      </button>`).join('');
+    list.querySelectorAll('.doc-pick').forEach(el => {
+      el.onclick = () => addDocumentNode(el.dataset.name, el.dataset.mime);
+    });
+  } catch (err) {
+    list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">Couldn't load documents: ${esc(err.message)}</div>`;
+  }
+}
+
+async function addDocumentNode(name, mime) {
+  const note = `Uploaded document · ${mime || 'file'}`;
+  try {
+    const res = await fetch(withMap('/api/neural-map/nodes'), {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({ label: name, type: 'doc', note })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    const w = toWorld(cw / 2, ch / 2);
+    const n = {
+      key: d.key, label: d.label, type: d.type, note, meta: [], apis: [], derived: false,
+      x: w.x + (Math.random() - .5) * 60, y: w.y + (Math.random() - .5) * 60, vx: 0, vy: 0, pinned: false
+    };
+    nodes.push(n);
+    renderLegend();
+    document.getElementById('docModal').classList.add('hidden');
+    openNode(n);
+    showToast(`Added “${name}” — open it and hit Connect to link it.`);
+  } catch (err) { showToast(`⚠️ Couldn't add document: ${err.message}`); }
 }
 
 async function finishLink(target) {
@@ -1151,6 +1413,7 @@ async function deleteNode(n) {
     nodes = nodes.filter(x => x.key !== n.key);
     edges = edges.filter(e => e.from !== n.key && e.to !== n.key);
     selection.delete(n.key); syncSelBanner();
+    renderLegend();
     closePanels();
     showToast(d.mode === 'hidden' ? `${n.label} hidden from your map.` : `${n.label} deleted.`);
   } catch (err) { showToast(`⚠️ ${err.message}`); }
@@ -1187,6 +1450,9 @@ searchInput.onkeydown = e => {
   }
 };
 document.getElementById('addNodeBtn').onclick = addNode;
+document.getElementById('addDocBtn').onclick = openDocPicker;
+document.getElementById('docModalClose').onclick = () => document.getElementById('docModal').classList.add('hidden');
+document.getElementById('docModal').addEventListener('click', e => { if (e.target.id === 'docModal') document.getElementById('docModal').classList.add('hidden'); });
 document.getElementById('selectAllBtn').onclick = selectAll;
 document.getElementById('themeBtn').onclick = () => applyTheme(theme === 'dark' ? 'warm' : 'dark');
 
@@ -1250,6 +1516,30 @@ resize();
 loadGraph().then(() => { resize(); });
 loadMapList();
 loop();
+
+// "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
+(function () {
+  const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+  document.querySelectorAll('#sideNav a').forEach(a => {
+    // label = only the text nodes, so the material-symbols ligature is ignored
+    const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
+    if (!SOON.includes(label)) return;
+    a.setAttribute('href', 'javascript:void(0)');
+    a.style.opacity = '0.55';
+    a.style.cursor = 'not-allowed';
+    if (!a.querySelector('.soon-badge')) {
+      const b = document.createElement('span');
+      b.className = 'soon-badge';
+      b.textContent = 'Soon';
+      b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
+      a.appendChild(b);
+    }
+    a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
+  });
+})();
 </script>
+<script src="notifications_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

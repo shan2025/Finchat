@@ -1,0 +1,215 @@
+// routes/groupChat.js — agent/user group chats (Sprint 8)
+const express = require('express');
+const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const { query } = require('../database');
+const { requireAuth } = require('../middleware/auth');
+const { getAgentConfig, listActiveAgents } = require('../services/agents/AgentRegistry');
+const { handleUserMessage, assignTask, saveMessage } = require('../services/agents/GroupChatOrchestrator');
+
+async function loadGroup(groupId, userId) {
+  const g = await query('SELECT * FROM group_chats WHERE group_id = $1 AND owner_id = $2', [groupId, userId]);
+  return g.rows[0] || null;
+}
+
+async function membersOf(groupId) {
+  const res = await query(
+    'SELECT member_type, member_id, added_at FROM group_chat_members WHERE group_id = $1 ORDER BY added_at ASC',
+    [groupId]);
+  const members = [];
+  for (const r of res.rows) {
+    if (r.member_type === 'agent') {
+      const cfg = await getAgentConfig(r.member_id);
+      members.push({ ...r, name: cfg?.name || r.member_id, capabilities: cfg?.capabilities || [] });
+    } else {
+      members.push({ ...r, name: 'You' });
+    }
+  }
+  return members;
+}
+
+// ── GET /api/group-chat/agents ── which agents can be added ──
+router.get('/agents', requireAuth, async (req, res) => {
+  try {
+    const agents = await listActiveAgents({ includeMiddleware: false });
+    res.json({
+      agents: agents
+        .filter(a => a.type !== 'middleware')
+        .map(a => ({ agentId: a.agentId, name: a.name, type: a.type, capabilities: a.capabilities || [] }))
+    });
+  } catch (err) {
+    console.error('List agents error:', err);
+    res.status(500).json({ error: 'Failed to list agents' });
+  }
+});
+
+// ── GET /api/group-chat ── my groups ──
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const groups = await query(`
+      SELECT g.*,
+        (SELECT COUNT(*) FROM group_chat_members m WHERE m.group_id = g.group_id AND m.member_type = 'agent') AS agent_count,
+        (SELECT content FROM group_chat_messages msg WHERE msg.group_id = g.group_id ORDER BY created_at DESC LIMIT 1) AS last_message
+      FROM group_chats g WHERE g.owner_id = $1
+      ORDER BY g.updated_at DESC
+    `, [req.user.id]);
+    res.json({ groups: groups.rows });
+  } catch (err) {
+    console.error('List groups error:', err);
+    res.status(500).json({ error: 'Failed to list group chats' });
+  }
+});
+
+// ── POST /api/group-chat ── create a group with chosen agents ──
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim().slice(0, 60);
+    const agents = Array.isArray(req.body.agents) ? [...new Set(req.body.agents.map(a => String(a).toLowerCase()))] : [];
+    if (!name) return res.status(400).json({ error: 'Group name required' });
+    if (!agents.length) return res.status(400).json({ error: 'Pick at least one agent' });
+    if (agents.length > 6) return res.status(400).json({ error: 'Maximum 6 agents per group' });
+
+    const valid = [];
+    for (const id of agents) {
+      const cfg = await getAgentConfig(id);
+      if (cfg && cfg.type !== 'middleware') valid.push(id);
+    }
+    if (!valid.length) return res.status(400).json({ error: 'No valid agents in selection' });
+
+    const groupId = `grp_${uuidv4()}`;
+    await query('INSERT INTO group_chats (group_id, owner_id, name) VALUES ($1, $2, $3)', [groupId, req.user.id, name]);
+    await query(`INSERT INTO group_chat_members (group_id, member_type, member_id) VALUES ($1, 'user', $2)`, [groupId, req.user.id]);
+    for (const id of valid) {
+      await query(`INSERT INTO group_chat_members (group_id, member_type, member_id) VALUES ($1, 'agent', $2) ON CONFLICT DO NOTHING`, [groupId, id]);
+    }
+    const names = [];
+    for (const id of valid) { const c = await getAgentConfig(id); names.push(c?.name || id); }
+    await saveMessage(groupId, 'system', 'system',
+      `👥 Group "${name}" created with ${names.join(', ')}. Ask anything, @mention an agent to address them directly, or type "/task @agent <goal>" to assign real work.`);
+
+    res.status(201).json({ groupId, name, agents: valid, members: await membersOf(groupId) });
+  } catch (err) {
+    console.error('Create group error:', err);
+    res.status(500).json({ error: 'Failed to create group chat' });
+  }
+});
+
+// ── GET /api/group-chat/:id ── group + members ──
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    res.json({ group, members: await membersOf(group.group_id) });
+  } catch (err) {
+    console.error('Get group error:', err);
+    res.status(500).json({ error: 'Failed to load group' });
+  }
+});
+
+// ── DELETE /api/group-chat/:id ── delete a group ──
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const del = await query('DELETE FROM group_chats WHERE group_id = $1 AND owner_id = $2', [req.params.id, req.user.id]);
+    if (!del.rowCount) return res.status(404).json({ error: 'Group not found' });
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Delete group error:', err);
+    res.status(500).json({ error: 'Failed to delete group' });
+  }
+});
+
+// ── POST /api/group-chat/:id/members ── add an agent ──
+router.post('/:id/members', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const agentId = String(req.body.agentId || '').toLowerCase();
+    const cfg = await getAgentConfig(agentId);
+    if (!cfg || cfg.type === 'middleware') return res.status(400).json({ error: `Unknown agent: ${agentId}` });
+    await query(`
+      INSERT INTO group_chat_members (group_id, member_type, member_id)
+      VALUES ($1, 'agent', $2) ON CONFLICT DO NOTHING
+    `, [group.group_id, agentId]);
+    await saveMessage(group.group_id, 'system', 'system', `➕ ${cfg.name} joined the group.`);
+    res.json({ status: 'ok', members: await membersOf(group.group_id) });
+  } catch (err) {
+    console.error('Add member error:', err);
+    res.status(500).json({ error: 'Failed to add agent' });
+  }
+});
+
+// ── DELETE /api/group-chat/:id/members/:agentId ── remove an agent ──
+router.delete('/:id/members/:agentId', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const agentId = String(req.params.agentId).toLowerCase();
+    const del = await query(`
+      DELETE FROM group_chat_members WHERE group_id = $1 AND member_type = 'agent' AND member_id = $2
+    `, [group.group_id, agentId]);
+    if (!del.rowCount) return res.status(404).json({ error: 'Agent is not in this group' });
+    const cfg = await getAgentConfig(agentId);
+    await saveMessage(group.group_id, 'system', 'system', `➖ ${cfg?.name || agentId} left the group.`);
+    res.json({ status: 'ok', members: await membersOf(group.group_id) });
+  } catch (err) {
+    console.error('Remove member error:', err);
+    res.status(500).json({ error: 'Failed to remove agent' });
+  }
+});
+
+// ── GET /api/group-chat/:id/messages ── history ──
+router.get('/:id/messages', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const limit = Math.min(parseInt(req.query.limit) || 100, 300);
+    const msgs = await query(`
+      SELECT message_id, sender_type, sender_id, content, meta, created_at
+      FROM group_chat_messages WHERE group_id = $1
+      ORDER BY created_at ASC LIMIT $2
+    `, [group.group_id, limit]);
+    res.json({ messages: msgs.rows });
+  } catch (err) {
+    console.error('Group messages error:', err);
+    res.status(500).json({ error: 'Failed to load messages' });
+  }
+});
+
+// ── POST /api/group-chat/:id/messages ── user posts; agents reply async ──
+router.post('/:id/messages', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const content = String(req.body.content || '').trim();
+    if (!content) return res.status(400).json({ error: 'Message required' });
+    const msg = await handleUserMessage({ groupId: group.group_id, userId: req.user.id, content });
+    res.status(202).json({ status: 'ok', message: msg });
+  } catch (err) {
+    console.error('Group send error:', err);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// ── POST /api/group-chat/:id/tasks ── explicit task assignment ──
+router.post('/:id/tasks', requireAuth, async (req, res) => {
+  try {
+    const group = await loadGroup(req.params.id, req.user.id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const agentId = String(req.body.agentId || '').toLowerCase();
+    const goal = String(req.body.goal || '').trim();
+    if (!agentId || !goal) return res.status(400).json({ error: 'agentId and goal required' });
+    const memberCheck = await query(`
+      SELECT 1 FROM group_chat_members WHERE group_id = $1 AND member_type = 'agent' AND member_id = $2
+    `, [group.group_id, agentId]);
+    if (!memberCheck.rows.length) return res.status(400).json({ error: `${agentId} is not in this group` });
+
+    assignTask({ groupId: group.group_id, userId: req.user.id, agentId, goal })
+      .catch(e => console.warn(`⚠️ Group task failed: ${e.message}`));
+    res.status(202).json({ status: 'task_assigned', agentId, goal });
+  } catch (err) {
+    console.error('Group task error:', err);
+    res.status(500).json({ error: 'Failed to assign task' });
+  }
+});
+
+module.exports = router;

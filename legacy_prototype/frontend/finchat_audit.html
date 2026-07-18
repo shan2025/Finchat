@@ -100,7 +100,7 @@
 </head>
 <body class="flex h-screen overflow-hidden antialiased selection:bg-accent-gold/30 selection:text-primary-brown">
     <!-- SideNavBar -->
-    <nav class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+    <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
             <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
                 FinChat
@@ -111,15 +111,19 @@
             <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
                 <span class="material-symbols-outlined text-[20px]">dashboard</span>
-                <span class="font-body-sm font-medium">Mission Control</span>
+                <span class="font-body-sm font-medium">Operations</span>
             </a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
                 <span class="material-symbols-outlined text-[20px]">smart_toy</span>
                 <span class="font-body-sm font-medium">Agents</span>
             </a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]">task_alt</span>
-                <span class="font-body-sm font-medium">Tasks</span>
+                <span class="material-symbols-outlined text-[20px]">chat</span>
+                <span class="font-body-sm font-medium">Chat</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+                <span class="material-symbols-outlined text-[20px]">hub</span>
+                <span class="font-body-sm font-medium">Neural Map</span>
             </a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
                 <span class="material-symbols-outlined text-[20px]">assessment</span>
@@ -153,7 +157,7 @@
                 <span class="material-symbols-outlined text-[20px]">help</span>
                 <span class="font-body-sm font-medium">Support</span>
             </a>
-            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
                 <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] text-[#3a2e23] font-bold text-xs shrink-0">
                     BT
                 </div>
@@ -190,7 +194,7 @@
                         <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-cream-bg"></span>
                     </button>
                 </div>
-                <div id="topbarUserIcon" onclick="window.location.href='finchat_chat.html'" class="h-8 w-8 rounded-full overflow-hidden ml-2 cursor-pointer border border-border-color flex items-center justify-center bg-[#efe8de] text-[#3a2e23] font-bold text-xs">
+                <div id="topbarUserIcon" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="h-8 w-8 rounded-full overflow-hidden ml-2 cursor-pointer border border-border-color flex items-center justify-center bg-[#efe8de] text-[#3a2e23] font-bold text-xs">
                     BT
                 </div>
             </div>
@@ -249,26 +253,26 @@
                         BLOCK #---
                     </div>
                 </div>
-                <div class="flex flex-col gap-4 p-4 overflow-y-auto">
+                <div class="flex flex-col gap-4 p-4 overflow-y-auto flex-1 min-h-0">
                     <!-- Verification Status Widget -->
-                    <div class="bg-primary-brown rounded-2xl p-6 text-cream-bg shadow-md relative overflow-hidden">
+                    <div class="bg-primary-brown rounded-2xl p-6 text-cream-bg shadow-md relative overflow-hidden shrink-0">
                         <!-- Deco bg -->
-                        <div class="absolute -right-10 -bottom-10 opacity-10">
+                        <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
                             <span class="material-symbols-outlined text-[120px]">verified</span>
                         </div>
-                        <div class="flex justify-between items-center mb-6">
+                        <div class="flex justify-between items-center mb-6 shrink-0">
                             <span class="font-code-sm text-[10px] tracking-widest text-cream-bg/70 uppercase">INTEGRITY STATUS</span>
                             <div class="flex items-center gap-1.5 bg-cream-bg/20 text-cream-bg px-2 py-1 rounded-md font-code-sm text-[10px]">
                                 <div class="w-1.5 h-1.5 rounded-full bg-accent-gold animate-pulse"></div>
                                 <span id="networkBadge">Solana Devnet</span>
                             </div>
                         </div>
-                        <div class="flex flex-col items-center justify-center py-2 relative z-10">
-                            <span id="integrityIcon" class="material-symbols-outlined text-[56px] text-accent-gold mb-3" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                            <h3 id="integrityTitle" class="font-serif text-2xl font-bold text-cream-bg mb-1">Cryptographically Secure</h3>
-                            <p id="integrityDesc" class="font-body-sm text-sm text-cream-bg/80 text-center">Hashes match on-chain anchors and IPFS records.</p>
+                        <div class="flex flex-col items-center justify-center py-3 relative z-10 shrink-0">
+                            <span id="integrityIcon" class="material-symbols-outlined text-[56px] text-accent-gold mb-3 shrink-0" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            <h3 id="integrityTitle" class="font-serif text-2xl font-bold text-cream-bg mb-2 text-center leading-relaxed shrink-0">Cryptographically Secure</h3>
+                            <p id="integrityDesc" class="font-body-sm text-sm text-cream-bg/80 text-center leading-relaxed shrink-0">Hashes match on-chain anchors and IPFS records.</p>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 mt-6 relative z-10">
+                        <div class="grid grid-cols-2 gap-3 mt-6 relative z-10 shrink-0">
                             <div class="bg-cream-bg/10 p-3 rounded-xl border border-cream-bg/20 flex flex-col items-center">
                                 <span id="monitorMsgCount" class="font-code-sm text-xl text-cream-bg font-bold">12</span>
                                 <span class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">MESSAGES</span>
@@ -286,6 +290,7 @@
                         <div class="flex border-b border-border-color mb-4">
                             <button id="tabBtnProof" onclick="switchMonitorTab('proof')" class="px-4 py-2 text-primary-brown border-b-2 border-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest">Proof</button>
                             <button id="tabBtnTokens" onclick="switchMonitorTab('tokens')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">Tokens</button>
+                            <button id="tabBtnRules" onclick="switchMonitorTab('rules')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">Rules</button>
                             <button id="tabBtnScans" onclick="switchMonitorTab('scans')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">AI Scans</button>
                         </div>
 
@@ -325,10 +330,15 @@
                                 <span class="material-symbols-outlined text-[18px]">download</span>
                                 Download Cryptographic Proof
                             </button>
+                            <!-- Sprint 6.1: live proof log + integrity check, moved here from chat.
+                                 Filled by system_panels.js. -->
+                            <div id="spProofExtra"></div>
                         </div>
 
-                        <!-- Tab Content: Tokens (Hidden by default) -->
+                        <!-- Tab Content: Tokens — real balance + transaction ledger
+                             (moved here from chat, filled by system_panels.js) -->
                         <div id="tabContentTokens" class="space-y-4 hidden">
+                            <div id="spEconomy"></div>
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color">
                                 <div class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-wider mb-2">Gas & Storage Ledger</div>
                                 <div class="space-y-2 text-sm text-text-secondary">
@@ -339,8 +349,16 @@
                             </div>
                         </div>
 
-                        <!-- Tab Content: AI Scans (Hidden by default) -->
+                        <!-- Tab Content: Rules — the governance rule cards moved from chat -->
+                        <div id="tabContentRules" class="space-y-4 hidden">
+                            <div id="spRules"></div>
+                        </div>
+
+                        <!-- Tab Content: AI Scans — real Sentinel fraud log first
+                             (moved here from chat, filled by system_panels.js),
+                             then the illustrative network diagram. -->
                         <div id="tabContentScans" class="space-y-4 hidden">
+                            <div id="spScans"></div>
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color flex flex-col items-center">
                                 <div class="w-full flex justify-between font-code-sm text-[10px] text-text-secondary uppercase tracking-widest mb-4">
                                     <span>INPUT</span>
@@ -592,23 +610,61 @@
             if (msgCount) msgCount.textContent = currentSelectedBlock.messages || 12;
         }
 
+        // Search text + the Filter dropdown combine into one predicate.
+        let currentBlockFilter = 'all'; // all | anchored | pending
         function filterProofBlocks() {
             const query = (document.getElementById('searchBar').value || '').toLowerCase();
-            if (!query) {
-                renderBlocks(allProofBlocks);
-                return;
+            let list = allProofBlocks;
+            if (currentBlockFilter === 'anchored') list = list.filter(b => !!b.solana_tx);
+            else if (currentBlockFilter === 'pending') list = list.filter(b => !b.solana_tx);
+            if (query) {
+                list = list.filter(b =>
+                    (b.hash && b.hash.toLowerCase().includes(query)) ||
+                    (b.chain_height && b.chain_height.toString().includes(query)) ||
+                    (b.title && b.title.toLowerCase().includes(query)) ||
+                    (b.content && b.content.toLowerCase().includes(query))
+                );
             }
-            const filtered = allProofBlocks.filter(b => 
-                (b.hash && b.hash.toLowerCase().includes(query)) ||
-                (b.chain_height && b.chain_height.toString().includes(query)) ||
-                (b.title && b.title.toLowerCase().includes(query)) ||
-                (b.content && b.content.toLowerCase().includes(query))
-            );
-            renderBlocks(filtered);
+            renderBlocks(list);
+        }
+
+        // The Filter button: a small dropdown to show all blocks, only those
+        // anchored on Solana, or only those still pending anchoring.
+        function toggleFilter() {
+            const existing = document.getElementById('auditFilterMenu');
+            if (existing) { existing.remove(); return; }
+            const btn = [...document.querySelectorAll('button')].find(b => /Filter/.test(b.textContent) && b.querySelector('.material-symbols-outlined'));
+            if (!btn) return;
+            const menu = document.createElement('div');
+            menu.id = 'auditFilterMenu';
+            menu.style.cssText = 'position:absolute;top:calc(100% + 6px);left:0;z-index:50;min-width:190px;background:#fffaf0;border:1px solid var(--border-color,#e3d3ba);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:6px;';
+            const opts = [
+                ['all', 'All blocks'],
+                ['anchored', 'Anchored on Solana'],
+                ['pending', 'Pending anchor']
+            ];
+            menu.innerHTML = opts.map(([v, label]) => `
+                <button data-filter="${v}" style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border:none;background:${v === currentBlockFilter ? '#efe8de' : 'transparent'};border-radius:8px;font-size:13px;font-weight:600;color:#3a2e23;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:16px;visibility:${v === currentBlockFilter ? 'visible' : 'hidden'};">check</span>${label}
+                </button>`).join('');
+            btn.style.position = 'relative';
+            btn.parentElement.style.position = btn.parentElement.style.position || 'relative';
+            btn.insertAdjacentElement('afterend', menu);
+            menu.querySelectorAll('[data-filter]').forEach(o => o.onclick = (e) => {
+                e.stopPropagation();
+                currentBlockFilter = o.dataset.filter;
+                filterProofBlocks();
+                menu.remove();
+            });
+            // Close on outside click
+            setTimeout(() => {
+                const close = (ev) => { if (!menu.contains(ev.target) && ev.target !== btn) { menu.remove(); document.removeEventListener('click', close); } };
+                document.addEventListener('click', close);
+            }, 0);
         }
 
         function switchMonitorTab(tabName) {
-            ['proof', 'tokens', 'scans'].forEach(t => {
+            ['proof', 'tokens', 'rules', 'scans'].forEach(t => {
                 const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
                 const content = document.getElementById('tabContent' + t.charAt(0).toUpperCase() + t.slice(1));
                 if (t === tabName) {
@@ -675,6 +731,44 @@
         window.addEventListener('DOMContentLoaded', () => {
             loadProofChain();
         });
+
+        // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
+        (function () {
+            const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+            function toast(msg) {
+                let t = document.getElementById('nmSoonToast');
+                if (!t) {
+                    t = document.createElement('div');
+                    t.id = 'nmSoonToast';
+                    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
+                    document.body.appendChild(t);
+                }
+                t.textContent = msg;
+                requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+                clearTimeout(t._h);
+                t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
+            }
+            document.querySelectorAll('#sideNav a').forEach(a => {
+                const labelEl = a.querySelector('.font-body-sm');
+                const label = labelEl ? labelEl.textContent.trim() : '';
+                if (!SOON.includes(label)) return;
+                a.setAttribute('href', 'javascript:void(0)');
+                a.style.opacity = '0.55';
+                a.style.cursor = 'not-allowed';
+                if (!a.querySelector('.soon-badge')) {
+                    const b = document.createElement('span');
+                    b.className = 'soon-badge';
+                    b.textContent = 'Soon';
+                    b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
+                    a.appendChild(b);
+                }
+                a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
+            });
+        })();
     </script>
+    <!-- Sprint 6.1: fills #spProofExtra / #spEconomy / #spRules / #spScans with live data -->
+    <script src="system_panels.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

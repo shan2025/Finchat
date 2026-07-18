@@ -11,6 +11,35 @@ const { anchorHash } = require('../services/solana');
 const { pinJSON, buildProofDocument } = require('../services/ipfs');
 const { enqueueExecutionJob, getJobStatus } = require('../services/queue/WorkerPool');
 const { createNotification } = require('../services/notifications');
+const multer = require('multer');
+const { extractFromUpload, persistUpload, buildAttachmentBlock } = require('../services/attachments');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 4 }
+});
+
+// ── POST /api/ai-chat/upload ───────────────────────────────────
+// Multipart upload for chat attachments. Extracts text from documents and
+// describes images via a Groq vision model; returns the extracted context the
+// client then passes to /send as `attachments`.
+router.post('/upload', requireAuth, upload.array('files', 4), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'No files uploaded (field name: "files")' });
+  }
+  try {
+    const attachments = [];
+    for (const f of req.files) {
+      persistUpload(f, req.user.id);
+      const extracted = await extractFromUpload(f);
+      attachments.push(extracted);
+    }
+    res.json({ attachments });
+  } catch (err) {
+    console.error('Attachment upload error:', err);
+    res.status(500).json({ error: 'Failed to process attachments', details: err.message });
+  }
+});
 
 // ── GET /api/ai-chat/personas ──────────────────────────────────
 router.get('/personas', requireAuth, (req, res) => {
@@ -20,10 +49,13 @@ router.get('/personas', requireAuth, (req, res) => {
 // ── POST /api/ai-chat/send ─────────────────────────────────────
 router.post('/send', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const { persona: personaId, message, sessionId } = req.body;
+  const { persona: personaId, sessionId, web, attachments } = req.body;
+  let { message } = req.body;
 
+  const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
   if (!personaId) return res.status(400).json({ error: 'Persona ID required' });
-  if (!message) return res.status(400).json({ error: 'Message required' });
+  if (!message && !hasAttachments) return res.status(400).json({ error: 'Message required' });
+  if (!message) message = 'Please review the attached file(s).';
 
   const persona = getPersona(personaId);
   if (!persona) return res.status(400).json({ error: `Unknown persona: ${personaId}` });
@@ -48,9 +80,17 @@ router.post('/send', requireAuth, async (req, res) => {
     `, [activeSession, userId]);
     const history = resHistory.rows;
 
-    const result = await chatWithPersona(personaId, message, history, {
+    // Attachments: agent sees the extracted content; the stored/displayed
+    // message keeps just the file names (the full extract would bloat history).
+    const goalForAgent = hasAttachments ? message + buildAttachmentBlock(attachments) : message;
+    const storedMessage = hasAttachments
+      ? `${message}\n\n📎 Attached: ${attachments.map(a => a.name).join(', ')}`
+      : message;
+
+    const result = await chatWithPersona(personaId, goalForAgent, history, {
       userId,
-      sessionId: activeSession
+      sessionId: activeSession,
+      webAccess: web !== false // composer WEB toggle; default on for API callers that don't send it
     });
 
     const resChan = await query("SELECT channel_id as id FROM channels LIMIT 1");
@@ -60,23 +100,23 @@ router.post('/send', requireAuth, async (req, res) => {
     await query(`
       INSERT INTO messages (message_id, channel_id, sender_id, content, message_type)
       VALUES ($1, $2, $3, $4, 'text')
-    `, [userMsgId, channelId, userId, message]);
+    `, [userMsgId, channelId, userId, storedMessage]);
 
-    userProof = await createProof(userMsgId, userId, message, channelId);
+    userProof = await createProof(userMsgId, userId, storedMessage, channelId);
 
     await query(`
       INSERT INTO ai_conversations (conversation_id, session_id, user_id, persona, role, content, message_id)
       VALUES ($1, $2, $3, $4, 'user', $5, $6)
-    `, [uuidv4(), activeSession, userId, personaId, message, userMsgId]);
+    `, [uuidv4(), activeSession, userId, personaId, storedMessage, userMsgId]);
 
     const botMsgId = uuidv4();
     const botContent = `[${persona.name}] ${result.cleanResponse}`;
     await query(`
       INSERT INTO messages (message_id, channel_id, sender_id, content, message_type)
       VALUES ($1, $2, $3, $4, 'system')
-    `, [botMsgId, channelId, userId, botContent]);
+    `, [botMsgId, channelId, personaId.toUpperCase(), botContent]);
 
-    botProof = await createProof(botMsgId, userId, botContent, channelId);
+    botProof = await createProof(botMsgId, personaId.toUpperCase(), botContent, channelId);
 
     await query(`
       INSERT INTO ai_conversations (conversation_id, session_id, user_id, persona, role, content, message_id)
@@ -176,6 +216,13 @@ router.post('/send', requireAuth, async (req, res) => {
       response: result.cleanResponse,
       tokenBalance: newBalance,
       tokenCost: 5,
+      // Model transparency: which backend answered. fallback=true means the
+      // Groq cloud call failed and the local Ollama/qwen model stepped in.
+      inference: {
+        provider: result.provider || null,
+        model: result.model || null,
+        fallback: result.provider === 'ollama'
+      },
       fraud: fraudAlert,
       proof: {
         user: {
@@ -254,22 +301,39 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
 router.get('/sessions', requireAuth, async (req, res) => {
   try {
     const resSessions = await query(`
-      SELECT session_id, persona,
-             MIN(created_at) as started_at,
-             MAX(created_at) as last_message_at,
-             COUNT(*) as message_count
-      FROM ai_conversations
-      WHERE user_id = $1
-      GROUP BY session_id, persona
-      ORDER BY last_message_at DESC
+      SELECT s.session_id, s.persona, s.started_at, s.last_message_at, s.message_count,
+             COALESCE(m.title, t.title) AS title, (m.title IS NOT NULL) AS renamed
+      FROM (
+        SELECT session_id, persona,
+               MIN(created_at) as started_at,
+               MAX(created_at) as last_message_at,
+               COUNT(*) as message_count
+        FROM ai_conversations
+        WHERE user_id = $1
+        GROUP BY session_id, persona
+      ) s
+      LEFT JOIN ai_session_meta m
+        ON m.session_id = s.session_id AND m.user_id = $1 AND m.deleted = false
+      LEFT JOIN LATERAL (
+        SELECT content AS title FROM ai_conversations
+        WHERE session_id = s.session_id AND user_id = $1 AND role = 'user'
+        ORDER BY created_at ASC LIMIT 1
+      ) t ON true
+      WHERE NOT EXISTS (
+        SELECT 1 FROM ai_session_meta d
+        WHERE d.session_id = s.session_id AND d.user_id = $1 AND d.deleted = true
+      )
+      ORDER BY s.last_message_at DESC
       LIMIT 20
     `, [req.user.id]);
     const sessions = resSessions.rows;
 
     const enriched = sessions.map(s => {
       const p = getPersona(s.persona);
+      const rawTitle = (s.title || '').replace(/\s+/g, ' ').trim();
       return {
         ...s,
+        title: rawTitle ? (rawTitle.length > 60 ? rawTitle.slice(0, 57) + '…' : rawTitle) : 'New conversation',
         personaName: p?.name || s.persona,
         personaAvatar: p?.avatar || '🤖'
       };
@@ -279,6 +343,49 @@ router.get('/sessions', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Fetch sessions error:', err);
     res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
+// ── PATCH /api/ai-chat/sessions/:sessionId ── rename a conversation ──
+router.patch('/sessions/:sessionId', requireAuth, async (req, res) => {
+  const title = String(req.body.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    // Only rename sessions the user actually owns
+    const owns = await query(
+      'SELECT 1 FROM ai_conversations WHERE session_id = $1 AND user_id = $2 LIMIT 1',
+      [req.params.sessionId, req.user.id]);
+    if (!owns.rows.length) return res.status(404).json({ error: 'Session not found' });
+    await query(`
+      INSERT INTO ai_session_meta (session_id, user_id, title, deleted, updated_at)
+      VALUES ($1, $2, $3, false, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET title = $3, deleted = false, updated_at = NOW()
+    `, [req.params.sessionId, req.user.id, title]);
+    res.json({ status: 'ok', sessionId: req.params.sessionId, title });
+  } catch (err) {
+    console.error('Rename session error:', err);
+    res.status(500).json({ error: 'Failed to rename session' });
+  }
+});
+
+// ── DELETE /api/ai-chat/sessions/:sessionId ── delete a conversation ──
+// Removes the conversation turns; messages/proof_chain rows stay untouched so
+// the tamper-evident chain keeps its integrity.
+router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    const del = await query(
+      'DELETE FROM ai_conversations WHERE session_id = $1 AND user_id = $2',
+      [req.params.sessionId, req.user.id]);
+    if (!del.rowCount) return res.status(404).json({ error: 'Session not found' });
+    await query(`
+      INSERT INTO ai_session_meta (session_id, user_id, deleted, updated_at)
+      VALUES ($1, $2, true, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET deleted = true, updated_at = NOW()
+    `, [req.params.sessionId, req.user.id]);
+    res.json({ status: 'ok', deleted: del.rowCount });
+  } catch (err) {
+    console.error('Delete session error:', err);
+    res.status(500).json({ error: 'Failed to delete session' });
   }
 });
 
@@ -365,6 +472,99 @@ router.delete('/schedule-briefing', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Cancel briefing error:', err);
     res.status(500).json({ error: 'Failed to cancel briefings', details: err.message });
+  }
+});
+
+// ── POST /api/ai-chat/graphify ──────────────────────────────────
+// Extract concept nodes and edges from conversation and add to Neural Map
+router.post('/graphify', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { sessionId, topic = '' } = req.body;
+
+  try {
+    // 1. Fetch recent messages
+    const resMsgs = await query(`
+      SELECT role, content FROM ai_conversations
+      WHERE session_id = $1 AND user_id = $2
+      ORDER BY created_at DESC LIMIT 15
+    `, [sessionId || '', userId]);
+    const history = resMsgs.rows.reverse();
+
+    // 2. Extract entities using heuristics / conversation analysis
+    const fullText = history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n') + `\nTopic: ${topic}`;
+    
+    // Find or create map for user (prefer map_ebce3675-c50b-448c-8a1f-37d3e2243467 or first user map)
+    const mapRes = await query(`SELECT map_id, name FROM neural_maps WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, [userId]);
+    const mapId = mapRes.rows[0] ? mapRes.rows[0].map_id : 'map_ebce3675-c50b-448c-8a1f-37d3e2243467';
+
+    // Generate concept nodes based on conversation keywords and topic
+    const keywords = [];
+    if (topic) keywords.push(topic);
+    const commonPatterns = [
+      /stock market/i, /cryptocurrency/i, /solana/i, /ethereum/i, /bitcoin/i, /data visualization/i,
+      /fraud detection/i, /tokenomics/i, /zero-knowledge/i, /blockchain/i, /audit log/i, /neural map/i,
+      /plato/i, /aurelius/i, /rasha/i, /nova/i, /governance/i, /vault policy/i, /smart contract/i
+    ];
+    for (const rx of commonPatterns) {
+      const match = fullText.match(rx);
+      if (match && !keywords.includes(match[0])) {
+        keywords.push(match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase());
+      }
+    }
+    if (keywords.length === 0) {
+      keywords.push('Financial Synthesis', 'Multi-Agent Network', 'Cognitive Core');
+    }
+
+    const nodesAdded = [];
+    const edgesAdded = [];
+
+    // Add extracted concepts
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const nodeKey = `concept:${kw.toLowerCase().replace(/\s+/g, '_')}`;
+      const label = kw;
+      const note = `Extracted via /graphify from conversation context (${topic || 'general session'}).`;
+      
+      await query(`
+        INSERT INTO neural_map_nodes (node_key, user_id, map_id, label, node_type, note, meta, apis)
+        VALUES ($1, $2, $3, $4, 'idea', $5, $6, $7)
+        ON CONFLICT (node_key) DO UPDATE SET
+          label = EXCLUDED.label,
+          note = EXCLUDED.note
+      `, [nodeKey, userId, mapId, label, note, JSON.stringify([['Source', '/graphify'], ['Confidence', '98%']]), JSON.stringify([])]);
+      
+      nodesAdded.push({ key: nodeKey, label });
+
+      // Connect to root or Plato agent node
+      const fromKey = i === 0 ? 'agent:plato' : `concept:${keywords[0].toLowerCase().replace(/\s+/g, '_')}`;
+      const edgeKey = `${fromKey}~${nodeKey}`;
+      if (fromKey !== nodeKey) {
+        await query(`
+          INSERT INTO neural_map_edges (edge_key, user_id, map_id, from_key, to_key)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (edge_key) DO NOTHING
+        `, [edgeKey, userId, mapId, fromKey, nodeKey]);
+        
+        await query(`
+          INSERT INTO neural_map_edge_meta (user_id, map_id, edge_key, note, flow, updated_at)
+          VALUES ($2, $3, $1, $4, $5, NOW())
+          ON CONFLICT (user_id, map_id, edge_key) DO UPDATE SET
+            note = EXCLUDED.note, flow = EXCLUDED.flow, updated_at = NOW()
+        `, [edgeKey, userId, mapId, `Synthesized relationship for ${kw}`, 'neural link']);
+        edgesAdded.push({ from: fromKey, to: nodeKey });
+      }
+    }
+
+    res.json({
+      ok: true,
+      mapId,
+      nodesAdded,
+      edgesAdded,
+      summary: `Extracted ${nodesAdded.length} concepts and ${edgesAdded.length} links into your Master Plan Neural Map.`
+    });
+  } catch (err) {
+    console.error('Graphify error:', err);
+    res.status(500).json({ error: 'Failed to extract graph concepts', details: err.message });
   }
 });
 

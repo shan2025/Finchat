@@ -9,7 +9,7 @@
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
 </script>
 <script src="nn_core.js"></script>
 <style>
@@ -76,51 +76,80 @@
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- LEFT SIDEBAR NAV (static rail at md+, slide-in drawer below) -->
-<nav id="sideNav" class="nm-rail fixed left-0 top-0 h-full flex flex-col gap-6 p-4 z-40 w-64 border-r">
-  <div class="px-2 py-1">
-    <h1 class="text-3xl tracking-normal" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--rail-txt);">FinChat</h1>
-  </div>
-  <div class="flex flex-col gap-1">
-    <span class="text-[11px] font-bold tracking-widest uppercase px-3 mb-1" style="color: var(--rail-muted);">Navigation</span>
-    <a href="finchat_chat.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">chat</span> Chat
-    </a>
-    <a href="finchat_agents.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">tune</span> Agents
-    </a>
-    <a href="finchat_dashboard.html" class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm transition-all" style="color: var(--rail-txt);">
-      <span class="material-symbols-outlined text-[18px]">space_dashboard</span> Operations
-    </a>
-    <a href="finchat_neuralmap.html" class="nm-rail-active flex items-center gap-3 px-3 py-2 rounded-full font-bold text-sm shadow-sm transition-all">
-      <span class="material-symbols-outlined text-[18px]">hub</span> Neural Map
-    </a>
-  </div>
-  <div class="flex-1"></div>
-  <div class="flex flex-col gap-1 border-t pt-4" style="border-color: var(--rail-hover);">
-    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="#">
-      <span class="material-symbols-outlined text-[18px]">account_balance</span> Governance
-    </a>
-    <a class="nm-rail-link flex items-center gap-3 px-3 py-2 rounded-full transition-all text-sm" style="color: var(--rail-muted);" href="finchat_audit.html">
-      <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span> Audit Logs
-    </a>
-  </div>
-  <div class="flex items-center gap-2 px-2 py-2 border-t pt-4" style="border-color: var(--rail-hover);">
-    <div class="w-9 h-9 rounded-full shrink-0 relative flex items-center justify-center font-bold text-xs shadow-sm" style="background: var(--chrome); border: 1px solid var(--border); color: var(--txt);">
-      <span id="sidebarAvatarText">JD</span>
-      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2" style="border-color: var(--rail);"></div>
+<nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+    <div class="mb-10 px-2">
+        <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+            FinChat
+        </h1>
+        <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
     </div>
-    <div class="flex-1 min-w-0">
-      <div class="text-[12px] font-semibold truncate" id="sidebarName" style="color: var(--rail-txt);">Jane Doe</div>
-      <div class="text-[10px] font-mono" id="sidebarRole" style="color: var(--rail-muted);">Staff · Internal</div>
+    <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+            <span class="material-symbols-outlined text-[20px]">dashboard</span>
+            <span class="font-body-sm font-medium">Operations</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+            <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+            <span class="font-body-sm font-medium">Agents</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">chat</span>
+            <span class="font-body-sm font-medium">Chat</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+            <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
+            <span class="font-body-sm font-medium">Neural Map</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">assessment</span>
+            <span class="font-body-sm font-medium">Reports</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">menu_book</span>
+            <span class="font-body-sm font-medium">Knowledge</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">account_balance</span>
+            <span class="font-body-sm font-medium">Governance</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+            <span class="material-symbols-outlined text-[20px]">account_tree</span>
+            <span class="font-body-sm font-medium">Blockchain</span>
+        </a>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+            <span class="material-symbols-outlined text-[20px]">policy</span>
+            <span class="font-body-sm font-medium">Audit Logs</span>
+        </a>
+        <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+            <span class="material-symbols-outlined text-[20px]">settings</span>
+            <span class="font-body-sm font-medium">Settings</span>
+        </a>
     </div>
-    <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
-  </div>
+    <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+            <span class="material-symbols-outlined text-[20px]">help</span>
+            <span class="font-body-sm font-medium">Support</span>
+        </a>
+        <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
+            <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+                <span id="sidebarAvatarText">BT</span>
+            </div>
+            <div class="flex-1 overflow-hidden">
+                <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+                <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+            </div>
+            <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
+        </div>
+    </div>
 </nav>
 
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top App Bar -->
-  <header class="nm-chrome flex items-center gap-3 w-full px-6 py-3 h-16 z-50 border-b shrink-0">
+  <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
     <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[18px]">menu</span>
     </button>
@@ -129,11 +158,27 @@
     </a>
     <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
     <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--accent-soft); max-width: 260px;" />
-    <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline">—</span>
+    <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline-block truncate min-w-0" style="max-width:200px">—</span>
     <div class="flex-1"></div>
     <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
     </button>
+    <!-- Notification bell -->
+    <div class="relative shrink-0">
+      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
+        <span class="material-symbols-outlined text-[16px]">notifications</span>
+        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+      </button>
+      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </div>
+    <!-- Profile -->
+    <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;"></div>
   </header>
 
   <div id="loadingVeil" class="flex-1 flex items-center justify-center">
@@ -286,9 +331,15 @@ const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/
 
 (function initSidebar() {
   const name = SESSION_USER.name || SESSION_USER.username || 'User';
+  const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
   document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarAvatarText').textContent = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('sidebarAvatarText').textContent = initials;
   document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
+  const topProfile = document.getElementById('topbarUserIcon');
+  if (topProfile) {
+    if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
+    else topProfile.textContent = initials;
+  }
   fetch('/api/tokens/balance', { headers: AUTH }).then(r => r.ok ? r.json() : null)
     .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; }).catch(() => {});
 })();
@@ -714,6 +765,29 @@ function loop() {
 // ══════════════════════════════════════════════════════════
 applyTheme(theme);
 loadNetwork().then(() => { resize(); loop(); });
+
+// "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
+(function () {
+  const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+  document.querySelectorAll('#sideNav a').forEach(a => {
+    const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
+    if (!SOON.includes(label)) return;
+    a.setAttribute('href', 'javascript:void(0)');
+    a.style.opacity = '0.55';
+    a.style.cursor = 'not-allowed';
+    if (!a.querySelector('.soon-badge')) {
+      const b = document.createElement('span');
+      b.className = 'soon-badge';
+      b.textContent = 'Soon';
+      b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
+      a.appendChild(b);
+    }
+    a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
+  });
+})();
 </script>
+<script src="notifications_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

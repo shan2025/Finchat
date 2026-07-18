@@ -5,8 +5,8 @@ const { listTools } = require('./ToolRegistry');
 /**
  * Build a tool description block for the system prompt.
  */
-function buildToolDescriptions() {
-  const tools = listTools();
+function buildToolDescriptions(allowWeb = true) {
+  const tools = listTools({ allowWeb });
   if (tools.length === 0) return '';
 
   const toolLines = tools.map(t => {
@@ -16,14 +16,17 @@ function buildToolDescriptions() {
     return `  - "${t.name}": ${t.description} | Parameters: ${params}`;
   }).join('\n');
 
-  return `\n\nAVAILABLE TOOLS:\n${toolLines}`;
+  const webNote = allowWeb ? '' :
+    '\n\nNOTE: The user has turned OFF web access for this conversation, so open-web search/browsing tools are hidden. Your data tools (prices, jobs, papers, resume) still work. If the goal truly needs the open web, say so and ask the user to enable the WEB toggle.';
+
+  return `\n\nAVAILABLE TOOLS:\n${toolLines}${webNote}`;
 }
 
 /**
  * The unified action schema per Phase 3 spec, now with tool descriptions from ToolRegistry.
  */
-function getActionSchema() {
-  const toolBlock = buildToolDescriptions();
+function getActionSchema(allowWeb = true) {
+  const toolBlock = buildToolDescriptions(allowWeb);
 
   return `You MUST respond with valid JSON matching ONE of these three shapes:
 
@@ -98,7 +101,8 @@ function buildContext({
   graphContext = [],
   recipeHints = [],
   budgetExceeded = false,
-  traits = null
+  traits = null,
+  allowWeb = true
 }) {
   const messages = [];
 
@@ -108,7 +112,7 @@ function buildContext({
     ? persona.systemPrompt
     : 'You are Plato, the Chief AI Officer of FinChat. Answer the user\'s questions thoughtfully and precisely.';
 
-  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema();
+  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb);
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
 
   messages.push({
@@ -162,7 +166,9 @@ function buildContext({
       role: 'system',
       content:
         `--- TOOL RESULTS FROM PREVIOUS STEPS ---\n${toolBlock}\n\n` +
-        `Now use these results to respond to the user. You MUST use action "respond" now.\n` +
+        `Use these results. NEVER call a tool that already has a result listed above — its answer will not change. ` +
+        `If the goal explicitly requires data from a DIFFERENT tool you have not called yet, call that tool next; ` +
+        `otherwise you MUST use action "respond" now.\n` +
         `CITATION RULE: If any result contains a "url", "source", or "AbstractURL" field, you MUST include ` +
         `those URLs in your response as inline links so the user can verify the information. ` +
         `Never claim you "couldn't find results" if the tool returned any results — instead, present them ` +

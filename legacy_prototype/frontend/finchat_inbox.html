@@ -292,7 +292,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV                    -->
 <!-- ═══════════════════════════════════ -->
-    <nav class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
+    <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
             <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
                 FinChat
@@ -303,15 +303,19 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
                 <span class="material-symbols-outlined text-[20px]" >dashboard</span>
-                <span class="font-body-sm font-medium">Mission Control</span>
+                <span class="font-body-sm font-medium">Operations</span>
             </a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
                 <span class="material-symbols-outlined text-[20px]" >smart_toy</span>
                 <span class="font-body-sm font-medium">Agents</span>
             </a>
-            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">task_alt</span>
-                <span class="font-body-sm font-medium">Tasks</span>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+                <span class="material-symbols-outlined text-[20px]" >chat</span>
+                <span class="font-body-sm font-medium">Chat</span>
+            </a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+                <span class="material-symbols-outlined text-[20px]" >hub</span>
+                <span class="font-body-sm font-medium">Neural Map</span>
             </a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
                 <span class="material-symbols-outlined text-[20px]" >assessment</span>
@@ -345,7 +349,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
                 <span class="material-symbols-outlined text-[20px]" >help</span>
                 <span class="font-body-sm font-medium">Support</span>
             </a>
-            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
                 <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
                     BT
                 </div>
@@ -2364,6 +2368,42 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--accent-red);font-size:12px;">Error: ${err.message}</div>`;
       }
     }
+
+    // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
+    (function () {
+      const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+      function toast(msg) {
+        let t = document.getElementById('nmSoonToast');
+        if (!t) {
+          t = document.createElement('div');
+          t.id = 'nmSoonToast';
+          t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
+          document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+        clearTimeout(t._h);
+        t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
+      }
+      document.querySelectorAll('#sideNav a').forEach(a => {
+        const labelEl = a.querySelector('.font-body-sm');
+        const label = labelEl ? labelEl.textContent.trim() : '';
+        if (!SOON.includes(label)) return;
+        a.setAttribute('href', 'javascript:void(0)');
+        a.style.opacity = '0.55';
+        a.style.cursor = 'not-allowed';
+        if (!a.querySelector('.soon-badge')) {
+          const b = document.createElement('span');
+          b.className = 'soon-badge';
+          b.textContent = 'Soon';
+          b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
+          a.appendChild(b);
+        }
+        a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
+      });
+    })();
   </script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

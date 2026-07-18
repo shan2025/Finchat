@@ -163,6 +163,36 @@ async function incrementUsage(executionId, { iterations = 0, toolCalls = 0, toke
   return res.rows[0];
 }
 
+/**
+ * Sweep executions stuck in non-terminal states (e.g. after a server crash the
+ * row stays 'running' forever, which makes /api/agents/status report the agent
+ * as WORKING indefinitely). Executions waiting on human approval are exempt —
+ * those are allowed to wait as long as the human takes.
+ */
+async function sweepStaleExecutions({ maxActiveMinutes = 30, maxWaitingHours = 6 } = {}) {
+  const res = await query(`
+    UPDATE executions
+    SET current_state = 'failed',
+        completion_reason = 'timeout',
+        result = 'Swept as stale: no activity for over the allowed window (likely a crashed or orphaned run)',
+        updated_at = now()
+    WHERE (
+            current_state IN ('created', 'ready', 'running')
+        AND updated_at < now() - ($1 * interval '1 minute')
+      ) OR (
+            current_state = 'waiting'
+        AND COALESCE(wait_reason, '') <> 'human_approval'
+        AND updated_at < now() - ($2 * interval '1 hour')
+      )
+    RETURNING execution_id, assigned_agent, goal;
+  `, [maxActiveMinutes, maxWaitingHours]);
+  if (res.rows.length > 0) {
+    console.log(`🧹 Swept ${res.rows.length} stale execution(s):`,
+      res.rows.map(r => `${r.execution_id} [${r.assigned_agent}]`).join(', '));
+  }
+  return res.rows;
+}
+
 module.exports = {
   createExecution,
   getExecution,
@@ -170,5 +200,6 @@ module.exports = {
   completeExecution,
   failExecution,
   checkBudget,
-  incrementUsage
+  incrementUsage,
+  sweepStaleExecutions
 };

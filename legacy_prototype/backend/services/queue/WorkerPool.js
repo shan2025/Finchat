@@ -120,6 +120,12 @@ function startWorkerPool(concurrency = 5) {
       return await processMorningBriefing(job);
     }
 
+    if (job.name === 'agent-mission') {
+      // Sprint 7: scheduled mission run (lazy-load to avoid circular requires)
+      const { runMission } = require('../agents/MissionScheduler');
+      return await runMission(job.data.missionId);
+    }
+
     // Default: cognitive execution chat
     const { personaId, userMessage, history = [], options = {} } = job.data;
     console.log(`[WorkerPool] Processing job #${job.id} for persona "${personaId}"...`);

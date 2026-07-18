@@ -40,6 +40,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
   ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
 
   @keyframes pulseGlow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.05); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .pulse-working { animation: pulseGlow 2s infinite ease-in-out; }
   
   .agent-card-working {
@@ -132,7 +133,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
                 <span class="material-symbols-outlined text-[20px]" >help</span>
                 <span class="font-body-sm font-medium">Support</span>
             </a>
-            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
                 <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
                     BT
                 </div>
@@ -164,7 +165,21 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
       <button onclick="triggerManualRefresh(this)" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#f3eee3] hover:bg-[#e8dfd1] border border-border-color rounded-xl text-xs font-bold transition-all text-[#3a2e23]">
         <span id="refreshIcon" class="material-symbols-outlined text-[16px]">refresh</span> Refresh Pulse
       </button>
-      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-border-color overflow-hidden flex items-center justify-center bg-[#f3eee3]" onclick="window.location.href='finchat_chat.html'">
+      <!-- Notification bell -->
+      <div class="relative">
+        <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="p-2 rounded-full text-[#3a2e23] hover:bg-[#e8dfd1] transition-colors relative">
+          <span class="material-symbols-outlined">notifications</span>
+          <span id="notifBadge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+        </button>
+        <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+          <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+            <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+            <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+          </div>
+          <div id="notifList"></div>
+        </div>
+      </div>
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-border-color overflow-hidden flex items-center justify-center bg-[#f3eee3] cursor-pointer" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
         <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
       </div>
     </div>
@@ -388,8 +403,10 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
   if (SESSION_USER.name) {
     const names = SESSION_USER.name.split(' ');
     const initials = (names[0]?.[0] || 'U') + (names[1]?.[0] || '');
-    document.getElementById('sidebarName').textContent = SESSION_USER.name;
-    document.getElementById('sidebarAvatarText').textContent = initials.toUpperCase();
+    const nameEl = document.getElementById('sidebarName');
+    if (nameEl) nameEl.textContent = SESSION_USER.name;
+    const avatarTextEl = document.getElementById('sidebarAvatar');
+    if (avatarTextEl) avatarTextEl.textContent = initials.toUpperCase();
     const roleEl = document.getElementById('sidebarRole');
     if (roleEl && SESSION_USER.role) {
       roleEl.textContent = `${SESSION_USER.role.charAt(0).toUpperCase() + SESSION_USER.role.slice(1)} · FinChat`;
@@ -402,8 +419,12 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
     if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   }
 
-  // Socket.io connection for live pulse
-  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || '';
+  // Socket.io connection for live pulse.
+  // The token may live under the finchat_token key OR embedded in the session
+  // user object (that's how login stores it) — fall back to the latter, like the
+  // other pages do, so requests are always authenticated.
+  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token')
+    || (SESSION_USER && SESSION_USER.token) || '';
 
   // Token display — real balance from backend (not localStorage)
   async function refreshUserBalance() {
@@ -649,7 +670,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
     window.debateRunning = true;
     const btn = document.getElementById('debateBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]" style="animation:spin 1s linear infinite">progress_activity</span> Debating…';
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]" style="display:inline-block;animation:spin 1s linear infinite">progress_activity</span> Debating…';
     document.getElementById('debateProgress').textContent = 'Convening the council…';
     const result = document.getElementById('debateResult');
     result.classList.remove('hidden');
@@ -831,5 +852,8 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
     });
   })();
 </script>
+<script src="notifications_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

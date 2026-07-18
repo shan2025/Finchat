@@ -28,16 +28,42 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 </script>
 <!-- Socket.io -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<!-- Markdown and DOMPurify -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <style>
-  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+  body { font-family: 'Figtree', system-ui, sans-serif; background-color: #f5ead8; color: #201e1d; }
   /* ── CSS Variables for JS-generated elements ── */
+  /* Reskinned to the "Organic / terracotta" design system (Chat.dc.html). */
   :root {
-    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
-    --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
-    --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
-    --user-bubble: #3a2e23; --user-text: #ffffff; --bot-bubble: #efe8de;
-    --mono: ui-monospace, SFMono-Regular, monospace; --sans: 'Inter', sans-serif;
-    --shadow: 0 1px 3px rgba(58,46,35,0.08); --shadow-md: 0 4px 12px rgba(58,46,35,0.12);
+    --bg: #f5ead8; --surface: #fffaf0; --surface2: #f4eede; --border: #e7d9be; --border2: #e3d3ba;
+    --accent: #c67139; --accent-hover: #b2622d;
+    --accent-blue: #3b82f6; --accent-green: #6f8a4e; --accent-amber: #d97706; --accent-red: #b0472e;
+    --text: #201e1d; --text2: #5b4a3a; --text3: #8a7d6a;
+    --user-bubble: #2a2420; --user-text: #f3ead9; --bot-bubble: #fffaf0;
+    --mono: ui-monospace, SFMono-Regular, monospace; --sans: 'Figtree', system-ui, sans-serif; --serif: 'Caprasimo', serif;
+    --shadow: 0 1px 2px rgba(46,43,37,0.06); --shadow-md: 0 8px 28px rgba(46,43,37,0.12);
+    --side-bg: #2a241d; --side-fg: #efe6d6; --side-muted: #a99e88;
+  }
+  
+  /* Markdown styling inside chat bubbles */
+  .markdown-body { font-family: var(--sans); font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+  .markdown-body p { margin-bottom: 0.5em; }
+  .markdown-body p:last-child { margin-bottom: 0; }
+  .markdown-body a { color: #3b82f6; text-decoration: underline; text-underline-offset: 2px; }
+  .markdown-body a:hover { color: #2563eb; }
+  .markdown-body strong { font-weight: 600; }
+  .markdown-body em { font-style: italic; }
+  .markdown-body code { font-family: var(--mono); background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; font-size: 12px; }
+  .markdown-body pre { background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
+  .markdown-body pre code { background: transparent; padding: 0; }
+  .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
+  .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
+  
+  .bot .bubble.markdown-body a { color: #4a3828; text-decoration-color: rgba(74, 56, 40, 0.4); }
+  .bot .bubble.markdown-body a:hover { text-decoration-color: #4a3828; }
+  .user .bubble.markdown-body a { color: #efe8de; text-decoration-color: rgba(239, 232, 222, 0.4); }
+  .user .bubble.markdown-body a:hover { text-decoration-color: #efe8de; }
     --solana-online: #16a34a; --solana-offline: #dc2626;
     --accent-solana: #9945FF;
   }
@@ -56,18 +82,19 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Message Components (JS-generated) ── */
-  .msg-group { display:flex; flex-direction:column; gap:2px; margin-bottom:12px; animation:fadeUp 0.2s ease; }
+  /* Centered ChatGPT-style conversation column (design: max-width ~860px) */
+  .msg-group { display:flex; flex-direction:column; gap:4px; margin:0 auto 20px; width:100%; max-width:840px; animation:fadeUp 0.24s cubic-bezier(.2,.8,.2,1); }
   .msg-group.user { align-items:flex-end; }
   .msg-group.bot { align-items:flex-start; }
-  .msg-row { display:flex; align-items:flex-end; gap:8px; max-width:72%; }
+  .msg-row { display:flex; align-items:flex-start; gap:13px; max-width:78%; }
   .msg-group.user .msg-row { flex-direction:row-reverse; }
-  .msg-avatar-space { width:32px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:center; }
-  .msg-content { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .msg-avatar-space { width:38px; flex-shrink:0; display:flex; align-items:flex-start; justify-content:center; padding-top:2px; }
+  .msg-content { display:flex; flex-direction:column; gap:5px; min-width:0; }
   .msg-group.user .msg-content { align-items:flex-end; }
-  .msg-sender { font-size:11px; font-weight:600; color:var(--text2); padding:0 4px; margin-bottom:2px; }
-  .bubble { padding:10px 14px; border-radius:16px; font-size:13.5px; line-height:1.55; word-break:break-word; box-shadow:var(--shadow); }
-  .user .bubble { background:var(--user-bubble); color:var(--user-text); border-bottom-right-radius:4px; }
-  .bot .bubble { background:var(--bot-bubble); color:var(--text); border:1px solid var(--border); border-bottom-left-radius:4px; }
+  .msg-sender { font-size:14px; font-weight:700; color:var(--text); padding:0 2px; margin-bottom:1px; }
+  .bubble { padding:13px 16px; border-radius:4px 18px 18px 18px; font-size:14.5px; line-height:1.6; word-break:break-word; text-wrap:pretty; }
+  .user .bubble { background:var(--user-bubble); color:var(--user-text); border-radius:18px 4px 18px 18px; }
+  .bot .bubble { background:var(--bot-bubble); color:#33302b; border:1px solid var(--border); border-radius:4px 18px 18px 18px; }
   .bubble.flagged { border:1.5px solid #991b1b !important; background:#2d1215 !important; color:var(--text) !important; }
   .bubble.warned { border:1.5px solid #92400e !important; background:#2d2305 !important; color:var(--text) !important; }
 
@@ -78,6 +105,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
   .msg-footer { display:flex; align-items:center; gap:6px; padding:0 4px; }
   .msg-group.user .msg-footer { justify-content:flex-end; }
+  .msg-copy { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; border-radius:6px; background:transparent; color:var(--text3); cursor:pointer; opacity:0; transition:opacity .12s, background .12s; padding:0; }
+  .msg-group:hover .msg-copy { opacity:1; }
+  .msg-copy:hover { background:var(--surface2); color:var(--text2); }
+  .rc-actions { display:none; align-items:center; gap:2px; flex-shrink:0; }
+  .fc-recent:hover .rc-actions { display:inline-flex; }
+  .rc-actions button { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:#a99e88; cursor:pointer; padding:0; }
+  .rc-actions button:hover { background:rgba(255,255,255,.12); color:#fff; }
   .msg-time { font-size:10px; color:var(--text3); font-family:var(--mono); }
   .read-receipt { font-size:11px; color:var(--text3); }
   .read-receipt.read { color:var(--accent-blue); }
@@ -98,20 +132,20 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .user .file-icon { background:#4d4c44; }
 
   /* Typing */
-  .typing-bubble { padding:10px 16px; background:var(--bot-bubble); border:1px solid var(--border); border-radius:16px; border-bottom-left-radius:4px; display:inline-flex; gap:10px; align-items:center; box-shadow:var(--shadow); max-width:420px; }
+  .typing-bubble { padding:13px 18px; background:var(--bot-bubble); border:1px solid var(--border); border-radius:4px 18px 18px 18px; display:inline-flex; gap:10px; align-items:center; box-shadow:var(--shadow); max-width:420px; }
   .typing-dots { display:flex; gap:4px; align-items:center; flex-shrink:0; }
-  .typing-dot { width:5px; height:5px; border-radius:50%; background:var(--text3); animation:typingAnim 1.3s infinite; }
+  .typing-dot { width:6px; height:6px; border-radius:50%; background:#8c7a63; animation:typingAnim 1.3s infinite; }
   .typing-dot:nth-child(2) { animation-delay:0.2s; }
   .typing-dot:nth-child(3) { animation-delay:0.4s; }
   .typing-phrase { font-size:12px; color:var(--text2); font-style:italic; font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.25s ease; }
 
   /* Date divider */
-  .date-divider { display:flex; align-items:center; gap:12px; margin:16px 0; }
+  .date-divider { display:flex; align-items:center; gap:12px; margin:16px auto; width:100%; max-width:840px; }
   .date-divider::before, .date-divider::after { content:''; flex:1; height:1px; background:var(--border); }
   .date-divider span { font-size:11px; color:var(--text3); font-weight:500; white-space:nowrap; }
 
   /* Checkpoint banner */
-  .checkpoint-banner { display:flex; align-items:center; gap:10px; margin:10px 0; padding:0 8px; }
+  .checkpoint-banner { display:flex; align-items:center; gap:10px; margin:10px auto; padding:0 8px; width:100%; max-width:840px; }
   .checkpoint-banner::before, .checkpoint-banner::after { content:''; flex:1; height:1px; background:linear-gradient(to right,transparent,#7c3aed44); }
   .checkpoint-banner::after { background:linear-gradient(to left,transparent,#7c3aed44); }
   .checkpoint-banner-label { display:flex; align-items:center; gap:6px; font-size:10px; font-family:var(--mono); font-weight:600; color:#c4b5fd; background:#1e1533; border:1px solid #3b2d63; border-radius:20px; padding:3px 10px; white-space:nowrap; }
@@ -286,6 +320,39 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
   #fileInput { display:none; }
 
+  /* Sidebar nav item hover (dark espresso rail) */
+  .fc-nav { transition: background .14s ease, color .14s ease; }
+  .fc-nav:hover { background: rgba(255,255,255,.07); }
+  .fc-newchat:hover { background: var(--accent-hover) !important; }
+  .side-label { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--side-muted); padding:8px 12px 6px; font-weight:700; }
+  .side-soon { margin-left:auto; font-size:9px; letter-spacing:.1em; padding:3px 7px; border-radius:999px; background:rgba(239,230,214,.1); color:var(--side-muted); }
+
+  /* Composer */
+  .fc-tool:hover { background:#f0e4cd !important; color:#201e1d !important; }
+  .fc-send:hover { background:var(--accent-hover) !important; }
+  #composerBox:focus-within { border-color:var(--accent) !important; }
+  /* Kill every browser-default focus rectangle inside the composer + header search;
+     the composer signals focus via its own border-color change instead. */
+  #composerBox:focus, #composerBox *:focus, #composerBox *:focus-visible,
+  #msgInput:focus, #msgInput:focus-visible,
+  header input:focus, header input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  #webToggle.on { border-color:var(--accent) !important; background:#fff3e6 !important; color:var(--accent) !important; }
+  .fc-icon:hover { background:#f0e4cd !important; }
+
+  /* Welcome / suggestion cards */
+  .fc-card { transition:transform .14s ease, box-shadow .16s ease, border-color .14s ease; }
+  .fc-card:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(46,43,37,.14); border-color:var(--accent) !important; }
+
+  /* Sidebar Recent + agent menu */
+  .fc-recent .fc-hdel { opacity:0; transition:opacity .12s; }
+  .fc-recent:hover .fc-hdel { opacity:1; }
+  .fc-agentmenu-item:hover { background:#f0e4cd !important; }
+  @keyframes fcPop { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  .fc-pop { animation:fcPop .2s cubic-bezier(.2,.8,.2,1); }
+
   /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
      narrow screens (was `hidden md:flex` — no nav at all under 768px). */
   #sideNav { transition: transform .25s ease; }
@@ -295,7 +362,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   }
   @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 </head>
 
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
@@ -306,71 +373,78 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-    <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
-        <div class="mb-10 px-2">
-            <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
-                FinChat
-            </h1>
-            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+    <nav id="sideNav" class="flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden;">
+        <!-- Brand -->
+        <div style="padding:22px 22px 14px;">
+            <div style="font-family:var(--serif); font-size:27px; line-height:1; letter-spacing:-.01em; color:#f3ead9;">FinChat</div>
+            <div style="font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--side-muted); margin-top:7px;">AI Operating System</div>
         </div>
-        <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
-                <span class="material-symbols-outlined text-[20px]" >dashboard</span>
-                <span class="font-body-sm font-medium">Operations</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
-                <span class="material-symbols-outlined text-[20px]" >smart_toy</span>
-                <span class="font-body-sm font-medium">Agents</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
-                <span class="font-body-sm font-medium">Chat</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
-                <span class="material-symbols-outlined text-[20px]" >hub</span>
-                <span class="font-body-sm font-medium">Neural Map</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" >assessment</span>
-                <span class="font-body-sm font-medium">Reports</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" >menu_book</span>
-                <span class="font-body-sm font-medium">Knowledge</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" >account_balance</span>
-                <span class="font-body-sm font-medium">Governance</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-                <span class="material-symbols-outlined text-[20px]" >account_tree</span>
-                <span class="font-body-sm font-medium">Blockchain</span>
-            </a>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-                <span class="material-symbols-outlined text-[20px]" >policy</span>
-                <span class="font-body-sm font-medium">Audit Logs</span>
-            </a>
-            <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-                <span class="material-symbols-outlined text-[20px]" >settings</span>
-                <span class="font-body-sm font-medium">Settings</span>
-            </a>
+        <!-- New chat -->
+        <div style="padding:4px 14px 12px;">
+            <button onclick="newChat()" class="fc-newchat" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;">
+                <span class="material-symbols-outlined text-[18px]">add</span> New chat
+            </button>
         </div>
-        <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
-            <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
-                <span class="material-symbols-outlined text-[20px]" >help</span>
-                <span class="font-body-sm font-medium">Support</span>
-            </a>
-            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
-                <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+        <!-- Recent Chats — real sessions from /api/ai-chat/sessions (rendered by loadRecentSessions) -->
+        <div style="padding:0 14px 12px;">
+            <div class="side-label" style="margin-bottom:6px; font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--side-muted);">Recent</div>
+            <div id="recentList" class="flex flex-col gap-0.5" style="max-height:168px; overflow-y:auto;">
+                <div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">Loading…</div>
+            </div>
+        </div>
+        <!-- Nav -->
+        <div class="flex-1 overflow-y-auto" style="padding:8px 14px;">
+            <div class="side-label">Navigation</div>
+            <div class="flex flex-col gap-0.5">
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_dashboard.html">
+                    <span class="material-symbols-outlined text-[20px]">dashboard</span> Operations
+                </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_agents.html">
+                    <span class="material-symbols-outlined text-[20px]">smart_toy</span> Agents
+                </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; background:var(--accent); color:#fff; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; box-shadow:0 6px 16px rgba(140,73,26,.32);" href="finchat_chat.html">
+                    <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">chat</span> Chat
+                </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralmap.html">
+                    <span class="material-symbols-outlined text-[20px]">hub</span> Neural Map
+                </a>
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">assessment</span> <span style="flex:1;">Reports</span> <span class="side-soon">SOON</span>
+                </div>
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">menu_book</span> <span style="flex:1;">Knowledge</span> <span class="side-soon">SOON</span>
+                </div>
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">account_balance</span> <span style="flex:1;">Governance</span> <span class="side-soon">SOON</span>
+                </div>
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">account_tree</span> <span style="flex:1;">Blockchain</span> <span class="side-soon">SOON</span>
+                </div>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_audit.html">
+                    <span class="material-symbols-outlined text-[20px]">policy</span> Audit Logs
+                </a>
+            </div>
+            <div class="side-label" style="padding-top:20px;">System</div>
+            <div class="flex flex-col gap-0.5">
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">settings</span> <span style="flex:1;">Settings</span> <span class="side-soon">SOON</span>
+                </div>
+                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
+                    <span class="material-symbols-outlined text-[20px]">help</span> <span style="flex:1;">Support</span> <span class="side-soon">SOON</span>
+                </div>
+            </div>
+        </div>
+        <!-- User profile -->
+        <div style="padding:12px 14px 16px; border-top:1px solid rgba(239,230,214,.14);">
+            <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:14px; cursor:pointer;" onclick="openSettings()">
+                <div id="sidebarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0" style="width:38px; height:38px; background:linear-gradient(135deg,#d67f48,#8c491a); color:#fff; font-family:var(--serif); font-size:15px;">
                     BT
                 </div>
                 <div class="flex-1 overflow-hidden">
-                    <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
-                    <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+                    <div id="sidebarName" style="font-size:14px; font-weight:700; color:#f3ead9;" class="truncate">Bro Test</div>
+                    <div id="sidebarRole" style="font-size:11px; color:var(--side-muted); margin-top:1px;" class="truncate">Staff • Internal</div>
                 </div>
+                <span class="material-symbols-outlined text-[18px]" style="color:var(--side-muted);">more_vert</span>
             </div>
         </div>
     </nav>
@@ -380,41 +454,58 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <!-- ═══════════════════════════════════ -->
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
-  <!-- Top App Bar -->
-  <header class="flex justify-between items-center w-full px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
-    <div class="flex items-center gap-md">
-      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant bg-surface-container-highest text-primary-fixed">
-        <span class="material-symbols-outlined text-[20px]">menu</span>
+  <!-- Top header (single, design: Chat.dc.html) -->
+  <header class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
+    <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full shrink-0" style="border:1px solid #e3d3ba; background:#f5ead8; color:#5b4a3a;">
+      <span class="material-symbols-outlined text-[20px]">menu</span>
+    </button>
+    <!-- Active agent identity -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div id="topbarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0" style="width:42px; height:42px; background:#f4eede;"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
+      <div class="min-w-0">
+        <h2 id="topbarName" class="truncate" style="font-family:var(--serif); font-size:19px; color:#201e1d; line-height:1.15;">Plato</h2>
+        <p id="topbarDesc" class="truncate" style="font-size:12.5px; color:#8a7d6a;">Chief AI Officer & System Supervisor</p>
+      </div>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <!-- Search -->
+    <div class="relative hidden sm:block" style="width:260px; max-width:32vw;">
+      <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px]" style="color:#a1937f;">search</span>
+      <input id="knowledgeSearch" class="w-full" placeholder="Search system knowledge…" type="text" autocomplete="off" style="padding:10px 14px 10px 40px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13.5px; outline:none;">
+    </div>
+
+    <!-- Notifications -->
+    <div class="relative shrink-0">
+      <button id="notifBell" onclick="toggleNotifications(event)" class="fc-icon" title="Notifications" style="position:relative; width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+        <span class="material-symbols-outlined text-[20px]">notifications</span>
+        <span id="notifBadge" class="hidden" style="position:absolute; top:6px; right:7px; min-width:16px; height:16px; padding:0 3px; background:var(--accent-red); color:#fff; font-size:10px; font-weight:700; line-height:16px; border-radius:999px; text-align:center; border:2px solid #fffaf0;"></span>
       </button>
-      <h1 class="text-headline-md font-bold text-primary-fixed md:hidden block">FinChat</h1>
-      <div class="relative hidden sm:block">
-        <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8c7a6b] text-[18px]">search</span>
-        <input class="bg-[#e8ded1] border border-[#d6cbc0] text-[#3a2e23] text-sm rounded-2xl py-2 pl-10 pr-4 focus:outline-none focus:border-[#3a2e23] focus:ring-1 focus:ring-[#3a2e23] transition-colors w-64 placeholder-[#8c7a6b]" placeholder="Search persona..." type="text">
-      </div>
-    </div>
-    <div class="flex items-center gap-lg">
-      <div class="hidden md:flex items-center gap-xs px-3 py-1.5 rounded-full border border-primary-fixed bg-surface-container-highest text-primary-fixed text-label-md">
-        <span class="w-2 h-2 rounded-full bg-primary-fixed animate-pulse"></span>
-        <span id="topbarTokenDisplay">1000</span> CHAT
-      </div>
-      <div class="flex items-center gap-sm relative">
-        <button id="notifBell" onclick="toggleNotifications(event)" class="p-2 rounded-full text-text-primary-variant hover:bg-surface-container-highest transition-colors relative">
-          <span class="material-symbols-outlined">notifications</span>
-          <span id="notifBadge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center border border-surface-container-low"></span>
-        </button>
-        <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-border-color sticky top-0 bg-cream-bg">
-            <span class="text-sm font-bold text-[#3a2e23]">Notifications</span>
-            <button onclick="markAllNotifsRead()" class="text-[11px] text-[#8c7a6b] hover:text-[#3a2e23] font-semibold">Mark all read</button>
-          </div>
-          <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
+      <div id="notifDropdown" class="hidden absolute right-0 top-12 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border-color sticky top-0 bg-cream-bg">
+          <span class="text-sm font-bold text-[#3a2e23]">Notifications</span>
+          <button onclick="markAllNotifsRead()" class="text-[11px] text-[#8c7a6b] hover:text-[#3a2e23] font-semibold">Mark all read</button>
         </div>
-      </div>
-      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="openSettings()">
-        <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
+        <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
       </div>
     </div>
+
+    <!-- Settings -->
+    <button id="topbarUserIcon" class="fc-icon shrink-0" title="Settings" onclick="openSettings()" style="width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+      <span class="material-symbols-outlined text-[20px]">settings</span>
+    </button>
   </header>
+
+  <!-- Hidden functional stubs — kept in the DOM so backend wiring stays intact
+       (token balance, Solana status, chain height, export, persona bar). -->
+  <div style="display:none;">
+    <span id="topbarTokenDisplay">1000</span>
+    <div id="solanaStatusBadge" title=""><span id="solanaStatusDot"></span><span id="solanaStatusText">Checking...</span></div>
+    <span id="topbarChain">Block #0</span>
+    <button id="exportJsonBtn" title="Export JSON" onclick="exportJSON()"><span class="material-symbols-outlined">download</span></button>
+    <div id="personaBar"></div>
+  </div>
 
   <!-- Main Dashboard Canvas -->
   <main class="flex-1 flex overflow-hidden bg-cream-bg">
@@ -422,191 +513,66 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     <!-- ═══════════════════════════════ -->
     <!-- CENTRAL CHAT AREA               -->
     <!-- ═══════════════════════════════ -->
-    <section class="flex-1 flex flex-col border-r border-outline-variant bg-surface-container-lowest relative">
-      <!-- Channel Header -->
-      <div class="px-lg py-md border-b border-outline-variant bg-surface-container-low flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-md">
-          <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant" id="topbarAvatar"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
-          <div>
-            <h2 class="text-label-md font-bold text-primary flex items-center gap-sm" id="topbarName">Plato</h2>
-            <p class="text-label-sm text-text-primary-variant mt-0.5" id="topbarDesc">Chief AI Officer & System Supervisor</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-sm">
-          <!-- Solana Status -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant" id="solanaStatusBadge" title="Checking Solana connection...">
-            <span class="w-[5px] h-[5px] rounded-full" id="solanaStatusDot" style="background:var(--text3)"></span>
-            <span id="solanaStatusText">Checking...</span>
-          </div>
-          <!-- Chain Badge -->
-          <div class="flex items-center gap-xs px-3 py-1 rounded-full border border-outline-variant bg-surface-container-highest text-[10px] font-mono text-text-primary-variant">
-            <span class="w-[5px] h-[5px] rounded-full bg-[#16a34a]" style="animation:blink 2s infinite"></span>
-            <span id="topbarChain">Block #0</span>
-          </div>
-          <!-- Actions -->
-          <button class="p-2 rounded-md border border-outline-variant text-text-primary-variant hover:bg-surface-container-highest transition-colors text-sm" title="Export JSON" onclick="exportJSON()">
-            <span class="material-symbols-outlined text-[18px]">download</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Persona selector — pick which agent you're talking to -->
-      <div id="personaBar" class="flex items-center gap-2 px-lg py-2 border-b border-outline-variant bg-surface-container-low overflow-x-auto shrink-0"></div>
-
-      <!-- Peeking Robot Mascot resting on messages container top border -->
-      <div class="relative w-full h-0 flex justify-center z-30 pointer-events-none">
-        <div class="absolute -top-7 drop-shadow-md flex flex-col items-center" style="width:110px;height:70px;">
-          <svg viewBox="0 0 120 80" class="w-full h-full overflow-visible">
-            <!-- Left Ear -->
-            <rect x="16" y="24" width="12" height="20" rx="6" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
-            <!-- Right Ear -->
-            <rect x="92" y="24" width="12" height="20" rx="6" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
-            <!-- Antenna Top -->
-            <line x1="60" y1="2" x2="60" y2="14" stroke="#3a2e23" stroke-width="4" stroke-linecap="round"/>
-            <circle cx="60" cy="2" r="5.5" fill="#3a2e23" stroke="#efe8de" stroke-width="2"/>
-            <!-- Head -->
-            <rect x="24" y="12" width="72" height="50" rx="22" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
-            <!-- Eyes -->
-            <ellipse cx="44" cy="32" rx="7" ry="6" fill="#efe8de"/>
-            <ellipse cx="76" cy="32" rx="7" ry="6" fill="#efe8de"/>
-            <!-- Smile -->
-            <path d="M46 44 Q60 56 74 44" stroke="#efe8de" stroke-width="4.5" stroke-linecap="round" fill="none"/>
-            <!-- Left Paw resting on border -->
-            <path d="M34 56 C34 46 50 46 50 56 L50 68 C50 73 34 73 34 68 Z" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
-            <!-- Right Paw resting on border -->
-            <path d="M70 56 C70 46 86 46 86 56 L86 68 C86 73 70 73 70 68 Z" fill="#3a2e23" stroke="#efe8de" stroke-width="3"/>
-          </svg>
-        </div>
-      </div>
-
-      <!-- Messages Container -->
-      <div class="flex-1 overflow-y-auto p-lg flex flex-col gap-[2px]" id="messages" style="scroll-behavior:smooth">
+    <section class="flex-1 flex flex-col relative" style="background:#f5ead8;">
+      <!-- Messages Container. When the conversation is empty this holds the
+           welcome hero (renderHeroHTML): big agent avatar, "How can I help
+           today?" and the suggestion cards, matching Chat.dc.html. -->
+      <div class="flex-1 overflow-y-auto p-lg flex flex-col gap-[2px]" id="messages" style="scroll-behavior:smooth;">
         <div class="date-divider"><span>Today</span></div>
       </div>
 
-      <!-- Input Area -->
-      <div class="p-lg border-t border-outline-variant bg-surface-container-low shrink-0">
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-2 flex flex-col gap-2 focus-within:border-primary-fixed transition-colors">
-          <div class="attach-preview" id="attachPreview"></div>
-          <textarea class="w-full bg-transparent border-none text-body-md text-text-primary resize-none focus:ring-0 p-2 placeholder-on-surface-variant min-h-[40px] max-h-[120px] outline-none" id="msgInput" placeholder="Message Plato..." rows="1"></textarea>
-          <div class="flex justify-between items-center px-2 pb-1 border-t border-outline-variant pt-2">
-            <div class="flex gap-sm">
-              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors" onclick="document.getElementById('fileInput').click()" title="Attach file">
-                <span class="material-symbols-outlined">attach_file</span>
+      <!-- Input Area (rounded pill composer, design: Chat.dc.html) -->
+      <div class="shrink-0" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
+        <div id="composerBox" style="max-width:860px; margin:0 auto; background:#fffaf0; border:1px solid #e3d3ba; border-radius:26px; box-shadow:0 8px 28px rgba(46,43,37,.10); transition:border-color .15s;">
+          <div class="attach-preview" id="attachPreview" style="border-top:none; border-radius:26px 26px 0 0;"></div>
+          <textarea id="msgInput" rows="1" placeholder="Message Plato..." style="width:100%; border:none; background:transparent; resize:none; outline:none; font-family:inherit; font-size:15.5px; line-height:1.55; color:#201e1d; padding:17px 20px 4px; min-height:40px; max-height:180px;"></textarea>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px 11px;">
+            <!-- Agent picker (replaces the old persona bar) -->
+            <div class="fc-agentwrap" style="position:relative;">
+              <button id="agentPickerBtn" onclick="toggleAgentMenu(event)" title="Choose agent" style="display:inline-flex; align-items:center; gap:8px; padding:5px 11px 5px 5px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">
+                <span id="agentPickerAvatar" style="width:26px; height:26px; border-radius:999px; background:#f4eede; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;"></span>
+                <span id="agentPickerName">Plato</span>
+                <span class="material-symbols-outlined text-[18px]" style="color:#8a7d6a;">expand_more</span>
               </button>
-              <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
-              <button class="text-text-primary-variant hover:text-primary-fixed transition-colors">
-                <span class="material-symbols-outlined">mood</span>
-              </button>
+              <div id="agentMenu" style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; width:250px; background:#fffaf0; border:1px solid #e3d3ba; border-radius:16px; box-shadow:0 14px 34px rgba(46,43,37,.20); padding:6px; z-index:40;"></div>
             </div>
-            <div class="flex items-center gap-md">
-              <span class="text-label-sm text-text-primary-variant font-mono" id="govHint">5 tokens / message</span>
-              <button class="bg-[#3a2e23] text-[#efe8de] px-4 py-1.5 rounded-full font-label-md text-label-md font-bold flex items-center gap-sm hover:bg-[#4a3828] transition-colors shadow-sm" id="sendBtn" onclick="sendMessage()">
-                Send
-                <span class="material-symbols-outlined text-[18px]">send</span>
-              </button>
-            </div>
+            <button class="fc-tool" onclick="document.getElementById('fileInput').click()" title="Attach file" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">attach_file</span>
+            </button>
+            <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
+            <button class="fc-tool" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">mic</span>
+            </button>
+            <button class="fc-tool" title="Upload image" onclick="document.getElementById('fileInput').click()" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">image</span>
+            </button>
+
+            <div style="flex:1;"></div>
+
+            <button id="webToggle" onclick="toggleWebAccess()" title="Web access" style="display:inline-flex; align-items:center; gap:9px; padding:7px 10px 7px 13px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#8a7d6a; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; letter-spacing:.03em; transition:all .15s;">
+              <span class="material-symbols-outlined text-[16px]">language</span>
+              WEB
+              <span id="webTrack" style="width:34px; height:20px; border-radius:999px; background:#e0d4bd; position:relative; transition:background .16s;"><span id="webKnob" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transform:translateX(0); transition:transform .16s; box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span>
+            </button>
+
+            <span id="govHint" style="font-size:12px; color:#a1937f; font-weight:600; white-space:nowrap;">5 tokens / message</span>
+
+            <button id="sendBtn" onclick="sendMessage()" title="Send" class="fc-send" style="width:44px; height:44px; border-radius:999px; border:none; background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:background .15s;">
+              <span class="material-symbols-outlined text-[22px]">arrow_upward</span>
+            </button>
           </div>
         </div>
+        <div style="max-width:860px; margin:9px auto 0; text-align:center; font-size:11.5px; color:#a1937f;">FinChat agents can make mistakes. Verify important results.</div>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════ -->
-    <!-- RIGHT SIDEBAR: SYSTEM MONITOR   -->
-    <!-- ═══════════════════════════════ -->
-    <aside class="w-80 bg-surface-container-low border-l border-outline-variant flex-col hidden lg:flex shrink-0">
-      <!-- Panel Header -->
-      <div class="p-lg border-b border-outline-variant shrink-0 flex items-center justify-between">
-        <h3 class="text-label-md font-bold text-primary uppercase tracking-wider flex items-center gap-sm">
-          <span class="material-symbols-outlined text-primary-fixed text-[18px]">receipt_long</span>
-          System Monitor
-        </h3>
-        <span class="text-[10px] font-mono text-text-primary-variant bg-surface-container px-2 py-0.5 rounded" id="modelLabel">TALKING: PLATO</span>
-      </div>
-
-      <!-- Panel Tabs -->
-      <div class="flex px-md border-b border-outline-variant gap-0 shrink-0">
-        <button class="ptab active" onclick="switchTab('proof',this)">Proof</button>
-        <button class="ptab" onclick="switchTab('tokens',this)">Tokens</button>
-        <button class="ptab" onclick="switchTab('gov',this)">Rules</button>
-        <button class="ptab" onclick="switchTab('ai',this)">AI Scans</button>
-      </div>
-
-      <!-- PROOF TAB -->
-      <div class="panel-body" id="tab-proof">
-        <div class="grid grid-cols-2 gap-2 mb-3">
-          <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 text-center shadow-sm">
-            <div class="text-xl font-bold font-mono text-[#efe8de]" id="statHeight">0</div>
-            <div class="text-[10px] text-[#c9c0b0]">Chain Height</div>
-          </div>
-          <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 text-center shadow-sm">
-            <div class="text-xl font-bold font-mono text-[#efe8de]" id="statFlags">0</div>
-            <div class="text-[10px] text-[#c9c0b0]">Flags</div>
-          </div>
-        </div>
-        <div class="mb-3">
-          <button class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-[#4a3828] bg-[#3a2e23] text-label-sm text-[#efe8de] hover:bg-[#4a3828] transition-colors shadow-sm font-semibold" id="verifyChainBtn" onclick="verifyChainUI()">
-            <span class="material-symbols-outlined text-[16px]">verified_user</span> Verify Chain Integrity
-          </button>
-          <div id="verifyStatusBanner" class="verify-banner" style="display:none;"></div>
-        </div>
-        <div id="proofLog">
-          <div class="empty">
-            <span class="empty-icon">🔗</span>
-            Proof log is empty.<br>Messages will appear here<br>with their chain hashes.
-          </div>
-        </div>
-      </div>
-
-      <!-- TOKENS TAB -->
-      <div class="panel-body" id="tab-tokens" style="display:none">
-        <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 mb-3 shadow-sm">
-          <div class="flex justify-between items-baseline mb-2">
-            <span class="text-[11px] font-semibold text-[#c9c0b0]">Token Balance</span>
-            <span class="font-mono text-[12px] font-bold text-[#efe8de]" id="tokenBig">1000 CHAT</span>
-          </div>
-          <div class="track-bar"><div class="track-fill" id="tokenBar" style="width:100%"></div></div>
-        </div>
-        <div class="grid grid-cols-2 gap-2 mb-3">
-          <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 text-center shadow-sm">
-            <div class="text-xl font-bold font-mono text-[#efe8de]" id="statSpent">0</div>
-            <div class="text-[10px] text-[#c9c0b0]">Spent</div>
-          </div>
-          <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 text-center shadow-sm">
-            <div class="text-xl font-bold font-mono text-[#efe8de]" id="statPenalties">0</div>
-            <div class="text-[10px] text-[#c9c0b0]">Penalties</div>
-          </div>
-        </div>
-        <div class="text-[11px] font-bold text-[#3a2e23] mb-2">Transactions</div>
-        <ul class="list-none" id="txList" style="padding:0;margin:0">
-          <li class="tx-row"><span class="tx-row-label">Initial grant</span><span class="tx-row-amount pos">+1000</span></li>
-        </ul>
-      </div>
-
-      <!-- GOV TAB -->
-      <div class="panel-body" id="tab-gov" style="display:none">
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Message Cost</h4></div><p>Each sent message costs 5 CHAT tokens. Enforces accountability.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — HIGH</h4></div><p>HIGH risk messages: −20 tokens, message quarantined with red border.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — MEDIUM</h4></div><p>MEDIUM risk messages: −10 tokens, flagged with amber warning.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Proof Chaining</h4></div><p>Every message is SHA-256 hashed and chained to the previous hash — tamper-evident by design.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Async Blockchain Anchoring</h4></div><p>Hashes are anchored to Solana devnet in the background. No chat lag — confirmation arrives silently.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Zero-Token Freeze</h4></div><p>Messaging is disabled when balance reaches 0. Economic participation enforced.</p></div>
-      </div>
-
-      <!-- AI SCANS TAB -->
-      <div class="panel-body" id="tab-ai" style="display:none">
-        <div class="bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-3 mb-3 text-[11px] leading-relaxed shadow-sm">
-          <div class="font-bold mb-1 text-[#efe8de]" id="aiTitle">AI Monitor — Simulation</div>
-          <div class="text-[#c9c0b0]" id="aiDesc">Pattern-based fraud detection active.</div>
-        </div>
-        <div id="scanLog">
-          <div class="empty">
-            <span class="empty-icon">🔍</span>
-            AI scan results will<br>appear here per message.
-          </div>
-        </div>
-      </div>
-    </aside>
+    <!-- Sprint 6.1: the Proof / Tokens / Rules / AI Scans panels moved to
+         finchat_audit.html. The conversation now gets the full width; live
+         panel updates from the inline script land in hidden stubs installed
+         by system_panels.js (shared-JS pattern — survives design-tool regen
+         with a single re-added include). -->
+    <script src="system_panels.js"></script>
+    <script src="knowledge_search.js"></script>
 
   </main>
 </div>
@@ -981,8 +947,133 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     }
 
     // ─────────────────────────────────
-    // PERSONA SWITCHING
+    // PERSONA SWITCHING & HERO
     // ─────────────────────────────────
+    function renderHeroHTML(personaId) {
+      const p = PERSONAS[personaId || activePersona] || PERSONAS['plato'];
+      return `
+        <div class="chat-hero flex flex-col items-center justify-center text-center my-6 max-w-[760px] mx-auto px-4 shrink-0" style="animation:fadeUp 0.25s ease;">
+          <div class="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-[#efe8de] border border-[#e3d3ba] shadow-sm mb-4">
+            ${p.avatar}
+          </div>
+          <h1 style="font-family:var(--serif); font-size:36px; line-height:1.2; color:#2a1f18; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px;">How can I help today?</h1>
+          <p style="font-size:14.5px; color:#8a7d6a; max-width:520px; line-height:1.5; margin-bottom:28px;">Ask anything — financial synthesis, neural mapping, or coordinating executive domain agents.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full text-left">
+            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Give me a rundown of what the agents handled across all channels today.')">
+              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Summarize system activity</div>
+              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Give me a rundown of what the agents handled across all channels today.</div>
+            </div>
+            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Draft a focused weekly plan across operations, analysis, and compliance.')">
+              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Plan this week's priorities</div>
+              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Draft a focused weekly plan across operations, analysis, and compliance.</div>
+            </div>
+            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('Verify recent zero-knowledge proofs and Solana anchor slots.')">
+              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Audit blockchain anchors</div>
+              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Verify recent zero-knowledge proofs and Solana anchor slots.</div>
+            </div>
+            <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('/graphify Solana ecosystem risks and agent governance flow')">
+              <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">Generate Neural Map</div>
+              <div style="font-size:12.5px; color:#8a7d6a; line-height:1.4;">Run /graphify to extract key concepts and update the knowledge graph.</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    function triggerSuggestion(promptText) {
+      const input = document.getElementById('msgInput');
+      if (input) {
+        input.value = promptText;
+        sendMessage();
+      }
+    }
+
+    // "New chat" — clears the current agent's conversation back to a fresh
+    // Today divider and hero. Backend history remains untouched (reloads on switch).
+    function newChat() {
+      const msgs = document.getElementById('messages');
+      if (msgs) {
+        msgs.innerHTML = renderHeroHTML(activePersona) + '<div class="date-divider"><span>Today</span></div>';
+        msgs.scrollTop = 0;
+      }
+      if (typeof personaHistories === 'object' && personaHistories) delete personaHistories[activePersona];
+      // Drop the session id so the next send opens a brand-new Supabase session
+      // (it will appear in Recents after the first message).
+      if (typeof personaSessions === 'object' && personaSessions) delete personaSessions[activePersona];
+      const mi = document.getElementById('msgInput');
+      if (mi) { mi.value = ''; mi.style.height = '40px'; mi.focus(); }
+      if (typeof loadRecentSessions === 'function') loadRecentSessions();
+      if (typeof showToast === 'function') showToast('New chat started');
+    }
+
+    // Web-access toggle in the composer. Sent with every /api/ai-chat/send call;
+    // when OFF the backend hides + hard-blocks open-web tools (search etc.) for
+    // that message. Defaults ON, persisted per browser.
+    window.webAccess = localStorage.getItem('finchat_web_access') !== 'off';
+    function renderWebToggle() {
+      const btn = document.getElementById('webToggle');
+      const track = document.getElementById('webTrack');
+      const knob = document.getElementById('webKnob');
+      if (btn) btn.classList.toggle('on', window.webAccess);
+      if (track) track.style.background = window.webAccess ? 'var(--accent)' : '#e0d4bd';
+      if (knob) knob.style.transform = window.webAccess ? 'translateX(14px)' : 'translateX(0)';
+    }
+    function toggleWebAccess() {
+      window.webAccess = !window.webAccess;
+      localStorage.setItem('finchat_web_access', window.webAccess ? 'on' : 'off');
+      renderWebToggle();
+      if (typeof showToast === 'function') showToast(window.webAccess ? 'Web access enabled — agents may search the web' : 'Web access disabled — agents will not use web search', 'info');
+    }
+    renderWebToggle();
+
+    // ── Composer agent picker (replaces the old top persona bar) ──
+    function updateAgentPicker(personaId) {
+      const p = PERSONAS[personaId] || PERSONAS['plato'];
+      if (!p) return;
+      const nameEl = document.getElementById('agentPickerName');
+      const avEl = document.getElementById('agentPickerAvatar');
+      if (nameEl) nameEl.textContent = p.name;
+      if (avEl) avEl.innerHTML = p.avatar;
+    }
+    function toggleAgentMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('agentMenu');
+      if (!menu) return;
+      const open = menu.style.display !== 'none';
+      if (open) { menu.style.display = 'none'; return; }
+      renderAgentMenu();
+      menu.style.display = 'block';
+      menu.classList.add('fc-pop');
+    }
+    function renderAgentMenu() {
+      const menu = document.getElementById('agentMenu');
+      if (!menu) return;
+      menu.innerHTML = Object.entries(PERSONAS).map(([id, p]) => {
+        const on = id === activePersona;
+        const check = on
+          ? '<span class="material-symbols-outlined text-[18px]" style="color:var(--accent);">check</span>'
+          : '';
+        return `<button class="fc-agentmenu-item" data-agent="${id}" style="width:100%; display:flex; align-items:center; gap:10px; padding:8px 9px; border-radius:11px; border:none; background:${on ? '#f5ead8' : 'transparent'}; color:#201e1d; font-family:inherit; cursor:pointer; text-align:left;">
+            <span style="width:30px; height:30px; border-radius:999px; flex-shrink:0; background:#f4eede; overflow:hidden; display:inline-flex; align-items:center; justify-content:center;">${p.avatar}</span>
+            <span style="min-width:0; flex:1;">
+              <span style="display:block; font-size:13.5px; font-weight:700;">${p.name}</span>
+              <span style="display:block; font-size:11px; color:#8a7d6a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.desc || ''}</span>
+            </span>
+            ${check}
+          </button>`;
+      }).join('');
+      menu.querySelectorAll('[data-agent]').forEach(b => b.onclick = (ev) => {
+        ev.stopPropagation();
+        const id = b.dataset.agent;
+        menu.style.display = 'none';
+        if (id !== activePersona) switchChat(id);
+      });
+    }
+    // Close the agent menu on any outside click
+    document.addEventListener('mousedown', (e) => {
+      const wrap = e.target.closest && e.target.closest('.fc-agentwrap');
+      if (!wrap) { const m = document.getElementById('agentMenu'); if (m) m.style.display = 'none'; }
+    });
+
     function switchChat(personaId) {
       // Save current chat HTML
       personaHistories[activePersona] = document.getElementById('messages').innerHTML;
@@ -1014,13 +1105,18 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       document.getElementById('topbarName').textContent = p.name;
       document.getElementById('topbarDesc').textContent = p.desc;
 
-      // Restore or load chat
+      // Update composer agent picker (avatar + name)
+      updateAgentPicker(personaId);
+
+      // Restore this persona's in-page conversation, or start a FRESH one.
+      // (Selecting an agent no longer resurrects an old session — past
+      // conversations are reached through the Recent list / ?session= links.)
       const msgs = document.getElementById('messages');
       if (personaHistories[personaId]) {
         msgs.innerHTML = personaHistories[personaId];
       } else {
-        msgs.innerHTML = '<div class="date-divider"><span>Today</span></div>';
-        loadChatHistory(personaId);
+        delete personaSessions[personaId];
+        msgs.innerHTML = renderHeroHTML(personaId) + '<div class="date-divider"><span>Today</span></div>';
       }
       msgs.scrollTop = 999999;
       updatePersonaBarActive();
@@ -1043,9 +1139,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     function updatePersonaBarActive() {
       document.querySelectorAll('#personaBar [data-persona]').forEach(b => {
         const on = b.dataset.persona === activePersona;
-        b.style.background = on ? '#3a2e23' : 'transparent';
-        b.style.color = on ? '#efe8de' : '#3a2e23';
-        b.style.borderColor = on ? '#3a2e23' : '#d6ccbc';
+        b.style.background = on ? 'var(--accent)' : '#fffaf0';
+        b.style.color = on ? '#fff' : '#5b4a3a';
+        b.style.borderColor = on ? 'var(--accent)' : '#e3d3ba';
       });
     }
 
@@ -1085,9 +1181,16 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       const existing = container.querySelectorAll('.msg-group');
       existing.forEach(e => e.remove());
+      if (!container.querySelector('.chat-hero')) {
+        container.insertAdjacentHTML('afterbegin', renderHeroHTML(personaId) + '<div class="date-divider"><span>Today</span></div>');
+      }
 
       messages.forEach(msg => {
-        const isUser = msg.role === 'user';
+        const rawContent = msg.content || '[message]';
+        const isBotMsg = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system' || msg.message_type === 'system' || /^\[(Plato|Aurelius|Rasha|Nova|System)\]/i.test(rawContent) || (msg.sender_id && msg.sender_id !== SESSION_USER.id);
+        const isUser = !isBotMsg && msg.role === 'user';
+        const cleanContent = rawContent.replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
+
         const wrapper = document.createElement('div');
         wrapper.className = `msg-group ${isUser ? 'user' : 'bot'}`;
 
@@ -1113,10 +1216,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         <div class="msg-content">
           ${!isUser ? `<div class="msg-sender">${p.name}</div>` : ''}
           ${fraudNotice}
-          <div class="bubble ${riskClass}">${escHtml(msg.content || '[message]')}</div>
+          <div class="bubble ${riskClass} markdown-body">${DOMPurify.sanitize(marked.parse(cleanContent), { ADD_ATTR: ['target'] })}</div>
           <div class="msg-footer">
             <span class="msg-time">${time}</span>
             <span class="hash-tag" style="opacity:0.5">${msg.hash ? msg.hash.substring(0, 8) : 'history'}</span>
+            <button class="msg-copy" title="Copy message" data-copy="${encodeURIComponent(cleanContent)}"><span class="material-symbols-outlined" style="font-size:13px">content_copy</span></button>
           </div>
         </div>
       </div>
@@ -1125,6 +1229,136 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       });
       container.scrollTop = 999999;
       personaHistories[personaId] = container.innerHTML;
+    }
+
+    // ─────────────────────────────────
+    // RECENT CONVERSATIONS (real Supabase sessions, not design mock)
+    // ─────────────────────────────────
+    async function loadRecentSessions() {
+      const list = document.getElementById('recentList');
+      const token = _session?.token;
+      if (!list || !token) return;
+      try {
+        const res = await fetch(`${API_URL}/api/ai-chat/sessions`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const sessions = (data.sessions || []).slice(0, 10);
+        if (!sessions.length) {
+          list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">No conversations yet</div>';
+          return;
+        }
+        list.innerHTML = sessions.map(s => {
+          const p = PERSONAS[s.persona];
+          const av = p
+            ? `<span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0" style="background:#efe8de;">${p.avatar}</span>`
+            : `<span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style="background:#efe8de; font-size:13px;">${s.personaAvatar || '🤖'}</span>`;
+          const active = s.session_id === personaSessions[activePersona];
+          return `<a class="fc-nav fc-recent" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:${active ? '#fff' : '#cfc3ad'}; background:${active ? 'rgba(255,255,255,.09)' : 'transparent'}; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
+              ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
+              <span class="rc-actions">
+                <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
+                <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
+                <button data-act="delete" title="Delete conversation"><span class="material-symbols-outlined" style="font-size:14px">delete</span></button>
+              </span>
+            </a>`;
+        }).join('');
+        list.querySelectorAll('[data-session]').forEach(a => {
+          a.onclick = (ev) => {
+            if (ev.target.closest('[data-act]')) return; // action buttons handle themselves
+            openSession(a.dataset.session, a.dataset.persona);
+          };
+        });
+        list.querySelectorAll('[data-act]').forEach(b => {
+          b.onclick = (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            const a = b.closest('[data-session]');
+            if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
+            else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
+            else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
+          };
+        });
+      } catch (e) { console.log('Could not load recent sessions:', e); }
+    }
+
+    // ── Conversation management: rename / delete / copy ──────────
+    async function renameSession(sessionId, currentTitle) {
+      const title = prompt('Rename conversation:', currentTitle || '');
+      if (!title || !title.trim()) return;
+      try {
+        const res = await fetch(`${API_URL}/api/ai-chat/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_session?.token}` },
+          body: JSON.stringify({ title: title.trim() })
+        });
+        if (res.ok) { showToast('Conversation renamed', 'info'); loadRecentSessions(); }
+        else showToast('Rename failed', 'warn');
+      } catch (e) { showToast('Rename failed: ' + e.message, 'warn'); }
+    }
+
+    async function deleteSession(sessionId) {
+      if (!confirm('Delete this conversation? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`${API_URL}/api/ai-chat/sessions/${sessionId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${_session?.token}` }
+        });
+        if (res.ok) {
+          showToast('Conversation deleted', 'info');
+          // If the deleted conversation is open, reset the pane to a fresh chat.
+          for (const pid of Object.keys(personaSessions)) {
+            if (personaSessions[pid] === sessionId) {
+              delete personaSessions[pid];
+              delete personaHistories[pid];
+              if (pid === activePersona) switchChat(pid);
+            }
+          }
+          loadRecentSessions();
+        } else showToast('Delete failed', 'warn');
+      } catch (e) { showToast('Delete failed: ' + e.message, 'warn'); }
+    }
+
+    async function copyConversation(sessionId) {
+      try {
+        const res = await fetch(`${API_URL}/api/ai-chat/history/${sessionId}`, {
+          headers: { 'Authorization': `Bearer ${_session?.token}` }
+        });
+        if (!res.ok) { showToast('Could not load conversation', 'warn'); return; }
+        const data = await res.json();
+        const text = (data.messages || []).map(m => {
+          const who = m.role === 'user' ? 'You' : (data.persona?.name || m.persona || 'Agent');
+          return `${who}: ${(m.content || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '')}`;
+        }).join('\n\n');
+        await navigator.clipboard.writeText(text);
+        showToast('Conversation copied to clipboard', 'info');
+      } catch (e) { showToast('Copy failed: ' + e.message, 'warn'); }
+    }
+
+    // Copy buttons on individual bubbles — event delegation, so it also works
+    // for messages restored from the personaHistories innerHTML cache.
+    document.addEventListener('click', async (e) => {
+      const b = e.target.closest('.msg-copy[data-copy]');
+      if (!b) return;
+      try {
+        await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy));
+        showToast('Message copied', 'info');
+      } catch (err) { showToast('Copy failed', 'warn'); }
+    });
+
+    // Open a specific past conversation (from the Recent list or a ?session= deep link).
+    async function openSession(sessionId, personaId) {
+      const token = _session?.token;
+      if (!token || !sessionId) return;
+      try {
+        const res = await fetch(`${API_URL}/api/ai-chat/history/${sessionId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { showToast('Could not open that conversation', 'warn'); return; }
+        const data = await res.json();
+        const pid = personaId || data.persona?.id || 'plato';
+        delete personaHistories[pid];       // force a clean re-render below
+        switchChat(pid);
+        personaSessions[pid] = sessionId;   // future sends continue THIS session
+        renderHistoryMessages(data.messages, pid);
+        loadRecentSessions();               // refresh the active highlight
+      } catch (e) { console.log('Could not open session:', e); }
     }
 
     // ─────────────────────────────────
@@ -1335,24 +1569,30 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
       const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">⏳</span>`;
 
+      const cleanText = isUser ? (text || '') : (text || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
+
       wrapper.innerHTML = `
     <div class="msg-row">
       <div class="msg-avatar-space">${isUser ? userAvatarHTML : botAvatarHTML}</div>
       <div class="msg-content">
         ${!isUser ? `<div class="msg-sender">${p.name}</div>` : ''}
         ${fraudNotice}
-        ${text ? `<div class="bubble ${riskClass}">${escHtml(text)}</div>` : ''}
+        ${cleanText ? `<div class="bubble ${riskClass} markdown-body">${DOMPurify.sanitize(marked.parse(cleanText), { ADD_ATTR: ['target'] })}</div>` : ''}
         ${filesHTML}
         <div class="msg-footer">
           <span class="msg-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           <span class="hash-tag" title="Full hash: ${proof.hash}">🔗 ${proof.hash.substring(0, 10)}…</span>
           ${chainStatus}
           ${readReceipt}
+          <button class="msg-copy" title="Copy message" data-copy="${encodeURIComponent(cleanText)}"><span class="material-symbols-outlined" style="font-size:13px">content_copy</span></button>
         </div>
       </div>
     </div>
   `;
 
+      // Once a conversation starts, drop the welcome hero (design shows the
+      // welcome only on an empty conversation).
+      document.getElementById('messages').querySelectorAll('.chat-hero').forEach(h => h.remove());
       document.getElementById('messages').appendChild(wrapper);
       document.getElementById('messages').scrollTop = 999999;
 
@@ -1514,6 +1754,47 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (!text && !files.length) return;
       if (tokenBalance < 5) { showToast('Insufficient tokens to send.', 'warn'); return; }
 
+      if (text.startsWith('/graphify')) {
+        const topic = text.replace(/^\/graphify\s*/i, '').trim() || 'General Conversation Summary';
+        input.value = '';
+        input.style.height = '40px';
+        showToast('Extracting concept graph via /graphify...', 'info');
+        const typingId = showTyping();
+        try {
+          const token = _session?.token || localStorage.getItem('finchat_token');
+          const res = await fetch(`${API_URL}/api/ai-chat/graphify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ sessionId: personaSessions[activePersona], topic })
+          });
+          const data = await res.json();
+          removeTyping(typingId);
+          if (res.ok) {
+            const proof = await createProof(`Graphify: ${data.nodesAdded.length} concepts`, 'SYSTEM');
+            const fraud = { risk: 'LOW', reason: 'Neural map extraction verified', indicators: ['Verified ZKP anchor'] };
+            const summaryHTML = `
+              <div style="margin-bottom:10px; font-weight:700; color:#2a1f18; font-size:15px;">⚡ Neural Map Synced (${data.nodesAdded.length} nodes added)</div>
+              <div style="font-size:13.5px; color:#5a4d3c; margin-bottom:12px; line-height:1.5;">${escHtml(data.summary)}</div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;">
+                ${data.nodesAdded.map(n => `<span style="padding:4px 10px; border-radius:8px; background:#efe8de; border:1px solid #e3d3ba; font-size:12px; font-weight:600; color:#3a2e23;">✦ ${escHtml(n.label)}</span>`).join('')}
+              </div>
+              <a href="finchat_neuralmap.html" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:999px; background:#3a2e23; color:#fff; font-size:13px; font-weight:700; text-decoration:none; box-shadow:0 4px 12px rgba(58,46,35,0.2); transition:background 0.15s;">
+                Explore on Neural Map →
+              </a>
+            `;
+            const botMsgEl = renderMessage('BOT', '', proof, fraud, null);
+            const bubble = botMsgEl ? botMsgEl.querySelector('.bubble') : null;
+            if (bubble) bubble.innerHTML = summaryHTML;
+          } else {
+            showToast('Failed to graphify: ' + (data.error || 'Unknown error'), 'warn');
+          }
+        } catch (e) {
+          removeTyping(typingId);
+          showToast('Error running /graphify: ' + e.message, 'warn');
+        }
+        return;
+      }
+
       isSending = true;
       input.value = '';
       input.style.height = '40px';
@@ -1541,10 +1822,37 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
         try {
           const token = _session?.token;
+
+          // Upload attachments first: the backend extracts document text and
+          // describes images with a vision model, then the agent answers with
+          // that context.
+          let uploadedAttachments;
+          if (files.length) {
+            try {
+              const fd = new FormData();
+              files.forEach(f => fd.append('files', f));
+              const upRes = await fetch(`${API_URL}/api/ai-chat/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: fd
+              });
+              if (upRes.ok) {
+                uploadedAttachments = (await upRes.json()).attachments;
+              } else {
+                const upErr = await upRes.json().catch(() => ({}));
+                showToast('Attachment processing failed — sending without files. ' + (upErr.error || ''), 'warn');
+              }
+            } catch (upEx) {
+              showToast('Attachment upload error: ' + upEx.message, 'warn');
+            }
+          }
+
           const body = {
             persona: activePersona,
             message: text,
-            sessionId: personaSessions[activePersona] || undefined
+            sessionId: personaSessions[activePersona] || undefined,
+            web: !!window.webAccess,
+            attachments: uploadedAttachments && uploadedAttachments.length ? uploadedAttachments : undefined
           };
 
           const res = await fetch(`${API_URL}/api/ai-chat/send`, {
@@ -1567,6 +1875,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             renderMessage('BOT', data.error || 'Failed to get response', errProof, errFraud, null);
           } else {
             personaSessions[activePersona] = data.sessionId;
+            // New conversations appear in Recents after their first message;
+            // existing ones bubble to the top.
+            if (typeof loadRecentSessions === 'function') loadRecentSessions();
 
             const serverUserProof = data.proof.user;
             const serverBotProof = data.proof.bot;
@@ -1623,7 +1934,15 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             const botIsCheckpoint = botProof.height > 0 && botProof.height % CHECKPOINT_INTERVAL === 0;
             const botFraud = { risk: 'LOW', reason: 'AI persona response', indicators: ['Trusted AI source'] };
             addProofCard(botProof, botFraud, botIsCheckpoint);
-            renderMessage('BOT', data.response, botProof, botFraud, null);
+            const botMsgEl = renderMessage('BOT', data.response, botProof, botFraud, null);
+            // Model transparency: flag replies that came from the local qwen
+            // fallback instead of the Groq cloud primary.
+            if (data.inference && data.inference.fallback && botMsgEl) {
+              const senderEl = botMsgEl.querySelector('.msg-sender');
+              if (senderEl) senderEl.insertAdjacentHTML('beforeend',
+                ` <span title="Groq cloud was unreachable — this reply came from the local ${escHtml(data.inference.model || 'qwen')} model" style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:10px;font-weight:700;vertical-align:middle;">⚠ local fallback · ${escHtml(data.inference.model || 'qwen')}</span>`);
+              showToast('Cloud AI unavailable — this reply used the local ' + (data.inference.model || 'qwen') + ' fallback model', 'warn');
+            }
             if (data.evaluation) {
               const evalHTML = `
                 <div class="mx-auto my-3 p-4 rounded-xl border border-[#d4af37] bg-[#2a1f18] text-[#efe8de] max-w-lg shadow-lg">
@@ -1963,12 +2282,44 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           else avatarEl.textContent = initials;
         }
       }
+
+      // The cached session object can predate an avatar upload (older logins
+      // didn't carry avatar_url at all) — refresh the profile from the server
+      // so the picture never "goes missing" after a re-login.
+      (async function refreshProfileFromServer() {
+        const token = _session?.token;
+        if (!token) return;
+        try {
+          const res = await fetch(`${API_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+          if (!res.ok) return;
+          const data = await res.json();
+          const fresh = data.user;
+          if (!fresh) return;
+          if (fresh.avatar_url && fresh.avatar_url !== SESSION_USER.avatar_url) {
+            SESSION_USER.avatar_url = fresh.avatar_url;
+            _session.avatar_url = fresh.avatar_url;
+            sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+            if (localStorage.getItem('finchat_session')) localStorage.setItem('finchat_session', JSON.stringify(_session));
+            const img = `<img src="${fresh.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            const sb = document.getElementById('sidebarAvatar');
+            if (sb) sb.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+            const tb = document.getElementById('topbarUserIcon');
+            if (tb) tb.innerHTML = img;
+          }
+        } catch (e) { /* offline — keep cached session rendering */ }
+      })();
     })();
 
 
 
-    // Load chat history for the default persona on page load
-    loadChatHistory(activePersona);
+    // Recents come from real Supabase sessions; a ?session= param deep-links
+    // straight into a past conversation (used by Recents on other pages and
+    // by knowledge-search results). Otherwise every page load starts fresh.
+    loadRecentSessions();
+    (function initSessionDeepLink() {
+      const sess = new URLSearchParams(location.search).get('session');
+      if (sess) openSession(sess);
+    })();
 
     // ── Sync State from Server on Startup ────────────────
     (async function syncServerState() {
@@ -2100,12 +2451,15 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             if (container && activePersona === 'plato') {
               const existing = container.querySelectorAll('.msg-group');
               existing.forEach(e => e.remove());
+              if (!container.querySelector('.chat-hero')) {
+                container.insertAdjacentHTML('afterbegin', renderHeroHTML('plato') + '<div class="date-divider"><span>Today</span></div>');
+              }
 
               messagesData.messages.forEach(msg => {
-                const isUser = msg.sender_id === _session.id;
-                const isSystem = msg.message_type === 'system';
+                const isSystem = msg.message_type === 'system' || msg.role === 'assistant' || msg.role === 'bot' || /^\[(Plato|Aurelius|Rasha|Nova|System)\]/i.test(msg.content || '') || (msg.sender_id && msg.sender_id !== _session.id);
+                const isUser = msg.sender_id === _session.id && !isSystem;
                 const wrapper = document.createElement('div');
-                wrapper.className = `msg-group ${isUser ? 'user' : isSystem ? 'bot' : 'bot'}`;
+                wrapper.className = `msg-group ${isUser ? 'user' : 'bot'}`;
 
                 const initials = isUser ? SESSION_USER.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'PL';
                 const avatar = `<div class="avatar ${isUser ? 'user-avatar' : ''}" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
@@ -2725,6 +3079,16 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
     // Build the persona selector now that PERSONAS and the DOM are ready.
     renderPersonaBar();
+    // Initialize the composer agent picker avatar/name for the active agent.
+    updateAgentPicker(activePersona);
+    // Show the welcome hero immediately on an empty conversation (the backend
+    // sync path only injects it when history exists, so cover the empty case).
+    (function () {
+      const msgs = document.getElementById('messages');
+      if (msgs && !msgs.querySelector('.chat-hero') && !msgs.querySelector('.msg-group')) {
+        msgs.insertAdjacentHTML('afterbegin', renderHeroHTML(activePersona));
+      }
+    })();
   </script>
   <script>
     // Drawer nav on narrow screens (below the md breakpoint the sidebar is
@@ -2776,6 +3140,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         }
         a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
       });
+      if (window.location.search.includes('settings=1') && typeof openSettings === 'function') {
+        setTimeout(openSettings, 300);
+      }
     })();
   </script>
 </body>

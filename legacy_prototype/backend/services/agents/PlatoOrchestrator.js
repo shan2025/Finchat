@@ -26,7 +26,7 @@ async function getAgentInstance(agentId) {
  * @param {string} [options.targetAgentId] - Optional direct target agentId (if pre-routed)
  * @returns {Promise<{ executionId, response, execution, logs, delegatedTo, auditTraceHash }>}
  */
-async function route({ goal, userId = 'system', conversationId = null, conversationHistory = [], targetAgentId = null }) {
+async function route({ goal, userId = 'system', conversationId = null, conversationHistory = [], targetAgentId = null, allowWeb = true, budget = {}, approvedTools = [] }) {
   // 1. Sentinel Middleware Pre-Check (Governance, Fraud & Budget enforcement)
   const preCheckResult = await SentinelAgent.preCheck(goal, { userId });
   if (!preCheckResult.allowed) {
@@ -93,7 +93,10 @@ async function route({ goal, userId = 'system', conversationId = null, conversat
     goal,
     userId,
     conversationId,
-    conversationHistory
+    conversationHistory,
+    allowWeb,
+    budget,
+    approvedTools
   });
 
   const enrichedResult = {

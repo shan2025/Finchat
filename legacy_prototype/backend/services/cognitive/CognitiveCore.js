@@ -42,16 +42,26 @@ async function run({
   userId = 'system',
   conversationId = null,
   agentName = 'plato',
-  conversationHistory = []
+  conversationHistory = [],
+  allowWeb = true,
+  approvedTools = [],
+  budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
   // 1. Create execution record
   const execution = await createExecution({
     userId,
     conversationId,
     goal,
-    assignedAgent: agentName
+    assignedAgent: agentName,
+    ...(budget.maxIterations ? { maxIterations: budget.maxIterations } : {}),
+    ...(budget.maxToolCalls ? { maxToolCalls: budget.maxToolCalls } : {}),
+    ...(budget.maxTokens ? { maxTokens: budget.maxTokens } : {}),
+    ...(budget.maxRuntimeSeconds ? { maxRuntimeSeconds: budget.maxRuntimeSeconds } : {})
   });
   const execId = execution.execution_id;
+  const toolContext = { userId, agentName, conversationId };
+  let pendingApproval = null; // set when a requires_approval tool was attempted
+  let hasPlanned = false;     // one plan per execution (re-plan loop guard)
 
   // Load this agent's runtime tuning (risk + traits + optional per-agent model) once.
   // risk → LLM temperature; traits → style directive; model → which Groq model to use.
@@ -79,6 +89,8 @@ async function run({
     let stepNumber = 0;
     let finalResponse = null;
     let completionReason = 'natural';
+    let lastProvider = null; // which inference backend produced the final answer
+    let lastModel = null;    // (groq = cloud primary, ollama = local qwen fallback)
     const logs = [];
     const accumulatedToolResults = []; // Carry tool results across loop iterations
 
@@ -109,13 +121,16 @@ async function run({
         graphContext: enriched.graphContext,
         recipeHints: enriched.recipeHints,
         budgetExceeded: budget.breached,
-        traits: agentTraits
+        traits: agentTraits,
+        allowWeb
       });
 
       // 3c. Run reasoning turn (temperature comes from the agent's risk setting;
       //     optional per-agent model override lets specialists pick their own Groq model)
       const thinkStart = new Date();
       const result = await reason({ messages, temperature: agentTemperature, model: agentModel });
+      lastProvider = result.provider || lastProvider;
+      lastModel = result.model || lastModel;
 
       // 3d. Log the thinking phase
       const logEntry = await logPhase(execId, 'thinking', stepNumber, {
@@ -173,6 +188,18 @@ async function run({
       }
 
       if (result.action.action === 'plan') {
+        // Re-plan guard: one plan per execution. Weaker models otherwise loop
+        // "plan → plan → plan" and burn the whole budget without doing anything.
+        if (hasPlanned) {
+          accumulatedToolResults.push({
+            tool: 'plan',
+            input: goal,
+            result: { error: 'BLOCKED: you already generated and executed a plan this run. Its tool results are listed above — synthesize them and use action "respond" NOW.' }
+          });
+          continue;
+        }
+        hasPlanned = true;
+
         // --- PHASE 5: Generate a structured plan ---
         const planStart = new Date();
         const planResult = await generatePlan({ executionId: execId, goal });
@@ -203,7 +230,10 @@ async function run({
                 executionId: execId,
                 agentId: execution.assigned_agent || 'system',
                 toolName: step.tool,
-                input: step.input || goal
+                input: step.input || goal,
+                allowWeb,
+                approvedTools,
+                context: toolContext
               });
               await incrementUsage(execId, { toolCalls: 1 });
               await logPhase(execId, 'using_tool', stepNumber, {
@@ -215,6 +245,9 @@ async function run({
               }, toolStart);
               accumulatedToolResults.push({ tool: step.tool, input: step.input, result: toolOut.output });
             } catch (toolErr) {
+              if (toolErr.name === 'ApprovalRequiredError') {
+                pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput, planStep: step.step };
+              }
               await logPhase(execId, 'using_tool', stepNumber, {
                 tool: step.tool,
                 input: step.input,
@@ -224,8 +257,11 @@ async function run({
               accumulatedToolResults.push({ tool: step.tool, input: step.input, result: { error: toolErr.message } });
             }
             await updateState(execId, STATES.RUNNING);
+            if (pendingApproval) break;
           }
         }
+
+        if (pendingApproval) break; // exit to the human-approval handler below
 
         // If we didn't break for budget, do a final reasoning pass with all tool results
         if (!finalResponse) {
@@ -239,6 +275,27 @@ async function run({
         const toolName = result.action.tool;
         const toolInput = result.action.input;
 
+        // Loop guard: chat-tuned models sometimes re-call the same tool over and
+        // over (burning the whole budget on "watchlist" ×5). A repeat call gets
+        // a synthetic nudge instead of a real execution.
+        const sameToolCalls = accumulatedToolResults.filter(tr => tr.tool === toolName);
+        const normalizedInput = typeof toolInput === 'string' ? toolInput.trim().toLowerCase() : JSON.stringify(toolInput || '');
+        const isDuplicate = sameToolCalls.some(tr => {
+          const prev = typeof tr.input === 'string' ? tr.input.trim().toLowerCase() : JSON.stringify(tr.input || '');
+          return prev === normalizedInput;
+        });
+        if (isDuplicate || sameToolCalls.length >= 3) {
+          accumulatedToolResults.push({
+            tool: toolName,
+            input: toolInput,
+            result: { error: `BLOCKED: you already called "${toolName}" ${sameToolCalls.length}× this run — its result is above and will not change. Use it, call a DIFFERENT tool the goal requires, or respond now.` }
+          });
+          await logPhase(execId, 'using_tool', stepNumber, {
+            tool: toolName, input: toolInput, error: 'duplicate_call_blocked'
+          }, new Date());
+          continue;
+        }
+
         // Transition to waiting state
         await updateState(execId, STATES.WAITING, { waitReason: WAIT_REASONS.TOOL_RESPONSE });
 
@@ -251,7 +308,10 @@ async function run({
             executionId: execId,
             agentId: execution.assigned_agent || 'system',
             toolName,
-            input: toolInput
+            input: toolInput,
+            allowWeb,
+            approvedTools,
+            context: toolContext
           });
 
           // Increment tool call usage
@@ -276,7 +336,11 @@ async function run({
 
         } catch (toolErr) {
           console.warn(`⚠️ CognitiveCore: Tool "${toolName}" failed: ${toolErr.message}`);
-          
+
+          if (toolErr.name === 'ApprovalRequiredError') {
+            pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput };
+          }
+
           await logPhase(execId, 'using_tool', stepNumber, {
             tool: toolName,
             input: toolInput,
@@ -292,8 +356,41 @@ async function run({
 
         // Transition back to running for the next reasoning iteration
         await updateState(execId, STATES.RUNNING);
+        if (pendingApproval) break;
         continue; // Loop back to thinking with tool results in context
       }
+    }
+
+    // 3z. Human-in-the-loop: a gated tool was attempted — park this execution in
+    // WAITING (human_approval), notify the user, and return a holding response.
+    // POST /api/executions/:id/approve re-runs with the tool whitelisted.
+    if (pendingApproval) {
+      await updateState(execId, STATES.WAITING, { waitReason: WAIT_REASONS.HUMAN_APPROVAL });
+      await logPhase(execId, 'waiting', stepNumber, {
+        reason: 'human_approval',
+        pendingTool: pendingApproval.tool,
+        pendingInput: pendingApproval.input
+      }, new Date());
+      try {
+        const { createNotification } = require('../notifications');
+        await createNotification({
+          userId,
+          type: 'approval',
+          title: `✋ ${agentName} needs your approval`,
+          content: `${agentName} wants to run "${pendingApproval.tool}" for: "${String(goal).slice(0, 120)}". Approve or reject it on the Operations page. [execution:${execId}]`
+        });
+      } catch (notifErr) {
+        console.warn(`⚠️ Could not create approval notification: ${notifErr.message}`);
+      }
+      const waitingResponse = `I've prepared an action that needs your approval before I proceed: tool "${pendingApproval.tool}". Approve or reject it from your notifications / the Operations page, and I'll continue.`;
+      return {
+        executionId: execId,
+        response: waitingResponse,
+        execution: await require('./ExecutionManager').getExecution(execId),
+        logs,
+        awaitingApproval: { tool: pendingApproval.tool, executionId: execId },
+        responseReadyAt: new Date().toISOString()
+      };
     }
 
     // 4. Complete execution
@@ -327,6 +424,8 @@ async function run({
       response: finalResponse,
       execution: completed,
       logs,
+      provider: lastProvider,
+      model: lastModel,
       responseReadyAt
     };
 
@@ -350,7 +449,7 @@ async function run({
  * @param {object} [options.modifiedParameters={}]
  * @param {string} [options.resumptionMessage='Approved']
  */
-async function resumeExecution(executionId, { userId = 'system', modifiedParameters = {}, resumptionMessage = 'Approved' } = {}) {
+async function resumeExecution(executionId, { userId = 'system', modifiedParameters = {}, resumptionMessage = 'Approved', approvedTools = [] } = {}) {
   const { query } = require('../../database');
   const { appendToScratchpad } = require('./MemoryService');
 
@@ -373,13 +472,27 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
     timestamp: new Date().toISOString()
   });
 
-  // Re-run cognitive loop with the resumption context
-  return await run({
+  // Re-run cognitive loop with the resumption context (gated tools whitelisted)
+  const result = await run({
     goal: `${execution.goal} (Resumed: ${resumptionMessage})`,
     userId: execution.user_id || userId,
     conversationId: execution.session_id,
-    agentName: execution.assigned_agent || 'plato'
+    agentName: execution.assigned_agent || 'plato',
+    approvedTools
   });
+
+  // Close out the ORIGINAL execution — it was flipped waiting→running above and
+  // would otherwise sit in 'running' forever (until the stale sweeper killed it).
+  try {
+    await completeExecution(executionId, {
+      result: `Resumed as ${result.executionId}`,
+      completionReason: 'resumed'
+    });
+  } catch (closeErr) {
+    console.warn(`⚠️ Could not close resumed execution ${executionId}: ${closeErr.message}`);
+  }
+
+  return result;
 }
 
 module.exports = { run, logPhase, resumeExecution };

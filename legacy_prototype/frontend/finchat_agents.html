@@ -137,7 +137,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
                 <span class="material-symbols-outlined text-[20px]" >help</span>
                 <span class="font-body-sm font-medium">Support</span>
             </a>
-            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="window.location.href='finchat_chat.html'">
+            <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
                 <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
                     BT
                 </div>
@@ -180,7 +180,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
         </div>
       </div>
-      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="window.location.href='finchat_chat.html'">
+      <div id="topbarUserIcon" class="w-10 h-10 rounded-full border border-outline-variant cursor-pointer overflow-hidden flex items-center justify-center bg-cream-bg" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
         <svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="35" r="18" fill="#4a3828"/><path d="M20 90 Q20 60 50 60 Q80 60 80 90 Z" fill="#4a3828"/></svg>
       </div>
     </div>
@@ -679,5 +679,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     });
   })();
 </script>
+<script src="notifications_widget.js"></script>
+<script src="missions_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="knowledge_search.js"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const result = await query(
-      `SELECT notification_id, type, title, content, is_read, created_at
+      `SELECT notification_id, type, title, content, is_read, link, created_at
        FROM notifications
        WHERE user_id = $1
        ORDER BY created_at DESC
