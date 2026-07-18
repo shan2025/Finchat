@@ -858,7 +858,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Persona state
     const PERSONAS = {
       plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Chief AI Officer & System Supervisor', color: '#6366f1' },
-      aurelius: { name: 'Aurelius', avatar: '<img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Finance & Investment Strategist', color: '#4f46e5' },
+      aurelius: { name: 'Aurelius', avatar: '<img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Risk & Compliance Officer', color: '#4f46e5' },
       rasha: { name: 'Rasha', avatar: '<img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Executive Career Strategist', color: '#ec4899' },
       nova: { name: 'Nova', avatar: '<img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Frontier Science & Technology Researcher', color: '#059669' }
     };
@@ -957,6 +957,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         plato: {
           title: 'How can I help today?',
           subtitle: 'Ask anything — planning, synthesis, or coordinating the other agents on a task.',
+          badgeBg: '#f5e8d8',
+          badgeText: '#8c491a',
           cards: [
             { icon: 'show_chart', title: 'Summarize system activity', desc: 'Give me a rundown of what the agents handled in the last 24 hours.', prompt: 'Summarize system activity. Give me a rundown of what the agents handled in the last 24 hours.' },
             { icon: 'gps_fixed', title: "Plan this week's priorities", desc: 'Draft a focused plan across operations, analysis and compliance.', prompt: "Plan this week's priorities. Draft a focused plan across operations, analysis and compliance." },
@@ -965,18 +967,22 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           ]
         },
         aurelius: {
-          title: 'Ready for financial analysis.',
-          subtitle: 'Ask anything — portfolio strategy, yield modeling, or macroeconomic risk synthesis.',
+          title: 'How can I help today?',
+          subtitle: 'Ask about policy, risk, or anything you need reviewed before it goes live.',
+          badgeBg: '#eef3eb',
+          badgeText: '#4a6b4c',
           cards: [
-            { icon: 'analytics', title: 'Analyze market volatility', desc: 'Synthesize current macro trends and impact on crypto & equities.', prompt: 'Analyze market volatility. Synthesize current macro trends and impact on crypto & equities.' },
-            { icon: 'pie_chart', title: 'Optimize treasury allocation', desc: 'Evaluate capital efficiency and recommend yield strategy.', prompt: 'Optimize treasury allocation. Evaluate capital efficiency and recommend yield strategy.' },
-            { icon: 'balance', title: 'Evaluate risk exposure', desc: 'Perform stress testing across decentralized liquidity pools.', prompt: 'Evaluate risk exposure. Perform stress testing across decentralized liquidity pools.' },
-            { icon: 'trending_up', title: 'Forecast yield curves', desc: 'Model 30-day returns and risk-adjusted growth vectors.', prompt: 'Forecast yield curves. Model 30-day returns and risk-adjusted growth vectors.' }
+            { icon: 'shield', title: 'Review a policy', desc: 'Check this workflow for compliance gaps and flag anything risky.', prompt: 'Review a policy. Check this workflow for compliance gaps and flag anything risky.' },
+            { icon: 'speed', title: 'Assess exposure', desc: 'Build a risk report and highlight the top concerns to watch.', prompt: 'Assess exposure. Build a risk report and highlight the top concerns to watch.' },
+            { icon: 'flag', title: 'Flag violations', desc: 'Scan this action against our rules and surface any conflicts.', prompt: 'Flag violations. Scan this action against our rules and surface any conflicts.' },
+            { icon: 'balance', title: 'Weigh a decision', desc: 'Lay out the risks and trade-offs of two options side by side.', prompt: 'Weigh a decision. Lay out the risks and trade-offs of two options side by side.' }
           ]
         },
         rasha: {
           title: 'How can we accelerate your career?',
           subtitle: 'Ask anything — leadership positioning, negotiation strategy, or executive branding.',
+          badgeBg: '#fce7f3',
+          badgeText: '#db2777',
           cards: [
             { icon: 'work', title: 'Review leadership presence', desc: 'Analyze executive communication and stakeholder alignment.', prompt: 'Review leadership presence. Analyze executive communication and stakeholder alignment.' },
             { icon: 'handshake', title: 'Prepare negotiation strategy', desc: 'Structure high-stakes compensation or partnership terms.', prompt: 'Prepare negotiation strategy. Structure high-stakes compensation or partnership terms.' },
@@ -987,6 +993,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         nova: {
           title: 'Exploring frontier research.',
           subtitle: 'Ask anything — emerging technologies, scientific literature, or complex technical synthesis.',
+          badgeBg: '#d1fae5',
+          badgeText: '#059669',
           cards: [
             { icon: 'science', title: 'Synthesize research papers', desc: 'Summarize latest breakthroughs in zero-knowledge cryptography.', prompt: 'Synthesize research papers. Summarize latest breakthroughs in zero-knowledge cryptography.' },
             { icon: 'hub', title: 'Map technology dependencies', desc: 'Trace architectural vectors across AI and decentralized protocols.', prompt: 'Map technology dependencies. Trace architectural vectors across AI and decentralized protocols.' },
@@ -997,13 +1005,15 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       };
 
       const cfg = heroConfigs[pid] || heroConfigs.plato;
+      const badgeBg = cfg.badgeBg || '#f5e8d8';
+      const badgeText = cfg.badgeText || '#8c491a';
 
       const cardsHTML = cfg.cards.map(c => {
         const safePrompt = c.prompt.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `
             <div class="p-4 rounded-2xl border border-[#e3d3ba] bg-[#fffaf0] hover:bg-[#faf3e4] hover:border-[#cfc3ad] transition-all cursor-pointer shadow-sm group flex flex-col justify-between" onclick="triggerSuggestion('${safePrompt}')">
               <div>
-                <div class="w-9 h-9 rounded-xl bg-[#f5e8d8] text-[#8c491a] flex items-center justify-center mb-3 shrink-0 transition-transform group-hover:scale-105">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center mb-3 shrink-0 transition-transform group-hover:scale-105" style="background:${badgeBg}; color:${badgeText};">
                   <span class="material-symbols-outlined text-[20px]">${c.icon}</span>
                 </div>
                 <div style="font-size:14px; font-weight:700; color:#2a1f18; margin-bottom:4px;" class="group-hover:text-[#8c491a] transition-colors">${c.title}</div>
