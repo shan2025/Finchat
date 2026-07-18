@@ -698,6 +698,18 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
   function renderDebate(d) {
     const result = document.getElementById('debateResult');
     const esc = (s) => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const formatMd = (s, isDark = false) => {
+      if (!s) return '';
+      let escaped = esc(s);
+      const boldClass = isDark ? 'text-[#d4af37] font-bold' : 'text-[#3a2e23] font-bold';
+      // Convert **bold** -> <strong>
+      escaped = escaped.replace(/\*\*([^*]+)\*\*/g, `<strong class="${boldClass}">$1</strong>`);
+      // Convert *italic* -> <em>
+      escaped = escaped.replace(/(^|[^\\])\*([^*]+)\*/g, `$1<em class="italic">$2</em>`);
+      // Convert inline `code` -> <code>
+      escaped = escaped.replace(/`([^`]+)`/g, `<code class="px-1 py-0.5 rounded ${isDark ? 'bg-black/30 text-amber-200' : 'bg-black/10 text-[#3a2e23]'} font-mono text-[11px]">$1</code>`);
+      return escaped;
+    };
     const nameOf = {};
     (d.participants || []).forEach(p => { nameOf[p.agentId] = p.name; });
     const rounds = {};
@@ -709,7 +721,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
       <span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${d.conflictDetected ? 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]' : 'bg-[#dcfce7] text-[#166534] border border-[#bbf7d0]'}">${d.conflictDetected ? '⚔ CONFLICT — ' + d.roundsRun + ' round(s)' : '✓ CONSENSUS'}</span>
       <span class="text-[11px] text-[#8c7a6b]">${(d.participants || []).map(p => p.name).join(' · ')}</span>
     </div>`;
-    if (d.conflictSummary) html += `<div class="text-xs text-[#5c4a38] italic">"${esc(d.conflictSummary)}"</div>`;
+    if (d.conflictSummary) html += `<div class="text-xs text-[#5c4a38] italic">"${formatMd(d.conflictSummary, false)}"</div>`;
 
     roundKeys.forEach(rk => {
       const label = rk === 0 ? 'Opening Positions' : `Rebuttal Round ${rk}`;
@@ -717,7 +729,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
       rounds[rk].forEach(t => {
         html += `<div class="bg-[#f3eee3] border border-border-color rounded-xl p-3">
           <div class="text-xs font-bold text-[#3a2e23] mb-1">${esc(t.name || nameOf[t.agentId] || t.agentId)}</div>
-          <div class="text-[11px] text-[#5c4a38] leading-relaxed">${esc(t.position)}</div>
+          <div class="text-[11px] text-[#5c4a38] leading-relaxed" style="white-space:pre-wrap">${formatMd(t.position, false)}</div>
         </div>`;
       });
       html += '</div></div>';
@@ -725,7 +737,7 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
 
     html += `<div class="rounded-xl p-4" style="background:linear-gradient(135deg,#3a2e23,#4a3828);color:#efe8de">
       <div class="text-[10px] font-bold uppercase tracking-wider text-[#d4af37] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">verified</span> Plato's Consensus</div>
-      <div class="text-xs leading-relaxed" style="white-space:pre-wrap">${esc(d.consensus)}</div>
+      <div class="text-xs leading-relaxed" style="white-space:pre-wrap">${formatMd(d.consensus, true)}</div>
     </div>`;
     html += '</div>';
     result.innerHTML = html;
