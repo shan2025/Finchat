@@ -1799,6 +1799,35 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     }
 
+    let currentAbortController = null;
+    function setSendButtonMode(mode) {
+      const sendBtn = document.getElementById('sendBtn');
+      if (!sendBtn) return;
+      if (mode === 'stop') {
+        sendBtn.disabled = false;
+        sendBtn.title = 'Stop generating';
+        sendBtn.style.background = '#dc2626';
+        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">stop</span>';
+        sendBtn.onclick = (e) => { e.preventDefault(); stopGenerating(); };
+      } else {
+        isSending = false;
+        currentAbortController = null;
+        sendBtn.disabled = false;
+        sendBtn.title = 'Send';
+        sendBtn.style.background = 'var(--accent)';
+        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">arrow_upward</span>';
+        sendBtn.onclick = sendMessage;
+      }
+    }
+    function stopGenerating() {
+      if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+      }
+      setSendButtonMode('send');
+      showToast('Generation stopped by user.', 'info');
+    }
+
     // ─────────────────────────────────
     // MAIN SEND
     // ─────────────────────────────────
@@ -1817,12 +1846,15 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         input.style.height = '40px';
         showToast('Extracting concept graph via /graphify...', 'info');
         const typingId = showTyping();
+        currentAbortController = new AbortController();
+        setSendButtonMode('stop');
         try {
           const token = _session?.token || localStorage.getItem('finchat_token');
           const res = await fetch(`${API_URL}/api/ai-chat/graphify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ sessionId: personaSessions[activePersona], topic })
+            body: JSON.stringify({ sessionId: personaSessions[activePersona], topic }),
+            signal: currentAbortController.signal
           });
           const data = await res.json();
           removeTyping(typingId);
@@ -1847,7 +1879,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           }
         } catch (e) {
           removeTyping(typingId);
-          showToast('Error running /graphify: ' + e.message, 'warn');
+          if (e.name === 'AbortError' || e.message?.includes('aborted')) {
+            showToast('Graphify stopped.', 'info');
+          } else {
+            showToast('Error running /graphify: ' + e.message, 'warn');
+          }
+        } finally {
+          setSendButtonMode('send');
         }
         return;
       }
@@ -1857,7 +1895,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       input.style.height = '40px';
       pendingFiles = [];
       renderAttachPreview();
-      document.getElementById('sendBtn').disabled = true;
+      currentAbortController = new AbortController();
+      setSendButtonMode('stop');
 
       const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
 
@@ -2065,6 +2104,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           }
         } catch (err) {
           removeTyping(typingId);
+          if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+            if (pendingChainEl) { pendingChainEl.textContent = '🛑'; pendingChainEl.title = 'Stopped by user'; }
+            setSendButtonMode('send');
+            return;
+          }
           if (pendingChainEl) { pendingChainEl.textContent = '⚠️'; pendingChainEl.title = 'Failed to anchor — network error'; }
           console.error('AI Service Error:', err);
           showToast('AI Service Error: ' + (err.message || 'Unknown error'), 'danger');
@@ -2104,8 +2148,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         renderMessage('BOT', botText, botProof, botFraud, null);
       }
 
-      isSending = false;
-      document.getElementById('sendBtn').disabled = false;
+      setSendButtonMode('send');
       input.focus();
     }
     // ─────────────────────────────────
