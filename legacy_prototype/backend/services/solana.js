@@ -177,4 +177,4 @@ async function initSolana() {
   }
 }
 
-module.exports = { anchorHash, isReachable, initSolana, getOrCreateKeypair };
+module.exports = { anchorHash, isReachable, initSolana, getOrCreateKeypair, getConnection, SOLANA_RPC };

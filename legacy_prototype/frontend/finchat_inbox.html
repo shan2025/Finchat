@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -30,7 +30,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
   body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
-  /* ── CSS Variables for JS-generated elements ── */
+  /* â”€â”€ CSS Variables for JS-generated elements â”€â”€ */
   :root {
     --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
     --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
@@ -42,12 +42,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     --accent-solana: #9945FF;
   }
 
-  /* ── Scrollbar ── */
+  /* â”€â”€ Scrollbar â”€â”€ */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #48473f; border-radius: 4px; }
 
-  /* ── Animations ── */
+  /* â”€â”€ Animations â”€â”€ */
   @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   @keyframes typingAnim { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
@@ -55,7 +55,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Message Components (JS-generated) ── */
+  /* â”€â”€ Message Components (JS-generated) â”€â”€ */
   .msg-group { display:flex; flex-direction:column; gap:2px; margin-bottom:12px; animation:fadeUp 0.2s ease; }
   .msg-group.user { align-items:flex-end; }
   .msg-group.bot { align-items:flex-start; }
@@ -121,7 +121,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .attach-chip button { background:none; border:none; cursor:pointer; color:var(--text3); font-size:12px; padding:0; line-height:1; display:flex; align-items:center; }
   .attach-chip button:hover { color:var(--accent-red); }
 
-  /* ── Right Panel Components (JS-generated) ── */
+  /* â”€â”€ Right Panel Components (JS-generated) â”€â”€ */
   .proof-card { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-family:var(--mono); font-size:10px; line-height:1.8; }
   .proof-card.flagged { border-color:#7f1d1d; background:#2d1215; }
   .proof-card.warned { border-color:#78350f; background:#2d2305; }
@@ -176,20 +176,20 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .token-pill.low { background:#2d2305; color:var(--accent-amber); border-color:#78350f; }
   .token-pill.critical { background:#2d1215; color:var(--accent-red); border-color:#7f1d1d; }
 
-  /* ── Toast ── */
+  /* â”€â”€ Toast â”€â”€ */
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#e5e2df; color:#141312; padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; transition:all 0.3s; pointer-events:none; z-index:9999; white-space:nowrap; box-shadow:var(--shadow-md); }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .toast.warn { background:var(--accent-amber); color:white; }
   .toast.danger { background:var(--accent-red); color:white; }
 
-  /* ── Verify Banner ── */
+  /* â”€â”€ Verify Banner â”€â”€ */
   .verify-banner { margin-top:8px; padding:10px 12px; border-radius:8px; font-size:11px; line-height:1.5; display:flex; flex-direction:column; gap:4px; animation:slideDown 0.2s ease; }
   .verify-banner.success { background:#052e16; border:1px solid #14532d; color:#86efac; }
   .verify-banner.error { background:#2d1215; border:1px solid #7f1d1d; color:#fca5a5; }
   .verify-banner.loading { background:var(--surface2); border:1px solid var(--border); color:var(--text2); opacity:0.7; }
   .issue-item { font-family:var(--mono); font-size:10px; background:rgba(255,255,255,0.03); padding:4px 6px; border-radius:4px; border-left:2px solid currentColor; }
 
-  /* ── Settings/Modals (JS-generated content within) ── */
+  /* â”€â”€ Settings/Modals (JS-generated content within) â”€â”€ */
   .settings-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; backdrop-filter:blur(4px); }
   .settings-overlay.show { display:flex; }
   .modal { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; backdrop-filter:blur(4px); }
@@ -289,9 +289,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- LEFT SIDEBAR NAV                    -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
             <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
@@ -361,9 +361,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         </div>
     </nav>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- MAIN CONTENT WRAPPER                -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top App Bar -->
@@ -395,9 +395,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   <!-- Main Dashboard Canvas -->
   <main class="flex-1 flex overflow-hidden bg-cream-bg">
 
-    <!-- ═══════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <!-- CENTRAL CHAT AREA               -->
-    <!-- ═══════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <section class="flex-1 flex flex-col border-r border-outline-variant bg-surface-container-lowest relative">
       <!-- Channel Header -->
       <div class="px-lg py-md border-b border-outline-variant bg-surface-container-low flex justify-between items-center shrink-0">
@@ -484,9 +484,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       </div>
     </section>
 
-    <!-- ═══════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <!-- RIGHT SIDEBAR: SYSTEM MONITOR   -->
-    <!-- ═══════════════════════════════ -->
+    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <aside class="w-80 bg-surface-container-low border-l border-outline-variant flex-col hidden lg:flex shrink-0">
       <!-- Panel Header -->
       <div class="p-lg border-b border-outline-variant shrink-0 flex items-center justify-between">
@@ -559,8 +559,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       <!-- GOV TAB -->
       <div class="panel-body" id="tab-gov" style="display:none">
         <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Message Cost</h4></div><p>Each sent message costs 5 CHAT tokens. Enforces accountability.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — HIGH</h4></div><p>HIGH risk messages: −20 tokens, message quarantined with red border.</p></div>
-        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — MEDIUM</h4></div><p>MEDIUM risk messages: −10 tokens, flagged with amber warning.</p></div>
+        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — HIGH</h4></div><p>HIGH risk messages: âˆ’20 tokens, message quarantined with red border.</p></div>
+        <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Fraud Penalty — MEDIUM</h4></div><p>MEDIUM risk messages: âˆ’10 tokens, flagged with amber warning.</p></div>
         <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Proof Chaining</h4></div><p>Every message is SHA-256 hashed and chained to the previous hash — tamper-evident by design.</p></div>
         <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Async Blockchain Anchoring</h4></div><p>Hashes are anchored to Solana devnet in the background. No chat lag — confirmation arrives silently.</p></div>
         <div class="gov-card"><div class="gov-card-header"><div class="gov-active"></div><h4>Zero-Token Freeze</h4></div><p>Messaging is disabled when balance reaches 0. Economic participation enforced.</p></div>
@@ -584,18 +584,18 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </main>
 </div>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- TOAST                               -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="toast" id="toast"></div>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- ADMIN FRAUD MODAL                   -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="adminModal" class="modal">
   <div class="modal-content" style="max-width:800px;">
     <div class="modal-header">
-      <h3>🛡️ Fraud Detection Logs</h3>
+      <h3>🛡ï¸ Fraud Detection Logs</h3>
       <button class="close-btn" onclick="closeModal('adminModal')">×</button>
     </div>
     <div class="modal-body">
@@ -621,13 +621,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </div>
 </div>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- ADMIN USER MANAGEMENT MODAL         -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="adminUserModal" class="modal">
   <div class="modal-content admin-modal-wide">
     <div class="modal-header">
-      <h3>🛡️ Admin — User Management & ZKP Proofs</h3>
+      <h3>🛡ï¸ Admin — User Management & ZKP Proofs</h3>
       <button class="close-btn" onclick="closeModal('adminUserModal')">×</button>
     </div>
     <div class="admin-tabs">
@@ -670,9 +670,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </div>
 </div>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- SETTINGS MODAL                      -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
   <div style="background:#3a2e23; border:1px solid #4a3828; border-radius:20px; width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.5); animation:modalSlideUp 0.25s ease;">
     <!-- Header -->
@@ -688,7 +688,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     <div style="padding:24px; display:flex; flex-direction:column; gap:24px;">
       <!-- Unfreeze Banner -->
       <div class="unfreeze-banner" id="unfreezeBanner">
-        ⚠️ Your account is frozen due to depleted tokens.
+        ⚠ï¸ Your account is frozen due to depleted tokens.
         <br><button class="unfreeze-btn" onclick="unfreezeAccount()">Unfreeze Account (+50 tokens)</button>
       </div>
 
@@ -745,21 +745,21 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       <!-- Buttons -->
       <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
-        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:#4a3828; color:#efe8de; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='#5c4a38'" onmouseout="this.style.background='#4a3828'">🛡️ Admin Dashboard</button>
+        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:#4a3828; color:#efe8de; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='#5c4a38'" onmouseout="this.style.background='#4a3828'">🛡ï¸ Admin Dashboard</button>
         <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid #5c4a38; background:transparent; color:#dc6b5a; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#4a2828'; this.style.borderColor='#6b3a3a'" onmouseout="this.style.background='transparent'; this.style.borderColor='#5c4a38'">🚪 Logout</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- ALL JAVASCRIPT (PRESERVED AS-IS)    -->
-<!-- ═══════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <script>
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // BACKEND CONFIG
-    // ─────────────────────────────────
-    const API_URL = 'http://localhost:3000';
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
     const SOCKET_URL = 'http://127.0.0.1:3000';
 
     // Load session from login page (sessionStorage first, then localStorage for Remember Me)
@@ -775,9 +775,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Pre-fill user info from session
     const SESSION_USER = _session || { name: 'User', role: 'user', email: '' };
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // STATE
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const LOCAL_BAL_KEY = 'finchat_persona_bal_' + SESSION_USER.id;
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
     if (!personaBalances || !personaBalances.plato || !personaBalances.aurelius) {
@@ -848,9 +848,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     let personaSessions = {};   // { personaId: sessionId }
     let personaHistories = {};  // { personaId: [messagesHTML] }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // CRYPTO
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async function sha256(msg) {
       const buf = new TextEncoder().encode(msg);
       const hash = await crypto.subtle.digest('SHA-256', buf);
@@ -869,9 +869,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return proof;
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SOCKET.IO CONNECTION
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let socket;
     try {
       socket = io(SOCKET_URL, {
@@ -880,12 +880,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       });
 
       socket.on('connect', () => {
-        console.log('✅ Socket connected:', socket.id);
+        console.log('âœ… Socket connected:', socket.id);
         socket.emit('join_channel', currentChannelId);
       });
 
       socket.on('connect_error', (err) => {
-        console.warn('⚠️ Socket connection failed:', err.message);
+        console.warn('⚠ï¸ Socket connection failed:', err.message);
       });
 
       socket.on('new_message', (msg) => {
@@ -898,9 +898,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       console.error('Socket init error:', e);
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // FRAUD DETECTION
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async function detectFraud(msg) {
       return await detectSimulated(msg);
     }
@@ -928,9 +928,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return { risk: 'LOW', reason: 'No fraud indicators detected', indicators: ['Message appears compliant'] };
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // PERSONA SWITCHING
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function switchChat(personaId) {
       // Save current chat HTML
       personaHistories[activePersona] = document.getElementById('messages').innerHTML;
@@ -1021,7 +1021,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         let fraudNotice = '';
         if (risk !== 'LOW') {
           const cls = risk === 'HIGH' ? 'high' : 'medium';
-          const icon = risk === 'HIGH' ? '🚨' : '⚠️';
+          const icon = risk === 'HIGH' ? '🚨' : '⚠ï¸';
           const label = risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
           fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
         }
@@ -1051,9 +1051,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       personaHistories[personaId] = container.innerHTML;
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // BOT RESPONSE (fallback)
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async function getBotResponse(msg) {
       const m = msg.toLowerCase();
       if (/hello|hi |hey|good morning|good afternoon/i.test(m)) return `Hello! Your message has been logged at chain block #${chainHeight} and verified clean. How can I assist you today?`;
@@ -1068,9 +1068,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       ];
       return fallbacks[Math.floor(Math.random() * fallbacks.length)];
     }
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // TOKENOMICS
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function applyTokens(amount, label, type) {
       tokenBalance = Math.max(0, tokenBalance + amount);
       personaBalances[activePersona] = tokenBalance;
@@ -1099,9 +1099,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       ).join('');
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // PROOF LOG
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const CHECKPOINT_INTERVAL = 10;
 
     function addProofCard(proof, fraud, isCheckpointBlock) {
@@ -1113,7 +1113,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       let chainLabel, chainClass;
       if (isCheckpointBlock) {
-        chainLabel = `⚓ Solana Checkpoint`;
+        chainLabel = `âš“ Solana Checkpoint`;
         chainClass = 'pc-chain checkpoint';
       } else {
         chainLabel = `🔗 chained`;
@@ -1124,7 +1124,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       card.className = `proof-card ${riskClass}${isCheckpointBlock ? ' confirmed' : ''}`;
       card.id = `proof-${proof.height}`;
       card.innerHTML = `
-    <div><span class="pc-key">HT  </span><span class="pc-val">#${proof.height}${isCheckpointBlock ? ' ⚓' : ''}</span></div>
+    <div><span class="pc-key">HT  </span><span class="pc-val">#${proof.height}${isCheckpointBlock ? ' âš“' : ''}</span></div>
     <div><span class="pc-key">FROM </span><span class="pc-val">${proof.sender}</span></div>
     <div><span class="pc-key">TIME </span><span class="pc-val">${new Date(proof.ts).toLocaleTimeString()}</span></div>
     <div class="proof-divider"></div>
@@ -1140,7 +1140,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const msgChain = document.getElementById(`msg-chain-${proof.height}`);
         if (msgChain) {
           msgChain.className = 'chain-status confirmed';
-          msgChain.textContent = '⚓';
+          msgChain.textContent = 'âš“';
         }
       }
     }
@@ -1149,13 +1149,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const container = document.getElementById('messages');
       const banner = document.createElement('div');
       banner.className = 'checkpoint-banner';
-      banner.innerHTML = `<span class="checkpoint-banner-label">⚓ Solana Checkpoint — Block #${height} anchored to devnet</span>`;
+      banner.innerHTML = `<span class="checkpoint-banner-label">âš“ Solana Checkpoint — Block #${height} anchored to devnet</span>`;
       container.appendChild(banner);
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SCAN LOG
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function addScanCard(msg, fraud) {
       const log = document.getElementById('scanLog');
       log.querySelectorAll('.empty').forEach(e => e.remove());
@@ -1174,9 +1174,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       log.insertBefore(card, log.firstChild);
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // FILE HANDLING
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function handleFiles(files) {
       for (const f of files) pendingFiles.push(f);
       renderAttachPreview();
@@ -1189,7 +1189,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       preview.innerHTML = pendingFiles.map((f, i) =>
         `<div class="attach-chip">
       📄 <span>${f.name.length > 20 ? f.name.substring(0, 18) + '…' : f.name}</span>
-      <button onclick="removeFile(${i})">✕</button>
+      <button onclick="removeFile(${i})">âœ•</button>
     </div>`
       ).join('');
     }
@@ -1215,9 +1215,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // RENDER MESSAGE
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function renderMessage(sender, text, proof, fraud, files) {
       const isUser = sender === 'USER';
       const p = PERSONAS[activePersona];
@@ -1230,11 +1230,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       let fraudNotice = '';
       if (fraud.risk !== 'LOW') {
         const cls = fraud.risk === 'HIGH' ? 'high' : 'medium';
-        const icon = fraud.risk === 'HIGH' ? '🚨' : '⚠️';
+        const icon = fraud.risk === 'HIGH' ? '🚨' : '⚠ï¸';
         const label = fraud.risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
         fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
       } else if (isUser) {
-        fraudNotice = `<div class="fraud-notice low">✓ Verified clean</div>`;
+        fraudNotice = `<div class="fraud-notice low">âœ“ Verified clean</div>`;
       }
 
       let filesHTML = '';
@@ -1253,8 +1253,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const userAvatarHTML = `<div class="avatar user-avatar" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
       const botAvatarHTML = `<div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div>`;
 
-      const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
-      const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">⏳</span>`;
+      const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">âœ“</span>` : '';
+      const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">â³</span>`;
 
       wrapper.innerHTML = `
     <div class="msg-row">
@@ -1280,13 +1280,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (isUser) {
         setTimeout(() => {
           const r = document.getElementById(`read-${proof.height}`);
-          if (r) { r.textContent = '✓✓'; r.className = 'read-receipt read'; }
+          if (r) { r.textContent = 'âœ“âœ“'; r.className = 'read-receipt read'; }
         }, 1500);
       }
     }
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // TYPING INDICATOR
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function showTyping() {
       updatePersonaStatusUI(activePersona, true);
       const id = 'typing' + Date.now();
@@ -1334,9 +1334,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // MAIN SEND
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async function sendMessage() {
       if (isSending) return;
       const input = document.getElementById('msgInput');
@@ -1356,7 +1356,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
 
       if (isPersonaChat) {
-        // ── AI Persona Chat via Backend API ──
+        // â”€â”€ AI Persona Chat via Backend API â”€â”€
         const typingId = showTyping();
 
         try {
@@ -1501,9 +1501,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       document.getElementById('sendBtn').disabled = false;
       input.focus();
     }
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // EXPORT JSON
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function exportJSON() {
       const cards = document.querySelectorAll('.proof-card');
       const data = {
@@ -1535,9 +1535,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       showToast('Proof log exported as JSON');
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // UI HELPERS
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function switchTab(name, btn) {
       ['proof', 'tokens', 'gov', 'ai'].forEach(t => {
         document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
@@ -1589,7 +1589,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           banner.className = 'verify-banner success';
           banner.innerHTML = `
             <div style="font-weight:600;display:flex;align-items:center;gap:6px">
-              ✅ Chain Verified Successfully
+              âœ… Chain Verified Successfully
             </div>
             <div>All ${data.verification.totalBlocks} blocks linked and signed correctly. No tampering detected.</div>
           `;
@@ -1611,7 +1611,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         btn.disabled = false;
         btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">verified_user</span> Verify Chain Integrity';
         banner.className = 'verify-banner error';
-        banner.innerHTML = '❌ Verification failed. Could not reach server.';
+        banner.innerHTML = 'âŒ Verification failed. Could not reach server.';
       }
     }
 
@@ -1625,7 +1625,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
-    // ── Init UI from session ─────────────────────────────
+    // â”€â”€ Init UI from session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     (function initSessionUI() {
       if (!SESSION_USER) return;
       const name = SESSION_USER.name || 'User';
@@ -1664,7 +1664,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Load chat history for the default persona on page load
     loadChatHistory(activePersona);
 
-    // ── Sync State from Server on Startup ────────────────
+    // â”€â”€ Sync State from Server on Startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     (async function syncServerState() {
       const token = _session?.token;
       if (!token) return;
@@ -1842,7 +1842,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
                 let fraudNotice = '';
                 if (risk !== 'LOW') {
                   const cls = risk === 'HIGH' ? 'high' : 'medium';
-                  const icon = risk === 'HIGH' ? '🚨' : '⚠️';
+                  const icon = risk === 'HIGH' ? '🚨' : '⚠ï¸';
                   const label = risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
                   fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
                 }
@@ -1872,7 +1872,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     })();
 
-    // ── Check Solana Status ─────────────────────────────
+    // â”€â”€ Check Solana Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async function checkSolanaStatus() {
       try {
         const res = await fetch(`${API_URL}/health`);
@@ -1902,9 +1902,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     checkSolanaStatus();
     setInterval(checkSolanaStatus, 30000);
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // SETTINGS PANEL + PHANTOM WALLET
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let phantomWallet = null;
     let selectedTier = null;
 
@@ -1989,7 +1989,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         phantomWallet = resp.publicKey.toString();
 
         btn.className = 'wallet-btn connected';
-        btn.textContent = `✅ Connected: ${phantomWallet.substring(0, 4)}...${phantomWallet.slice(-4)}`;
+        btn.textContent = `âœ… Connected: ${phantomWallet.substring(0, 4)}...${phantomWallet.slice(-4)}`;
         btn.disabled = true;
 
         info.style.display = 'block';
@@ -2052,7 +2052,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
         document.getElementById('unfreezeBanner').classList.remove('show');
 
-        btn.textContent = `✅ +${data.tokensAdded} tokens added!`;
+        btn.textContent = `âœ… +${data.tokensAdded} tokens added!`;
         showToast(`+${data.tokensAdded} tokens purchased successfully!`, 'success');
 
         loadTxHistory();
@@ -2066,7 +2066,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       } catch (err) {
         console.error('Buy tokens error:', err);
-        btn.textContent = '❌ Purchase failed — try again';
+        btn.textContent = 'âŒ Purchase failed — try again';
         btn.disabled = false;
         showToast('Token purchase failed: ' + err.message, 'danger');
       }
@@ -2102,9 +2102,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       window.location.href = 'finchat_login.html';
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ADMIN FACING
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     function openAdminModal() {
       const modal = document.getElementById('adminModal');
       if (modal) {
@@ -2158,9 +2158,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     }
 
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ADMIN USER MANAGEMENT + ZKP
-    // ─────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     if (SESSION_USER.role === 'admin') {
       const adminSection = document.getElementById('adminSidebarSection');
@@ -2206,7 +2206,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const unblockAllBtn = document.getElementById('unblockAllBtn');
         if (data.frozen === 0) {
           unblockAllBtn.disabled = true;
-          unblockAllBtn.textContent = '✅ No Frozen Users';
+          unblockAllBtn.textContent = 'âœ… No Frozen Users';
         } else {
           unblockAllBtn.disabled = false;
           unblockAllBtn.textContent = `🔓 Unblock All Frozen (${data.frozen})`;
@@ -2221,8 +2221,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           const initials = (user.name || '??').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
           const isFrozen = user.is_frozen;
           const statusBadge = isFrozen
-            ? '<span class="status-badge frozen">❄️ Frozen</span>'
-            : '<span class="status-badge active">✅ Active</span>';
+            ? '<span class="status-badge frozen">â„ï¸ Frozen</span>'
+            : '<span class="status-badge active">âœ… Active</span>';
           const actionBtn = isFrozen
             ? `<button class="unblock-btn" onclick="adminUnblockUser('${user.id}', '${user.name.replace(/'/g, "\\'")}')" id="unblock-${user.id}">🔓 Unblock</button>`
             : '<span style="font-size:10px;color:var(--text3);">—</span>';
@@ -2260,7 +2260,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const btn = document.getElementById(`unblock-${userId}`);
       if (btn) {
         btn.disabled = true;
-        btn.textContent = '⏳ Processing...';
+        btn.textContent = 'â³ Processing...';
       }
 
       try {
@@ -2280,12 +2280,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         }
 
         const data = await res.json();
-        showToast(`✅ ${userName} unblocked! ZKP proof: ${data.zkpProof.commitmentHash.substring(0, 16)}...`, 'success');
+        showToast(`âœ… ${userName} unblocked! ZKP proof: ${data.zkpProof.commitmentHash.substring(0, 16)}...`, 'success');
 
         loadAdminUsers();
 
       } catch (err) {
-        showToast(`❌ Unblock failed: ${err.message}`, 'danger');
+        showToast(`âŒ Unblock failed: ${err.message}`, 'danger');
         if (btn) {
           btn.disabled = false;
           btn.textContent = '🔓 Unblock';
@@ -2299,7 +2299,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       const btn = document.getElementById('unblockAllBtn');
       btn.disabled = true;
-      btn.textContent = '⏳ Processing...';
+      btn.textContent = 'â³ Processing...';
 
       try {
         const token = _session?.token;
@@ -2315,11 +2315,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         if (!res.ok) throw new Error('Bulk unblock failed');
         const data = await res.json();
 
-        showToast(`✅ Unblocked ${data.unblocked} users with ZKP proofs!`, 'success');
+        showToast(`âœ… Unblocked ${data.unblocked} users with ZKP proofs!`, 'success');
         loadAdminUsers();
 
       } catch (err) {
-        showToast(`❌ Bulk unblock failed: ${err.message}`, 'danger');
+        showToast(`âŒ Bulk unblock failed: ${err.message}`, 'danger');
         btn.disabled = false;
         btn.textContent = `🔓 Unblock All Frozen`;
       }
@@ -2345,13 +2345,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         container.innerHTML = data.proofs.map(proof => {
           const time = new Date(proof.createdAt).toLocaleString();
           const userFrozenNow = proof.targetUser.currentlyFrozen;
-          const statusText = userFrozenNow ? '❄️ Re-frozen since' : '✅ Currently active';
+          const statusText = userFrozenNow ? 'â„ï¸ Re-frozen since' : 'âœ… Currently active';
 
           return `
             <div class="zkp-proof-card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="zkp-label">ZKP Unblock Proof</div>
-                <span class="zkp-verified-badge">✅ Verified</span>
+                <span class="zkp-verified-badge">âœ… Verified</span>
               </div>
               <div class="zkp-hash">${proof.commitmentHash}</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:6px;">

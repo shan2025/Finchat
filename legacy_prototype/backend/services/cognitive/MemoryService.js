@@ -276,7 +276,21 @@ async function retrieveEnrichedContext({ userId, conversationId, goal, agentName
   try {
     if (goal) {
       const { findRelatedForText } = require('./EntityGraph');
-      graphContext = await findRelatedForText(goal, 6);
+      graphContext = await findRelatedForText(goal, 6, agentName || null);
+      // Cognitive Memory Engine: the nodes used to answer "light up" —
+      // fire-and-forget so retrieval latency is untouched.
+      const activatedIds = graphContext.map(g => g.entity_id).filter(Boolean);
+      if (activatedIds.length > 0) {
+        const { recordActivation } = require('./MemoryEngine');
+        recordActivation({
+          entityIds: activatedIds,
+          userId,
+          agentId: agentName || null,
+          source: 'retrieval',
+          sourceId: conversationId || null,
+          detail: goal ? `Recalled while answering: "${String(goal).slice(0, 120)}"` : ''
+        }).catch(() => { });
+      }
     }
   } catch (e) { /* best-effort */ }
   try {

@@ -205,12 +205,15 @@ async function processMorningBriefing(job) {
     }
 
     // Store notification so it shows on the notification bell (live via notification:new)
+    // Full report as content: the bell preview truncates it for display, while
+    // external channels (Telegram/email) deliver the whole briefing.
     const { createNotification } = require('../notifications');
     await createNotification({
       userId,
       type: 'briefing',
-      title: '🌅 Morning Executive Briefing Ready',
-      content: `Your daily briefing is ready! ${briefingText.substring(0, 200)}...`
+      title: '🌅 Morning Executive Briefing',
+      content: briefingText,
+      link: 'finchat_inbox.html'
     });
 
     eventBus.emit('briefing:completed', {

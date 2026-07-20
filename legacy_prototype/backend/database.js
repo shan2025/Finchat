@@ -39,6 +39,10 @@ async function query(text, params = []) {
   try {
     const res = await p.query(text, params);
     const duration = Date.now() - start;
+    const slowMs = Number(process.env.SLOW_QUERY_MS) || 500;
+    if (duration >= slowMs) {
+      console.warn(`🐢 Slow query (${duration}ms):`, text.replace(/\s+/g, ' ').trim().slice(0, 120));
+    }
     return res;
   } catch (err) {
     console.error('❌ Database query error:', { text, error: err.message });

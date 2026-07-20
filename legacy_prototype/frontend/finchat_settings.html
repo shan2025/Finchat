@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+  :root { --bg:#f7f4ed; --surface:#efe8de; --surface2:#f3eee3; --border:#d6ccbc; --text:#3a2e23; --text2:#5c4a38; --text3:#8c7a6b; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
+  textarea:focus, input:focus, select:focus {
+    outline: none !important; box-shadow: none !important;
+    border-color: var(--border) !important; --tw-ring-color: transparent !important;
+  }
+  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s; pointer-events:none; z-index:9999; transform:translateY(20px); }
+  .toast.show { opacity:1; transform:translateY(0); }
+  /* iOS-style toggle */
+  .tgl { position:relative; width:44px; height:24px; border-radius:999px; background:#c9c0b0; transition:background .18s; cursor:pointer; flex-shrink:0; }
+  .tgl::after { content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .18s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+  .tgl.on { background:#16a34a; } .tgl.on::after { left:22px; }
+  .tgl.disabled { opacity:.45; cursor:not-allowed; }
+  .chan-input { width:100%; margin-top:8px; padding:9px 14px; border-radius:14px; font-size:13px; background:var(--surface2); border:1px solid var(--border); outline:none; }
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+</style>
+</head>
+
+<body class="bg-cream-bg h-screen overflow-hidden flex">
+
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
+
+<div class="flex-1 flex flex-col md:ml-64 h-full min-w-0">
+
+  <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
+    <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
+      <span class="material-symbols-outlined text-[18px]">menu</span>
+    </button>
+    <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Settings</h1>
+    <span class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3);">notifications · channels · account</span>
+    <div class="flex-1"></div>
+    <div class="relative shrink-0">
+      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
+        <span class="material-symbols-outlined text-[16px]">notifications</span>
+        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+      </button>
+      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 overflow-y-auto px-6 py-6">
+    <div class="max-w-3xl mx-auto space-y-6">
+
+      <!-- Notification channels -->
+      <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 class="text-lg font-bold flex items-center gap-2">
+              <span class="material-symbols-outlined">notifications_active</span> Notification channels
+            </h2>
+            <p class="text-[12.5px] mt-1" style="color:var(--text2);">
+              Choose where FinChat reaches you when agents finish tasks, need approval, flag fraud, or post briefings.
+            </p>
+          </div>
+          <button onclick="sendTest()" id="testBtn" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#8c491a;">
+            <span class="material-symbols-outlined text-[15px]">send</span> Send test
+          </button>
+        </div>
+
+        <div id="channels" class="mt-5 space-y-3"><!-- populated by JS --></div>
+
+        <div class="mt-4 text-[11px] font-mono px-1" style="color:var(--text3);">
+          Channels marked "server not configured" need credentials in backend/.env
+          (SMTP_* for email, TWILIO_* for WhatsApp/SMS, TELEGRAM_BOT_TOKEN for Telegram). Push works out of the box.
+        </div>
+      </section>
+
+      <!-- Recent deliveries -->
+      <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
+        <h2 class="text-lg font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined">receipt_long</span> Recent deliveries
+        </h2>
+        <div id="deliveries" class="mt-3 space-y-1.5 text-[12px] font-mono">
+          <div style="color:var(--text3);">No external deliveries yet.</div>
+        </div>
+      </section>
+
+      <!-- Account -->
+      <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
+        <h2 class="text-lg font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined">person</span> Account
+        </h2>
+        <div class="mt-3 text-[13px] space-y-1.5" style="color:var(--text2);">
+          <div><span class="font-bold" style="color:var(--text);">Name:</span> <span id="accName">—</span></div>
+          <div><span class="font-bold" style="color:var(--text);">Email:</span> <span id="accEmail">—</span></div>
+          <div><span class="font-bold" style="color:var(--text);">Role:</span> <span id="accRole">—</span></div>
+        </div>
+        <button onclick="logout()" class="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold" style="background:#fee2e2; border:1px solid #dc2626; color:#991b1b;">
+          <span class="material-symbols-outlined text-[15px]">logout</span> Sign out
+        </button>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  if (!_session) window.location.href = 'finchat_login.html';
+  else if (!sessionStorage.getItem('finchat_user')) sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+  const SESSION_USER = _session || {};
+  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || SESSION_USER.token || '';
+  const AUTH = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 4000); }
+
+  document.getElementById('accName').textContent = SESSION_USER.name || '—';
+  document.getElementById('accEmail').textContent = SESSION_USER.email || '—';
+  document.getElementById('accRole').textContent = SESSION_USER.role || 'user';
+  function logout() {
+    sessionStorage.clear();
+    localStorage.removeItem('finchat_session'); localStorage.removeItem('finchat_token');
+    location.href = 'finchat_login.html';
+  }
+
+  // ── Channel definitions ──
+  const CHANNELS = [
+    { key: 'inapp',    icon: 'notifications', label: 'In-app bell', desc: 'The bell on every FinChat page. Always recommended.', field: null },
+    { key: 'push',     icon: 'smartphone',    label: 'Mobile / browser push', desc: 'Real push notifications on this device, even with FinChat closed.', field: null },
+    { key: 'email',    icon: 'mail',          label: 'Email', desc: 'One email per notification.', field: 'email_to', placeholder: 'you@example.com' },
+    { key: 'whatsapp', icon: 'chat',          label: 'WhatsApp', desc: 'Via Twilio WhatsApp.', field: 'whatsapp_to', placeholder: '+91 98765 43210' },
+    { key: 'telegram', icon: 'send',          label: 'Telegram', desc: 'Tap "Link Telegram" below — message the bot once and we capture your chat ID automatically.', field: 'telegram_chat_id', placeholder: 'e.g. 123456789' },
+    { key: 'sms',      icon: 'sms',           label: 'SMS', desc: 'Text message via Twilio.', field: 'sms_to', placeholder: '+91 98765 43210' }
+  ];
+  let prefs = {}, serverChannels = {};
+
+  function renderChannels() {
+    const wrap = document.getElementById('channels');
+    wrap.innerHTML = CHANNELS.map(c => {
+      const on = !!prefs['channel_' + c.key];
+      const serverOk = c.key === 'inapp' || serverChannels[c.key] !== false;
+      const badge = (c.key !== 'inapp' && serverChannels[c.key] === false)
+        ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#fee2e2; border:1px solid #dc2626; color:#991b1b;">server not configured</span>'
+        : '';
+      return `
+      <div class="rounded-2xl px-4 py-3.5" style="background:var(--surface2); border:1px solid var(--border);">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[20px]" style="color:var(--text2);">${c.icon}</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13.5px] font-bold">${c.label}${badge}</div>
+            <div class="text-[11.5px]" style="color:var(--text3);">${c.desc}</div>
+          </div>
+          <div class="tgl ${on ? 'on' : ''} ${serverOk ? '' : ''}" data-chan="${c.key}" onclick="toggleChannel('${c.key}')"></div>
+        </div>
+        ${c.field ? `<input class="chan-input" id="fld_${c.field}" placeholder="${c.placeholder}" value="${esc(prefs[c.field] || '')}" onchange="markDirty()" style="display:${on ? 'block' : 'none'}">` : ''}
+        ${c.key === 'telegram' ? `
+        <div id="tgLinkWrap" style="display:${on ? 'block' : 'none'}; margin-top:8px;">
+          <button onclick="linkTelegram(event)" id="tgLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#229ED9; color:#fff; border:none; cursor:pointer;">
+            <span style="vertical-align:middle;">${prefs.telegram_chat_id ? '🔗 Re-link Telegram' : '🔗 Link Telegram automatically'}</span>
+          </button>
+          <div id="tgLinkStatus" style="font-size:11.5px; color:var(--text3); margin-top:6px; line-height:1.5;">${prefs.telegram_chat_id ? 'Linked to chat <b>' + esc(prefs.telegram_chat_id) + '</b>.' : ''}</div>
+        </div>` : ''}
+      </div>`;
+    }).join('') + `
+      <button onclick="savePrefs()" id="saveBtn" class="w-full py-3 rounded-full text-sm font-bold text-white" style="background:#3a2e23;">Save notification settings</button>`;
+  }
+
+  async function toggleChannel(key) {
+    prefs['channel_' + key] = !prefs['channel_' + key];
+    if (key === 'push' && prefs.channel_push) {
+      const ok = await enablePush();
+      if (!ok) prefs.channel_push = false;
+    }
+    renderChannels();
+  }
+  function markDirty() { /* fields read on save */ }
+
+  async function loadPrefs() {
+    try {
+      const r = await fetch(API + '/api/settings/notifications', { headers: AUTH });
+      if (!r.ok) throw new Error('load failed');
+      const d = await r.json();
+      prefs = d.prefs || {};
+      serverChannels = d.serverChannels || {};
+      renderChannels();
+      renderDeliveries(d.recentDeliveries || []);
+    } catch (e) {
+      document.getElementById('channels').innerHTML =
+        '<div class="text-xs" style="color:#dc2626;">Could not load settings — is the backend running (and migration 018 applied)?</div>';
+    }
+  }
+
+  function renderDeliveries(rows) {
+    const el = document.getElementById('deliveries');
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--text3);">No external deliveries yet — enable a channel and hit "Send test".</div>'; return; }
+    const COLOR = { sent: '#16a34a', failed: '#dc2626', unconfigured: '#d97706', skipped: '#8c7a6b' };
+    el.innerHTML = rows.map(r => `
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="px-2 py-0.5 rounded-full text-[9px] font-bold text-white" style="background:${COLOR[r.status] || '#8c7a6b'};">${esc(r.status)}</span>
+        <span class="font-bold">${esc(r.channel)}</span>
+        <span style="color:var(--text3);">${esc(r.destination || '')}</span>
+        <span class="text-[10px]" style="color:var(--text3);">${new Date(r.created_at).toLocaleString()}</span>
+        ${r.detail ? `<span class="w-full text-[10px] pl-1" style="color:var(--text3);">↳ ${esc(r.detail)}</span>` : ''}
+      </div>`).join('');
+  }
+
+  async function savePrefs() {
+    const body = {};
+    for (const c of CHANNELS) {
+      body['channel_' + c.key] = !!prefs['channel_' + c.key];
+      if (c.field) {
+        const f = document.getElementById('fld_' + c.field);
+        if (f) body[c.field] = f.value.trim();
+      }
+    }
+    try {
+      const r = await fetch(API + '/api/settings/notifications', { method: 'PUT', headers: AUTH, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'save failed');
+      prefs = (await r.json()).prefs;
+      renderChannels();
+      showToast('✅ Notification settings saved');
+    } catch (e) { showToast('Save failed: ' + e.message); }
+  }
+
+  async function sendTest() {
+    const btn = document.getElementById('testBtn');
+    btn.disabled = true;
+    showToast('Sending test to your enabled channels…');
+    try {
+      const r = await fetch(API + '/api/settings/notifications/test', { method: 'POST', headers: AUTH });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'test failed');
+      const sent = (d.deliveries || []).filter(x => x.status === 'sent').length;
+      const bad = (d.deliveries || []).filter(x => x.status !== 'sent');
+      showToast(`Test sent — ${sent} delivered${bad.length ? ', ' + bad.length + ' not (see log below)' : ''}. Bell got it too.`);
+      loadPrefs();
+    } catch (e) { showToast('Test failed: ' + e.message); }
+    finally { btn.disabled = false; }
+  }
+
+  // ── Telegram auto-link ──
+  let tgPollTimer = null;
+  async function linkTelegram(e) {
+    if (e) e.preventDefault();
+    const status = document.getElementById('tgLinkStatus');
+    const btn = document.getElementById('tgLinkBtn');
+    try {
+      if (btn) btn.disabled = true;
+      if (status) status.textContent = 'Preparing your link…';
+      const r = await fetch(API + '/api/settings/telegram/start-link', { method: 'POST', headers: AUTH });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'could not start linking');
+      // Open the bot in Telegram (desktop app or web).
+      window.open(d.deepLink, '_blank');
+      if (status) status.innerHTML = `Opened <b>@${esc(d.botUsername)}</b>. In Telegram, press <b>Start</b>. Waiting for your message… ` +
+        `<a href="${esc(d.deepLink)}" target="_blank" style="color:#229ED9;text-decoration:underline;">open again</a>`;
+      let tries = 0;
+      clearInterval(tgPollTimer);
+      tgPollTimer = setInterval(async () => {
+        tries++;
+        if (tries > 40) { // ~80s
+          clearInterval(tgPollTimer);
+          if (status) status.textContent = 'Timed out waiting for Telegram. Tap “Link Telegram” to try again.';
+          if (btn) btn.disabled = false;
+          return;
+        }
+        try {
+          const pr = await fetch(API + '/api/settings/telegram/poll?code=' + encodeURIComponent(d.code), { headers: AUTH });
+          const pd = await pr.json();
+          if (pd.linked) {
+            clearInterval(tgPollTimer);
+            prefs.channel_telegram = true;
+            prefs.telegram_chat_id = pd.chatId;
+            renderChannels();
+            showToast('✅ Telegram linked (chat ' + pd.chatId + ')');
+          } else if (pd.expired) {
+            clearInterval(tgPollTimer);
+            if (status) status.textContent = 'Link code expired. Tap “Link Telegram” to try again.';
+            if (btn) btn.disabled = false;
+          }
+        } catch (err) { /* keep polling */ }
+      }, 2000);
+    } catch (err) {
+      if (status) status.textContent = 'Could not start linking: ' + err.message;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ── Web Push ──
+  function b64ToUint8(base64) {
+    const pad = '='.repeat((4 - base64.length % 4) % 4);
+    const b = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(b); return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+  async function enablePush() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        showToast('This browser does not support push notifications'); return false;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { showToast('Push permission was denied'); return false; }
+      const reg = await navigator.serviceWorker.register('sw.js');
+      const keyRes = await fetch(API + '/api/settings/push/public-key', { headers: AUTH });
+      if (!keyRes.ok) { showToast('Push unavailable on the server'); return false; }
+      const { publicKey } = await keyRes.json();
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(publicKey) });
+      const saveRes = await fetch(API + '/api/settings/push/subscribe', {
+        method: 'POST', headers: AUTH, body: JSON.stringify({ subscription: sub.toJSON() })
+      });
+      if (!saveRes.ok) { showToast('Could not save push subscription'); return false; }
+      showToast('✅ Push enabled on this device');
+      return true;
+    } catch (e) { showToast('Push setup failed: ' + e.message); return false; }
+  }
+
+  // Drawer
+  const navToggle = document.getElementById('navToggle');
+  if (navToggle) navToggle.onclick = () => {
+    document.getElementById('sideNav').classList.toggle('open');
+    document.getElementById('navBackdrop').classList.toggle('hidden');
+  };
+  document.getElementById('navBackdrop').onclick = () => {
+    document.getElementById('sideNav').classList.remove('open');
+    document.getElementById('navBackdrop').classList.add('hidden');
+  };
+
+  loadPrefs();
+</script>
+<script src="notifications_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+</body>
+</html>

@@ -4,9 +4,20 @@ const router = express.Router();
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const {
-  getPrefs, savePrefs, channelConfigStatus, getVapidKeys
+  getPrefs, savePrefs, channelConfigStatus, getVapidKeys,
+  getTelegramBotInfo, telegramGetUpdates
 } = require('../services/notificationChannels');
 const { createNotification } = require('../services/notifications');
+
+// In-memory Telegram link codes: code -> { userId, createdAt }. Short-lived;
+// the user starts a link, messages the bot, and we match their /start payload.
+const tgLinkCodes = new Map();
+function cleanupTgCodes() {
+  const now = Date.now();
+  for (const [code, v] of tgLinkCodes) {
+    if (now - v.createdAt > 10 * 60 * 1000) tgLinkCodes.delete(code);
+  }
+}
 
 // ── GET /api/settings/notifications ── prefs + server channel status ──
 router.get('/notifications', requireAuth, async (req, res) => {
@@ -73,6 +84,64 @@ router.post('/notifications/test', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Test notification error:', err);
     res.status(500).json({ error: 'Failed to send test notification' });
+  }
+});
+
+// ── POST /api/settings/telegram/start-link ── begin auto-link ──
+// Returns a t.me deep link the user taps; pressing Start sends /start <code>
+// to the bot, which the poll endpoint below matches to capture their chat_id.
+router.post('/telegram/start-link', requireAuth, async (req, res) => {
+  try {
+    if (!process.env.TELEGRAM_BOT_TOKEN) {
+      return res.status(503).json({ error: 'TELEGRAM_BOT_TOKEN not set in .env' });
+    }
+    const info = await getTelegramBotInfo();
+    if (!info || !info.username) {
+      return res.status(503).json({ error: 'Could not reach the Telegram bot — check the token in .env' });
+    }
+    cleanupTgCodes();
+    const code = 'fc' + Math.random().toString(36).slice(2, 10);
+    tgLinkCodes.set(code, { userId: req.user.id, createdAt: Date.now() });
+    res.json({
+      code,
+      botUsername: info.username,
+      deepLink: `https://t.me/${info.username}?start=${code}`
+    });
+  } catch (err) {
+    console.error('Telegram start-link error:', err);
+    res.status(500).json({ error: 'Failed to start Telegram linking' });
+  }
+});
+
+// ── GET /api/settings/telegram/poll?code=… ── poll for the /start message ──
+router.get('/telegram/poll', requireAuth, async (req, res) => {
+  try {
+    const code = req.query.code;
+    const entry = code && tgLinkCodes.get(code);
+    if (!entry || entry.userId !== req.user.id) {
+      return res.json({ linked: false, expired: true });
+    }
+    const updates = await telegramGetUpdates();
+    let chatId = null, matchedUpdateId = null;
+    for (const u of updates) {
+      const msg = u.message;
+      if (msg && typeof msg.text === 'string' && msg.text.trim() === `/start ${code}`) {
+        chatId = String(msg.chat.id);
+        matchedUpdateId = u.update_id;
+        break;
+      }
+    }
+    if (!chatId) return res.json({ linked: false });
+    await savePrefs(req.user.id, { channel_telegram: true, telegram_chat_id: chatId });
+    tgLinkCodes.delete(code);
+    // Confirm/clear consumed updates so they don't linger for the next link.
+    if (matchedUpdateId != null) {
+      try { await telegramGetUpdates(matchedUpdateId + 1); } catch (e) { /* best effort */ }
+    }
+    res.json({ linked: true, chatId });
+  } catch (err) {
+    console.error('Telegram poll error:', err);
+    res.status(500).json({ error: 'Failed to poll Telegram' });
   }
 });
 

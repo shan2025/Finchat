@@ -70,7 +70,7 @@ router.post('/send', requireAuth, async (req, res) => {
 
   const activeSession = sessionId || uuidv4();
 
-  let userProof, botProof;
+  let userProof, botProof, lastCleanResponse;
   try {
     const resHistory = await query(`
       SELECT role, content FROM ai_conversations
@@ -92,6 +92,7 @@ router.post('/send', requireAuth, async (req, res) => {
       sessionId: activeSession,
       webAccess: web !== false // composer WEB toggle; default on for API callers that don't send it
     });
+    lastCleanResponse = result.cleanResponse;
 
     const resChan = await query("SELECT channel_id as id FROM channels LIMIT 1");
     const channelId = resChan.rows[0] ? resChan.rows[0].id : 'general';
@@ -223,6 +224,8 @@ router.post('/send', requireAuth, async (req, res) => {
         model: result.model || null,
         fallback: result.provider === 'ollama'
       },
+      // Sprint X Stage 2 — explainability: what the AI recalled to answer
+      memoryTrace: result.memoryTrace || null,
       fraud: fraudAlert,
       proof: {
         user: {
@@ -250,6 +253,27 @@ router.post('/send', requireAuth, async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
+
+  // Cognitive Memory Engine: every exchange teaches the knowledge graph.
+  // Runs after the response is sent; failures never touch the chat.
+  setImmediate(async () => {
+    try {
+      const { ingestChat } = require('../services/cognitive/MemoryEngine');
+      const report = await ingestChat({
+        userId,
+        sessionId: activeSession,
+        agentId: personaId,
+        userText: message,
+        aiText: lastCleanResponse || '',
+        sourceLabel: `Chat with ${persona.name}`
+      });
+      if (report.learned.length > 0) {
+        console.log(`🧠 MemoryEngine: learned ${report.learned.length} node(s), ${report.linked.length} link(s) from session ${activeSession.slice(0, 8)}`);
+      }
+    } catch (memErr) {
+      console.warn('⚠️ MemoryEngine ingest error:', memErr.message);
+    }
+  });
 
   setImmediate(async () => {
     if (!userProof || !botProof) return;

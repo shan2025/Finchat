@@ -28,8 +28,14 @@ async function savePrefs(userId, prefs) {
   const cols = ['channel_inapp', 'channel_email', 'email_to', 'channel_whatsapp', 'whatsapp_to',
     'channel_telegram', 'telegram_chat_id', 'channel_sms', 'sms_to', 'channel_push',
     'push_subscription', 'muted_types'];
+  // Defaults keep NOT NULL columns satisfied when a field was never set.
+  const DEFAULTS = {
+    channel_inapp: true, channel_email: false, channel_whatsapp: false,
+    channel_telegram: false, channel_sms: false, channel_push: false,
+    muted_types: '[]'
+  };
   const existing = await getPrefs(userId);
-  const merged = { ...(existing || {}), ...prefs };
+  const merged = { ...DEFAULTS, ...(existing || {}), ...prefs };
   const vals = cols.map(c => {
     let v = merged[c];
     if (v === undefined) v = null;
@@ -50,7 +56,7 @@ async function savePrefs(userId, prefs) {
 // ── Channel configuration status (for the Settings page) ─────
 function channelConfigStatus() {
   return {
-    email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
+    email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
     whatsapp: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
     sms: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_SMS_FROM),
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
@@ -82,6 +88,7 @@ function getVapidKeys() {
 // ── Adapters ─────────────────────────────────────────────────
 async function sendEmail(to, subject, text) {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return { status: 'unconfigured', detail: 'SMTP_HOST / SMTP_USER not set in .env' };
+  if (!process.env.SMTP_PASS) return { status: 'unconfigured', detail: 'SMTP_PASS not set — generate a Gmail App Password and paste it into .env' };
   const nodemailer = require('nodemailer');
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -117,14 +124,58 @@ async function sendSMS(to, body) {
   return twilioSend(to, process.env.TWILIO_SMS_FROM, body);
 }
 
+// Telegram hard-limits a message to 4096 chars. Split long reports (e.g. the
+// morning briefing) on newline boundaries so each part is a whole section.
+function splitForTelegram(text, max = 4000) {
+  const out = [];
+  let s = String(text);
+  while (s.length > max) {
+    let cut = s.lastIndexOf('\n', max);
+    if (cut < max * 0.5) cut = max; // no sensible break — hard cut
+    out.push(s.slice(0, cut));
+    s = s.slice(cut).replace(/^\n/, '');
+  }
+  if (s.length) out.push(s);
+  return out;
+}
+
 async function sendTelegram(chatId, text) {
   if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
-  await axios.post(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-    { chat_id: chatId, text },
-    { timeout: 15000 }
-  );
+  for (const chunk of splitForTelegram(text)) {
+    await axios.post(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      { chat_id: chatId, text: chunk },
+      { timeout: 15000 }
+    );
+  }
   return { status: 'sent' };
+}
+
+// ── Telegram auto-link helpers (getUpdates polling — no public webhook) ──
+// getMe result cached so the "Link Telegram" flow can build a t.me deep link.
+let _tgBotInfo = null;
+async function getTelegramBotInfo() {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return null;
+  if (_tgBotInfo) return _tgBotInfo;
+  try {
+    const r = await axios.get(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`,
+      { timeout: 15000 });
+    if (r.data && r.data.ok) { _tgBotInfo = r.data.result; return _tgBotInfo; }
+  } catch (e) { /* unreachable — caller treats null as unconfigured */ }
+  return null;
+}
+
+// Pull recent bot updates. `offset` (last_update_id + 1) confirms/clears older
+// updates so they don't pile up. Returns the raw updates array.
+async function telegramGetUpdates(offset) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return [];
+  const params = { allowed_updates: JSON.stringify(['message']) };
+  if (offset != null) params.offset = offset;
+  const r = await axios.get(
+    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates`,
+    { params, timeout: 15000 });
+  return (r.data && r.data.ok) ? r.data.result : [];
 }
 
 async function sendPush(subscription, payload) {
@@ -204,5 +255,7 @@ module.exports = {
   sendWhatsApp,
   sendSMS,
   sendTelegram,
-  sendPush
+  sendPush,
+  getTelegramBotInfo,
+  telegramGetUpdates
 };

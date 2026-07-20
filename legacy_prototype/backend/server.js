@@ -39,8 +39,13 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Serve frontend statically
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Serve frontend statically.
+// Cache-Control: no-cache forces revalidation (cheap 304s via ETag) — without
+// it browsers heuristically cache shared JS like sidebar_nav.js for hours,
+// so new nav items (Group Chat, Blockchain, Settings) never appear.
+app.use(express.static(path.join(__dirname, '../frontend'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+}));
 
 // Redirect root to login
 app.get('/', (req, res) => {
@@ -59,6 +64,10 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/neural-map', require('./routes/neuralMap'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/missions', require('./routes/missions'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/group-chat', require('./routes/groupChat'));
+app.use('/api/blockchain', require('./routes/blockchain'));
+app.use('/api/knowledge', require('./routes/knowledge'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');
@@ -82,6 +91,18 @@ eventBus.on('execution:resumed', (data) => {
 
 eventBus.on('briefing:completed', (data) => {
   io.emit('agent_status_pulse', { type: 'briefing_completed', ...data });
+});
+
+// ── Sprint X · Cognitive Memory Engine — live graph pulses ───
+// The neural map listens for these to make nodes glow while the AI thinks.
+eventBus.on('graph:activation', (data) => {
+  io.emit('graph_pulse', { type: 'activation', ...data });
+});
+eventBus.on('memory:ingested', (data) => {
+  io.emit('graph_pulse', { type: 'learned', ...data });
+});
+eventBus.on('memory:dream_completed', (data) => {
+  io.emit('graph_pulse', { type: 'dream', ...data });
 });
 
 // ── Sprint 5 · Phase 5A — Multi-Agent Debate pulses ──────────
@@ -109,6 +130,14 @@ eventBus.on('debate:completed', (data) => {
 eventBus.on('notification:new', (row) => {
   // Deliver to the owning user's sockets (fallback: broadcast so open tabs refresh)
   io.emit('notification:new', row);
+});
+
+// ── Sprint 8 — Group chat relays (room = group:<groupId>) ────
+eventBus.on('group:message', (msg) => {
+  io.to(`group:${msg.group_id}`).emit('group:message', msg);
+});
+eventBus.on('group:typing', (info) => {
+  io.to(`group:${info.group_id}`).emit('group:typing', info);
 });
 
 // Health check
@@ -183,6 +212,14 @@ io.on('connection', (socket) => {
     socket.emit('online_users', inChannel);
 
     console.log(`📢 ${user.name} joined #${channelId}`);
+  });
+
+  // ── Group chat rooms (Sprint 8) ──────────────────────────
+  socket.on('join_group', (groupId) => {
+    if (typeof groupId === 'string' && groupId.startsWith('grp_')) socket.join(`group:${groupId}`);
+  });
+  socket.on('leave_group', (groupId) => {
+    if (typeof groupId === 'string') socket.leave(`group:${groupId}`);
   });
 
   // ── Leave channel ────────────────────────────────────────
@@ -278,6 +315,11 @@ server.listen(PORT, async () => {
   } catch (e) {
     console.error('⚠️ Mission scheduler init failed (missions will not fire until restart):', e.message);
   }
+
+  // Sprint X: dream cycle — consolidate the knowledge graph every 6 hours
+  // (merge duplicates, decay stale edges, surface knowledge gaps).
+  const { dream } = require('./services/cognitive/MemoryEngine');
+  setInterval(() => dream({}).catch(e => console.error('Dream cycle failed:', e.message)), 6 * 60 * 60 * 1000);
 
   console.log('');
   console.log('╔══════════════════════════════════════╗');

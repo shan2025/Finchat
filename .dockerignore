@@ -1,0 +1,9 @@
+node_modules
+.git
+.env
+finchat.db
+finchat.db-shm
+finchat.db-wal
+uploads
+.DS_Store
+Thumbs.db

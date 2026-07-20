@@ -106,6 +106,23 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── PATCH /api/group-chat/:id ── rename a group ──
+router.patch('/:id', requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim().slice(0, 60);
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const upd = await query(
+      'UPDATE group_chats SET name = $1, updated_at = NOW() WHERE group_id = $2 AND owner_id = $3',
+      [name, req.params.id, req.user.id]);
+    if (!upd.rowCount) return res.status(404).json({ error: 'Group not found' });
+    await saveMessage(req.params.id, 'system', 'system', `✏️ Group renamed to "${name}".`);
+    res.json({ status: 'ok', name });
+  } catch (err) {
+    console.error('Rename group error:', err);
+    res.status(500).json({ error: 'Failed to rename group' });
+  }
+});
+
 // ── DELETE /api/group-chat/:id ── delete a group ──
 router.delete('/:id', requireAuth, async (req, res) => {
   try {

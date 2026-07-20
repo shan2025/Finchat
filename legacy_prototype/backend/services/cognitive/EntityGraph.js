@@ -132,42 +132,97 @@ async function ingestExecution(execution) {
 }
 
 /**
- * Given text (typically a fresh goal), find anchor entities present in text and
- * do a one-hop graph walk to return related entities plus co-occurrence weight.
- * Returns [{name, type, viaEdge, weight}], sorted by weight desc.
+ * Given text (typically a fresh goal), find anchor entities in text and do a
+ * 2-hop weighted walk using edge strength×confidence scores. Agent-owned nodes
+ * receive a 1.5× boost so specialists surface their domain first.
+ *
+ * @param {string}  text      - Goal / query text
+ * @param {number}  limit     - Max neighbor results (anchors always included)
+ * @param {string|null} agentName - Current agent id; owned nodes are boosted
+ * Returns [{entity_id, name, type, viaEdge, weight}], anchors first.
  */
-async function findRelatedForText(text, limit = 8) {
+async function findRelatedForText(text, limit = 8, agentName = null) {
   if (!text) return [];
-  const lower = text.toLowerCase();
-  // Grab entities whose canonical_name appears in the text (fast substring match)
+
   const anchors = await query(`
     SELECT entity_id, canonical_name, entity_type
     FROM entities
     WHERE $1 ILIKE '%' || canonical_name || '%'
+      AND status = 'active'
     ORDER BY mention_count DESC
     LIMIT 6
   `, [text]);
   if (anchors.rows.length === 0) return [];
 
   const anchorIds = anchors.rows.map(r => r.entity_id);
-  const placeholders = anchorIds.map((_, i) => `$${i + 1}`).join(',');
-  const related = await query(`
-    SELECT e.canonical_name, e.entity_type, edge.edge_type AS via, SUM(edge.weight)::int AS weight
-    FROM entity_edges edge
-    JOIN entities e ON e.entity_id = edge.to_entity_id
-    WHERE edge.from_entity_id IN (${placeholders})
-      AND edge.to_entity_id NOT IN (${placeholders})
-    GROUP BY e.canonical_name, e.entity_type, edge.edge_type
-    ORDER BY weight DESC
-    LIMIT ${Math.max(1, Math.min(20, limit))}
-  `, anchorIds);
+  const N = anchorIds.length;
+  // Params: $1..$N = anchorIds, $N+1 = agentName, $N+2 = limit
+  const inList  = anchorIds.map((_, i) => `$${i + 1}`).join(',');
+  const agentP  = `$${N + 1}`;
+  const limitP  = `$${N + 2}`;
+  const params  = [...anchorIds, agentName, Math.max(1, Math.min(20, limit))];
 
-  return related.rows.map(r => ({
-    name: r.canonical_name,
-    type: r.entity_type,
-    viaEdge: r.via,
-    weight: r.weight
-  }));
+  // 2-hop CTE:
+  //   hop1 score = strength × confidence × weight  (falls back gracefully when
+  //                living columns are NULL — pre-engine edges have no strength yet)
+  //   hop2 score = hop1.score × same product along the second edge
+  //   agent boost = ×1.5 when the node is owned by the current agent
+  //   GROUP BY de-dupes nodes reachable via multiple paths and sums their scores
+  const related = await query(`
+    WITH hop1 AS (
+      SELECT e.entity_id, e.canonical_name, e.entity_type, ee.edge_type AS via,
+             COALESCE(ee.strength, 0.3) * COALESCE(ee.confidence, 0.5) * GREATEST(COALESCE(ee.weight, 1), 1) AS score,
+             CASE WHEN e.owner_agent = ${agentP} AND ${agentP} IS NOT NULL THEN 1.5 ELSE 1.0 END AS boost
+      FROM entity_edges ee
+      JOIN entities e ON e.entity_id = ee.to_entity_id
+      WHERE ee.from_entity_id IN (${inList})
+        AND ee.to_entity_id   NOT IN (${inList})
+        AND e.status = 'active'
+    ),
+    hop2 AS (
+      SELECT e.entity_id, e.canonical_name, e.entity_type, ee2.edge_type AS via,
+             h1.score * COALESCE(ee2.strength, 0.3) * COALESCE(ee2.confidence, 0.5) * GREATEST(COALESCE(ee2.weight, 1), 1) AS score,
+             CASE WHEN e.owner_agent = ${agentP} AND ${agentP} IS NOT NULL THEN 1.5 ELSE 1.0 END AS boost
+      FROM hop1 h1
+      JOIN entity_edges ee2 ON ee2.from_entity_id = h1.entity_id
+      JOIN entities e ON e.entity_id = ee2.to_entity_id
+      WHERE ee2.to_entity_id NOT IN (${inList})
+        AND e.status = 'active'
+    ),
+    ranked AS (
+      SELECT entity_id, canonical_name, entity_type, via,
+             SUM(score * boost) AS total_score
+      FROM (
+        SELECT entity_id, canonical_name, entity_type, via, score, boost FROM hop1
+        UNION ALL
+        SELECT entity_id, canonical_name, entity_type, via, score, boost FROM hop2
+      ) t
+      GROUP BY entity_id, canonical_name, entity_type, via
+    )
+    SELECT entity_id, canonical_name, entity_type, via, total_score
+    FROM ranked
+    ORDER BY total_score DESC
+    LIMIT ${limitP}
+  `, params);
+
+  // Anchors first (concepts named in the text), then scored neighbors.
+  // entity_id rides along so retrieval can *activate* these nodes.
+  return [
+    ...anchors.rows.map(r => ({
+      entity_id: r.entity_id,
+      name: r.canonical_name,
+      type: r.entity_type,
+      viaEdge: 'anchor',
+      weight: 99
+    })),
+    ...related.rows.map(r => ({
+      entity_id: r.entity_id,
+      name: r.canonical_name,
+      type: r.entity_type,
+      viaEdge: r.via,
+      weight: parseFloat(r.total_score) || 0
+    }))
+  ];
 }
 
 module.exports = {

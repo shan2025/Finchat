@@ -253,9 +253,12 @@ router.get('/', requireAuth, async (req, res) => {
         query(`SELECT ac.agent_id, a.name, ac.capabilities, ac.tools, ac.runtime_settings, ac.memory_namespace
                FROM agent_configs ac JOIN agents a ON a.agent_id = ac.agent_id
                ORDER BY ac.agent_id`),
-        query(`SELECT entity_id, canonical_name, entity_type, mention_count
-               FROM entities ORDER BY mention_count DESC LIMIT 120`),
-        query(`SELECT from_entity_id, to_entity_id, edge_type, weight FROM entity_edges LIMIT 400`),
+        query(`SELECT entity_id, canonical_name, entity_type, mention_count,
+                      summary, importance, confidence, activation_count, last_activated_at, owner_agent
+               FROM entities WHERE status = 'active'
+               ORDER BY importance DESC, mention_count DESC LIMIT 120`),
+        query(`SELECT from_entity_id, to_entity_id, edge_type, weight, strength, reason, source
+               FROM entity_edges ORDER BY strength DESC, weight DESC LIMIT 400`),
         query(`SELECT COUNT(*)::int AS total_blocks,
                       COUNT(*) FILTER (WHERE solana_confirmed = 1)::int AS anchored,
                       COALESCE(MAX(chain_height), 0) AS max_height
@@ -375,14 +378,27 @@ router.get('/', requireAuth, async (req, res) => {
     for (const e of entsQ.rows) {
       const k = `entity:${e.entity_id}`;
       entKeys.add(e.entity_id);
+      const meta = [['Type', e.entity_type], ['Mentions', String(e.mention_count)],
+        ['Importance', `${Math.round(e.importance * 10) / 10}/10`],
+        ['Confidence', `${Math.round(e.confidence * 100)}%`]];
+      if (e.activation_count > 0) meta.push(['Activations', String(e.activation_count)]);
+      if (e.owner_agent) meta.push(['Agent', e.owner_agent]);
       nodes.push({
         key: k,
         label: e.canonical_name,
         type: 'entity',
-        note: `Learned from your conversations. Mentioned ${e.mention_count} time${e.mention_count === 1 ? '' : 's'}.`,
-        meta: [['Type', e.entity_type], ['Mentions', String(e.mention_count)]],
+        note: e.summary || `Learned from your conversations. Mentioned ${e.mention_count} time${e.mention_count === 1 ? '' : 's'}.`,
+        meta,
         apis: [],
-        derived: true
+        derived: true,
+        // Living-node payload for the Cognitive Memory Engine UI
+        living: {
+          entityId: e.entity_id,
+          importance: e.importance,
+          confidence: e.confidence,
+          activationCount: e.activation_count,
+          lastActivatedAt: e.last_activated_at
+        }
       });
     }
     for (const ed of entEdgesQ.rows) {
@@ -390,10 +406,12 @@ router.get('/', requireAuth, async (req, res) => {
       pushEdge(
         `entity:${ed.from_entity_id}`,
         `entity:${ed.to_entity_id}`,
-        `${ed.edge_type.replace(/_/g, ' ')} · weight ${ed.weight}`,
+        ed.reason || `${ed.edge_type.replace(/_/g, ' ')} · weight ${ed.weight}`,
         '',
         ed.edge_type
       );
+      // strength drives edge thickness in the living-graph render
+      edges[edges.length - 1].strength = ed.strength;
     }
 
     } // end derived block — a user-made knowledge map holds only its own nodes

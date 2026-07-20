@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Blockchain</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+  :root { --bg:#f7f4ed; --surface:#efe8de; --surface2:#f3eee3; --border:#d6ccbc; --text:#3a2e23; --text2:#5c4a38; --text3:#8c7a6b; }
+  ::-webkit-scrollbar { width: 6px; height:6px; } ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
+  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s; pointer-events:none; z-index:9999; transform:translateY(20px); }
+  .toast.show { opacity:1; transform:translateY(0); }
+
+  /* ── Animated linear block chain ── */
+  #chainViewport { overflow: hidden; position: relative; }
+  #chainTrack { display: flex; align-items: center; gap: 0; width: max-content; animation: chainDrift 40s linear infinite; }
+  #chainTrack:hover { animation-play-state: paused; }
+  @keyframes chainDrift { 0% { transform: translateX(0); } 50% { transform: translateX(calc(-100% + min(100%, 900px))); } 100% { transform: translateX(0); } }
+  .blk { position: relative; min-width: 168px; max-width: 168px; border-radius: 18px; padding: 12px 14px; background: var(--surface); border: 1.5px solid var(--border); transition: transform .15s, box-shadow .15s; cursor: pointer; }
+  .blk:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(58,46,35,.18); z-index: 2; }
+  .blk.anchored { border-color: #8c491a; background: linear-gradient(160deg, var(--surface) 55%, #f6e3cf); }
+  .blk.genesis { border-color: #16a34a; }
+  .blk-link { width: 34px; height: 3px; background: repeating-linear-gradient(90deg, #8c7a6b 0 5px, transparent 5px 9px); position: relative; flex-shrink: 0; overflow: visible; }
+  .blk-link::after { content:''; position:absolute; top:-2.5px; left:-8px; width:8px; height:8px; border-radius:50%; background:#c67139; animation: linkPulse 1.6s linear infinite; will-change: transform; }
+  @keyframes linkPulse { 0% { transform: translateX(0); opacity:0; } 15% { opacity:1; } 85% { opacity:1; } 100% { transform: translateX(42px); opacity:0; } }
+  @keyframes blockIn { from { transform: scale(.6) translateY(10px); opacity:0; } to { transform: scale(1) translateY(0); opacity:1; } }
+  .blk.new { animation: blockIn .5s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes spinKf { to { transform: rotate(360deg); } }
+  .live-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  @keyframes livePulse { 0%,100% { box-shadow:0 0 0 0 rgba(22,163,74,.5);} 60% { box-shadow:0 0 0 7px rgba(22,163,74,0);} }
+  .live-dot.ok { background:#16a34a; animation: livePulse 1.8s infinite; }
+  .live-dot.bad { background:#dc2626; }
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+</style>
+</head>
+
+<body class="bg-cream-bg h-screen overflow-hidden flex">
+
+<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
+
+<div class="flex-1 flex flex-col md:ml-64 h-full min-w-0">
+
+  <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
+    <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
+      <span class="material-symbols-outlined text-[18px]">menu</span>
+    </button>
+    <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Blockchain</h1>
+    <span id="hdrChain" class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:280px;">connecting…</span>
+    <div class="flex-1"></div>
+    <button onclick="refreshAll(true)" title="Refresh" class="w-9 h-9 flex items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
+      <span class="material-symbols-outlined text-[16px]" id="refreshIcon">sync</span>
+    </button>
+    <div class="relative shrink-0">
+      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
+        <span class="material-symbols-outlined text-[16px]">notifications</span>
+        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+      </button>
+      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 overflow-y-auto px-6 py-6">
+    <div class="max-w-5xl mx-auto space-y-6">
+
+      <!-- Status cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
+          <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Active chain</div>
+          <div class="mt-1.5 flex items-center gap-2">
+            <span class="live-dot bad" id="rpcDot"></span>
+            <span class="text-lg font-bold" id="chainName">—</span>
+          </div>
+          <div class="text-[11px] font-mono mt-1 truncate" id="chainCluster" style="color:var(--text3);">—</div>
+        </div>
+        <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
+          <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Proof-chain height</div>
+          <div class="mt-1.5 text-2xl font-black font-mono" id="statHeight">—</div>
+          <div class="text-[11px] mt-1" style="color:var(--text3);"><span id="statTotal">—</span> blocks total</div>
+        </div>
+        <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
+          <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Anchored on Solana</div>
+          <div class="mt-1.5 text-2xl font-black font-mono" id="statAnchored">—</div>
+          <div class="text-[11px] mt-1" style="color:var(--text3);">every 10th block is a ⚓ checkpoint</div>
+        </div>
+        <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
+          <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Live network slot</div>
+          <div class="mt-1.5 text-2xl font-black font-mono" id="statSlot">—</div>
+          <div class="text-[11px] mt-1 truncate" style="color:var(--text3);">wallet <span id="statBalance">—</span> SOL</div>
+        </div>
+      </div>
+
+      <!-- Animated chain -->
+      <section class="rounded-3xl p-6" style="background:var(--surface2); border:1px solid var(--border);">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h2 class="text-lg font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined">account_tree</span> Proof-of-conversation chain
+          </h2>
+          <span class="text-[11px] font-mono" style="color:var(--text3);">newest on the right · hover to pause · click a block for details</span>
+        </div>
+        <div id="chainViewport" class="mt-4 py-4">
+          <div id="chainTrack">
+            <div class="text-xs font-mono px-4" style="color:var(--text3);">Loading blocks…</div>
+          </div>
+        </div>
+        <div id="blockDetail" class="hidden mt-2 rounded-2xl p-4 text-[12px] font-mono break-all" style="background:var(--surface); border:1px solid var(--border);"></div>
+      </section>
+
+      <!-- Wallet / RPC details -->
+      <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
+        <h2 class="text-lg font-bold flex items-center gap-2">
+          <span class="material-symbols-outlined">wallet</span> Anchor wallet & RPC
+        </h2>
+        <div class="mt-3 grid md:grid-cols-2 gap-x-8 gap-y-2 text-[12.5px]">
+          <div><span class="font-bold">Wallet:</span> <span class="font-mono break-all" id="walletAddr" style="color:var(--text2);">—</span></div>
+          <div><span class="font-bold">RPC endpoint:</span> <span class="font-mono break-all" id="rpcUrl" style="color:var(--text2);">—</span></div>
+          <div><span class="font-bold">Anchor program:</span> <span class="font-mono break-all" id="programId" style="color:var(--text2);">—</span></div>
+          <div><span class="font-bold">Last anchor:</span> <span class="font-mono" id="lastAnchor" style="color:var(--text2);">—</span></div>
+        </div>
+        <div class="mt-3 text-[11px]" style="color:var(--text3);">
+          Every message is SHA-256 hashed into the proof chain; each 10th block's hash is written to Solana devnet as an SPL Memo transaction.
+          Anchored blocks glow amber — click one to open its transaction on Solana Explorer.
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  if (!_session) window.location.href = 'finchat_login.html';
+  else if (!sessionStorage.getItem('finchat_user')) sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (_session && _session.token) || '';
+  const AUTH = { 'Authorization': 'Bearer ' + token };
+  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 3500); }
+
+  let blocks = [];
+
+  async function loadStatus() {
+    const r = await fetch(API + '/api/blockchain/status', { headers: AUTH });
+    if (!r.ok) throw new Error('status ' + r.status);
+    const d = await r.json();
+    const c = d.chain, p = d.proofChain;
+    document.getElementById('chainName').textContent = c.name;
+    document.getElementById('chainCluster').textContent = c.cluster + (c.reachable ? ' · connected' : ' · offline (simulating)');
+    document.getElementById('rpcDot').className = 'live-dot ' + (c.reachable ? 'ok' : 'bad');
+    document.getElementById('hdrChain').textContent = `${c.name} ${c.cluster} · chain height ${p.height} · ${p.anchored} anchored`;
+    document.getElementById('statHeight').textContent = '#' + p.height;
+    document.getElementById('statTotal').textContent = p.totalProofs;
+    document.getElementById('statAnchored').textContent = p.anchored + (p.anchoredReal ? ` (${p.anchoredReal} on-chain)` : '');
+    document.getElementById('statSlot').textContent = c.currentSlot != null ? c.currentSlot.toLocaleString() : 'offline';
+    document.getElementById('statBalance').textContent = d.wallet.balanceSol != null ? d.wallet.balanceSol : '—';
+    document.getElementById('walletAddr').textContent = d.wallet.address || '—';
+    document.getElementById('rpcUrl').textContent = c.rpc;
+    document.getElementById('programId').textContent = c.program;
+    document.getElementById('lastAnchor').textContent = p.lastAnchor
+      ? `block #${p.lastAnchor.chain_height} → ${String(p.lastAnchor.solana_tx).slice(0, 20)}…`
+      : 'none yet';
+  }
+
+  async function loadBlocks() {
+    const r = await fetch(API + '/api/blockchain/blocks?limit=24', { headers: AUTH });
+    if (!r.ok) throw new Error('blocks ' + r.status);
+    const prevIds = new Set(blocks.map(b => b.proof_id));
+    blocks = (await r.json()).blocks || [];
+    const track = document.getElementById('chainTrack');
+    if (!blocks.length) {
+      track.innerHTML = '<div class="text-xs font-mono px-4" style="color:var(--text3);">No blocks yet — send a chat message to mint block #1.</div>';
+      return;
+    }
+    track.innerHTML = blocks.map((b, i) => {
+      const anchored = !!b.solana_tx;
+      const isNew = prevIds.size && !prevIds.has(b.proof_id);
+      const real = anchored && !String(b.solana_tx).startsWith('sim_');
+      return `${i > 0 ? '<div class="blk-link"></div>' : ''}
+        <div class="blk ${anchored ? 'anchored' : ''} ${b.chain_height === 1 ? 'genesis' : ''} ${isNew ? 'new' : ''}" onclick="showBlock(${i})">
+          <div class="flex items-center justify-between">
+            <span class="text-[13px] font-black font-mono">#${b.chain_height}</span>
+            <span class="text-[13px]">${anchored ? (real ? '⚓' : '🔗') : '⛓'}</span>
+          </div>
+          <div class="text-[10px] font-mono mt-1.5 truncate" style="color:var(--text2);">${esc(String(b.hash).slice(0, 14))}…</div>
+          <div class="text-[9px] font-mono mt-0.5 truncate" style="color:var(--text3);">prev ${esc(String(b.prev_hash || '').slice(0, 10))}…</div>
+          <div class="text-[9px] font-mono mt-1" style="color:var(--text3);">${new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${esc(b.sender_id || '')}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function showBlock(i) {
+    const b = blocks[i];
+    if (!b) return;
+    const el = document.getElementById('blockDetail');
+    const real = b.solana_tx && !String(b.solana_tx).startsWith('sim_');
+    el.classList.remove('hidden');
+    el.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <span class="font-bold text-[13px]">Block #${b.chain_height} ${b.solana_tx ? (real ? '· ⚓ anchored on Solana' : '· 🔗 simulated anchor (offline)') : '· ⛓ chained locally'}</span>
+        <button onclick="this.closest('#blockDetail').classList.add('hidden')" class="text-[11px] underline">close</button>
+      </div>
+      <div><b>hash:</b> ${esc(b.hash)}</div>
+      <div><b>prev:</b> ${esc(b.prev_hash || '(genesis)')}</div>
+      <div><b>sender:</b> ${esc(b.sender_id || '—')} · <b>time:</b> ${new Date(b.timestamp).toLocaleString()}</div>
+      ${b.solana_tx ? `<div class="mt-1"><b>solana tx:</b> ${esc(b.solana_tx)} ${b.solana_slot ? '· slot ' + b.solana_slot : ''}
+        ${real ? `· <a class="underline" style="color:#8c491a" target="_blank" href="https://explorer.solana.com/tx/${esc(b.solana_tx)}?cluster=devnet">view on Explorer ↗</a>` : ''}</div>` : ''}`;
+  }
+
+  async function refreshAll(manual) {
+    const icon = document.getElementById('refreshIcon');
+    if (manual) icon.style.animation = 'spinKf 1s linear infinite';
+    try {
+      await Promise.all([loadStatus(), loadBlocks()]);
+      if (manual) showToast('Refreshed');
+    } catch (e) {
+      document.getElementById('hdrChain').textContent = 'backend unreachable';
+      if (manual) showToast('Refresh failed: ' + e.message);
+    } finally {
+      if (manual) setTimeout(() => icon.style.animation = '', 600);
+    }
+  }
+
+  // Live: refresh when new proofs are minted (chat activity pulses over socket)
+  try {
+    const socket = io(API, { auth: { token } });
+    window.socket = socket;
+    let pending = null;
+    socket.on('agent_status_pulse', () => { clearTimeout(pending); pending = setTimeout(() => refreshAll(false), 1500); });
+    socket.on('new_message', () => { clearTimeout(pending); pending = setTimeout(() => refreshAll(false), 1500); });
+  } catch (e) {}
+
+  const navToggle = document.getElementById('navToggle');
+  if (navToggle) navToggle.onclick = () => {
+    document.getElementById('sideNav').classList.toggle('open');
+    document.getElementById('navBackdrop').classList.toggle('hidden');
+  };
+  document.getElementById('navBackdrop').onclick = () => {
+    document.getElementById('sideNav').classList.remove('open');
+    document.getElementById('navBackdrop').classList.add('hidden');
+  };
+
+  refreshAll(false);
+  setInterval(() => refreshAll(false), 30000);
+</script>
+<script src="notifications_widget.js"></script>
+<script src="sidebar_nav.js"></script>
+</body>
+</html>

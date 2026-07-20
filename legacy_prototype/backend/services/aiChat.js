@@ -71,7 +71,9 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       isDirect: result.isDirect,
       auditTraceHash: result.auditTraceHash,
       provider: result.provider || null, // 'groq' | 'ollama' (local qwen fallback)
-      model: result.model || null
+      model: result.model || null,
+      // Sprint X Stage 2 — explainability: graph nodes / memories that fed the answer
+      memoryTrace: result.memoryTrace || null
     };
   } catch (err) {
     console.error('⚠️ CognitiveCore Route Error:', err.message);

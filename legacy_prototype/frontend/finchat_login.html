@@ -241,8 +241,8 @@
   </div>
 
 <script>
-    // Configuration
-    const API_URL = 'http://localhost:3000';
+    // Configuration — same-origin when served by the backend, else the dev default
+    const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
     let currentUser = null;
   
     // Pressing Enter triggers login

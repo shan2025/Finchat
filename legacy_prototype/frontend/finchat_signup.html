@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -202,7 +202,7 @@
 
 <script>
     // Configuration
-    const API_URL = 'http://localhost:3000';
+    const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
   
     // Pressing Enter triggers signup
     document.getElementById('confirm_password').addEventListener('keypress', function (e) {

@@ -94,6 +94,10 @@ async function run({
     const logs = [];
     const accumulatedToolResults = []; // Carry tool results across loop iterations
 
+    // Sprint X Stage 2 — explainability: which memories/graph nodes fed this answer
+    const traceConcepts = new Map();
+    let traceMemories = 0, traceRecipes = 0;
+
     // 3. Reasoning loop — now supports tool cycling
     const MAX_LOOP = 8; // Safety net
     for (let i = 0; i < MAX_LOOP; i++) {
@@ -110,6 +114,13 @@ async function run({
         agentName,
         limit: 5
       });
+      for (const g of enriched.graphContext || []) {
+        if (g.entity_id && !traceConcepts.has(g.entity_id)) {
+          traceConcepts.set(g.entity_id, { entityId: g.entity_id, name: g.name, type: g.type, viaEdge: g.viaEdge });
+        }
+      }
+      traceMemories = Math.max(traceMemories, (enriched.memories || []).length);
+      traceRecipes = Math.max(traceRecipes, (enriched.recipeHints || []).length);
 
       // 3c. Build context (includes memories + tool results + graph + recipes)
       const messages = buildContext({
@@ -426,7 +437,13 @@ async function run({
       logs,
       provider: lastProvider,
       model: lastModel,
-      responseReadyAt
+      responseReadyAt,
+      memoryTrace: {
+        concepts: [...traceConcepts.values()],
+        memories: traceMemories,
+        recipes: traceRecipes,
+        agent: agentName
+      }
     };
 
   } catch (err) {
