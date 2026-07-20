@@ -35,8 +35,9 @@
     } catch (e) { /* fall through */ }
     return localStorage.getItem('finchat_token') || localStorage.getItem('finchat_jwt') || '';
   }
+  var API_BASE = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';
   async function api(path) {
-    const res = await fetch(window.location.origin + path, {
+    const res = await fetch(API_BASE + path, {
       headers: { 'Authorization': 'Bearer ' + getToken() }
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);

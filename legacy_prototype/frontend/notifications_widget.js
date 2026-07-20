@@ -4,6 +4,10 @@
 // #notifBadge, #notifDropdown, #notifList) but lost the JS that drives it.
 // This file restores it, and is safe to include on any page: every DOM lookup
 // is guarded, so pages without the markup simply do nothing.
+// file:// fallback — route root-relative "/api/…" fetches to the local backend
+// when a page is opened directly from disk. Global + idempotent; no-op over http.
+(function(){ if(location.protocol==='file:'&&!window.__apiFileFix){ window.__apiFileFix=true; var _f=window.fetch.bind(window);
+  window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
 (function () {
   function init() {
     if (!document.getElementById('notifBell')) return; // no bell on this page

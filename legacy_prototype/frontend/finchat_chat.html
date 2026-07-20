@@ -454,12 +454,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralmap.html">
                     <span class="material-symbols-outlined text-[20px]">hub</span> Neural Map
                 </a>
-                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
-                    <span class="material-symbols-outlined text-[20px]">assessment</span> <span style="flex:1;">Reports</span> <span class="side-soon">SOON</span>
-                </div>
-                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
-                    <span class="material-symbols-outlined text-[20px]">menu_book</span> <span style="flex:1;">Knowledge</span> <span class="side-soon">SOON</span>
-                </div>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_reports.html">
+                    <span class="material-symbols-outlined text-[20px]">assessment</span> Reports
+                </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_knowledge.html">
+                    <span class="material-symbols-outlined text-[20px]">menu_book</span> Knowledge
+                </a>
                 <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
                     <span class="material-symbols-outlined text-[20px]">account_balance</span> <span style="flex:1;">Governance</span> <span class="side-soon">SOON</span>
                 </div>
@@ -3364,7 +3364,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Mark not-yet-built nav destinations as "Coming soon" instead of silently
     // opening the chat page.
     (function () {
-      const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+      const SOON = ['Governance', 'Support'];
       function toast(msg) {
         let t = document.getElementById('nmSoonToast');
         if (!t) {

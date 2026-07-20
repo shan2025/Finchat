@@ -432,7 +432,7 @@
 
     <!-- Client Logic -->
     <script>
-        const API_URL = window.location.origin;
+        const API_URL = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';
         let allProofBlocks = [];
         let currentSelectedBlock = null;
 
@@ -734,7 +734,7 @@
 
         // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
         (function () {
-            const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+            const SOON = ['Governance', 'Support'];
             function toast(msg) {
                 let t = document.getElementById('nmSoonToast');
                 if (!t) {

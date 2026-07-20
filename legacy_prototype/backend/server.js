@@ -68,6 +68,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/group-chat', require('./routes/groupChat'));
 app.use('/api/blockchain', require('./routes/blockchain'));
 app.use('/api/knowledge', require('./routes/knowledge'));
+app.use('/api/reports', require('./routes/reports'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');
@@ -320,6 +321,15 @@ server.listen(PORT, async () => {
   // (merge duplicates, decay stale edges, surface knowledge gaps).
   const { dream } = require('./services/cognitive/MemoryEngine');
   setInterval(() => dream({}).catch(e => console.error('Dream cycle failed:', e.message)), 6 * 60 * 60 * 1000);
+
+  // Sprint X · Stage 4: nightly dream digest — consolidate, then tell each
+  // active user what changed ("While you were away: merged 3, learned 12…")
+  // via their configured notification channels + a Reports snapshot.
+  const { runNightlyDigest } = require('./services/cognitive/DreamDigest');
+  setInterval(
+    () => runNightlyDigest({}).catch(e => console.error('Dream digest failed:', e.message)),
+    24 * 60 * 60 * 1000
+  );
 
   console.log('');
   console.log('╔══════════════════════════════════════╗');

@@ -273,6 +273,20 @@ router.post('/dream', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/knowledge/dream/digest — run the nightly digest now ──
+// Consolidate + notify active users. Useful for demoing "While you were away".
+router.post('/dream/digest', requireAuth, async (req, res) => {
+  try {
+    const { runNightlyDigest } = require('../services/cognitive/DreamDigest');
+    const notify = req.body?.notify !== false;
+    const result = await runNightlyDigest({ notify, windowHours: req.body?.windowHours || 24 });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Dream digest error:', err);
+    res.status(500).json({ error: 'Dream digest failed', details: err.message });
+  }
+});
+
 // ── POST /api/knowledge/gaps — hunt for missing concepts ───
 router.post('/gaps', requireAuth, async (req, res) => {
   try {
@@ -281,6 +295,50 @@ router.post('/gaps', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Gap detection error:', err);
     res.status(500).json({ error: 'Gap detection failed', details: err.message });
+  }
+});
+
+// ── GET /api/knowledge/communities ─────────────────────────
+// Named neighborhoods of the graph (Stage 4b). Each carries its label, color,
+// size, representative nodes and — once the dream summarizer runs — a paragraph.
+router.get('/communities', requireAuth, async (req, res) => {
+  try {
+    const q = await query(`
+      SELECT community_id, label, summary, color, size, top_nodes, summarized_at, updated_at
+      FROM graph_communities
+      ORDER BY size DESC, updated_at DESC
+      LIMIT 50
+    `);
+    res.json({
+      communities: q.rows.map(c => ({
+        communityId: c.community_id,
+        label: c.label,
+        summary: c.summary || '',
+        color: c.color,
+        size: c.size,
+        topNodes: Array.isArray(c.top_nodes) ? c.top_nodes : [],
+        summarizedAt: c.summarized_at,
+        updatedAt: c.updated_at
+      }))
+    });
+  } catch (err) {
+    console.error('Communities list error:', err);
+    res.status(500).json({ error: 'Failed to load communities' });
+  }
+});
+
+// ── POST /api/knowledge/communities/detect — re-cluster now ─
+router.post('/communities/detect', requireAuth, async (req, res) => {
+  try {
+    const { detectCommunities } = require('../services/cognitive/Communities');
+    const result = await detectCommunities({
+      minSize: Math.max(2, parseInt(req.body?.minSize) || 3),
+      name: req.body?.name !== false
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Community detection error:', err);
+    res.status(500).json({ error: 'Community detection failed', details: err.message });
   }
 });
 
@@ -311,6 +369,221 @@ router.get('/stats', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Knowledge stats error:', err);
     res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// Sprint Y — Knowledge Center aggregation
+// ═══════════════════════════════════════════════════════════
+
+// Scalar count that never throws — a missing table/column returns null so one
+// absent store can't 500 the whole dashboard.
+async function safeScalar(sql, params = []) {
+  try {
+    const r = await query(sql, params);
+    const v = r.rows[0] ? Object.values(r.rows[0])[0] : null;
+    return v == null ? null : Number(v);
+  } catch (err) {
+    return null;
+  }
+}
+
+// ── GET /api/knowledge/memory/overview ─────────────────────
+// One number + honest status per memory store, for the taxonomy quadrant.
+// Every store below is REAL and already wired; status reflects whether it
+// currently holds data, not whether the feature exists.
+router.get('/memory/overview', requireAuth, async (req, res) => {
+  try {
+    const [
+      graphNodes, graphEdges, graphEvents,
+      episodicExec, episodicMem,
+      procedural, recipes,
+      semantic, knowledgeDocs, embeddings, reflections
+    ] = await Promise.all([
+      safeScalar(`SELECT COUNT(*) FROM entities WHERE status = 'active'`),
+      safeScalar(`SELECT COUNT(*) FROM entity_edges`),
+      safeScalar(`SELECT COUNT(*) FROM node_events`),
+      safeScalar(`SELECT COUNT(*) FROM executions WHERE current_state = 'completed'`),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'episodic'`),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'procedural'`),
+      safeScalar(`SELECT COUNT(*) FROM skill_recipes`),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'semantic'`),
+      safeScalar(`SELECT COUNT(*) FROM knowledge`),
+      safeScalar(`SELECT COUNT(*) FROM knowledge_embeddings`),
+      safeScalar(`SELECT COUNT(*) FROM reflections`)
+    ]);
+
+    const status = (n) => (n == null ? 'roadmap' : n > 0 ? 'live' : 'instrumented');
+    const num = (n) => (n == null ? 0 : n);
+
+    res.json({
+      stores: [
+        {
+          key: 'semantic_graph', label: 'Semantic — Knowledge Graph', icon: 'hub',
+          primary: num(graphNodes), unit: 'concepts',
+          detail: { nodes: num(graphNodes), edges: num(graphEdges), events: num(graphEvents) },
+          status: status(graphNodes),
+          blurb: 'Living concepts and the reasoned links between them.'
+        },
+        {
+          key: 'episodic', label: 'Episodic — Experiences', icon: 'history',
+          primary: num(episodicExec) + num(episodicMem), unit: 'episodes',
+          detail: { completedExecutions: num(episodicExec), episodicMemories: num(episodicMem) },
+          status: status((num(episodicExec) + num(episodicMem)) || null),
+          blurb: 'What happened and when — past executions and recalled events.'
+        },
+        {
+          key: 'procedural', label: 'Procedural — Know-how', icon: 'construction',
+          primary: num(procedural) + num(recipes), unit: 'procedures',
+          detail: { proceduralMemories: num(procedural), skillRecipes: num(recipes) },
+          status: status((num(procedural) + num(recipes)) || null),
+          blurb: 'Reusable workflows and skill recipes distilled from success.'
+        },
+        {
+          key: 'rag', label: 'RAG — Vector Recall', icon: 'search',
+          primary: num(embeddings), unit: 'embedded chunks',
+          detail: { documents: num(knowledgeDocs), embeddings: num(embeddings), semanticMemories: num(semantic) },
+          status: status(embeddings),
+          blurb: 'Documents embedded (768-dim) for cosine-similarity retrieval.'
+        },
+        {
+          key: 'reflective', label: 'Reflective — Learnings', icon: 'lightbulb',
+          primary: num(reflections), unit: 'reflections',
+          detail: { reflections: num(reflections) },
+          status: status(reflections),
+          blurb: 'Post-execution learnings the system wrote about itself.'
+        }
+      ]
+    });
+  } catch (err) {
+    console.error('Memory overview error:', err);
+    res.status(500).json({ error: 'Failed to load memory overview' });
+  }
+});
+
+// ── GET /api/knowledge/stats/growth?days=30 ────────────────
+// Daily new-learning counts from node_events → the growth sparkline.
+router.get('/stats/growth', requireAuth, async (req, res) => {
+  try {
+    const days = Math.max(1, Math.min(180, parseInt(req.query.days) || 30));
+    const q = await query(`
+      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+             COALESCE(c.created, 0)::int   AS created,
+             COALESCE(c.activated, 0)::int AS activated,
+             COALESCE(c.total, 0)::int     AS total
+      FROM generate_series(
+             (now() - ($1 || ' days')::interval)::date, now()::date, interval '1 day'
+           ) AS d(day)
+      LEFT JOIN (
+        SELECT date_trunc('day', created_at)::date AS day,
+               COUNT(*) FILTER (WHERE event_type = 'created')   AS created,
+               COUNT(*) FILTER (WHERE event_type = 'activated') AS activated,
+               COUNT(*) AS total
+        FROM node_events
+        WHERE created_at > now() - ($1 || ' days')::interval
+        GROUP BY 1
+      ) c ON c.day = d.day
+      ORDER BY d.day
+    `, [String(days)]);
+    res.json({ days, series: q.rows });
+  } catch (err) {
+    console.error('Growth stats error:', err);
+    res.status(500).json({ error: 'Failed to load growth' });
+  }
+});
+
+// ── GET /api/knowledge/agents/overview ─────────────────────
+// Per-agent learning footprint — how much each agent knows and how active it is.
+router.get('/agents/overview', requireAuth, async (req, res) => {
+  try {
+    const q = await query(`
+      SELECT owner_agent AS agent_id,
+             COUNT(*)::int                       AS node_count,
+             COALESCE(SUM(activation_count), 0)::int AS activations,
+             ROUND(AVG(importance)::numeric, 1)  AS avg_importance,
+             MAX(last_activated_at)              AS last_active
+      FROM entities
+      WHERE status = 'active' AND owner_agent IS NOT NULL
+      GROUP BY owner_agent
+      ORDER BY node_count DESC
+      LIMIT 20
+    `);
+    // Top concept per agent (best-effort, one extra query per agent is fine at ≤20).
+    const agents = [];
+    for (const row of q.rows) {
+      const topQ = await query(`
+        SELECT canonical_name FROM entities
+        WHERE owner_agent = $1 AND status = 'active'
+        ORDER BY activation_count DESC, importance DESC LIMIT 3
+      `, [row.agent_id]);
+      agents.push({ ...row, topConcepts: topQ.rows.map(r => r.canonical_name) });
+    }
+    const totalNodes = agents.reduce((s, a) => s + a.node_count, 0) || 1;
+    agents.forEach(a => { a.share = Math.round((a.node_count / totalNodes) * 100); });
+    res.json({ agents, totalNodes });
+  } catch (err) {
+    console.error('Agents overview error:', err);
+    res.status(500).json({ error: 'Failed to load agents overview' });
+  }
+});
+
+// ── GET /api/knowledge/inference/stats?days=7 ──────────────
+// Tokens, latency and per-feature breakdown — the honest inference/cost panel.
+router.get('/inference/stats', requireAuth, async (req, res) => {
+  try {
+    const days = Math.max(1, Math.min(90, parseInt(req.query.days) || 7));
+    const [totals, byFeature, byProvider] = await Promise.all([
+      query(`
+        SELECT COUNT(*)::int AS calls,
+               COALESCE(SUM(prompt_tokens), 0)::bigint     AS prompt_tokens,
+               COALESCE(SUM(completion_tokens), 0)::bigint AS completion_tokens,
+               COALESCE(ROUND(AVG(latency_ms)), 0)::int    AS avg_latency_ms,
+               COALESCE(percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0)::int AS p95_latency_ms
+        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
+      `, [String(days)]),
+      query(`
+        SELECT feature, COUNT(*)::int AS calls,
+               COALESCE(SUM(prompt_tokens + completion_tokens), 0)::bigint AS tokens
+        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
+        GROUP BY feature ORDER BY tokens DESC
+      `, [String(days)]),
+      query(`
+        SELECT provider, COUNT(*)::int AS calls
+        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
+        GROUP BY provider ORDER BY calls DESC
+      `, [String(days)])
+    ]);
+    res.json({
+      days,
+      totals: totals.rows[0],
+      byFeature: byFeature.rows,
+      byProvider: byProvider.rows
+    });
+  } catch (err) {
+    console.error('Inference stats error:', err);
+    res.status(500).json({ error: 'Failed to load inference stats' });
+  }
+});
+
+// ── GET /api/knowledge/patterns ────────────────────────────
+// "What the system thinks you care about" — strongest user-scoped preferences.
+router.get('/patterns', requireAuth, async (req, res) => {
+  try {
+    const q = await query(`
+      SELECT f.canonical_name AS from_name, t.canonical_name AS to_name,
+             t.entity_type AS to_type, e.strength, e.weight, e.reason
+      FROM entity_edges e
+      JOIN entities f ON f.entity_id = e.from_entity_id
+      JOIN entities t ON t.entity_id = e.to_entity_id
+      WHERE e.edge_type = 'prefers' AND e.user_id = $1
+        AND f.status = 'active' AND t.status = 'active'
+      ORDER BY e.strength DESC, e.weight DESC
+      LIMIT 15
+    `, [req.user.id]);
+    res.json({ patterns: q.rows });
+  } catch (err) {
+    console.error('Patterns error:', err);
+    res.status(500).json({ error: 'Failed to load patterns' });
   }
 });
 

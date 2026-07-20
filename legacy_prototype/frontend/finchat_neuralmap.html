@@ -81,6 +81,13 @@
   .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
   .toast.show { opacity:1; transform:translateY(0); }
 </style>
+<script>
+/* file:// fallback — when this page is opened directly from disk (file://),
+   root-relative "/api/…" fetches would resolve to file:///api/… and fail.
+   Route them to the local backend instead. No-op when served over http. */
+(function(){ if(location.protocol==='file:'){ var _f=window.fetch.bind(window);
+  window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
+</script>
 </head>
 
 <body class="h-screen overflow-hidden flex">
@@ -205,6 +212,9 @@
     </button>
     <button id="heatmapBtn" title="Knowledge heatmap — colour concepts by how recently the AI used them" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
       <span class="material-symbols-outlined text-[16px]">local_fire_department</span>
+    </button>
+    <button id="neighborhoodsBtn" title="Neighborhoods — colour concepts by the community they belong to" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+      <span class="material-symbols-outlined text-[16px]">workspaces</span>
     </button>
     <button id="insightsBtn" title="Insights — knowledge gaps &amp; contradictions the AI found" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0 relative">
       <span class="material-symbols-outlined text-[16px]">emoji_objects</span>
@@ -447,6 +457,15 @@ function renderLegend() {
     ).join('');
     return;
   }
+  // Neighborhoods mode: the legend becomes the list of named territories.
+  if (neighborhoodMode) {
+    document.getElementById('legend').innerHTML = communities.length
+      ? communities.slice(0, 8).map(c =>
+          `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)" title="${(c.summary || '').replace(/"/g, '&quot;')}"><span class="w-2.5 h-2.5 rounded-full" style="background:${c.color}"></span>${c.label} × ${c.size}</span>`
+        ).join('')
+      : `<span style="color: var(--sub)">No neighborhoods yet — run a Dream to cluster.</span>`;
+    return;
+  }
   const counts = {};
   for (const n of nodes) counts[n.type] = (counts[n.type] || 0) + 1;
   const present = Object.entries(TYPE_LABEL).filter(([k]) => counts[k]);
@@ -471,6 +490,13 @@ let searchQuery = '';
 
 // Sprint X · Cognitive Memory Engine view state
 let heatmapMode = false;
+let neighborhoodMode = false;
+let communities = [];   // [{id,label,summary,color,size}] from the last load
+// Colour a concept by its neighborhood; structure/unclustered nodes stay neutral.
+function neighColor(n) {
+  const c = n.living && n.living.community;
+  return c ? c.color : 'rgba(120,130,145,0.4)';
+}
 const pulseAt = new Map();   // node key → ms when its activation pulse started (animation clock)
 const pulseSeen = new Map(); // node key → newest server activation ts we've already pulsed for
 const flowAt = new Map();    // edge key → ms when its retrieval-path glow started
@@ -531,6 +557,7 @@ async function loadGraph() {
       vx: 0, vy: 0
     }));
     edges = data.edges.slice();
+    communities = data.communities || [];
     selection.clear(); syncSelBanner(); closePanels();
     centered = false; view.scale = 1;
 
@@ -866,7 +893,9 @@ function draw() {
     const dim = dimmed(n);
     const match = q && n.label.toLowerCase().includes(q);
     const picked = selection.has(n.key);
-    const col = heatmapMode ? heatColor(n) : (n.color || T.cat[n.type] || T.accent);
+    const col = heatmapMode ? heatColor(n)
+      : neighborhoodMode ? neighColor(n)
+      : (n.color || T.cat[n.type] || T.accent);
     ctx.globalAlpha = dim ? 0.2 : 1;
 
     // Cognitive Memory Engine: activation pulse — a fading, expanding ring on
@@ -1654,11 +1683,26 @@ document.getElementById('resetViewBtn').onclick = () => {
 // ══════════════════════════════════════════════════════════
 document.getElementById('heatmapBtn').onclick = () => {
   heatmapMode = !heatmapMode;
+  if (heatmapMode && neighborhoodMode) { neighborhoodMode = false; document.getElementById('neighborhoodsBtn').style.background = ''; }
   document.getElementById('heatmapBtn').style.background = heatmapMode ? 'var(--accent)' : '';
   renderLegend();
   showToast(heatmapMode
     ? 'Knowledge heatmap: red = used today, orange = this week, green = sometimes, gray = forgotten.'
     : 'Back to type colours.');
+};
+
+document.getElementById('neighborhoodsBtn').onclick = () => {
+  neighborhoodMode = !neighborhoodMode;
+  if (neighborhoodMode && heatmapMode) { heatmapMode = false; document.getElementById('heatmapBtn').style.background = ''; }
+  document.getElementById('neighborhoodsBtn').style.background = neighborhoodMode ? 'var(--accent)' : '';
+  renderLegend();
+  if (neighborhoodMode) {
+    showToast(communities.length
+      ? `${communities.length} neighborhoods: ${communities.slice(0, 4).map(c => c.label).join(', ')}${communities.length > 4 ? '…' : ''}`
+      : 'No neighborhoods yet — run a Dream to cluster the graph.');
+  } else {
+    showToast('Back to type colours.');
+  }
 };
 
 // Live thinking: poll for freshly activated nodes and pulse them on the canvas.
@@ -1866,7 +1910,7 @@ loop();
 
 // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
 (function () {
-  const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+  const SOON = ['Governance', 'Support'];
   document.querySelectorAll('#sideNav a').forEach(a => {
     // label = only the text nodes, so the material-symbols ligature is ignored
     const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();

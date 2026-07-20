@@ -7,21 +7,25 @@ This is not a chatbot wrapper. It's a **governed AI operating system**: multi-ag
 
 ---
 
-## What's shipped (Stage 1–3 verified ✅)
+## What's shipped (Stages 1–4 verified ✅)
 
 | Feature | Status | Notes |
 |---|---|---|
 | **Cognitive Memory Engine** | ✅ Live | 18/18 automated tests; first dream cycle merged 14 duplicates |
 | **4 AI agents** (Plato, Aurelius, Rasha, Nova) | ✅ Live | Specialized domains, real system prompts, avatars |
-| **Neural Map visualization** | ✅ Live | Shows thinking in real-time, heatmap mode, activation pulses |
+| **Neural Map visualization** | ✅ Live | Real-time thinking, heatmap mode, **neighborhoods mode**, activation pulses |
+| **Community detection** | ✅ Live | Label propagation clusters the graph into named neighborhoods (LLM-named) |
+| **Nightly dream digest** | ✅ Live | "While you were away: learned N, merged K, found G gaps" → your channels |
 | **Blockchain proof chain** | ✅ Live | SHA-256 hash chaining, IPFS archival, Solana anchoring |
 | **Token economy** | ✅ Live | Per-user & per-agent budgets, real cost tracking |
 | **Real-time chat** | ✅ Live | Socket.io, typing indicators, group chat, read receipts |
 | **Fraud detection** | ✅ Live | Policy scanning, account freeze, auditor quarantine |
 | **Missions scheduler** | ✅ Live | BullMQ + Redis, per-mission budgets, autonomous agents |
 | **Notifications** | ✅ Live | Email (Gmail SMTP), Telegram (@Platotelebot), Web Push |
-| **Knowledge Center dashboard** | 🛣️ Roadmap | Sprint Y phase 1 |
-| **Reports module** | 🛣️ Roadmap | Periodic narratives, weekly digests (Sprint Y phase 2) |
+| **Knowledge Center dashboard** | ✅ Live | Four-quadrant memory view (Semantic/Episodic/Procedural/RAG) |
+| **Reports module** | ✅ Live | Periodic narratives (growth, agent learning, dream digest, gaps, profile) |
+| **Cluster summarization in dreams** | 🛣️ Roadmap | AI writes a paragraph per neighborhood (Stage 2 of the memory sprint) |
+| **Embedding-based dedup** | 🛣️ Roadmap | Merge "LLM" ≈ "large language model" by vector similarity (Stage 3) |
 
 ---
 
@@ -64,8 +68,9 @@ This is not a chatbot wrapper. It's a **governed AI operating system**: multi-ag
    - Isolated sandboxes with token budgets
    - Health checks + auto-restart on crash
 
-3. **Data Layer** — PostgreSQL (20 migrations)
+3. **Data Layer** — PostgreSQL (21 migrations)
    - `entities` & `entity_edges` (the living knowledge graph)
+   - `graph_communities` (named neighborhoods from community detection)
    - `node_events` (append-only timeline per concept)
    - `messages` & `proof_chain` (chat + cryptographic audit trail)
    - `user_tokens` & `token_ledger` (spend history)
@@ -249,7 +254,10 @@ FinChat's AI doesn't just chat — it **learns and remembers**. Every message up
 - Timeline per node: shows every chat, mention, activation, merge
 
 **The dream cycle:**
-Every 6 hours, the system consolidates: merges duplicates, decays unused links (dim them, never delete), reinforces recent ones, hunts for gaps. **The first real run merged 14 duplicate nodes** that months of chats had accumulated.
+Every 6 hours, the system consolidates: merges duplicates, decays unused links (dim them, never delete), reinforces recent ones, hunts for gaps, and **re-clusters the graph into named neighborhoods** (label propagation, e.g. *"DeFi"*, *"LLM Tooling"*, *"Precious Metals"*). **The first real run merged 14 duplicate nodes** that months of chats had accumulated; a live run clustered 86 of 95 concepts into 10 neighborhoods.
+
+**The nightly digest:**
+Once a day, after consolidating, the system tells each active user what changed — *"While you were away, I learned 12 new concepts, formed 5 links, merged 3 duplicates and found 2 knowledge gaps."* — delivered to their in-app bell and every channel they enabled (email, Telegram, Web Push), plus a snapshot on the Reports page. On the Neural Map, the **Neighborhoods** toggle (workspaces icon) colors every concept by its territory and turns the legend into the list of named clusters.
 
 **Verified:**
 - `scripts/test_cognitive_memory_engine.js` — **18/18 checks passed** (extraction, dedup, retrieval, activation, merge, decay, gaps)
@@ -317,10 +325,11 @@ Every AI action is constrained:
 
 ### 📊 What's in the database
 
-PostgreSQL (Supabase or local), 20 migrations:
+PostgreSQL (Supabase or local), 21 migrations:
 
 - **Core**: `users`, `messages`, `channels`, `sessions`
-- **Knowledge**: `entities`, `entity_edges`, `node_events`, `entity_links`, `graph_insights`
+- **Knowledge**: `entities`, `entity_edges`, `node_events`, `entity_links`, `graph_insights`, `graph_communities`
+- **Reports**: `report_snapshots`, `inference_metrics`
 - **Governance**: `fraud_logs`, `user_tokens`, `token_ledger`, `auditor_decisions`
 - **Blockchain**: `proof_chain` (hash chains), `solana_anchors` (finalized tx hashes)
 - **Agents**: `agent_registry`, `executions`, `execution_logs`, `missions`, `mission_runs`
@@ -332,16 +341,16 @@ Every table is immutable by design — history is the feature.
 
 ### 🛣️ Roadmap (sprints X & Y)
 
-**Sprint X Stage 4** (in progress):
-- Community detection on the graph (clusters → neighborhoods)
-- Embedding-based (not just name) duplicate detection
-- Nightly dream digests pushed to Telegram/email
+**Sprint X Stage 4** (shipped ✅):
+- ✅ Nightly dream digests pushed to the bell + Telegram/email/Web Push
+- ✅ Community detection on the graph (clusters → LLM-named neighborhoods, surfaced on the Neural Map)
+- 🛣️ Cluster summarization during dreams — a paragraph per neighborhood
+- 🛣️ Embedding-based (not just name) duplicate detection
 
-**Sprint Y** (next):
-- **Knowledge Center dashboard** — four-quadrant memory view (Semantic/Episodic/Procedural/RAG)
-- **Reports module** — periodic summaries (weekly growth, agent learning, user patterns), exportable
-- RAG vector store (pgvector) for document retrieval
-- Inference & context-reuse instrumentation
+**Sprint Y** (shipped ✅):
+- ✅ **Knowledge Center dashboard** — four-quadrant memory view (Semantic/Episodic/Procedural/RAG)
+- ✅ **Reports module** — periodic narratives (growth, agent learning, dream digest, gaps, user profile)
+- ✅ Inference & context-reuse instrumentation (`inference_metrics`)
 
 **Vision (in `docs/system_architecture_document.md`)**:
 - FastAPI microservices (Python/async focus)
@@ -511,8 +520,15 @@ GET /api/knowledge/activity
 # Get gaps & contradictions
 GET /api/knowledge/insights
 
-# Run dream cycle
+# Run dream cycle (consolidate + re-cluster neighborhoods)
 POST /api/knowledge/dream
+
+# Run the nightly digest now (consolidate + notify active users)
+POST /api/knowledge/dream/digest
+
+# Named neighborhoods (community detection)
+GET  /api/knowledge/communities
+POST /api/knowledge/communities/detect
 
 # Ingest a document (PDF/Word/text) into an agent's cortex
 POST /api/knowledge/ingest-document

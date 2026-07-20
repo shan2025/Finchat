@@ -254,7 +254,7 @@ router.get('/', requireAuth, async (req, res) => {
                FROM agent_configs ac JOIN agents a ON a.agent_id = ac.agent_id
                ORDER BY ac.agent_id`),
         query(`SELECT entity_id, canonical_name, entity_type, mention_count,
-                      summary, importance, confidence, activation_count, last_activated_at, owner_agent
+                      summary, importance, confidence, activation_count, last_activated_at, owner_agent, community_id
                FROM entities WHERE status = 'active'
                ORDER BY importance DESC, mention_count DESC LIMIT 120`),
         query(`SELECT from_entity_id, to_entity_id, edge_type, weight, strength, reason, source
@@ -278,6 +278,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     const toolsSeen = new Set();
     let ch = {};
+    let communities = [];
 
     if (isSystem) {
     // ── you ────────────────────────────────────────────────
@@ -374,6 +375,13 @@ router.get('/', requireAuth, async (req, res) => {
     pushEdge('user:me', 'sys:proofchain', 'Every message you send is hashed into the chain.', '', 'you → chain');
 
     // ── Sprint 5C knowledge graph ──────────────────────────
+    // Named neighborhoods (Stage 4b) — color/group the living nodes by cluster.
+    const communityQ = await query(`SELECT community_id, label, summary, color, size FROM graph_communities ORDER BY size DESC`);
+    const communityById = new Map(communityQ.rows.map(c => [c.community_id, c]));
+    communities = communityQ.rows.map(c => ({
+      id: c.community_id, label: c.label, summary: c.summary || '', color: c.color, size: c.size
+    }));
+
     const entKeys = new Set();
     for (const e of entsQ.rows) {
       const k = `entity:${e.entity_id}`;
@@ -383,6 +391,8 @@ router.get('/', requireAuth, async (req, res) => {
         ['Confidence', `${Math.round(e.confidence * 100)}%`]];
       if (e.activation_count > 0) meta.push(['Activations', String(e.activation_count)]);
       if (e.owner_agent) meta.push(['Agent', e.owner_agent]);
+      const community = e.community_id ? communityById.get(e.community_id) : null;
+      if (community) meta.push(['Neighborhood', community.label]);
       nodes.push({
         key: k,
         label: e.canonical_name,
@@ -397,7 +407,8 @@ router.get('/', requireAuth, async (req, res) => {
           importance: e.importance,
           confidence: e.confidence,
           activationCount: e.activation_count,
-          lastActivatedAt: e.last_activated_at
+          lastActivatedAt: e.last_activated_at,
+          community: community ? { id: community.community_id, label: community.label, color: community.color } : null
         }
       });
     }
@@ -468,6 +479,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json({
       nodes: visible,
       edges: liveEdges,
+      communities,
       map: { mapId, name: map.name, kind: map.kind, builtIn: isSystem },
       stats: {
         agents: isSystem ? agentsQ.rows.length : 0,

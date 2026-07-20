@@ -768,7 +768,7 @@ loadNetwork().then(() => { resize(); loop(); });
 
 // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
 (function () {
-  const SOON = ['Reports', 'Knowledge', 'Governance', 'Blockchain', 'Settings', 'Support'];
+  const SOON = ['Governance', 'Support'];
   document.querySelectorAll('#sideNav a').forEach(a => {
     const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
     if (!SOON.includes(label)) return;

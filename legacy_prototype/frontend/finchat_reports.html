@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Reports</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>tailwind.config = {darkMode:"class", theme:{extend:{colors:{"primary-brown":"#3a2e23","cream-bg":"#efe8de"}}}};</script>
+<style>
+  :root { --bg:#f7f4ed; --card:#fffdf8; --border:#e2d9c9; --txt:#3a2e23; --sub:#8c7a6b; --accent:#c67139; --accent-soft:#e9d6c2; --muted:#b3a693; }
+  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--txt); }
+  ::-webkit-scrollbar { width:7px; height:7px; } ::-webkit-scrollbar-thumb { background:var(--muted); border-radius:6px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:18px; }
+  .kbtn { background:var(--accent); color:#fff; border:none; border-radius:999px; font-weight:700; cursor:pointer; transition:filter .12s; }
+  .kbtn:hover { filter:brightness(1.07); } .kbtn:disabled{opacity:.55;cursor:default;}
+  .kbtn.ghost { background:var(--card); color:var(--txt); border:1px solid var(--border); }
+  .kind-tab { border:1px solid var(--border); background:var(--card); color:var(--sub); border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+  .kind-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .skel { background:linear-gradient(90deg,var(--accent-soft) 25%,#f3ead8 50%,var(--accent-soft) 75%); background-size:200% 100%; animation:sh 1.3s infinite; border-radius:8px; }
+  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:.3s; transform:translateY(20px); z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.2); }
+  .toast.show { opacity:1; transform:translateY(0); }
+  @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+</style>
+</head>
+<body class="min-h-screen flex">
+
+<nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
+
+<main class="flex-1 md:ml-64 min-h-screen">
+  <div class="max-w-[1000px] mx-auto px-5 md:px-8 py-8">
+
+    <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+      <div>
+        <div class="flex items-center gap-2 text-[13px] font-semibold" style="color:var(--sub)">
+          <span class="material-symbols-outlined" style="font-size:18px">assessment</span> Reports
+        </div>
+        <h1 class="text-3xl font-extrabold mt-1" style="letter-spacing:-.02em">Memory reports</h1>
+        <p class="text-sm mt-1" style="color:var(--sub)">Periodic, shareable narratives generated over the live memory vitals.</p>
+      </div>
+    </div>
+
+    <!-- Generate row -->
+    <div class="card p-5 mb-6">
+      <div class="font-bold text-sm mb-3 flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">auto_awesome</span> Generate a report</div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div id="kindPicker" class="flex flex-wrap gap-2"></div>
+        <select id="daysSel" class="rounded-full text-sm px-3 py-1.5" style="border:1px solid var(--border);background:var(--card)">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+        <button id="genBtn" class="kbtn px-5 py-2 text-sm flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:18px">bolt</span> Generate</button>
+      </div>
+    </div>
+
+    <div class="mb-2 font-bold text-sm flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">history</span> Recent reports</div>
+    <div id="list" class="flex flex-col gap-3"><div class="skel" style="height:80px"></div></div>
+
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';
+function token(){ try{const s=JSON.parse(sessionStorage.getItem('finchat_user'));if(s&&s.token)return s.token;}catch(e){} return localStorage.getItem('finchat_jwt')||''; }
+async function api(path){ const r=await fetch(API+path,{headers:token()?{'Authorization':'Bearer '+token()}:{}}); if(!r.ok) throw new Error(path+' '+r.status); return r.json(); }
+async function post(path,body){ const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token()?{'Authorization':'Bearer '+token()}:{})},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(path+' '+r.status); return r.json(); }
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function when(d){ try{return new Date(d).toLocaleString();}catch(e){return '';} }
+
+const KIND_ICON={growth:'trending_up',agent_learning:'smart_toy',dream_digest:'bedtime',gaps:'emergency_home',user_profile:'favorite'};
+let KINDS=[]; let selectedKind='growth';
+
+function renderKindPicker(){
+  document.getElementById('kindPicker').innerHTML = KINDS.map(k=>
+    `<button class="kind-tab ${k.kind===selectedKind?'active':''}" data-k="${k.kind}">
+      <span class="material-symbols-outlined align-middle" style="font-size:15px">${KIND_ICON[k.kind]||'description'}</span> ${esc(k.title)}</button>`).join('');
+  document.querySelectorAll('.kind-tab').forEach(b=>b.addEventListener('click',()=>{ selectedKind=b.dataset.k; renderKindPicker(); }));
+}
+
+function reportCard(r){
+  return `<div class="card p-5">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="font-bold flex items-center gap-2">
+        <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">${KIND_ICON[r.kind]||'description'}</span> ${esc(r.title||r.kind)}</div>
+      <div class="text-xs" style="color:var(--sub)">${when(r.created_at)}</div>
+    </div>
+    <p class="text-sm mt-3" style="color:var(--txt);line-height:1.6">${esc(r.summary||'')}</p>
+    <div class="text-[11px] mt-3" style="color:var(--sub)">${r.period_start?('Period: '+when(r.period_start)+' → '+when(r.period_end)):''}</div>
+  </div>`;
+}
+
+async function loadList(){
+  try{
+    const d=await api('/api/reports');
+    const rs=d.reports||[];
+    document.getElementById('list').innerHTML = rs.length ? rs.map(reportCard).join('')
+      : `<div class="card p-6 text-sm text-center" style="color:var(--sub)">No reports yet — generate your first one above.</div>`;
+  }catch(e){ document.getElementById('list').innerHTML=`<div class="card p-6 text-sm text-center" style="color:var(--sub)">Reports unavailable (run migration 020 &amp; restart the server).</div>`; }
+}
+
+document.getElementById('genBtn').addEventListener('click', async ()=>{
+  const b=document.getElementById('genBtn'); b.disabled=true;
+  const days=parseInt(document.getElementById('daysSel').value)||7;
+  try{ await post('/api/reports/generate',{kind:selectedKind,days}); toast('Report generated'); await loadList(); }
+  catch(e){ toast('Generation failed'); }
+  b.disabled=false;
+});
+
+(async ()=>{
+  try{ const k=await api('/api/reports/kinds'); KINDS=k.kinds||[]; if(KINDS.length) selectedKind=KINDS[0].kind; }
+  catch(e){ KINDS=[{kind:'growth',title:'Memory Growth'}]; }
+  renderKindPicker(); loadList();
+})();
+</script>
+<script src="sidebar_nav.js"></script>
+</body>
+</html>

@@ -519,6 +519,16 @@ async function dream({ userId = null } = {}) {
 
   const gaps = await detectGaps({ userId });
 
+  // Re-cluster the consolidated graph into named neighborhoods (Stage 4b).
+  let communities = [];
+  try {
+    const { detectCommunities } = require('./Communities');
+    const cr = await detectCommunities({});
+    communities = cr.communities;
+  } catch (err) {
+    console.warn(`⚠️ MemoryEngine.dream community detection failed: ${err.message}`);
+  }
+
   const report = {
     startedAt,
     finishedAt: new Date().toISOString(),
@@ -527,7 +537,9 @@ async function dream({ userId = null } = {}) {
     edgesDecayed: decayed.rowCount,
     edgesStrengthened: strengthened.rowCount,
     gapsFound: gaps.length,
-    gaps: gaps.map(g => g.concept)
+    gaps: gaps.map(g => g.concept),
+    communities: communities.length,
+    communityLabels: communities.map(c => c.label)
   };
 
   try {

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Knowledge Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>tailwind.config = {darkMode:"class", theme:{extend:{colors:{"primary-brown":"#3a2e23","cream-bg":"#efe8de"}}}};</script>
+<style>
+  :root {
+    --bg:#f7f4ed; --card:#fffdf8; --border:#e2d9c9; --txt:#3a2e23; --sub:#8c7a6b;
+    --accent:#c67139; --accent-soft:#e9d6c2; --good:#4f8a52; --warn:#c99a3a; --muted:#b3a693;
+  }
+  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--txt); }
+  ::-webkit-scrollbar { width:7px; height:7px; }
+  ::-webkit-scrollbar-thumb { background:var(--muted); border-radius:6px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:18px; }
+  .chip { font-size:10px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; padding:3px 9px; border-radius:999px; }
+  .chip-live { background:rgba(79,138,82,.14); color:var(--good); }
+  .chip-instrumented { background:rgba(201,154,58,.16); color:var(--warn); }
+  .chip-roadmap { background:rgba(140,122,107,.14); color:var(--sub); }
+  .stat-num { font-weight:800; letter-spacing:-.02em; }
+  .kbtn { background:var(--accent); color:#fff; border:none; border-radius:999px; font-weight:700; cursor:pointer; transition:filter .12s; }
+  .kbtn:hover { filter:brightness(1.07); }
+  .kbtn.ghost { background:var(--card); color:var(--txt); border:1px solid var(--border); }
+  .skel { background:linear-gradient(90deg,var(--accent-soft) 25%,#f3ead8 50%,var(--accent-soft) 75%); background-size:200% 100%; animation:sh 1.3s infinite; border-radius:8px; }
+  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:.3s; transform:translateY(20px); z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.2); }
+  .toast.show { opacity:1; transform:translateY(0); }
+  @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+</style>
+</head>
+<body class="min-h-screen flex">
+
+<nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
+
+<main class="flex-1 md:ml-64 min-h-screen">
+  <div class="max-w-[1200px] mx-auto px-5 md:px-8 py-8">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+      <div>
+        <div class="flex items-center gap-2 text-[13px] font-semibold" style="color:var(--sub)">
+          <span class="material-symbols-outlined" style="font-size:18px">menu_book</span> Knowledge Center
+        </div>
+        <h1 class="text-3xl font-extrabold mt-1" style="letter-spacing:-.02em">What the system knows</h1>
+        <p class="text-sm mt-1" style="color:var(--sub)">Every kind of memory — how much, how healthy, how fast it grew, and who learned what.</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="finchat_neuralmap.html" class="kbtn ghost px-4 py-2 text-sm flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:18px">hub</span> Neural Map
+        </a>
+        <button id="dreamBtn" class="kbtn px-4 py-2 text-sm flex items-center gap-1">
+          <span class="material-symbols-outlined" style="font-size:18px">bedtime</span> Consolidate now
+        </button>
+      </div>
+    </div>
+
+    <!-- Vitals -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" id="vitals"></div>
+
+    <!-- Growth -->
+    <div class="card p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="font-bold text-sm flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">trending_up</span> Memory growth</div>
+        <div class="text-xs" style="color:var(--sub)">last 30 days · learning events</div>
+      </div>
+      <div id="growthChart"><div class="skel" style="height:90px"></div></div>
+    </div>
+
+    <!-- Memory taxonomy -->
+    <div class="mb-2 font-bold text-sm flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">psychology</span> Memory stores</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" id="stores"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Inference -->
+      <div class="card p-5">
+        <div class="font-bold text-sm flex items-center gap-2 mb-1"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">bolt</span> Inference &amp; context reuse</div>
+        <p class="text-xs mb-4" style="color:var(--sub)">Token &amp; latency instrumentation (7d). Honest note: Groq exposes token counts, not KV-cache hits.</p>
+        <div id="inference"><div class="skel" style="height:120px"></div></div>
+      </div>
+      <!-- Agents -->
+      <div class="card p-5">
+        <div class="font-bold text-sm flex items-center gap-2 mb-1"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">smart_toy</span> Agent cortex — who knows what</div>
+        <p class="text-xs mb-4" style="color:var(--sub)">Concepts each agent owns and how active they are.</p>
+        <div id="agents"><div class="skel" style="height:120px"></div></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+      <!-- Insights -->
+      <div class="card p-5">
+        <div class="font-bold text-sm flex items-center gap-2 mb-4"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">emergency_home</span> Health &amp; insights</div>
+        <div id="insights"><div class="skel" style="height:100px"></div></div>
+      </div>
+      <!-- Patterns -->
+      <div class="card p-5">
+        <div class="font-bold text-sm flex items-center gap-2 mb-4"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">favorite</span> Your patterns</div>
+        <div id="patterns"><div class="skel" style="height:100px"></div></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';
+function token(){ try{const s=JSON.parse(sessionStorage.getItem('finchat_user'));if(s&&s.token)return s.token;}catch(e){} return localStorage.getItem('finchat_jwt')||''; }
+async function api(path){ const r=await fetch(API+path,{headers:token()?{'Authorization':'Bearer '+token()}:{}}); if(!r.ok) throw new Error(path+' '+r.status); return r.json(); }
+async function post(path,body){ const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json',...(token()?{'Authorization':'Bearer '+token()}:{})},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(path+' '+r.status); return r.json(); }
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function fmt(n){ n=Number(n||0); if(n>=1e6)return (n/1e6).toFixed(1)+'M'; if(n>=1e3)return (n/1e3).toFixed(1)+'k'; return String(n); }
+
+function vitalCard(label,val,icon,sub){
+  return `<div class="card p-4">
+    <div class="flex items-center gap-2 text-xs font-semibold" style="color:var(--sub)">
+      <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">${icon}</span>${label}</div>
+    <div class="stat-num text-3xl mt-2">${fmt(val)}</div>
+    <div class="text-xs mt-1" style="color:var(--sub)">${sub||''}</div></div>`;
+}
+
+function sparkline(series){
+  if(!series||!series.length) return '<div class="text-xs" style="color:var(--sub)">No activity yet.</div>';
+  const w=1000,h=90,pad=4;
+  const vals=series.map(d=>d.total);
+  const max=Math.max(1,...vals);
+  const step=(w-pad*2)/Math.max(1,series.length-1);
+  const pts=series.map((d,i)=>[pad+i*step, h-pad-(d.total/max)*(h-pad*2)]);
+  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const area=line+` L ${pad+(series.length-1)*step} ${h-pad} L ${pad} ${h-pad} Z`;
+  const totalNew=series.reduce((s,d)=>s+d.created,0);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:90px">
+    <path d="${area}" fill="var(--accent)" opacity="0.10"/>
+    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+  </svg>
+  <div class="text-xs mt-1" style="color:var(--sub)"><b style="color:var(--txt)">${totalNew}</b> concepts learned · peak ${max} events/day</div>`;
+}
+
+function storeCard(s){
+  return `<div class="card p-4 flex flex-col">
+    <div class="flex items-center justify-between">
+      <span class="material-symbols-outlined" style="font-size:22px;color:var(--accent)">${s.icon}</span>
+      <span class="chip chip-${s.status}">${s.status}</span>
+    </div>
+    <div class="stat-num text-2xl mt-3">${fmt(s.primary)} <span class="text-sm font-medium" style="color:var(--sub)">${esc(s.unit)}</span></div>
+    <div class="font-bold text-sm mt-1">${esc(s.label)}</div>
+    <div class="text-xs mt-1 flex-1" style="color:var(--sub)">${esc(s.blurb)}</div>
+    <div class="text-[11px] mt-3 pt-2 flex flex-wrap gap-x-3 gap-y-1" style="color:var(--sub);border-top:1px solid var(--border)">
+      ${Object.entries(s.detail).map(([k,v])=>`<span>${esc(k.replace(/([A-Z])/g,' $1').toLowerCase())}: <b style="color:var(--txt)">${fmt(v)}</b></span>`).join('')}
+    </div></div>`;
+}
+
+function bar(pct,color){ return `<div style="background:var(--accent-soft);border-radius:999px;height:7px;overflow:hidden"><div style="width:${Math.max(3,pct)}%;height:100%;background:${color||'var(--accent)'}"></div></div>`; }
+
+async function loadVitals(){
+  try{
+    const s=await api('/api/knowledge/stats');
+    document.getElementById('vitals').innerHTML =
+      vitalCard('Concepts',s.nodes,'hub','active graph nodes')+
+      vitalCard('Connections',s.edges,'share','reasoned links')+
+      vitalCard('Timeline events',s.events,'timeline','learning history')+
+      vitalCard('Most active',(s.mostActive[0]?s.mostActive[0].activation_count:0),'local_fire_department',esc(s.mostActive[0]?s.mostActive[0].canonical_name:'—'));
+  }catch(e){ document.getElementById('vitals').innerHTML=`<div class="card p-4 text-sm" style="color:var(--sub)">Vitals unavailable.</div>`; }
+}
+async function loadGrowth(){
+  try{ const g=await api('/api/knowledge/stats/growth?days=30'); document.getElementById('growthChart').innerHTML=sparkline(g.series); }
+  catch(e){ document.getElementById('growthChart').innerHTML=`<div class="text-xs" style="color:var(--sub)">Growth unavailable.</div>`; }
+}
+async function loadStores(){
+  try{ const d=await api('/api/knowledge/memory/overview'); document.getElementById('stores').innerHTML=d.stores.map(storeCard).join(''); }
+  catch(e){ document.getElementById('stores').innerHTML=`<div class="card p-4 text-sm" style="color:var(--sub)">Memory overview unavailable.</div>`; }
+}
+async function loadInference(){
+  try{
+    const d=await api('/api/knowledge/inference/stats?days=7'); const t=d.totals||{};
+    const feat=(d.byFeature||[]);
+    const maxTok=Math.max(1,...feat.map(f=>Number(f.tokens)));
+    document.getElementById('inference').innerHTML=
+      `<div class="grid grid-cols-3 gap-3 mb-4">
+        <div><div class="stat-num text-xl">${fmt(t.calls)}</div><div class="text-[11px]" style="color:var(--sub)">calls</div></div>
+        <div><div class="stat-num text-xl">${fmt(Number(t.prompt_tokens)+Number(t.completion_tokens))}</div><div class="text-[11px]" style="color:var(--sub)">tokens</div></div>
+        <div><div class="stat-num text-xl">${fmt(t.avg_latency_ms)}<span class="text-xs">ms</span></div><div class="text-[11px]" style="color:var(--sub)">avg latency</div></div>
+      </div>`+
+      (feat.length? feat.map(f=>`<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>${esc(f.feature)}</span><span style="color:var(--sub)">${fmt(f.tokens)} tok</span></div>${bar(Number(f.tokens)/maxTok*100)}</div>`).join('')
+        : `<div class="text-xs" style="color:var(--sub)">No inference recorded yet — run a chat to populate this.</div>`);
+  }catch(e){ document.getElementById('inference').innerHTML=`<div class="text-xs" style="color:var(--sub)">Inference stats unavailable (run migration 020 &amp; restart).</div>`; }
+}
+async function loadAgents(){
+  try{
+    const d=await api('/api/knowledge/agents/overview'); const a=d.agents||[];
+    if(!a.length){ document.getElementById('agents').innerHTML=`<div class="text-xs" style="color:var(--sub)">No agent-owned concepts yet.</div>`; return; }
+    document.getElementById('agents').innerHTML=a.map(x=>
+      `<div class="mb-3">
+        <div class="flex justify-between text-sm mb-1"><span class="font-semibold capitalize">${esc(x.agent_id)}</span><span style="color:var(--sub)">${fmt(x.node_count)} concepts · ${x.share}%</span></div>
+        ${bar(x.share)}
+        <div class="text-[11px] mt-1" style="color:var(--sub)">${(x.topConcepts||[]).map(esc).join(' · ')||'—'}</div>
+      </div>`).join('');
+  }catch(e){ document.getElementById('agents').innerHTML=`<div class="text-xs" style="color:var(--sub)">Agent overview unavailable.</div>`; }
+}
+async function loadInsights(){
+  try{
+    const d=await api('/api/knowledge/insights?status=open'); const ins=d.insights||[];
+    if(!ins.length){ document.getElementById('insights').innerHTML=`<div class="text-xs" style="color:var(--sub)">No open gaps or contradictions — memory is healthy.</div>`; return; }
+    document.getElementById('insights').innerHTML=ins.slice(0,6).map(i=>
+      `<div class="mb-2 pb-2" style="border-bottom:1px solid var(--border)">
+        <div class="text-sm font-semibold flex items-center gap-1">
+          <span class="chip chip-${i.kind==='gap'?'instrumented':'roadmap'}">${esc(i.kind)}</span> ${esc(i.title)}</div>
+        <div class="text-xs mt-1" style="color:var(--sub)">${esc(i.detail)}</div></div>`).join('');
+  }catch(e){ document.getElementById('insights').innerHTML=`<div class="text-xs" style="color:var(--sub)">Insights unavailable.</div>`; }
+}
+async function loadPatterns(){
+  try{
+    const d=await api('/api/knowledge/patterns'); const p=d.patterns||[];
+    if(!p.length){ document.getElementById('patterns').innerHTML=`<div class="text-xs" style="color:var(--sub)">The system hasn't learned your preferences yet — chat more and they'll appear here.</div>`; return; }
+    document.getElementById('patterns').innerHTML=p.map(x=>
+      `<div class="flex items-center gap-2 mb-2">
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">arrow_right</span>
+        <div class="flex-1"><div class="text-sm font-semibold">${esc(x.to_name)} <span class="text-xs font-normal" style="color:var(--sub)">(${esc(x.to_type)})</span></div>
+        <div class="text-[11px]" style="color:var(--sub)">${esc(x.reason||'')}</div></div>
+        <div style="width:60px">${bar((x.strength||0)*100)}</div></div>`).join('');
+  }catch(e){ document.getElementById('patterns').innerHTML=`<div class="text-xs" style="color:var(--sub)">Patterns unavailable.</div>`; }
+}
+
+document.getElementById('dreamBtn').addEventListener('click', async ()=>{
+  const b=document.getElementById('dreamBtn'); b.disabled=true; b.style.opacity=.6;
+  try{ const r=await post('/api/knowledge/dream'); const rp=r.report||{};
+    toast(`Consolidated: ${rp.merged||0} merged, ${rp.edgesDecayed||0} faded, ${rp.gapsFound||0} gaps`);
+    loadInsights(); loadVitals();
+  }catch(e){ toast('Consolidation failed'); }
+  b.disabled=false; b.style.opacity=1;
+});
+
+loadVitals(); loadGrowth(); loadStores(); loadInference(); loadAgents(); loadInsights(); loadPatterns();
+</script>
+<script src="sidebar_nav.js"></script>
+</body>
+</html>

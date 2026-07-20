@@ -4,6 +4,10 @@
 // the live conversation); every OTHER page includes this file and gets its
 // #sideNav rebuilt in place. Shared-JS pattern: survives design-tool regens —
 // if a regen wipes the include, re-add <script src="sidebar_nav.js"></script>.
+// file:// fallback — route root-relative "/api/…" fetches to the local backend
+// when a page is opened directly from disk. Global + idempotent; no-op over http.
+(function(){ if(location.protocol==='file:'&&!window.__apiFileFix){ window.__apiFileFix=true; var _f=window.fetch.bind(window);
+  window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
 (function () {
   var API = (typeof window.API_URL === 'string' && window.API_URL)
     ? window.API_URL
@@ -29,6 +33,8 @@
     ['finchat_groupchat', 'groupchat'],
     ['finchat_neuralmap', 'neuralmap'],
     ['finchat_neuralnetwork', 'neuralmap'], // Model Lab lives under Neural Map
+    ['finchat_knowledge', 'knowledge'],
+    ['finchat_reports', 'reports'],
     ['finchat_blockchain', 'blockchain'],
     ['finchat_settings', 'settings'],
     ['finchat_audit', 'audit'],
@@ -164,8 +170,8 @@
           navItem('chat', 'finchat_chat.html', 'chat', 'Chat') +
           navItem('groupchat', 'finchat_groupchat.html', 'forum', 'Group Chat') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
-          soonItem('assessment', 'Reports') +
-          soonItem('menu_book', 'Knowledge') +
+          navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
+          navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +
           soonItem('account_balance', 'Governance') +
           navItem('blockchain', 'finchat_blockchain.html', 'account_tree', 'Blockchain') +
           navItem('audit', 'finchat_audit.html', 'policy', 'Audit Logs') +
