@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY backend/package.json backend/package-lock.json ./
-RUN npm ci --production
+RUN npm ci --legacy-peer-deps --production
 
 # ── Runtime stage ──
 FROM node:20-alpine
