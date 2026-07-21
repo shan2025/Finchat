@@ -41,7 +41,7 @@
     const TYPE_LINKS = {
       approval: 'finchat_dashboard.html',   // approval gate lives on Operations
       debate: 'finchat_dashboard.html',
-      briefing: 'finchat_inbox.html',
+      briefing: 'finchat_chat.html',
       fraud: 'finchat_audit.html',
       mission: 'finchat_agents.html',
       group_chat: 'finchat_groupchat.html',

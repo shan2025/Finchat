@@ -226,6 +226,8 @@ router.post('/send', requireAuth, async (req, res) => {
       },
       // Sprint X Stage 2 — explainability: what the AI recalled to answer
       memoryTrace: result.memoryTrace || null,
+      // Claude-style citations: the web/data sources consulted for this answer
+      sources: Array.isArray(result.sources) ? result.sources : [],
       fraud: fraudAlert,
       proof: {
         user: {

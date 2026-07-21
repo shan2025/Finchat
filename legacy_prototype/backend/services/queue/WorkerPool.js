@@ -185,7 +185,15 @@ async function processMorningBriefing(job) {
     const result = await route({
       goal: BRIEFING_GOAL,
       userId,
-      targetAgentId: 'plato' // Force Plato to orchestrate
+      targetAgentId: 'plato', // Force Plato to orchestrate
+      // The briefing goal requires 4+ tool calls across 3 domains (crypto,
+      // stocks, search, paper) plus planning/synthesis reasoning turns — the
+      // CognitiveCore default budget (60s / 5 tool calls / 8 iterations) is
+      // sized for a single interactive chat turn and was reliably tripping
+      // "Budget exceeded during plan execution" before the plan finished.
+      // This runs as a background job with no one waiting on a spinner, so a
+      // larger budget is safe here without loosening the interactive default.
+      budget: { maxRuntimeSeconds: 180, maxToolCalls: 10, maxIterations: 12, maxTokens: 8000 }
     });
 
     const durationMs = Date.now() - start;
@@ -193,27 +201,34 @@ async function processMorningBriefing(job) {
 
     console.log(`🌅 [MorningBriefing] Completed in ${durationMs}ms (${briefingText.length} chars)`);
 
-    // Store briefing as a message from Plato to the user
+    // Store briefing as a Plato turn in ai_conversations — this is the table
+    // the Chat page actually reads (via /api/ai-chat/sessions + /history), not
+    // the channel-based `messages` table. A prior version wrote to `messages`
+    // with a `receiver_id` column that table doesn't have, so every briefing
+    // insert silently failed and the bell notification always linked to a page
+    // with nothing to show.
+    const briefingSessionId = `briefing_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     try {
-      const msgId = `msg_briefing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       await dbQuery(`
-        INSERT INTO messages (message_id, sender_id, receiver_id, content, message_type, created_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
-      `, [msgId, 'plato', userId, briefingText, 'briefing']);
+        INSERT INTO ai_conversations (conversation_id, session_id, user_id, persona, role, content)
+        VALUES ($1, $2, $3, $4, 'assistant', $5)
+      `, [`conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`, briefingSessionId, userId, 'plato', briefingText]);
     } catch (msgErr) {
       console.warn(`⚠️ [MorningBriefing] Failed to store briefing message: ${msgErr.message}`);
     }
 
     // Store notification so it shows on the notification bell (live via notification:new)
     // Full report as content: the bell preview truncates it for display, while
-    // external channels (Telegram/email) deliver the whole briefing.
+    // external channels (Telegram/email) deliver the whole briefing. Link deep-
+    // links straight into the session created above so the briefing is visible
+    // immediately instead of landing on Plato's default empty chat.
     const { createNotification } = require('../notifications');
     await createNotification({
       userId,
       type: 'briefing',
       title: '🌅 Morning Executive Briefing',
       content: briefingText,
-      link: 'finchat_inbox.html'
+      link: `finchat_chat.html?session=${briefingSessionId}`
     });
 
     eventBus.emit('briefing:completed', {

@@ -10,6 +10,50 @@ const { createExecution, updateState, completeExecution, failExecution, checkBud
 const { STATES, WAIT_REASONS } = require('./StateMachine');
 const { query } = require('../../database');
 
+// Community sources whose facts must be treated as unverified opinion.
+const UNVERIFIED_TOOLS = new Set(['reddit', 'quora']);
+
+/**
+ * Walk the accumulated tool results and pull out the citable sources (title + url)
+ * the agent actually consulted, so the chat UI can show "where this came from"
+ * like Claude's citations. Deduped by URL, capped, community sources flagged.
+ *
+ * @param {Array<{tool, input, result}>} toolResults
+ * @returns {Array<{tool, title, url, verified}>}
+ */
+function extractSources(toolResults = []) {
+  const out = [];
+  const seen = new Set();
+  const push = (tool, title, url, verified) => {
+    if (!url || typeof url !== 'string' || !/^https?:\/\//.test(url)) return;
+    if (seen.has(url)) return;
+    seen.add(url);
+    out.push({ tool, title: String(title || url).slice(0, 200), url, verified });
+  };
+
+  for (const tr of toolResults) {
+    const r = tr && tr.result;
+    if (!r || typeof r !== 'object' || r.error) continue;
+    const verified = !UNVERIFIED_TOOLS.has(tr.tool) && r.verified !== false;
+
+    // Single-page tools (fetch) and Wikipedia's top article.
+    if (r.url && (r.title || r.text)) push(tr.tool, r.title, r.url, verified);
+    if (r.topArticle && r.topArticle.url) push(tr.tool, r.topArticle.title, r.topArticle.url, verified);
+
+    // List-shaped results across search/news/reddit/quora/wikipedia/paper/crawl/jobs.
+    const lists = [r.results, r.papers, r.pages].filter(Array.isArray);
+    for (const list of lists) {
+      for (const item of list) {
+        if (!item || typeof item !== 'object') continue;
+        const url = item.url || item.pdfUrl || item.link;
+        const title = item.title || item.question || item.name || item.snippet;
+        push(tr.tool, title, url, verified);
+      }
+    }
+  }
+  return out.slice(0, 10);
+}
+
 /**
  * Log a cognitive phase (thinking, planning, using_tool, reflecting) to execution_logs.
  */
@@ -438,6 +482,8 @@ async function run({
       provider: lastProvider,
       model: lastModel,
       responseReadyAt,
+      // Claude-style citations: the web/data sources the agent actually consulted.
+      sources: extractSources(accumulatedToolResults),
       memoryTrace: {
         concepts: [...traceConcepts.values()],
         memories: traceMemories,

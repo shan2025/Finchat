@@ -243,6 +243,60 @@ const TOOLS = {
     rateLimitPerMinute: 6
   },
 
+  wikipedia: {
+    name: 'wikipedia',
+    web: true,
+    description: 'Look up authoritative, citation-backed encyclopedic facts on Wikipedia (people, companies, technologies, events, definitions). Because it is sourced, use this as your GROUND TRUTH to verify claims found on Reddit/Quora before reporting them. Input: {"query":"..."}',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Topic or entity to look up' } },
+      required: ['query']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: { topArticle: { type: 'object' }, results: { type: 'array' } }
+    },
+    cacheTTLSeconds: 3600, // encyclopedic facts change slowly
+    rateLimitPerMinute: 15
+  },
+
+  reddit: {
+    name: 'reddit',
+    web: true,
+    description: 'Search Reddit for real community discussion, sentiment, and first-hand experiences on any topic. Results are UNVERIFIED opinion — you MUST cross-check any factual claim with the wikipedia, news, or search tool before reporting it. Input: {"query":"...","subreddit":"optional"}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to search Reddit for' },
+        subreddit: { type: 'string', description: 'Optional subreddit to restrict to, e.g. "wallstreetbets"' }
+      },
+      required: ['query']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: { results: { type: 'array' }, crossCheckAdvice: { type: 'string' } }
+    },
+    cacheTTLSeconds: 300,
+    rateLimitPerMinute: 10
+  },
+
+  quora: {
+    name: 'quora',
+    web: true,
+    description: 'Find relevant Quora question threads and perspectives on a topic. Answers are anonymous opinion of varying quality — UNVERIFIED. Use for angles/viewpoints only and cross-check every fact with wikipedia/news/search. Use the fetch tool on a result URL to read a full thread. Input: {"query":"..."}',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Question or topic to find on Quora' } },
+      required: ['query']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: { results: { type: 'array' }, crossCheckAdvice: { type: 'string' } }
+    },
+    cacheTTLSeconds: 600,
+    rateLimitPerMinute: 6
+  },
+
   crypto: {
     name: 'crypto',
     description: 'Look up the current price, 24h change, and market cap of a cryptocurrency. Use this when the user asks about crypto prices, DeFi tokens, or digital asset performance.',

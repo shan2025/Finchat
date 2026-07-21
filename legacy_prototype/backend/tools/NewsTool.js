@@ -10,7 +10,13 @@ const FEEDS = [
   { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss', topics: ['crypto'] },
   { name: 'CNBC Markets', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', topics: ['markets', 'finance'] },
   { name: 'CNBC Tech', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910', topics: ['tech', 'ai'] },
-  { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', topics: ['tech', 'ai', 'research'] }
+  { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', topics: ['tech', 'ai', 'research'] },
+  // Bloomberg public RSS is intermittent/partly paywalled — kept because when it
+  // responds it's high-signal; per-feed errors are swallowed below if it 403s.
+  { name: 'Bloomberg Markets', url: 'https://feeds.bloomberg.com/markets/news.rss', topics: ['markets', 'finance'] },
+  { name: 'Bloomberg Technology', url: 'https://feeds.bloomberg.com/technology/news.rss', topics: ['tech', 'ai'] },
+  // Reuters as a reliable markets fallback so a Bloomberg outage never leaves the brief empty.
+  { name: 'Reuters Business', url: 'https://feeds.reuters.com/reuters/businessNews', topics: ['markets', 'finance', 'business'] }
 ];
 
 const MAX_AGE_HOURS = 48;

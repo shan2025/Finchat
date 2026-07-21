@@ -192,7 +192,8 @@ async function runMission(missionId, { manual = false } = {}) {
     });
 
     const durationMs = Date.now() - start;
-    const preview = String(result.cleanResponse || result.response || '').slice(0, 500);
+    const fullReport = String(result.cleanResponse || result.response || '').trim();
+    const preview = fullReport.slice(0, 500); // short teaser stored on the mission row / in-app bell
 
     await query(`
       UPDATE agent_missions
@@ -205,8 +206,11 @@ async function runMission(missionId, { manual = false } = {}) {
     await createNotification({
       userId: mission.user_id,
       type: 'mission',
-      title: `🗓️ Mission complete: ${mission.title}`,
-      content: preview.slice(0, 200) || 'Mission run finished.'
+      title: `🗓️ Mission report: ${mission.title}`,
+      // Deliver the FULL report to external channels (email/Telegram split long
+      // messages themselves) so the user actually gets the news/research, not a
+      // 200-char teaser. Fall back to the preview if the run produced no body.
+      content: fullReport || preview || 'Mission run finished (no output produced).'
     });
 
     eventBus.emit('mission:completed', { missionId, executionId: result.executionId, durationMs });

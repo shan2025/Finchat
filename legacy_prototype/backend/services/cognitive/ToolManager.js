@@ -15,6 +15,9 @@ const TOOL_IMPLEMENTATIONS = {
   fetch: require('../../tools/FetchTool'),
   crawl: require('../../tools/CrawlTool'),
   news: require('../../tools/NewsTool'),
+  wikipedia: require('../../tools/WikipediaTool'),
+  reddit: require('../../tools/RedditTool'),
+  quora: require('../../tools/QuoraTool'),
   watchlist: require('../../tools/WatchlistTool'),
   apply_draft: require('../../tools/ApplyDraftTool')
 };

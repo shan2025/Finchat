@@ -33,7 +33,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <style>
   body { font-family: 'Figtree', system-ui, sans-serif; background-color: #f5ead8; color: #201e1d; }
-  /* â”€â”€ CSS Variables for JS-generated elements â”€â”€ */
+  /* ── CSS Variables for JS-generated elements ── */
   /* Reskinned to the "Organic / terracotta" design system (Chat.dc.html). */
   :root {
     --bg: #f5ead8; --surface: #fffaf0; --surface2: #f4eede; --border: #e7d9be; --border2: #e3d3ba;
@@ -68,7 +68,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     --accent-solana: #9945FF;
   }
 
-  /* â”€â”€ Scrollbar â”€â”€ */
+  /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #48473f; border-radius: 4px; }
@@ -79,7 +79,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .fc-sidescroll::-webkit-scrollbar-thumb { background: rgba(239,230,214,.14); border-radius: 999px; }
   .fc-sidescroll:hover::-webkit-scrollbar-thumb { background: rgba(239,230,214,.28); }
 
-  /* â”€â”€ Animations â”€â”€ */
+  /* ── Animations ── */
   @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   @keyframes typingAnim { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
@@ -87,7 +87,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* â”€â”€ Message Components (JS-generated) â”€â”€ */
+  /* ── Message Components (JS-generated) ── */
   /* Centered ChatGPT-style conversation column (design: max-width ~860px) */
   .msg-group { display:flex; flex-direction:column; gap:4px; margin:0 auto 20px; width:100%; max-width:840px; animation:fadeUp 0.24s cubic-bezier(.2,.8,.2,1); }
   .msg-group.user { align-items:flex-end; }
@@ -163,7 +163,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .attach-chip button { background:none; border:none; cursor:pointer; color:var(--text3); font-size:12px; padding:0; line-height:1; display:flex; align-items:center; }
   .attach-chip button:hover { color:var(--accent-red); }
 
-  /* â”€â”€ Right Panel Components (JS-generated) â”€â”€ */
+  /* ── Right Panel Components (JS-generated) ── */
   .proof-card { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-family:var(--mono); font-size:10px; line-height:1.8; }
   .proof-card.flagged { border-color:#7f1d1d; background:#2d1215; }
   .proof-card.warned { border-color:#78350f; background:#2d2305; }
@@ -218,20 +218,20 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .token-pill.low { background:#2d2305; color:var(--accent-amber); border-color:#78350f; }
   .token-pill.critical { background:#2d1215; color:var(--accent-red); border-color:#7f1d1d; }
 
-  /* â”€â”€ Toast â”€â”€ */
+  /* ── Toast ── */
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#e5e2df; color:#141312; padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; transition:all 0.3s; pointer-events:none; z-index:9999; white-space:nowrap; box-shadow:var(--shadow-md); }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   .toast.warn { background:var(--accent-amber); color:white; }
   .toast.danger { background:var(--accent-red); color:white; }
 
-  /* â”€â”€ Verify Banner â”€â”€ */
+  /* ── Verify Banner ── */
   .verify-banner { margin-top:8px; padding:10px 12px; border-radius:8px; font-size:11px; line-height:1.5; display:flex; flex-direction:column; gap:4px; animation:slideDown 0.2s ease; }
   .verify-banner.success { background:#052e16; border:1px solid #14532d; color:#86efac; }
   .verify-banner.error { background:#2d1215; border:1px solid #7f1d1d; color:#fca5a5; }
   .verify-banner.loading { background:var(--surface2); border:1px solid var(--border); color:var(--text2); opacity:0.7; }
   .issue-item { font-family:var(--mono); font-size:10px; background:rgba(255,255,255,0.03); padding:4px 6px; border-radius:4px; border-left:2px solid currentColor; }
 
-  /* â”€â”€ Settings/Modals (JS-generated content within) â”€â”€ */
+  /* ── Settings/Modals (JS-generated content within) ── */
   .settings-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center; backdrop-filter:blur(4px); }
   .settings-overlay.show { display:flex; }
   .modal { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; backdrop-filter:blur(4px); }
@@ -378,8 +378,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
   /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
      narrow screens (was `hidden md:flex` — no nav at all under 768px). */
-  /* â”€â”€ Cream nav theme (toggle in the sidebar header; shared key
-        localStorage['finchat_nav_theme'] with every other page) â”€â”€ */
+  /* ── Cream nav theme (toggle in the sidebar header; shared key
+        localStorage['finchat_nav_theme'] with every other page) ── */
   body.nav-cream { --side-bg:#f3eee3; --side-fg:#3a2e23; --side-muted:#8c7a6b; }
   body.nav-cream #sideNav { border-right:1px solid #d6ccbc; }
   body.nav-cream #sideNav [style*="#cfc3ad"] { color:#5c4a38 !important; }
@@ -408,9 +408,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 <!-- Backdrop behind the drawer nav on narrow screens -->
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
     <nav id="sideNav" class="fc-sidescroll flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden; overflow-y:auto;">
         <!-- Brand -->
         <div style="padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px;">
@@ -495,9 +495,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         </div>
     </nav>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top header (single, design: Chat.dc.html) -->
@@ -556,9 +556,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   <!-- Main Dashboard Canvas -->
   <main class="flex-1 flex overflow-hidden bg-cream-bg">
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ═══════════════════════════════ -->
     <!-- CENTRAL CHAT AREA               -->
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ═══════════════════════════════ -->
     <section class="flex-1 flex flex-col relative" style="background:#f5ead8;">
       <!-- Messages Container. When the conversation is empty this holds the
            welcome hero (renderHeroHTML): big agent avatar, "How can I help
@@ -619,22 +619,23 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
          with a single re-added include). -->
     <script src="system_panels.js"></script>
     <script src="knowledge_search.js"></script>
+    <script src="notifications_widget.js"></script>
 
   </main>
 </div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- TOAST                               -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <div class="toast" id="toast"></div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- ADMIN FRAUD MODAL                   -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <div id="adminModal" class="modal">
   <div class="modal-content" style="max-width:800px;">
     <div class="modal-header">
-      <h3>🛡ï¸ Fraud Detection Logs</h3>
+      <h3>🛡️ Fraud Detection Logs</h3>
       <button class="close-btn" onclick="closeModal('adminModal')">×</button>
     </div>
     <div class="modal-body">
@@ -660,13 +661,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </div>
 </div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- ADMIN USER MANAGEMENT MODAL         -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <div id="adminUserModal" class="modal">
   <div class="modal-content admin-modal-wide">
     <div class="modal-header">
-      <h3>🛡ï¸ Admin — User Management & ZKP Proofs</h3>
+      <h3>🛡️ Admin — User Management & ZKP Proofs</h3>
       <button class="close-btn" onclick="closeModal('adminUserModal')">×</button>
     </div>
     <div class="admin-tabs">
@@ -709,9 +710,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </div>
 </div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- SETTINGS MODAL                      -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
   <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 24px 64px rgba(58,46,35,0.28); animation:modalSlideUp 0.25s ease;">
     <!-- Header -->
@@ -727,7 +728,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     <div style="padding:24px; display:flex; flex-direction:column; gap:24px;">
       <!-- Unfreeze Banner -->
       <div class="unfreeze-banner" id="unfreezeBanner">
-        ⚠ï¸ Your account is frozen due to depleted tokens.
+        ⚠️ Your account is frozen due to depleted tokens.
         <br><button class="unfreeze-btn" onclick="unfreezeAccount()">Unfreeze Account (+50 tokens)</button>
       </div>
 
@@ -792,14 +793,14 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       <!-- Buttons -->
       <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
-        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">🛡ï¸ Admin Dashboard</button>
+        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">🛡️ Admin Dashboard</button>
         <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:#b91c1c; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fbeaea'; this.style.borderColor='#e7b7b7'" onmouseout="this.style.background='transparent'; this.style.borderColor='var(--border)'">🚪 Logout</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- â”€â”€ In-app rename / delete dialog (replaces native prompt/confirm) â”€â”€ -->
+<!-- ── In-app rename / delete dialog (replaces native prompt/confirm) ── -->
 <div id="convoModal" class="fc-cmodal" aria-hidden="true">
   <div class="fc-cmodal-card" role="dialog" aria-modal="true" aria-labelledby="convoModalTitle">
     <h3 id="convoModalTitle" class="fc-cmodal-title">Rename conversation</h3>
@@ -812,13 +813,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   </div>
 </div>
 
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <!-- ALL JAVASCRIPT (PRESERVED AS-IS)    -->
-<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ═══════════════════════════════════ -->
 <script>
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // BACKEND CONFIG
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
     const SOCKET_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000';
 
@@ -835,9 +836,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Pre-fill user info from session
     const SESSION_USER = _session || { name: 'User', role: 'user', email: '' };
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // STATE
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     const LOCAL_BAL_KEY = 'finchat_persona_bal_' + SESSION_USER.id;
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
     if (!personaBalances || !personaBalances.plato || !personaBalances.aurelius) {
@@ -925,9 +926,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     let personaSessions = {};   // { personaId: sessionId }
     let personaHistories = {};  // { personaId: [messagesHTML] }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // CRYPTO
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     async function sha256(msg) {
       const buf = new TextEncoder().encode(msg);
       const hash = await crypto.subtle.digest('SHA-256', buf);
@@ -946,9 +947,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return proof;
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // SOCKET.IO CONNECTION
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     let socket;
     try {
       socket = io(SOCKET_URL, {
@@ -957,12 +958,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       });
 
       socket.on('connect', () => {
-        console.log('âœ… Socket connected:', socket.id);
+        console.log('✅ Socket connected:', socket.id);
         socket.emit('join_channel', currentChannelId);
       });
 
       socket.on('connect_error', (err) => {
-        console.warn('⚠ï¸ Socket connection failed:', err.message);
+        console.warn('⚠️ Socket connection failed:', err.message);
       });
 
       socket.on('new_message', (msg) => {
@@ -981,7 +982,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const path = pulse.entities.slice(0, 4).map(e => e.name).join(' → ');
         phraseEl.style.opacity = '0';
         setTimeout(() => {
-          phraseEl.textContent = `ðŸ§  Recalling: ${path}`;
+          phraseEl.textContent = `🧠  Recalling: ${path}`;
           phraseEl.style.opacity = '1';
         }, 200);
         // Hold the real recall on screen: push the rotating-phrase timer back
@@ -998,9 +999,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       console.error('Socket init error:', e);
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // FRAUD DETECTION
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     async function detectFraud(msg) {
       return await detectSimulated(msg);
     }
@@ -1028,9 +1029,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return { risk: 'LOW', reason: 'No fraud indicators detected', indicators: ['Message appears compliant'] };
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // PERSONA SWITCHING & HERO
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function renderHeroHTML(personaId) {
       const pid = personaId || activePersona || 'plato';
       const p = PERSONAS[pid] || PERSONAS['plato'];
@@ -1164,7 +1165,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     }
     renderWebToggle();
 
-    // â”€â”€ Composer agent picker (replaces the old top persona bar) â”€â”€
+    // ── Composer agent picker (replaces the old top persona bar) ──
     function updateAgentPicker(personaId) {
       const p = PERSONAS[personaId] || PERSONAS['plato'];
       if (!p) return;
@@ -1339,7 +1340,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         let fraudNotice = '';
         if (risk !== 'LOW') {
           const cls = risk === 'HIGH' ? 'high' : 'medium';
-          const icon = risk === 'HIGH' ? '🚨' : '⚠ï¸';
+          const icon = risk === 'HIGH' ? '🚨' : '⚠️';
           const label = risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
           fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
         }
@@ -1371,9 +1372,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       personaHistories[personaId] = container.innerHTML;
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // RECENT CONVERSATIONS (real Supabase sessions, not design mock)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     async function loadRecentSessions() {
       const list = document.getElementById('recentList');
       const token = _session?.token;
@@ -1420,7 +1421,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       } catch (e) { console.log('Could not load recent sessions:', e); }
     }
 
-    // â”€â”€ Conversation management: rename / delete / copy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Conversation management: rename / delete / copy ──────────
     // In-app dialog (replaces native prompt/confirm) — styled to match the Chat design.
     // Returns the trimmed string for a prompt (or null if cancelled), or a boolean for a confirm.
     function fcDialog({ title, message = '', value = null, okLabel = 'Save', danger = false }) {
@@ -1599,9 +1600,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       } catch (e) { console.log('Could not open session:', e); }
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // BOT RESPONSE (fallback)
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     async function getBotResponse(msg) {
       const m = msg.toLowerCase();
       if (/hello|hi |hey|good morning|good afternoon/i.test(m)) return `Hello! Your message has been logged at chain block #${chainHeight} and verified clean. How can I assist you today?`;
@@ -1616,9 +1617,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       ];
       return fallbacks[Math.floor(Math.random() * fallbacks.length)];
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // TOKENOMICS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function applyTokens(amount, label, type) {
       tokenBalance = Math.max(0, tokenBalance + amount);
       personaBalances[activePersona] = tokenBalance;
@@ -1650,9 +1651,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }).join('');
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // PROOF LOG
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     const CHECKPOINT_INTERVAL = 10;
 
     function addProofCard(proof, fraud, isCheckpointBlock) {
@@ -1664,7 +1665,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       let chainLabel, chainClass;
       if (isCheckpointBlock) {
-        chainLabel = `âš“ Solana Checkpoint`;
+        chainLabel = `⚓ Solana Checkpoint`;
         chainClass = 'pc-chain checkpoint';
       } else {
         chainLabel = `🔗 chained`;
@@ -1675,7 +1676,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       card.className = `proof-card ${riskClass}${isCheckpointBlock ? ' confirmed' : ''}`;
       card.id = `proof-${proof.height}`;
       card.innerHTML = `
-    <div><span class="pc-key">HT  </span><span class="pc-val">#${proof.height}${isCheckpointBlock ? ' âš“' : ''}</span></div>
+    <div><span class="pc-key">HT  </span><span class="pc-val">#${proof.height}${isCheckpointBlock ? ' ⚓' : ''}</span></div>
     <div><span class="pc-key">FROM </span><span class="pc-val">${proof.sender}</span></div>
     <div><span class="pc-key">TIME </span><span class="pc-val">${new Date(proof.ts).toLocaleTimeString()}</span></div>
     <div class="proof-divider"></div>
@@ -1691,7 +1692,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const msgChain = document.getElementById(`msg-chain-${proof.height}`);
         if (msgChain) {
           msgChain.className = 'chain-status confirmed';
-          msgChain.textContent = 'âš“';
+          msgChain.textContent = '⚓';
         }
       }
     }
@@ -1700,13 +1701,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const container = document.getElementById('messages');
       const banner = document.createElement('div');
       banner.className = 'checkpoint-banner';
-      banner.innerHTML = `<span class="checkpoint-banner-label">âš“ Solana Checkpoint — Block #${height} anchored to devnet</span>`;
+      banner.innerHTML = `<span class="checkpoint-banner-label">⚓ Solana Checkpoint — Block #${height} anchored to devnet</span>`;
       container.appendChild(banner);
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // SCAN LOG
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function addScanCard(msg, fraud) {
       const log = document.getElementById('scanLog');
       log.querySelectorAll('.empty').forEach(e => e.remove());
@@ -1725,9 +1726,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       log.insertBefore(card, log.firstChild);
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // FILE HANDLING
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function handleFiles(files) {
       for (const f of files) pendingFiles.push(f);
       renderAttachPreview();
@@ -1740,7 +1741,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       preview.innerHTML = pendingFiles.map((f, i) =>
         `<div class="attach-chip">
       📄 <span>${f.name.length > 20 ? f.name.substring(0, 18) + '…' : f.name}</span>
-      <button onclick="removeFile(${i})">âœ•</button>
+      <button onclick="removeFile(${i})">✕</button>
     </div>`
       ).join('');
     }
@@ -1766,9 +1767,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // RENDER MESSAGE
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function renderMessage(sender, text, proof, fraud, files) {
       const isUser = sender === 'USER';
       const p = PERSONAS[activePersona];
@@ -1781,11 +1782,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       let fraudNotice = '';
       if (fraud.risk !== 'LOW') {
         const cls = fraud.risk === 'HIGH' ? 'high' : 'medium';
-        const icon = fraud.risk === 'HIGH' ? '🚨' : '⚠ï¸';
+        const icon = fraud.risk === 'HIGH' ? '🚨' : '⚠️';
         const label = fraud.risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
         fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
       } else if (isUser) {
-        fraudNotice = `<div class="fraud-notice low">âœ“ Verified clean</div>`;
+        fraudNotice = `<div class="fraud-notice low">✓ Verified clean</div>`;
       }
 
       let filesHTML = '';
@@ -1804,8 +1805,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const userAvatarHTML = `<div class="avatar user-avatar" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
       const botAvatarHTML = `<div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div>`;
 
-      const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">âœ“</span>` : '';
-      const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">â³</span>`;
+      const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
+      const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">⏳</span>`;
 
       const cleanText = isUser ? (text || '') : (text || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
 
@@ -1838,35 +1839,35 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (isUser) {
         setTimeout(() => {
           const r = document.getElementById(`read-${proof.height}`);
-          if (r) { r.textContent = 'âœ“âœ“'; r.className = 'read-receipt read'; }
+          if (r) { r.textContent = '✓✓'; r.className = 'read-receipt read'; }
         }, 1500);
       }
 
       return wrapper;
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // TYPING INDICATOR
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     const PERSONA_THINKING_PHRASES = {
       aurelius: [
-        "🏛ï¸ Contemplating the impermanence of bull markets...",
+        "🏛️ Contemplating the impermanence of bull markets...",
         "📜 Consulting the Stoic texts on portfolio diversification...",
-        "âš–ï¸ Weighing risk vs. reward with Roman precision...",
-        "🛡ï¸ Fortifying your balance sheet against the chaos of the cosmos...",
+        "⚖️ Weighing risk vs. reward with Roman precision...",
+        "🛡️ Fortifying your balance sheet against the chaos of the cosmos...",
         "🤔 Meditating on compound interest and virtue...",
         "📈 Analyzing financial cycles through the lens of Stoic philosophy...",
-        "🏛ï¸ Applying discipline to market volatility...",
+        "🏛️ Applying discipline to market volatility...",
         "💭 \"You have power over your mind — not outside events... or market dips.\"",
-        "âš¡ Calculating optimal asset allocation while maintaining inner peace...",
+        "⚡ Calculating optimal asset allocation while maintaining inner peace...",
         "🔍 Investigating financial anomalies with philosophical rigor..."
       ],
       plato: [
         "🤔 Planning 14,000,605 possible system responses...",
-        "🏛ï¸ Philosophizing on AI governance and ethics...",
+        "🏛️ Philosophizing on AI governance and ethics...",
         "🔍 Investigating agent outputs across the network...",
         "🧠 Connecting core cognitive concepts across multi-agent space...",
-        "âš¡ Orchestrating executive sub-agents at 4.2 GHz...",
-        "🛡ï¸ Running SHA-256 integrity checks & verifying truth...",
+        "⚡ Orchestrating executive sub-agents at 4.2 GHz...",
+        "🛡️ Running SHA-256 integrity checks & verifying truth...",
         "🧐 Cross-checking system supervisor directives...",
         "💡 Synthesizing pure executive intelligence...",
         "💎 Crystallizing Chief AI Officer directives into text...",
@@ -1878,16 +1879,16 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         "🔍 Investigating market demand for high-impact talent...",
         "🤝 Crafting negotiation frameworks for optimal compensation...",
         "🎯 Positioning career milestones for exponential growth...",
-        "âš–ï¸ Evaluating organizational hierarchy & strategic influence...",
-        "âœ¨ Polishing executive presence & corporate narrative...",
+        "⚖️ Evaluating organizational hierarchy & strategic influence...",
+        "✨ Polishing executive presence & corporate narrative...",
         "📝 Drafting career master plan with 99.9% confidence..."
       ],
       nova: [
         "🔬 Hypothesizing breakthrough scientific models...",
-        "âš›ï¸ Simulating quantum states & frontier technology shifts...",
+        "⚛️ Simulating quantum states & frontier technology shifts...",
         "🌐 Searching decentralized research grids...",
         "📡 Analyzing multi-dimensional data vectors...",
-        "âš¡ Processing technological forecasts at petaflop speeds...",
+        "⚡ Processing technological forecasts at petaflop speeds...",
         "🌌 Reflecting on advanced computational horizons...",
         "🚀 Crystallizing frontier research insights into actionable data..."
       ]
@@ -1899,10 +1900,10 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       "🌐 Searching the web for validation...",
       "📂 Reading repository & analyzing structures...",
       "💭 Reading memory & recovering context...",
-      "🕵ï¸ Collecting evidence from the blockchain...",
-      "âš¡ Reasoning at peak capacity...",
-      "🛡ï¸ Verifying facts & running integrity checks...",
-      "âœ¨ Polishing grammar & refining output..."
+      "🕵️ Collecting evidence from the blockchain...",
+      "⚡ Reasoning at peak capacity...",
+      "🛡️ Verifying facts & running integrity checks...",
+      "✨ Polishing grammar & refining output..."
     ];
 
     window.typingTimers = window.typingTimers || {};
@@ -2010,9 +2011,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       showToast('Generation stopped by user.', 'info');
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // MAIN SEND
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     async function sendMessage() {
       if (isSending) return;
       const input = document.getElementById('msgInput');
@@ -2044,10 +2045,10 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             const proof = await createProof(`Graphify: ${data.nodesAdded.length} concepts`, 'SYSTEM');
             const fraud = { risk: 'LOW', reason: 'Neural map extraction verified', indicators: ['Verified ZKP anchor'] };
             const summaryHTML = `
-              <div style="margin-bottom:10px; font-weight:700; color:#2a1f18; font-size:15px;">âš¡ Neural Map Synced (${data.nodesAdded.length} nodes added)</div>
+              <div style="margin-bottom:10px; font-weight:700; color:#2a1f18; font-size:15px;">⚡ Neural Map Synced (${data.nodesAdded.length} nodes added)</div>
               <div style="font-size:13.5px; color:#5a4d3c; margin-bottom:12px; line-height:1.5;">${escHtml(data.summary)}</div>
               <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;">
-                ${data.nodesAdded.map(n => `<span style="padding:4px 10px; border-radius:8px; background:#efe8de; border:1px solid #e3d3ba; font-size:12px; font-weight:600; color:#3a2e23;">âœ¦ ${escHtml(n.label)}</span>`).join('')}
+                ${data.nodesAdded.map(n => `<span style="padding:4px 10px; border-radius:8px; background:#efe8de; border:1px solid #e3d3ba; font-size:12px; font-weight:600; color:#3a2e23;">✦ ${escHtml(n.label)}</span>`).join('')}
               </div>
               <a href="finchat_neuralmap.html" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:999px; background:#3a2e23; color:#fff; font-size:13px; font-weight:700; text-decoration:none; box-shadow:0 4px 12px rgba(58,46,35,0.2); transition:background 0.15s;">
                 Explore on Neural Map →
@@ -2083,7 +2084,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
 
       if (isPersonaChat) {
-        // â”€â”€ AI Persona Chat via Backend API â”€â”€
+        // ── AI Persona Chat via Backend API ──
         // Optimistic render: show the user's message INSTANTLY, before the LLM round-trip.
         // The real proof hash is reconciled onto this same bubble when the server responds.
         const userFraudOpt = { risk: 'LOW', reason: 'Scanned by AI persona', indicators: ['AI persona monitoring'] };
@@ -2094,7 +2095,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const userMsgEl = renderMessage('USER', text, pendingProof, userFraudOpt, files);
         // mark its chain badge as "anchoring…" until the server proof returns
         const pendingChainEl = userMsgEl ? userMsgEl.querySelector('.chain-status') : null;
-        if (pendingChainEl) { pendingChainEl.textContent = 'â³'; pendingChainEl.title = 'Anchoring to proof chain…'; }
+        if (pendingChainEl) { pendingChainEl.textContent = '⏳'; pendingChainEl.title = 'Anchoring to proof chain…'; }
 
         const typingId = showTyping();
 
@@ -2152,7 +2153,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
           if (!res.ok) {
             // Leave the user's message visible but flag that it failed to anchor
-            if (pendingChainEl) { pendingChainEl.textContent = '⚠ï¸'; pendingChainEl.title = 'Failed to anchor — server error'; }
+            if (pendingChainEl) { pendingChainEl.textContent = '⚠️'; pendingChainEl.title = 'Failed to anchor — server error'; }
             const errProof = await createProof(data.error || 'Error', 'SYSTEM');
             const errFraud = { risk: 'LOW', reason: 'System error', indicators: ['API error'] };
             renderMessage('BOT', data.error || 'Failed to get response', errProof, errFraud, null);
@@ -2186,7 +2187,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
               const cs = userMsgEl.querySelector('.chain-status');
               if (cs) {
                 cs.className = userIsCheckpoint ? 'chain-status confirmed' : 'chain-status';
-                cs.textContent = userIsCheckpoint ? 'âš“' : '🔗';
+                cs.textContent = userIsCheckpoint ? '⚓' : '🔗';
                 cs.title = userIsCheckpoint ? 'Anchored to Solana checkpoint' : 'Chained to proof-of-conversation';
               }
             }
@@ -2237,9 +2238,33 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
                 const traceDiv = document.createElement('div');
                 traceDiv.style.cssText = 'margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
                 traceDiv.innerHTML = `
-                  <span title="This answer was generated using these knowledge-graph memories">ðŸ§  ${shown}${more}${memBit}</span>
+                  <span title="This answer was generated using these knowledge-graph memories">🧠  ${shown}${more}${memBit}</span>
                   <a href="finchat_neuralmap.html" style="color:var(--text2);text-decoration:underline;opacity:.8">view on map</a>`;
                 contentEl.appendChild(traceDiv);
+              }
+            }
+            // Claude-style citations: the web/data sources the agent actually consulted.
+            const sources = Array.isArray(data.sources) ? data.sources : [];
+            if (botMsgEl && sources.length > 0) {
+              const contentEl = botMsgEl.querySelector('.msg-content');
+              if (contentEl) {
+                const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+                const rows = sources.map((s, i) => {
+                  const unverified = s.verified === false;
+                  const badge = unverified
+                    ? ` <span title="Community source — treat as unverified opinion; cross-checked against reference sources where possible" style="padding:1px 6px;border-radius:999px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-size:9px;font-weight:700;">unverified</span>`
+                    : '';
+                  return `<a href="${escHtml(s.url)}" target="_blank" rel="noopener noreferrer"
+                      style="display:flex;align-items:baseline;gap:6px;padding:4px 8px;border-radius:8px;background:var(--bg2,#efe8de);border:1px solid var(--border,#e3d3ba);text-decoration:none;color:var(--text,#3a2e23);font-size:11px;">
+                      <span style="opacity:.6;font-family:var(--mono);">${i + 1}</span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(s.title || s.url)}</span>
+                      <span style="opacity:.6;">${escHtml(host(s.url))} · ${escHtml(s.tool)}</span>${badge}
+                    </a>`;
+                }).join('');
+                const srcDiv = document.createElement('div');
+                srcDiv.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:4px;';
+                srcDiv.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:5px;margin-bottom:1px;">🔗 Sources <span style="opacity:.6;font-weight:400;">(${sources.length})</span></div>${rows}`;
+                contentEl.appendChild(srcDiv);
               }
             }
             if (data.evaluation) {
@@ -2312,7 +2337,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             setSendButtonMode('send');
             return;
           }
-          if (pendingChainEl) { pendingChainEl.textContent = '⚠ï¸'; pendingChainEl.title = 'Failed to anchor — network error'; }
+          if (pendingChainEl) { pendingChainEl.textContent = '⚠️'; pendingChainEl.title = 'Failed to anchor — network error'; }
           console.error('AI Service Error:', err);
           showToast('AI Service Error: ' + (err.message || 'Unknown error'), 'danger');
         }
@@ -2354,9 +2379,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       setSendButtonMode('send');
       input.focus();
     }
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // EXPORT JSON
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function exportJSON() {
       const cards = document.querySelectorAll('.proof-card');
       const data = {
@@ -2388,9 +2413,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       showToast('Proof log exported as JSON');
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // UI HELPERS
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function switchTab(name, btn) {
       ['proof', 'tokens', 'gov', 'ai'].forEach(t => {
         document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
@@ -2416,80 +2441,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    // â”€â”€ Notification bell (backend-wired) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    (function () {
-      const tok = () => localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
-        (JSON.parse(sessionStorage.getItem('finchat_user') || 'null') || {}).token || '';
-      const $ = (id) => document.getElementById(id);
-      let open = false;
-
-      function timeAgo(ts) {
-        const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
-        if (s < 60) return 'just now';
-        if (s < 3600) return Math.floor(s / 60) + 'm ago';
-        if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-        return Math.floor(s / 86400) + 'd ago';
-      }
-
-      async function refreshBadge() {
-        try {
-          const r = await fetch('/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + tok() } });
-          if (!r.ok) return;
-          const d = await r.json();
-          const badge = $('notifBadge');
-          if (!badge) return;
-          if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.classList.remove('hidden'); }
-          else badge.classList.add('hidden');
-        } catch (e) { }
-      }
-
-      async function loadList() {
-        const list = $('notifList');
-        if (!list) return;
-        list.innerHTML = '<div style="padding:16px;text-align:center;color:#8c7a6b;font-size:12px">Loading…</div>';
-        try {
-          const r = await fetch('/api/notifications?limit=20', { headers: { Authorization: 'Bearer ' + tok() } });
-          const d = await r.json();
-          const items = d.notifications || [];
-          if (!items.length) { list.innerHTML = '<div style="padding:24px;text-align:center;color:#8c7a6b;font-size:12px">No notifications yet</div>'; return; }
-          list.innerHTML = items.map(n => `
-            <div onclick="__notifClick('${n.notification_id}')" style="padding:12px 16px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${n.is_read ? 'opacity:0.55' : 'background:rgba(212,175,55,0.08)'}">
-              <div style="flex:1;min-width:0">
-                <div style="font-size:12px;font-weight:700;color:#3a2e23">${n.title}</div>
-                <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${(n.content || '').slice(0, 120)}</div>
-                <div style="font-size:10px;color:#8c7a6b;font-family:ui-monospace,monospace;margin-top:3px">${timeAgo(n.created_at)}</div>
-              </div>
-              ${n.is_read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:4px"></span>'}
-            </div>`).join('');
-        } catch (e) { list.innerHTML = '<div style="padding:16px;text-align:center;color:#dc2626;font-size:12px">Failed to load</div>'; }
-      }
-
-      window.__notifClick = async function (id) {
-        try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
-        await loadList(); refreshBadge();
-      };
-      window.markAllNotifsRead = async function () {
-        try { await fetch('/api/notifications/read-all', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
-        await loadList(); refreshBadge();
-      };
-      window.toggleNotifications = function (e) {
-        if (e) e.stopPropagation();
-        const dd = $('notifDropdown'); if (!dd) return;
-        open = !open; dd.classList.toggle('hidden', !open);
-        if (open) loadList();
-      };
-      document.addEventListener('click', (e) => {
-        const dd = $('notifDropdown'), bell = $('notifBell');
-        if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
-      });
-      function bindSocket() {
-        const s = window.socket || (typeof socket !== 'undefined' ? socket : null);
-        if (s && !window.__notifSockBound) { s.on('notification:new', () => { refreshBadge(); if (open) loadList(); }); window.__notifSockBound = true; }
-      }
-      refreshBadge();
-      setInterval(() => { refreshBadge(); bindSocket(); }, 12000);
-      setTimeout(bindSocket, 2000);
-    })();
+    // Notification bell is wired by the shared notifications_widget.js include
+    // (see bottom of page) — do not re-add an inline copy here; it drifts out
+    // of sync with the shared version and loses link-based click routing.
 
     async function verifyChainUI() {
       const btn = document.getElementById('verifyChainBtn');
@@ -2519,7 +2473,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           banner.className = 'verify-banner success';
           banner.innerHTML = `
             <div style="font-weight:600;display:flex;align-items:center;gap:6px">
-              âœ… Chain Verified Successfully
+              ✅ Chain Verified Successfully
             </div>
             <div>All ${data.verification.totalBlocks} blocks linked and signed correctly. No tampering detected.</div>
           `;
@@ -2541,7 +2495,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         btn.disabled = false;
         btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">verified_user</span> Verify Chain Integrity';
         banner.className = 'verify-banner error';
-        banner.innerHTML = 'âŒ Verification failed. Could not reach server.';
+        banner.innerHTML = '❌ Verification failed. Could not reach server.';
       }
     }
 
@@ -2555,7 +2509,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
-    // â”€â”€ Init UI from session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Init UI from session ─────────────────────────────
     (function initSessionUI() {
       if (!SESSION_USER) return;
       const name = SESSION_USER.name || 'User';
@@ -2626,7 +2580,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (sess) openSession(sess);
     })();
 
-    // â”€â”€ Sync State from Server on Startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Sync State from Server on Startup ────────────────
     (async function syncServerState() {
       const token = _session?.token;
       if (!token) return;
@@ -2755,7 +2709,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     })();
 
-    // â”€â”€ Check Solana Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Check Solana Status ─────────────────────────────
     async function checkSolanaStatus() {
       try {
         const res = await fetch(`${API_URL}/health`);
@@ -2785,9 +2739,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     checkSolanaStatus();
     setInterval(checkSolanaStatus, 30000);
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // SETTINGS PANEL + PHANTOM WALLET
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     let phantomWallet = null;
     let selectedTier = null;
 
@@ -2951,7 +2905,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         phantomWallet = resp.publicKey.toString();
 
         btn.className = 'wallet-btn connected';
-        btn.textContent = `âœ… Connected: ${phantomWallet.substring(0, 4)}...${phantomWallet.slice(-4)}`;
+        btn.textContent = `✅ Connected: ${phantomWallet.substring(0, 4)}...${phantomWallet.slice(-4)}`;
         btn.disabled = true;
 
         info.style.display = 'block';
@@ -3014,7 +2968,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
         document.getElementById('unfreezeBanner').classList.remove('show');
 
-        btn.textContent = `âœ… +${data.tokensAdded} tokens added!`;
+        btn.textContent = `✅ +${data.tokensAdded} tokens added!`;
         showToast(`+${data.tokensAdded} tokens purchased successfully!`, 'success');
 
         loadTxHistory();
@@ -3028,7 +2982,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       } catch (err) {
         console.error('Buy tokens error:', err);
-        btn.textContent = 'âŒ Purchase failed — try again';
+        btn.textContent = '❌ Purchase failed — try again';
         btn.disabled = false;
         showToast('Token purchase failed: ' + err.message, 'danger');
       }
@@ -3064,9 +3018,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       window.location.href = 'finchat_login.html';
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // ADMIN FACING
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     function openAdminModal() {
       const modal = document.getElementById('adminModal');
       if (modal) {
@@ -3120,9 +3074,9 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       }
     }
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
     // ADMIN USER MANAGEMENT + ZKP
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─────────────────────────────────
 
     if (SESSION_USER.role === 'admin') {
       const adminSection = document.getElementById('adminSidebarSection');
@@ -3168,7 +3122,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const unblockAllBtn = document.getElementById('unblockAllBtn');
         if (data.frozen === 0) {
           unblockAllBtn.disabled = true;
-          unblockAllBtn.textContent = 'âœ… No Frozen Users';
+          unblockAllBtn.textContent = '✅ No Frozen Users';
         } else {
           unblockAllBtn.disabled = false;
           unblockAllBtn.textContent = `🔓 Unblock All Frozen (${data.frozen})`;
@@ -3183,8 +3137,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           const initials = (user.name || '??').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
           const isFrozen = user.is_frozen;
           const statusBadge = isFrozen
-            ? '<span class="status-badge frozen">â„ï¸ Frozen</span>'
-            : '<span class="status-badge active">âœ… Active</span>';
+            ? '<span class="status-badge frozen">❄️ Frozen</span>'
+            : '<span class="status-badge active">✅ Active</span>';
           const actionBtn = isFrozen
             ? `<button class="unblock-btn" onclick="adminUnblockUser('${user.id}', '${user.name.replace(/'/g, "\\'")}')" id="unblock-${user.id}">🔓 Unblock</button>`
             : '<span style="font-size:10px;color:var(--text3);">—</span>';
@@ -3222,7 +3176,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       const btn = document.getElementById(`unblock-${userId}`);
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'â³ Processing...';
+        btn.textContent = '⏳ Processing...';
       }
 
       try {
@@ -3242,12 +3196,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         }
 
         const data = await res.json();
-        showToast(`âœ… ${userName} unblocked! ZKP proof: ${data.zkpProof.commitmentHash.substring(0, 16)}...`, 'success');
+        showToast(`✅ ${userName} unblocked! ZKP proof: ${data.zkpProof.commitmentHash.substring(0, 16)}...`, 'success');
 
         loadAdminUsers();
 
       } catch (err) {
-        showToast(`âŒ Unblock failed: ${err.message}`, 'danger');
+        showToast(`❌ Unblock failed: ${err.message}`, 'danger');
         if (btn) {
           btn.disabled = false;
           btn.textContent = '🔓 Unblock';
@@ -3261,7 +3215,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
       const btn = document.getElementById('unblockAllBtn');
       btn.disabled = true;
-      btn.textContent = 'â³ Processing...';
+      btn.textContent = '⏳ Processing...';
 
       try {
         const token = _session?.token;
@@ -3277,11 +3231,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         if (!res.ok) throw new Error('Bulk unblock failed');
         const data = await res.json();
 
-        showToast(`âœ… Unblocked ${data.unblocked} users with ZKP proofs!`, 'success');
+        showToast(`✅ Unblocked ${data.unblocked} users with ZKP proofs!`, 'success');
         loadAdminUsers();
 
       } catch (err) {
-        showToast(`âŒ Bulk unblock failed: ${err.message}`, 'danger');
+        showToast(`❌ Bulk unblock failed: ${err.message}`, 'danger');
         btn.disabled = false;
         btn.textContent = `🔓 Unblock All Frozen`;
       }
@@ -3307,13 +3261,13 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         container.innerHTML = data.proofs.map(proof => {
           const time = new Date(proof.createdAt).toLocaleString();
           const userFrozenNow = proof.targetUser.currentlyFrozen;
-          const statusText = userFrozenNow ? 'â„ï¸ Re-frozen since' : 'âœ… Currently active';
+          const statusText = userFrozenNow ? '❄️ Re-frozen since' : '✅ Currently active';
 
           return `
             <div class="zkp-proof-card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="zkp-label">ZKP Unblock Proof</div>
-                <span class="zkp-verified-badge">âœ… Verified</span>
+                <span class="zkp-verified-badge">✅ Verified</span>
               </div>
               <div class="zkp-hash">${proof.commitmentHash}</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-top:6px;">
