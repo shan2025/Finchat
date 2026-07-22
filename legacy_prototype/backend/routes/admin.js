@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, clearUserCache } = require('../middleware/auth');
 const { generateUnblockProof, verifyUnblockProof, verifyZKProof, getUnblockProofs } = require('../services/zkp');
 
 router.use(requireAuth, requireRole('admin'));
@@ -55,6 +55,7 @@ router.post('/unblock/:userId', async (req, res) => {
     const newBalance = targetUser.token_balance + recoveryTokens;
 
     await query('UPDATE users SET token_balance = $1, is_frozen = 0 WHERE user_id = $2', [newBalance, userId]);
+    clearUserCache(userId);
 
     await query(`
       INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)
@@ -113,6 +114,7 @@ router.post('/unblock-all', async (req, res) => {
       const newBalance = user.token_balance + recoveryTokens;
 
       await query('UPDATE users SET token_balance = $1, is_frozen = 0 WHERE user_id = $2', [newBalance, user.id]);
+      clearUserCache(user.id);
       await query(`
         INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)
         VALUES ($1, $2, $3, $4, 'grant', $5)

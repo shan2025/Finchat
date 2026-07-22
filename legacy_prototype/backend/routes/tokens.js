@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, clearUserCache } = require('../middleware/auth');
 
 // ── GET /api/tokens/balance ─────────────────────────────────
 router.get('/balance', requireAuth, async (req, res) => {
@@ -70,6 +70,7 @@ router.post('/topup', requireAuth, async (req, res) => {
     const newBalance = user.token_balance + tokensToAdd;
 
     await query('UPDATE users SET token_balance = $1, is_frozen = 0 WHERE user_id = $2', [newBalance, req.user.id]);
+    clearUserCache(req.user.id);
 
     await query(`
       INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)
@@ -117,6 +118,7 @@ router.post('/unfreeze', requireAuth, async (req, res) => {
     const newBalance = user.token_balance + recoveryTokens;
 
     await query('UPDATE users SET token_balance = $1, is_frozen = 0 WHERE user_id = $2', [newBalance, req.user.id]);
+    clearUserCache(req.user.id);
 
     await query(`
       INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)

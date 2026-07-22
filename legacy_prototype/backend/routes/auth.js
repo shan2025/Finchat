@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, getPool } = require('../database');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, clearUserCache } = require('../middleware/auth');
 
 const TOKEN_EXPIRY = '7d';
 
@@ -270,6 +270,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // ── POST /api/auth/logout ────────────────────────────────────
 router.post('/logout', requireAuth, (req, res) => {
+  clearUserCache(req.user.id);
   res.json({ message: 'Logged out' });
 });
 
@@ -281,6 +282,7 @@ router.post('/profile/avatar', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'avatarUrl data is required' });
     }
     await query('UPDATE users SET avatar_url = $1 WHERE user_id = $2', [avatarUrl, req.user.id]);
+    clearUserCache(req.user.id);
     const resUser = await query('SELECT *, user_id as id FROM users WHERE user_id = $1', [req.user.id]);
     res.json({ message: 'Avatar updated', user: sanitizeUser(resUser.rows[0]) });
   } catch (err) {
