@@ -59,11 +59,13 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
     });
 
     // Check if the LLM flagged fraud during generation
-    let fraudDetected = result.response.includes(FRAUD_TAG);
-    let cleanResponse = result.response.replace(FRAUD_TAG, '').trim();
+    const rawResp = result.response || result.cleanResponse || '';
+    const safeResponse = typeof rawResp === 'string' ? rawResp : String(rawResp);
+    const fraudDetected = safeResponse.includes(FRAUD_TAG);
+    const cleanResponse = safeResponse.replace(FRAUD_TAG, '').trim();
 
     return {
-      response: result.response,
+      response: safeResponse,
       cleanResponse,
       fraudDetected,
       executionId: result.executionId,
@@ -78,10 +80,14 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       sources: Array.isArray(result.sources) ? result.sources : []
     };
   } catch (err) {
-    console.error('⚠️ CognitiveCore Route Error:', err.message);
+    console.error('⚠️ CognitiveCore Route Error:', err.stack || err.message);
+    const errMessage = err.message || '';
+    const userMsg = errMessage.includes('AI Inference unavailable') || errMessage.includes('rate limit') || errMessage.includes('429')
+      ? `I'm currently experiencing temporary network delays connecting to my inference engine (${errMessage}). Please try asking your question again in a moment.`
+      : 'System error processing your cognitive request. Falling back to safe mode.';
     return {
-      response: 'System error processing your cognitive request. Falling back to safe mode.',
-      cleanResponse: 'System error processing your cognitive request. Falling back to safe mode.',
+      response: userMsg,
+      cleanResponse: userMsg,
       fraudDetected: false,
       delegatedAgent: 'system'
     };

@@ -110,8 +110,8 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
       console.warn(`⚠️ Groq rate limit: bucket empty after waiting ${MAX_WAIT_MS}ms, falling back to Ollama [${feature}]`);
       // Fall through to Ollama below
     } else {
-      // Attempt Groq with one 429-retry
-      for (let attempt = 0; attempt < 2; attempt++) {
+      // Attempt Groq with 429-retries
+      for (let attempt = 0; attempt < 4; attempt++) {
         try {
           const response = await _callGroq({ apiKey, model: gModel, messages, temperature, jsonMode });
           console.log(`⚡ Groq Cloud Inference Successful [Model: ${gModel}]`);
@@ -131,16 +131,16 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
           };
         } catch (err) {
           const status = err.response?.status;
-          if (status === 429 && attempt === 0) {
-            // Read Retry-After header (seconds) or default to 2s
-            const retryAfter = Number(err.response?.headers?.['retry-after']) || 2;
-            const delayMs = Math.min(retryAfter * 1000, 10_000);
-            console.warn(`⚠️ Groq 429 rate-limited — waiting ${delayMs}ms before retry [${feature}]`);
+          if (status === 429 && attempt < 3) {
+            // Read Retry-After header (seconds) or default to 2s * (attempt + 1)
+            const retryAfter = Number(err.response?.headers?.['retry-after']) || (2 * (attempt + 1));
+            const delayMs = Math.min(retryAfter * 1000, 15_000);
+            console.warn(`⚠️ Groq 429 rate-limited (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
             _bucket.tokens = 0; // Drain bucket so other concurrent calls also wait
             await _sleep(delayMs);
-            continue; // retry once
+            continue; // retry
           }
-          // Non-429 error or second 429 — fall to Ollama
+          // Non-429 error or exhausted 429 retries — fall to Ollama
           console.warn(`⚠️ Groq API call failed (${status || 'network'}), falling back to Ollama: ${err.message}`);
           break;
         }

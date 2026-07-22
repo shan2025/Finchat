@@ -11,6 +11,11 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+  if (typeof io === 'undefined') {
+    document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
+  }
+</script>
 <style>
   body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
   :root { --bg:#f7f4ed; --surface:#efe8de; --surface2:#f3eee3; --border:#d6ccbc; --text:#3a2e23; --text2:#5c4a38; --text3:#8c7a6b; }

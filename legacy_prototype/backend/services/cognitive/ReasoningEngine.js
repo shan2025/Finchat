@@ -127,12 +127,40 @@ function parseActionResponse(rawContent) {
  */
 async function reason({ messages, temperature = 0.7, model = null }) {
   // First attempt: call LLM with JSON mode
-  const firstResult = await runInference({
-    messages,
-    temperature,
-    jsonMode: true,
-    model
-  });
+  let firstResult;
+  try {
+    firstResult = await runInference({
+      messages,
+      temperature,
+      jsonMode: true,
+      model
+    });
+  } catch (err) {
+    console.warn(`⚠️ ReasoningEngine: first runInference failed (${err.message}). Attempting non-JSON fallback inference...`);
+    try {
+      firstResult = await runInference({
+        messages,
+        temperature,
+        jsonMode: false,
+        model
+      });
+    } catch (err2) {
+      console.error(`❌ ReasoningEngine: inference failed across providers: ${err2.message}`);
+      return {
+        action: {
+          thought: `Inference failed across providers (${err2.message}).`,
+          action: 'respond',
+          response: `I am currently experiencing temporary high traffic or network delays connecting to my inference engine (${err2.message}). Please give me just a moment and try asking your question again.`
+        },
+        raw: '',
+        provider: 'system',
+        model: 'fallback',
+        tokens: 0,
+        retried: true,
+        fallback: true
+      };
+    }
+  }
 
   const firstParse = parseActionResponse(firstResult.content);
 
