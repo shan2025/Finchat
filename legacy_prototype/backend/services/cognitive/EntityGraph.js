@@ -48,23 +48,51 @@ async function extractEntities(text) {
 /**
  * Upsert an entity node. Bumps mention_count + last_seen_at on repeat.
  * Returns the entity_id (existing or new).
+ *
+ * Fix 5: ON CONFLICT targets entity_id (PK) to handle the race where two
+ * concurrent chats generate the same deterministic id. A secondary catch
+ * handles the (canonical_name, entity_type) unique constraint if a different
+ * id was previously generated for the same name+type, by re-reading.
  */
 async function upsertEntity({ name, type }) {
   const canonical = name.trim();
   const t = (type || 'topic').toLowerCase();
   const id = `ent_${t}_${canonical.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}`;
 
-  await query(`
-    INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at)
-    VALUES ($1, $2, $3, 1, now())
-    ON CONFLICT (canonical_name, entity_type) DO UPDATE
-      SET mention_count = entities.mention_count + 1,
-          last_seen_at = now()
-    RETURNING entity_id
-  `, [id, canonical, t]);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await query(`
+        INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at)
+        VALUES ($1, $2, $3, 1, now())
+        ON CONFLICT (entity_id) DO UPDATE
+          SET mention_count = entities.mention_count + 1,
+              last_seen_at = now()
+      `, [id, canonical, t]);
 
-  // The RETURNING above is the inserted row — but ON CONFLICT DO UPDATE returns the updated row,
-  // and we can't rely on the id we constructed matching an older row's id. Re-read to be safe.
+      return id; // success — the id we generated is the row's id
+    } catch (err) {
+      // If it's a unique constraint violation on (canonical_name, entity_type),
+      // the row exists with a different entity_id. Re-read and return that.
+      if (err.message && err.message.includes('duplicate key') && attempt === 0) {
+        const r = await query(
+          `SELECT entity_id FROM entities WHERE canonical_name = $1 AND entity_type = $2`,
+          [canonical, t]
+        );
+        if (r.rows[0]?.entity_id) {
+          // Bump its mention count while we're here
+          await query(
+            `UPDATE entities SET mention_count = mention_count + 1, last_seen_at = now() WHERE entity_id = $1`,
+            [r.rows[0].entity_id]
+          ).catch(() => {});
+          return r.rows[0].entity_id;
+        }
+        continue; // retry the insert (row may have been deleted between calls)
+      }
+      throw err; // non-duplicate error — let it propagate
+    }
+  }
+
+  // Fallback: re-read whatever is there
   const r = await query(
     `SELECT entity_id FROM entities WHERE canonical_name = $1 AND entity_type = $2`,
     [canonical, t]

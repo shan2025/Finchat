@@ -1,10 +1,38 @@
 // database.js — FinChat Supabase PostgreSQL Connection Pool
+// Fix 2: Auto-recreate pool on fatal errors, keepalive ping, query retry.
 const { Pool } = require('pg');
 require('dotenv').config();
 
 const connectionString = process.env.DATABASE_URL;
 
 let pool = null;
+let _keepaliveTimer = null;
+
+// Errors that indicate the connection is dead and the pool should be recreated.
+const FATAL_ERROR_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EPIPE', 'ETIMEDOUT',
+  'CONNECTION_LOST', 'PROTOCOL_CONNECTION_LOST'
+]);
+
+function isFatalError(err) {
+  if (!err) return false;
+  if (FATAL_ERROR_CODES.has(err.code)) return true;
+  const msg = (err.message || '').toLowerCase();
+  return msg.includes('connection terminated') ||
+    msg.includes('client has encountered a connection error') ||
+    msg.includes('getaddrinfo enotfound') ||
+    msg.includes('read econnreset');
+}
+
+function destroyPool() {
+  if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
+  if (pool) {
+    const old = pool;
+    pool = null;
+    old.end().catch(() => {}); // best-effort cleanup
+    console.warn('🔄 PG pool destroyed — will recreate on next query');
+  }
+}
 
 function getPool() {
   if (!pool) {
@@ -18,12 +46,24 @@ function getPool() {
       },
       max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000
+      connectionTimeoutMillis: 15000 // bumped from 10s — Supabase can be slow
     });
 
     pool.on('error', (err) => {
       console.error('⚠️ Supabase PG Pool Error:', err.message);
+      if (isFatalError(err)) {
+        destroyPool(); // force recreation on next getPool() call
+      }
     });
+
+    // Keepalive: ping every 60s to prevent Supabase from closing idle connections
+    _keepaliveTimer = setInterval(() => {
+      if (!pool) return;
+      pool.query('SELECT 1').catch((err) => {
+        console.warn('⚠️ PG keepalive ping failed:', err.message);
+        if (isFatalError(err)) destroyPool();
+      });
+    }, 60_000);
 
     console.log('✅ Connected to Supabase PostgreSQL pool');
   }
@@ -31,22 +71,31 @@ function getPool() {
 }
 
 /**
- * Execute a query against Supabase PostgreSQL
+ * Execute a query against Supabase PostgreSQL.
+ * On transient connection errors, recreates the pool and retries once.
  */
 async function query(text, params = []) {
-  const p = getPool();
   const start = Date.now();
-  try {
-    const res = await p.query(text, params);
-    const duration = Date.now() - start;
-    const slowMs = Number(process.env.SLOW_QUERY_MS) || 500;
-    if (duration >= slowMs) {
-      console.warn(`🐢 Slow query (${duration}ms):`, text.replace(/\s+/g, ' ').trim().slice(0, 120));
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const p = getPool();
+    try {
+      const res = await p.query(text, params);
+      const duration = Date.now() - start;
+      const slowMs = Number(process.env.SLOW_QUERY_MS) || 500;
+      if (duration >= slowMs) {
+        console.warn(`🐢 Slow query (${duration}ms):`, text.replace(/\s+/g, ' ').trim().slice(0, 120));
+      }
+      return res;
+    } catch (err) {
+      if (attempt === 0 && isFatalError(err)) {
+        console.warn(`🔄 Retrying query after connection error: ${err.message}`);
+        destroyPool(); // force fresh pool
+        continue;      // retry once
+      }
+      console.error('❌ Database query error:', { text: text.replace(/\s+/g, ' ').trim().slice(0, 200), error: err.message });
+      throw err;
     }
-    return res;
-  } catch (err) {
-    console.error('❌ Database query error:', { text, error: err.message });
-    throw err;
   }
 }
 
@@ -62,3 +111,4 @@ module.exports = {
   query,
   getDB
 };
+

@@ -1,4 +1,5 @@
 // services/queue/WorkerPool.js — BullMQ Background Workers for Cognitive Core
+// Fix 3: Redis resilience — retryStrategy, reconnectOnError, startup retry.
 const { Queue, Worker, QueueEvents } = require('bullmq');
 const Redis = require('ioredis');
 const { chatWithPersona } = require('../aiChat');
@@ -28,7 +29,27 @@ function getConnectionOptions(url) {
   return {
     maxRetriesPerRequest: null, // Required by BullMQ
     enableReadyCheck: false,
-    tls: isTls ? { rejectUnauthorized: false } : undefined
+    tls: isTls ? { rejectUnauthorized: false } : undefined,
+    // ── Fix 3: Reconnect with exponential backoff ────────────────
+    retryStrategy(times) {
+      if (times > 20) {
+        console.error(`❌ Redis: giving up after ${times} retries`);
+        return null; // stop retrying
+      }
+      const delay = Math.min(times * 1000, 30_000); // cap at 30s
+      console.warn(`🔄 Redis: reconnecting in ${delay}ms (attempt ${times})`);
+      return delay;
+    },
+    reconnectOnError(err) {
+      const msg = (err.message || '').toLowerCase();
+      // Force reconnect on DNS and connection errors instead of dying
+      if (msg.includes('enotfound') || msg.includes('econnreset') ||
+          msg.includes('econnrefused') || msg.includes('etimedout')) {
+        console.warn(`🔄 Redis: reconnectOnError triggered — ${err.message}`);
+        return true; // reconnect
+      }
+      return false;
+    }
   };
 }
 
@@ -38,12 +59,24 @@ let queueEvents = null;
 let connection = null;
 
 /**
+ * Attach event listeners to an ioredis connection for visibility.
+ */
+function _attachRedisListeners(conn, label) {
+  conn.on('connect', () => console.log(`🟢 Redis [${label}]: connected`));
+  conn.on('ready', () => console.log(`🟢 Redis [${label}]: ready`));
+  conn.on('error', (err) => console.warn(`🔴 Redis [${label}] error: ${err.message}`));
+  conn.on('reconnecting', (ms) => console.warn(`🔄 Redis [${label}]: reconnecting in ${ms || '?'}ms`));
+  conn.on('close', () => console.warn(`⚪ Redis [${label}]: connection closed`));
+}
+
+/**
  * Get or initialize the BullMQ Queue instance.
  */
 function getQueue() {
   if (!queue) {
     const redisUrl = getRedisConnectionConfig();
     connection = new Redis(redisUrl, getConnectionOptions(redisUrl));
+    _attachRedisListeners(connection, 'queue');
     queue = new Queue(QUEUE_NAME, { connection });
     queueEvents = new QueueEvents(QUEUE_NAME, { connection });
 
@@ -113,6 +146,7 @@ function startWorkerPool(concurrency = 5) {
 
   const redisUrl = getRedisConnectionConfig();
   const workerConnection = new Redis(redisUrl, getConnectionOptions(redisUrl));
+  _attachRedisListeners(workerConnection, 'worker');
 
   worker = new Worker(QUEUE_NAME, async (job) => {
     // Route to appropriate processor based on job name
@@ -197,7 +231,8 @@ async function processMorningBriefing(job) {
     });
 
     const durationMs = Date.now() - start;
-    const briefingText = result.cleanResponse || result.response || 'Briefing generation failed — no content returned.';
+    const rawBriefing = result.cleanResponse || result.response || 'Briefing generation failed — no content returned.';
+    const briefingText = typeof rawBriefing === 'string' ? rawBriefing : String(rawBriefing);
 
     console.log(`🌅 [MorningBriefing] Completed in ${durationMs}ms (${briefingText.length} chars)`);
 

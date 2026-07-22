@@ -131,7 +131,9 @@ async function gatherOpeningPositions({ goal, participants, userId, conversation
         `Use your tools to ground your view in real data where relevant, then state a clear position.)`;
 
       const result = await agent.execute({ goal: framedGoal, userId, conversationId });
-      position = (result.cleanResponse || result.response || '').trim();
+      // Fix 6: Guard against non-string response shapes (object, number, etc.)
+      const raw = result.cleanResponse || result.response || '';
+      position = (typeof raw === 'string' ? raw : String(raw)).trim();
       executionId = result.executionId || null;
     } catch (err) {
       console.warn(`⚠️ DebateOrchestrator: opening position for "${agentId}" failed: ${err.message}`);

@@ -3,27 +3,27 @@
 
 **FinChat is where humans and AI agents collaborate in the same chat.** A silent supervisor engine (Plato) monitors every message for fraud, manages a token economy, cryptographically anchors conversation history to the Solana blockchain — and the standout feature: **a living knowledge graph that learns from every chat, consolidates itself during "dream cycles," and shows you exactly which concepts it used to answer you.**
 
-This is not a chatbot wrapper. It's a **governed AI operating system**: multi-agent (4 specialist personas), multi-memory (semantic graph + episodic timeline + procedural learnings), multi-chain (IPFS + Solana), and production-hardened (real fraud detection, token ledger, zero-knowledge proofs, role-based governance).
+This is not a chatbot wrapper. It's a **governed AI operating-system prototype**: multi-agent (4 specialist personas), multi-memory (semantic graph + episodic timeline + procedural learnings), multi-chain (IPFS + Solana), and governance controls including fraud scanning, token accounting, zero-knowledge proofs, and role-based access. External services must be configured to use their live integrations; development fallbacks are explicitly marked in the UI and code.
 
 ---
 
-## What's shipped (Stages 1–4 verified ✅)
+## Implementation status
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Cognitive Memory Engine** | ✅ Live | 18/18 automated tests; first dream cycle merged 14 duplicates |
-| **4 AI agents** (Plato, Aurelius, Rasha, Nova) | ✅ Live | Specialized domains, real system prompts, avatars |
-| **Neural Map visualization** | ✅ Live | Real-time thinking, heatmap mode, **neighborhoods mode**, activation pulses |
-| **Community detection** | ✅ Live | Label propagation clusters the graph into named neighborhoods (LLM-named) |
-| **Nightly dream digest** | ✅ Live | "While you were away: learned N, merged K, found G gaps" → your channels |
-| **Blockchain proof chain** | ✅ Live | SHA-256 hash chaining, IPFS archival, Solana anchoring |
-| **Token economy** | ✅ Live | Per-user & per-agent budgets, real cost tracking |
-| **Real-time chat** | ✅ Live | Socket.io, typing indicators, group chat, read receipts |
-| **Fraud detection** | ✅ Live | Policy scanning, account freeze, auditor quarantine |
-| **Missions scheduler** | ✅ Live | BullMQ + Redis, per-mission budgets, autonomous agents |
-| **Notifications** | ✅ Live | Email (Gmail SMTP), Telegram (@Platotelebot), Web Push |
-| **Knowledge Center dashboard** | ✅ Live | Four-quadrant memory view (Semantic/Episodic/Procedural/RAG) |
-| **Reports module** | ✅ Live | Periodic narratives (growth, agent learning, dream digest, gaps, profile) |
+| **Cognitive Memory Engine** | Implemented | Includes name-based deduplication, retrieval, activation, dream consolidation, and gap detection; run the verification commands before claiming a live result. |
+| **4 AI agents** (Plato, Aurelius, Rasha, Nova) | Implemented | Specialized domains, real system prompts, avatars |
+| **Neural Map visualization** | Implemented | Real-time thinking, heatmap mode, **neighborhoods mode**, activation pulses |
+| **Community detection** | Implemented | Label propagation clusters the graph into named neighborhoods (LLM-named) |
+| **Nightly dream digest** | Implemented | "While you were away: learned N, merged K, found G gaps" → your channels |
+| **Blockchain proof chain** | Implemented | SHA-256 hash chain with optional IPFS archival and Solana devnet anchoring; unavailable services fall back to clearly marked simulation. |
+| **Token economy** | Implemented | Per-user & per-agent budgets, real cost tracking |
+| **Real-time chat** | Implemented | Socket.io, typing indicators, group chat, read receipts |
+| **Fraud detection** | Implemented | Uses Ollama when configured; otherwise the prototype uses deterministic pattern-based fallback scanning. |
+| **Missions scheduler** | Implemented | BullMQ + Redis, per-mission budgets, autonomous agents |
+| **Notifications** | Implemented | In-app notifications are wired; email, Telegram, and Web Push require their respective service configuration. |
+| **Knowledge Center dashboard** | Implemented | Four-quadrant memory view (Semantic/Episodic/Procedural/RAG) |
+| **Reports module** | Implemented | Periodic narratives (growth, agent learning, dream digest, gaps, profile) |
 | **Cluster summarization in dreams** | 🛣️ Roadmap | AI writes a paragraph per neighborhood (Stage 2 of the memory sprint) |
 | **Embedding-based dedup** | 🛣️ Roadmap | Merge "LLM" ≈ "large language model" by vector similarity (Stage 3) |
 
@@ -88,7 +88,7 @@ finchat/
 │   ├── SPRINT_X_COGNITIVE_MEMORY_ENGINE.md ← What's shipped (Stages 1–3)
 │   └── SPRINT_Y_KNOWLEDGE_AND_REPORTS.md   ← Next (Knowledge Center + Reports)
 │
-├── legacy_prototype/                        ← The working system (production-ready)
++-- legacy_prototype/                        ? The working Node.js/PostgreSQL prototype
 │   ├── backend/
 │   │   ├── server.js                        ← Express + Socket.io entry point
 │   │   ├── database.js                      ← PostgreSQL connection
@@ -259,9 +259,9 @@ Every 6 hours, the system consolidates: merges duplicates, decays unused links (
 **The nightly digest:**
 Once a day, after consolidating, the system tells each active user what changed — *"While you were away, I learned 12 new concepts, formed 5 links, merged 3 duplicates and found 2 knowledge gaps."* — delivered to their in-app bell and every channel they enabled (email, Telegram, Web Push), plus a snapshot on the Reports page. On the Neural Map, the **Neighborhoods** toggle (workspaces icon) colors every concept by its territory and turns the legend into the list of named clusters.
 
-**Verified:**
-- `scripts/test_cognitive_memory_engine.js` — **18/18 checks passed** (extraction, dedup, retrieval, activation, merge, decay, gaps)
-- `scripts/test_stage3_agent_cortex.js` — **14/14 checks passed** (per-agent knowledge silos, 2-hop retrieval, document ingestion)
+**Verification:**
+- `npm run verify` performs a safe local configuration and component check; it makes no network or database calls.
+- `scripts/test_cognitive_memory_engine.js` and `scripts/test_stage3_agent_cortex.js` are integration-style scripts. Run them only against a disposable test database and record their current results before presenting test counts.
 
 ---
 
@@ -309,7 +309,7 @@ Every AI action is constrained:
 - **Agent status pulses**: watch in real-time as agents think (execution:created → waiting → completed)
 - **Graph activation pulses**: watch nodes light up as the AI recalls them
 - **Debate rounds**: see agent positions, conflicts, and consensus in real-time
-- **Notifications**: email, Telegram, Web Push (all working, no mocks)
+- **Notifications**: in-app notifications are available; email, Telegram, and Web Push activate when their channels are configured.
 
 ---
 
