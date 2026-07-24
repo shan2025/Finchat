@@ -48,6 +48,18 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       }
     }
 
+    // Determine dynamic cognitive budget based on user prompt keywords
+    let dynamicBudget = undefined;
+    const msgLower = goal.toLowerCase();
+    
+    if (msgLower.includes('ultrathink') || msgLower.includes('think intensely') || msgLower.includes('think super hard')) {
+      dynamicBudget = { maxRuntimeSeconds: 300, maxToolCalls: 20, maxIterations: 20, maxTokens: 32000 };
+    } else if (msgLower.includes('megathink') || msgLower.includes('think deeply') || msgLower.includes('think really hard')) {
+      dynamicBudget = { maxRuntimeSeconds: 180, maxToolCalls: 15, maxIterations: 15, maxTokens: 15000 };
+    } else if (msgLower.includes('think hard') || msgLower.includes('think more')) {
+      dynamicBudget = { maxRuntimeSeconds: 120, maxToolCalls: 10, maxIterations: 12, maxTokens: 8000 };
+    }
+
     // Pass execution to the full cognitive loop (supporting Dual-Entry routing & Sentinel Middleware)
     const result = await route({
       goal,
@@ -55,7 +67,8 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       conversationId: options.sessionId || 'default_session',
       conversationHistory: history,
       targetAgentId,
-      allowWeb: options.webAccess !== false
+      allowWeb: options.webAccess !== false,
+      ...(dynamicBudget ? { budget: dynamicBudget } : {})
     });
 
     // Check if the LLM flagged fraud during generation
