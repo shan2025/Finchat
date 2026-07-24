@@ -150,6 +150,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .typing-dot:nth-child(3) { animation-delay:0.4s; }
   .typing-phrase { font-size:12px; color:var(--text2); font-style:italic; font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.25s ease; }
 
+  /* Tengu Thinking */
+  .tengu-bubble { padding:13px 18px; background:linear-gradient(145deg, #2d1215, #1a080a); border:1px solid #991b1b; border-radius:4px 18px 18px 18px; display:inline-flex; gap:10px; align-items:center; box-shadow:0 0 15px rgba(220,38,38,0.2); max-width:420px; }
+  .tengu-icon { font-size:16px; animation:spin 3s linear infinite; }
+  .tengu-phrase { font-size:12px; color:#fca5a5; font-style:italic; font-family:var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.25s ease; }
+
   /* Date divider */
   .date-divider { display:flex; align-items:center; gap:12px; margin:16px auto; width:100%; max-width:840px; }
   .date-divider::before, .date-divider::after { content:''; flex:1; height:1px; background:var(--border); }
@@ -1913,7 +1918,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
     window.typingTimers = window.typingTimers || {};
 
-    function showTyping() {
+    function showTyping(userText = '') {
       updatePersonaStatusUI(activePersona, true);
       const id = 'typing' + Date.now();
       const p = PERSONAS[activePersona];
@@ -1921,11 +1926,30 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       div.className = 'msg-group bot';
       div.id = id;
 
-      const phrases = PERSONA_THINKING_PHRASES[activePersona] || GENERAL_THINKING_PHRASES;
+      const txt = userText.toLowerCase();
+      const isTengu = txt.includes('think harder') || txt.includes('ultrathink') || txt.includes('megathink') || txt.includes('think deeply');
+      
+      const phrases = isTengu 
+        ? ["Expanding cognitive context window (32k)...", "Engaging multi-agent reasoning paths...", "Bypassing standard inference constraints...", "Synthesizing deep semantic analysis...", "Performing high-depth strategic generation..."]
+        : (PERSONA_THINKING_PHRASES[activePersona] || GENERAL_THINKING_PHRASES);
+        
       let phraseIdx = Math.floor(Math.random() * phrases.length);
       const initialPhrase = phrases[phraseIdx];
 
-      div.innerHTML = `
+      if (isTengu) {
+        div.innerHTML = `
+    <div class="msg-row">
+      <div class="msg-avatar-space"><div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div></div>
+      <div class="msg-content">
+        <div class="msg-sender">${p.name} (Tengu Mode)</div>
+        <div class="tengu-bubble">
+          <div class="tengu-icon">👺</div>
+          <span class="tengu-phrase" id="${id}-phrase">${initialPhrase}</span>
+        </div>
+      </div>
+    </div>`;
+      } else {
+        div.innerHTML = `
     <div class="msg-row">
       <div class="msg-avatar-space"><div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div></div>
       <div class="msg-content">
@@ -1940,6 +1964,8 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         </div>
       </div>
     </div>`;
+      }
+      
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 999999;
 
@@ -2033,7 +2059,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         input.value = '';
         input.style.height = '40px';
         showToast('Extracting concept graph via /graphify...', 'info');
-        const typingId = showTyping();
+        const typingId = showTyping(text);
         currentAbortController = new AbortController();
         setSendButtonMode('stop');
         try {
@@ -2102,7 +2128,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         const pendingChainEl = userMsgEl ? userMsgEl.querySelector('.chain-status') : null;
         if (pendingChainEl) { pendingChainEl.textContent = '⏳'; pendingChainEl.title = 'Anchoring to proof chain…'; }
 
-        const typingId = showTyping();
+        const typingId = showTyping(text);
 
         try {
           const token = _session?.token;
@@ -2371,7 +2397,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         addScanCard(text || '[file]', fraud);
         renderMessage('USER', text, proof, fraud, files);
 
-        const typingId = showTyping();
+        const typingId = showTyping(text);
         const botText = await getBotResponse(text);
         removeTyping(typingId);
 
