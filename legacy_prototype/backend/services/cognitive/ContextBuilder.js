@@ -172,7 +172,11 @@ function buildContext({
         `CITATION RULE: If any result contains a "url", "source", or "AbstractURL" field, you MUST include ` +
         `those URLs in your response as inline links so the user can verify the information. ` +
         `Never claim you "couldn't find results" if the tool returned any results — instead, present them ` +
-        `with their sources. If a tool returned an error, say so plainly and suggest a next step.`
+        `with their sources. If a tool returned an error, say so plainly and suggest a next step.\n` +
+        `SYNTHESIS RULE: When you have results from multiple tools, CROSS-REFERENCE them. ` +
+        `Connect related findings across domains (e.g. link a stock earnings report to an industry trend from news, ` +
+        `or connect a research paper to a funding round). Produce editorial analysis with "Why it matters" context, ` +
+        `not just restated data. Structure your response with clear section headers when the output is long.`
     });
   }
 

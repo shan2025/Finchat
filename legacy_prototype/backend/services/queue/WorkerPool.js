@@ -191,15 +191,51 @@ function startWorkerPool(concurrency = 5) {
 
 // ─── Morning Executive Briefing System ───
 
-const BRIEFING_GOAL = `Generate our Daily Morning Executive Briefing. You MUST use your tools to gather REAL, LIVE data for each section:
+const BRIEFING_GOAL = `You are producing today's **🧠 Frontier Intelligence Brief** — a premium daily executive report.
 
-1. 📈 MARKET & CRYPTO PULSE (Aurelius domain): Use the "crypto" tool to look up current prices for Bitcoin, Ethereum, and Solana. Use the "stocks" tool to check TSLA and AAPL. Summarize the market conditions.
+RESEARCH PHASE — use your tools to gather REAL, CURRENT data across these domains:
+- "news" tool: AI industry headlines, earnings, partnerships, funding rounds (Bloomberg, Reuters, CNBC, TechCrunch level)
+- "crypto" tool: Bitcoin, Ethereum, Solana current prices and 24h moves
+- "stocks" tool: AAPL, TSLA, and any tickers mentioned in today's headlines
+- "commodities" tool: Gold and oil as macro sentiment indicators
+- "paper" tool: Recent arXiv work on LLMs, agents, neuro-computation, or AI safety
+- "search" tool: Fill gaps — VC funding trends, fintech news, career/hiring market shifts
+- "fetch" tool: Read the most important article in depth for richer analysis
 
-2. 💼 CAREER & HIRING PULSE (Rasha domain): Use the "search" tool to find the latest trends in tech hiring, AI jobs, and remote work opportunities. Provide 2-3 actionable career insights.
+WRITING PHASE — synthesize everything into this exact structure:
 
-3. 🔬 FRONTIER SCIENCE & TECH (Nova domain): Use the "paper" tool to search for recent breakthroughs in "artificial intelligence" or "neural interfaces". Highlight 2-3 notable papers or discoveries.
+# 🧠 Frontier Intelligence Brief — [Today's Date]
 
-Format the briefing as a clean, executive-style daily report with clear section headers. Include actual numbers and data from your tool results. End with a "🎯 Key Action Items" section with 3 bullet points.`;
+## Executive Summary
+3-5 bullet points ranking today's strongest signals by importance. Use emoji indicators (📉📈🧪🖥️🧠💰₿).
+
+## [Themed Sections — 4 to 7 of these, each covering ONE major story]
+For each section:
+### [Company/Topic Name]
+#### [Descriptive one-line subtitle]
+1-2 paragraphs of ANALYSIS (not just facts — explain context, implications, competitive dynamics). Reference sources inline as markdown links: ([Source Name][N]).
+**Why it matters** — A short paragraph explaining the strategic significance for investors, builders, or researchers.
+
+## 📈 Markets & Funding (if relevant data found)
+Synthesize market moves and startup funding into strategic narrative, not raw numbers.
+
+## ₿ Crypto & Blockchain (if relevant data found)
+Focus on structural trends (stablecoins, RWAs, DePIN, verifiable AI) not just price ticks.
+
+## 🎯 Key Takeaway
+One synthesizing paragraph that connects the dots across all sections — what is the overarching theme today?
+
+[1]: URL "Title"
+[2]: URL "Title"
+... (numbered reference links at the bottom)
+
+QUALITY RULES:
+- NEVER list raw tool output. Every data point must be contextualized with analysis.
+- NEVER fabricate URLs, numbers, or quotes. Only report what tools returned.
+- ALWAYS include "Why it matters" after each major section.
+- Write in a confident, analytical editorial voice — like a senior intelligence analyst, not a news aggregator.
+- Cross-reference findings: if a funding round connects to an earnings report or a research paper, SAY SO.
+- Minimum 800 words, maximum 2000 words. Quality over quantity.`;
 
 /**
  * Process a morning executive briefing job.
@@ -227,7 +263,7 @@ async function processMorningBriefing(job) {
       // "Budget exceeded during plan execution" before the plan finished.
       // This runs as a background job with no one waiting on a spinner, so a
       // larger budget is safe here without loosening the interactive default.
-      budget: { maxRuntimeSeconds: 180, maxToolCalls: 10, maxIterations: 12, maxTokens: 8000 }
+      budget: { maxRuntimeSeconds: 240, maxToolCalls: 15, maxIterations: 14, maxTokens: 15000 }
     });
 
     const durationMs = Date.now() - start;

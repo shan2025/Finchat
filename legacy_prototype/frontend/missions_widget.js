@@ -96,7 +96,7 @@
         '</div>' +
         '<div style="font-size:12px; color:#5a4d3c; margin-top:8px; line-height:1.45;">' + esc(m.goal).slice(0, 220) + (m.goal.length > 220 ? '…' : '') + '</div>' +
         '<div style="font-size:11.5px; color:#8c7a6b; margin-top:8px;">Last run: ' + fmtTime(m.last_run_at) + (m.enabled ? ' · Next ≈ ' + fmtTime(m.next_run_at) : '') + '</div>' +
-        (m.last_result_preview ? '<details style="margin-top:6px;"><summary style="font-size:12px; color:#8c491a; cursor:pointer; font-weight:600;">Last result</summary><div style="font-size:12px; color:#5a4d3c; white-space:pre-wrap; margin-top:6px; max-height:180px; overflow-y:auto; background:#f5ead8; border-radius:10px; padding:10px;">' + esc(m.last_result_preview) + '</div></details>' : '') +
+        (m.last_result_preview ? '<details style="margin-top:6px;"><summary style="font-size:12px; color:#8c491a; cursor:pointer; font-weight:600;">Last result</summary><div class="markdown-body" style="font-size:12px; color:#5a4d3c; margin-top:6px; max-height:250px; overflow-y:auto; background:#f5ead8; border-radius:10px; padding:12px;">' + (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.last_result_preview)) : esc(m.last_result_preview).replace(/\\n/g, '<br>')) + '</div></details>' : '') +
       '</div>';
     }).join('') : '<div style="font-size:13px; color:#8c7a6b; padding:4px 2px;">No missions for this agent yet — create one below. Missions run on a schedule while the server is up; new and seeded missions start <b>paused</b> so nothing spends tokens until you enable it.</div>';
 

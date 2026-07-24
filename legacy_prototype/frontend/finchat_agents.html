@@ -12,6 +12,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Markdown rendering for mission results -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- Theme Configuration -->
 <script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
                         "headline-lg": ["Inter"],
@@ -73,11 +76,26 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     #sideNav.open { transform: translateX(0); }
   }
   @media (min-width: 768px) { #sideNav { transform: none !important; } }
+  
+  /* Markdown styling for mission results */
+  .markdown-body { font-family: var(--sans); font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #3a2e23; }
+  .markdown-body h1 { font-size: 1.2em; }
+  .markdown-body h2 { font-size: 1.1em; }
+  .markdown-body h3 { font-size: 1.05em; }
+  .markdown-body p { margin-bottom: 0.5em; }
+  .markdown-body p:last-child { margin-bottom: 0; }
+  .markdown-body a { color: #8c491a; text-decoration: underline; text-underline-offset: 2px; }
+  .markdown-body a:hover { color: #b0472e; }
+  .markdown-body strong { font-weight: 700; }
+  .markdown-body em { font-style: italic; }
+  .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
+  .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
 </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
-<body class="bg-cream-bg text-text-primary h-screen overflow-hidden flex">
+<body class="bg-cream-bg text-text-primary h-screen overflow-hidden">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
@@ -410,6 +428,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   document.getElementById('topbarTokenDisplay').textContent = personaBalances.plato || 1000;
 
   const AUTH_HDR = () => ({ 'Authorization': 'Bearer ' + (SESSION_USER.token || _session?.token || localStorage.getItem('finchat_token') || '') });
+  const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
 
   function applyConfigToUI(cfg) {
     document.getElementById('sliderFormal').value = cfg.formal;
@@ -448,7 +467,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     let cfg = agentConfigs[agent] || { risk: 'Low', formal: 50, brief: 50, serious: 50 };
     applyConfigToUI(cfg); // instant paint from cache
     try {
-      const r = await fetch(`/api/agents/${agent}/config`, { headers: AUTH_HDR() });
+      const r = await fetch(`${API_URL}/api/agents/${agent}/config`, { headers: AUTH_HDR() });
       if (r.ok) {
         const d = await r.json();
         const s = d.settings || {};
@@ -476,7 +495,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     if (!box) return;
     box.innerHTML = '<div class="text-center text-[#8c7a6b] text-[11px] py-4">Loading audit trail…</div>';
     try {
-      const r = await fetch(`/api/agents/${agent}/audit?limit=12`, { headers: AUTH_HDR() });
+      const r = await fetch(`${API_URL}/api/agents/${agent}/audit?limit=12`, { headers: AUTH_HDR() });
       const d = await r.json();
       const logs = d.logs || [];
       if (!logs.length) {
@@ -542,7 +561,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
 
     const capitalized = currentAgent.charAt(0).toUpperCase() + currentAgent.slice(1);
     try {
-      const r = await fetch(`/api/agents/${currentAgent}/config`, {
+      const r = await fetch(`${API_URL}/api/agents/${currentAgent}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...AUTH_HDR() },
         body: JSON.stringify(payload)

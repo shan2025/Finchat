@@ -98,7 +98,7 @@
         ::-webkit-scrollbar-thumb:hover { background: theme('colors.accent-gold'); }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden antialiased selection:bg-accent-gold/30 selection:text-primary-brown">
+<body class="h-screen overflow-hidden antialiased selection:bg-accent-gold/30 selection:text-primary-brown">
     <!-- SideNavBar -->
     <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
@@ -188,11 +188,18 @@
                     <div class="w-2 h-2 rounded-full bg-accent-gold shadow-[0_0_8px_rgba(193,156,77,0.6)] animate-pulse"></div>
                     <span class="font-body-sm text-[12px] font-medium">System Status: Secured</span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button class="p-2 text-text-secondary hover:text-primary-brown transition-colors rounded-full hover:bg-cream-card relative">
+                <div class="flex items-center gap-sm relative">
+                    <button id="notifBell" onclick="toggleNotifications(event)" class="p-2 rounded-full text-text-secondary hover:text-primary-brown transition-colors relative hover:bg-cream-card">
                         <span class="material-symbols-outlined">notifications</span>
-                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-cream-bg"></span>
+                        <span id="notifBadge" class="hidden absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center border border-cream-bg"></span>
                     </button>
+                    <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-border-color sticky top-0 bg-cream-bg">
+                            <span class="text-sm font-bold text-[#3a2e23]">Notifications</span>
+                            <button onclick="markAllNotifsRead()" class="text-[11px] text-[#8c7a6b] hover:text-[#3a2e23] font-semibold">Mark all read</button>
+                        </div>
+                        <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
+                    </div>
                 </div>
                 <div id="topbarUserIcon" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="h-8 w-8 rounded-full overflow-hidden ml-2 cursor-pointer border border-border-color flex items-center justify-center bg-[#efe8de] text-[#3a2e23] font-bold text-xs">
                     BT
@@ -768,6 +775,7 @@
     </script>
     <!-- Sprint 6.1: fills #spProofExtra / #spEconomy / #spRules / #spScans with live data -->
     <script src="system_panels.js"></script>
+    <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>
 <script src="knowledge_search.js"></script>
 </body>

@@ -13,294 +13,294 @@
 </script>
 <script src="nn_core.js"></script>
 <style>
-  /* Same two-theme system as Neural Map — shared localStorage key so switching
-     theme on one page carries over to the other. */
-  :root, [data-nm-theme="warm"] {
-    --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
-    --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
-    --danger: #b0472e; --good: #7a8a5e; --rail: #3a2e23; --rail-txt: #efe8de;
-    --rail-hover: #4a3828; --rail-muted: #c9c0b0; --track: #e3d3ba; --graphbg: #fbf5e9;
-    --wpos: #7a8a5e; --wneg: #c67139; --pulse: #c67139; --node: #fffaf0; --nodestroke: #f5ead8; --nodetext: #2a221b;
-  }
-  [data-nm-theme="dark"] {
-    --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
-    --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
-    --danger: #e8867a; --good: #5fd0e6; --rail: #131c2e; --rail-txt: #e8eef8;
-    --rail-hover: #1c2942; --rail-muted: #7f93b3; --track: #1b2740; --graphbg: #0a111f;
-    --wpos: #5fd0e6; --wneg: #e08a3c; --pulse: #fff2c8; --node: #dfe9f7; --nodestroke: #0b1220; --nodetext: #0b1220;
-  }
-  body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
-  /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
-     navigation is reachable on narrow screens (the old `hidden md:flex` left no
-     nav at all under 768px). */
-  #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
-  }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
-  .nn-canvas { display: block; }
-  .nm-rail    { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
-  .nm-chrome  { background: var(--chrome); border-color: var(--border); }
-  .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
-  .nm-field   { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
-  .nm-sub     { color: var(--sub); }
-  .nm-btn     { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; cursor: pointer; }
-  .nm-btn:hover { filter: brightness(.96); }
-  [data-nm-theme="dark"] .nm-btn:hover { filter: brightness(1.35); }
-  .nm-btn-primary { background: var(--accent); border: none; cursor: pointer; transition: filter .12s ease; }
-  .nm-btn-primary:hover { filter: brightness(1.1); }
-  [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
-  [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
-  .nm-rail-link:hover { background: var(--rail-hover); }
-  .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
-  .seg-btn { cursor: pointer; font-weight: 600; font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--field); color: var(--txt); transition: filter .1s ease; }
-  .seg-btn.on { background: var(--accent); border-color: transparent; }
-  [data-nm-theme="warm"] .seg-btn.on { color: #efe8de; }
-  [data-nm-theme="dark"] .seg-btn.on { color: #0b1220; }
-  input[type=range] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px; outline: none; background: var(--track); }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
-  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
-  .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
-  .toast.show { opacity:1; transform:translateY(0); }
-  .metric-tile { background: var(--graphbg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+ /* Same two-theme system as Neural Map — shared localStorage key so switching
+   theme on one page carries over to the other. */
+ :root, [data-nm-theme="warm"] {
+  --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
+  --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
+  --danger: #b0472e; --good: #7a8a5e; --rail: #3a2e23; --rail-txt: #efe8de;
+  --rail-hover: #4a3828; --rail-muted: #c9c0b0; --track: #e3d3ba; --graphbg: #fbf5e9;
+  --wpos: #7a8a5e; --wneg: #c67139; --pulse: #c67139; --node: #fffaf0; --nodestroke: #f5ead8; --nodetext: #2a221b;
+ }
+ [data-nm-theme="dark"] {
+  --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
+  --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
+  --danger: #e8867a; --good: #5fd0e6; --rail: #131c2e; --rail-txt: #e8eef8;
+  --rail-hover: #1c2942; --rail-muted: #7f93b3; --track: #1b2740; --graphbg: #0a111f;
+  --wpos: #5fd0e6; --wneg: #e08a3c; --pulse: #fff2c8; --node: #dfe9f7; --nodestroke: #0b1220; --nodetext: #0b1220;
+ }
+ body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
+ ::-webkit-scrollbar { width: 6px; height: 6px; }
+ ::-webkit-scrollbar-track { background: transparent; }
+ ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
+ /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
+   navigation is reachable on narrow screens (the old `hidden md:flex` left no
+   nav at all under 768px). */
+ #sideNav { transition: transform .25s ease; }
+ @media (max-width: 767px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  #sideNav.open { transform: translateX(0); }
+ }
+ @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ .nn-canvas { display: block; }
+ .nm-rail  { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
+ .nm-chrome { background: var(--chrome); border-color: var(--border); }
+ .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
+ .nm-field  { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
+ .nm-sub   { color: var(--sub); }
+ .nm-btn   { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; cursor: pointer; }
+ .nm-btn:hover { filter: brightness(.96); }
+ [data-nm-theme="dark"] .nm-btn:hover { filter: brightness(1.35); }
+ .nm-btn-primary { background: var(--accent); border: none; cursor: pointer; transition: filter .12s ease; }
+ .nm-btn-primary:hover { filter: brightness(1.1); }
+ [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
+ [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
+ .nm-rail-link:hover { background: var(--rail-hover); }
+ .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
+ .seg-btn { cursor: pointer; font-weight: 600; font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--field); color: var(--txt); transition: filter .1s ease; }
+ .seg-btn.on { background: var(--accent); border-color: transparent; }
+ [data-nm-theme="warm"] .seg-btn.on { color: #efe8de; }
+ [data-nm-theme="dark"] .seg-btn.on { color: #0b1220; }
+ input[type=range] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px; outline: none; background: var(--track); }
+ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
+ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
+ .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
+ .toast.show { opacity:1; transform:translateY(0); }
+ .metric-tile { background: var(--graphbg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
 </style>
 </head>
 
-<body class="h-screen overflow-hidden flex">
+<body class="h-screen overflow-hidden ">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- LEFT SIDEBAR NAV (static rail at md+, slide-in drawer below) -->
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
-    <div class="mb-10 px-2">
-        <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
-            FinChat
-        </h1>
-        <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+  <div class="mb-10 px-2">
+    <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+      FinChat
+    </h1>
+    <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+  </div>
+  <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+      <span class="material-symbols-outlined text-[20px]">dashboard</span>
+      <span class="font-body-sm font-medium">Operations</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+      <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+      <span class="font-body-sm font-medium">Agents</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">chat</span>
+      <span class="font-body-sm font-medium">Chat</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+      <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
+      <span class="font-body-sm font-medium">Neural Map</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">assessment</span>
+      <span class="font-body-sm font-medium">Reports</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">menu_book</span>
+      <span class="font-body-sm font-medium">Knowledge</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">account_balance</span>
+      <span class="font-body-sm font-medium">Governance</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+      <span class="material-symbols-outlined text-[20px]">account_tree</span>
+      <span class="font-body-sm font-medium">Blockchain</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+      <span class="material-symbols-outlined text-[20px]">policy</span>
+      <span class="font-body-sm font-medium">Audit Logs</span>
+    </a>
+    <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">settings</span>
+      <span class="font-body-sm font-medium">Settings</span>
+    </a>
+  </div>
+  <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+      <span class="material-symbols-outlined text-[20px]">help</span>
+      <span class="font-body-sm font-medium">Support</span>
+    </a>
+    <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
+      <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+        <span id="sidebarAvatarText">BT</span>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+        <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+      </div>
+      <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
     </div>
-    <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
-            <span class="material-symbols-outlined text-[20px]">dashboard</span>
-            <span class="font-body-sm font-medium">Operations</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
-            <span class="material-symbols-outlined text-[20px]">smart_toy</span>
-            <span class="font-body-sm font-medium">Agents</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">chat</span>
-            <span class="font-body-sm font-medium">Chat</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
-            <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
-            <span class="font-body-sm font-medium">Neural Map</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">assessment</span>
-            <span class="font-body-sm font-medium">Reports</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">menu_book</span>
-            <span class="font-body-sm font-medium">Knowledge</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">account_balance</span>
-            <span class="font-body-sm font-medium">Governance</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-            <span class="material-symbols-outlined text-[20px]">account_tree</span>
-            <span class="font-body-sm font-medium">Blockchain</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-            <span class="material-symbols-outlined text-[20px]">policy</span>
-            <span class="font-body-sm font-medium">Audit Logs</span>
-        </a>
-        <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">settings</span>
-            <span class="font-body-sm font-medium">Settings</span>
-        </a>
-    </div>
-    <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
-            <span class="material-symbols-outlined text-[20px]">help</span>
-            <span class="font-body-sm font-medium">Support</span>
-        </a>
-        <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
-            <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
-                <span id="sidebarAvatarText">BT</span>
-            </div>
-            <div class="flex-1 overflow-hidden">
-                <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
-                <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
-            </div>
-            <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
-        </div>
-    </div>
+  </div>
 </nav>
 
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
-  <!-- Top App Bar -->
-  <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
-    <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[18px]">menu</span>
+ <!-- Top App Bar -->
+ <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
+  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[18px]">menu</span>
+  </button>
+  <a href="finchat_neuralmap.html" class="nm-btn flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0">
+   <span class="material-symbols-outlined text-[15px]">arrow_back</span> Neural Map
+  </a>
+  <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
+  <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--accent-soft); max-width: 260px;" />
+  <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline-block truncate min-w-0" style="max-width:200px">—</span>
+  <div class="flex-1"></div>
+  <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
+  </button>
+  <!-- Notification bell -->
+  <div class="relative shrink-0">
+   <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
+    <span class="material-symbols-outlined text-[16px]">notifications</span>
+    <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+   </button>
+   <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+    <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+     <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+     <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+    </div>
+    <div id="notifList"></div>
+   </div>
+  </div>
+  <!-- Profile -->
+  <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;"></div>
+ </header>
+
+ <div id="loadingVeil" class="flex-1 flex items-center justify-center">
+  <div class="flex items-center gap-3 nm-sub text-sm font-mono">
+   <span class="material-symbols-outlined animate-spin">progress_activity</span> Loading network…
+  </div>
+ </div>
+
+ <div id="appBody" class="hidden flex-1 min-h-0 flex flex-col md:flex-row">
+
+  <!-- NETWORK VISUALIZATION -->
+  <div class="flex-1 min-w-0 flex flex-col relative" style="min-height: 280px;">
+   <div class="flex-1 min-h-0 relative">
+    <canvas id="netCanvas" class="nn-canvas w-full h-full"></canvas>
+    <!-- Legend sits bottom-left, clear of the OUTPUT caption drawn top-right
+       on the canvas, with a surface background so it reads over the wires. -->
+    <div class="nm-surface absolute left-3 bottom-3 flex flex-wrap gap-x-3 gap-y-1 items-center text-[11px] px-3 py-1.5 rounded-full pointer-events-none" style="max-width: calc(100% - 24px);">
+     <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block" style="width:16px;height:3px;border-radius:9px;background:var(--wpos)"></span>positive weight</span>
+     <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block" style="width:16px;height:3px;border-radius:9px;background:var(--wneg)"></span>negative weight</span>
+     <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block rounded-full" style="width:9px;height:9px;background:var(--pulse)"></span>signal pulse</span>
+    </div>
+   </div>
+   <div class="nm-chrome flex items-center gap-2.5 px-5 py-3 border-t shrink-0 flex-wrap">
+    <button id="playForwardBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold">
+     <span class="material-symbols-outlined text-[15px]">play_arrow</span> Forward pass
     </button>
-    <a href="finchat_neuralmap.html" class="nm-btn flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0">
-      <span class="material-symbols-outlined text-[15px]">arrow_back</span> Neural Map
-    </a>
-    <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
-    <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--accent-soft); max-width: 260px;" />
-    <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline-block truncate min-w-0" style="max-width:200px">—</span>
+    <button id="playBackBtn" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold">
+     <span class="material-symbols-outlined text-[15px]">undo</span> Backpropagate
+    </button>
     <div class="flex-1"></div>
-    <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
+    <span id="flowStatus" class="text-[12px] nm-sub">idle · press Train</span>
+   </div>
+  </div>
+
+  <!-- CONTROLS + METRICS -->
+  <div class="nm-chrome flex-shrink-0 md:w-[380px] md:max-w-[380px] w-full overflow-y-auto border-t md:border-t-0 md:border-l p-4 flex flex-col gap-3.5">
+
+   <!-- Architecture -->
+   <div class="nm-field rounded-2xl p-3.5">
+    <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Architecture</div>
+    <div class="flex gap-1.5 mb-3">
+     <button class="seg-btn flex-1" data-preset="0,1">Perceptron</button>
+     <button class="seg-btn flex-1" data-preset="1,6">MLP</button>
+     <button class="seg-btn flex-1" data-preset="2,8">Deep MLP</button>
+    </div>
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Hidden layers</span><span id="hiddenVal" class="font-bold" style="color:var(--txt)">1</span></div>
+    <div class="flex gap-1.5 mb-3.5">
+     <button class="seg-btn flex-1" data-hidden="0">none</button>
+     <button class="seg-btn flex-1" data-hidden="1">1</button>
+     <button class="seg-btn flex-1" data-hidden="2">2</button>
+    </div>
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Neurons per hidden layer</span><span id="widthVal" class="font-bold" style="color:var(--txt)">6</span></div>
+    <input id="widthRange" type="range" min="1" max="12" step="1" class="w-full" />
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Activation</span></div>
+    <div class="flex gap-1.5">
+     <button class="seg-btn flex-1" data-act="tanh">tanh</button>
+     <button class="seg-btn flex-1" data-act="relu">relu</button>
+     <button class="seg-btn flex-1" data-act="sigmoid">sigmoid</button>
+    </div>
+    <div class="text-[11px] nm-sub mt-2.5 leading-relaxed">Hidden units use the activation above; the output is always linear. More neurons &amp; layers = more capacity to bend the curve.</div>
+   </div>
+
+   <!-- Training -->
+   <div class="nm-field rounded-2xl p-3.5">
+    <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Training</div>
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>What it learns</span></div>
+    <div class="flex gap-1.5 mb-3.5 flex-wrap">
+     <button class="seg-btn flex-1" data-target="sine">sine</button>
+     <button class="seg-btn flex-1" data-target="zigzag">zigzag</button>
+     <button class="seg-btn flex-1" data-target="step">step</button>
+     <button class="seg-btn flex-1" data-target="bump">bump</button>
+    </div>
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Learning rate</span><span id="lrVal" class="font-bold" style="color:var(--txt)">0.15</span></div>
+    <input id="lrRange" type="range" min="0.01" max="0.6" step="0.01" class="w-full" />
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Data noise</span><span id="noiseVal" class="font-bold" style="color:var(--txt)">0.12</span></div>
+    <input id="noiseRange" type="range" min="0" max="0.4" step="0.02" class="w-full" />
+    <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Samples</span><span id="samplesVal" class="font-bold" style="color:var(--txt)">30</span></div>
+    <input id="samplesRange" type="range" min="6" max="80" step="2" class="w-full" />
+    <div class="flex gap-2 mt-3.5">
+     <button id="trainBtn" class="nm-btn-primary flex-1 py-2.5 rounded-full font-bold text-[13px]">Train</button>
+     <button id="stepBtn" class="nm-btn px-3.5 py-2.5 rounded-full font-semibold text-[13px]">Step</button>
+     <button id="resetBtn" class="nm-btn px-3.5 py-2.5 rounded-full font-semibold text-[13px]">Reset</button>
+    </div>
+   </div>
+
+   <!-- Fit & generalization -->
+   <div class="nm-field rounded-2xl p-3.5">
+    <div class="flex items-baseline justify-between mb-2.5">
+     <div class="text-[15px] font-bold" style="font-family: Georgia, serif;">Fit &amp; generalization</div>
+     <div class="text-[12px] nm-sub">epoch <b id="epochVal" style="color:var(--txt)">0</b></div>
+    </div>
+    <canvas id="regCanvas" class="nn-canvas w-full rounded-xl" style="height:170px; background: var(--graphbg);"></canvas>
+    <div id="verdictBanner" class="mt-2.5 py-2 px-3 rounded-xl text-[13px] font-bold text-center"></div>
+
+    <!-- Metrics grid — this is the "different metrics of evaluation" ask:
+       MSE alone isn't enough, so RMSE / MAE / R² / max error are all
+       computed for BOTH train and held-out test data. -->
+    <div class="mt-3">
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Evaluation metrics</div>
+     <div class="grid grid-cols-2 gap-1.5 text-[11px]" id="metricsGrid"></div>
+    </div>
+
+    <div class="mt-3 flex flex-col gap-1.5">
+     <div>
+      <div class="flex justify-between text-[11px] nm-sub mb-0.5"><span>Bias (proxy: train error)</span><span id="biasPct">0%</span></div>
+      <div class="h-[7px] rounded-full" style="background: var(--track);"><div id="biasBar" class="h-full rounded-full" style="width:0%; background: var(--accent);"></div></div>
+     </div>
+     <div>
+      <div class="flex justify-between text-[11px] nm-sub mb-0.5"><span>Variance (proxy: train→test gap)</span><span id="varPct">0%</span></div>
+      <div class="h-[7px] rounded-full" style="background: var(--track);"><div id="varBar" class="h-full rounded-full" style="width:0%; background: var(--good);"></div></div>
+     </div>
+    </div>
+
+    <button id="serverEvalBtn" class="nm-btn w-full mt-3 py-2 rounded-full text-[12px] font-semibold flex items-center justify-center gap-1.5">
+     <span class="material-symbols-outlined text-[14px]">verified</span> Run server-verified evaluation
     </button>
-    <!-- Notification bell -->
-    <div class="relative shrink-0">
-      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
-        <span class="material-symbols-outlined text-[16px]">notifications</span>
-        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
-      </button>
-      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
-        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
-          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
-          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
-        </div>
-        <div id="notifList"></div>
-      </div>
-    </div>
-    <!-- Profile -->
-    <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;"></div>
-  </header>
+    <div id="serverEvalNote" class="text-[10px] nm-sub text-center mt-1.5"></div>
 
-  <div id="loadingVeil" class="flex-1 flex items-center justify-center">
-    <div class="flex items-center gap-3 nm-sub text-sm font-mono">
-      <span class="material-symbols-outlined animate-spin">progress_activity</span> Loading network…
-    </div>
+    <div class="text-[11px] nm-sub mt-3 leading-relaxed">The faint dashed line is the true function. Dots are noisy samples. The solid curve is what the network learned — press <b>Train</b> and watch it bend to fit. Hover a neuron on the left to read its activation.</div>
+   </div>
   </div>
-
-  <div id="appBody" class="hidden flex-1 min-h-0 flex flex-col md:flex-row">
-
-    <!-- NETWORK VISUALIZATION -->
-    <div class="flex-1 min-w-0 flex flex-col relative" style="min-height: 280px;">
-      <div class="flex-1 min-h-0 relative">
-        <canvas id="netCanvas" class="nn-canvas w-full h-full"></canvas>
-        <!-- Legend sits bottom-left, clear of the OUTPUT caption drawn top-right
-             on the canvas, with a surface background so it reads over the wires. -->
-        <div class="nm-surface absolute left-3 bottom-3 flex flex-wrap gap-x-3 gap-y-1 items-center text-[11px] px-3 py-1.5 rounded-full pointer-events-none" style="max-width: calc(100% - 24px);">
-          <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block" style="width:16px;height:3px;border-radius:9px;background:var(--wpos)"></span>positive weight</span>
-          <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block" style="width:16px;height:3px;border-radius:9px;background:var(--wneg)"></span>negative weight</span>
-          <span class="inline-flex items-center gap-1.5 nm-sub"><span class="inline-block rounded-full" style="width:9px;height:9px;background:var(--pulse)"></span>signal pulse</span>
-        </div>
-      </div>
-      <div class="nm-chrome flex items-center gap-2.5 px-5 py-3 border-t shrink-0 flex-wrap">
-        <button id="playForwardBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold">
-          <span class="material-symbols-outlined text-[15px]">play_arrow</span> Forward pass
-        </button>
-        <button id="playBackBtn" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-bold">
-          <span class="material-symbols-outlined text-[15px]">undo</span> Backpropagate
-        </button>
-        <div class="flex-1"></div>
-        <span id="flowStatus" class="text-[12px] nm-sub">idle · press Train</span>
-      </div>
-    </div>
-
-    <!-- CONTROLS + METRICS -->
-    <div class="nm-chrome flex-shrink-0 md:w-[380px] md:max-w-[380px] w-full overflow-y-auto border-t md:border-t-0 md:border-l p-4 flex flex-col gap-3.5">
-
-      <!-- Architecture -->
-      <div class="nm-field rounded-2xl p-3.5">
-        <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Architecture</div>
-        <div class="flex gap-1.5 mb-3">
-          <button class="seg-btn flex-1" data-preset="0,1">Perceptron</button>
-          <button class="seg-btn flex-1" data-preset="1,6">MLP</button>
-          <button class="seg-btn flex-1" data-preset="2,8">Deep MLP</button>
-        </div>
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Hidden layers</span><span id="hiddenVal" class="font-bold" style="color:var(--txt)">1</span></div>
-        <div class="flex gap-1.5 mb-3.5">
-          <button class="seg-btn flex-1" data-hidden="0">none</button>
-          <button class="seg-btn flex-1" data-hidden="1">1</button>
-          <button class="seg-btn flex-1" data-hidden="2">2</button>
-        </div>
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Neurons per hidden layer</span><span id="widthVal" class="font-bold" style="color:var(--txt)">6</span></div>
-        <input id="widthRange" type="range" min="1" max="12" step="1" class="w-full" />
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Activation</span></div>
-        <div class="flex gap-1.5">
-          <button class="seg-btn flex-1" data-act="tanh">tanh</button>
-          <button class="seg-btn flex-1" data-act="relu">relu</button>
-          <button class="seg-btn flex-1" data-act="sigmoid">sigmoid</button>
-        </div>
-        <div class="text-[11px] nm-sub mt-2.5 leading-relaxed">Hidden units use the activation above; the output is always linear. More neurons &amp; layers = more capacity to bend the curve.</div>
-      </div>
-
-      <!-- Training -->
-      <div class="nm-field rounded-2xl p-3.5">
-        <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Training</div>
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>What it learns</span></div>
-        <div class="flex gap-1.5 mb-3.5 flex-wrap">
-          <button class="seg-btn flex-1" data-target="sine">sine</button>
-          <button class="seg-btn flex-1" data-target="zigzag">zigzag</button>
-          <button class="seg-btn flex-1" data-target="step">step</button>
-          <button class="seg-btn flex-1" data-target="bump">bump</button>
-        </div>
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>Learning rate</span><span id="lrVal" class="font-bold" style="color:var(--txt)">0.15</span></div>
-        <input id="lrRange" type="range" min="0.01" max="0.6" step="0.01" class="w-full" />
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Data noise</span><span id="noiseVal" class="font-bold" style="color:var(--txt)">0.12</span></div>
-        <input id="noiseRange" type="range" min="0" max="0.4" step="0.02" class="w-full" />
-        <div class="flex justify-between text-[12px] nm-sub mb-1.5 mt-3"><span>Samples</span><span id="samplesVal" class="font-bold" style="color:var(--txt)">30</span></div>
-        <input id="samplesRange" type="range" min="6" max="80" step="2" class="w-full" />
-        <div class="flex gap-2 mt-3.5">
-          <button id="trainBtn" class="nm-btn-primary flex-1 py-2.5 rounded-full font-bold text-[13px]">Train</button>
-          <button id="stepBtn" class="nm-btn px-3.5 py-2.5 rounded-full font-semibold text-[13px]">Step</button>
-          <button id="resetBtn" class="nm-btn px-3.5 py-2.5 rounded-full font-semibold text-[13px]">Reset</button>
-        </div>
-      </div>
-
-      <!-- Fit & generalization -->
-      <div class="nm-field rounded-2xl p-3.5">
-        <div class="flex items-baseline justify-between mb-2.5">
-          <div class="text-[15px] font-bold" style="font-family: Georgia, serif;">Fit &amp; generalization</div>
-          <div class="text-[12px] nm-sub">epoch <b id="epochVal" style="color:var(--txt)">0</b></div>
-        </div>
-        <canvas id="regCanvas" class="nn-canvas w-full rounded-xl" style="height:170px; background: var(--graphbg);"></canvas>
-        <div id="verdictBanner" class="mt-2.5 py-2 px-3 rounded-xl text-[13px] font-bold text-center"></div>
-
-        <!-- Metrics grid — this is the "different metrics of evaluation" ask:
-             MSE alone isn't enough, so RMSE / MAE / R² / max error are all
-             computed for BOTH train and held-out test data. -->
-        <div class="mt-3">
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Evaluation metrics</div>
-          <div class="grid grid-cols-2 gap-1.5 text-[11px]" id="metricsGrid"></div>
-        </div>
-
-        <div class="mt-3 flex flex-col gap-1.5">
-          <div>
-            <div class="flex justify-between text-[11px] nm-sub mb-0.5"><span>Bias (proxy: train error)</span><span id="biasPct">0%</span></div>
-            <div class="h-[7px] rounded-full" style="background: var(--track);"><div id="biasBar" class="h-full rounded-full" style="width:0%; background: var(--accent);"></div></div>
-          </div>
-          <div>
-            <div class="flex justify-between text-[11px] nm-sub mb-0.5"><span>Variance (proxy: train→test gap)</span><span id="varPct">0%</span></div>
-            <div class="h-[7px] rounded-full" style="background: var(--track);"><div id="varBar" class="h-full rounded-full" style="width:0%; background: var(--good);"></div></div>
-          </div>
-        </div>
-
-        <button id="serverEvalBtn" class="nm-btn w-full mt-3 py-2 rounded-full text-[12px] font-semibold flex items-center justify-center gap-1.5">
-          <span class="material-symbols-outlined text-[14px]">verified</span> Run server-verified evaluation
-        </button>
-        <div id="serverEvalNote" class="text-[10px] nm-sub text-center mt-1.5"></div>
-
-        <div class="text-[11px] nm-sub mt-3 leading-relaxed">The faint dashed line is the true function. Dots are noisy samples. The solid curve is what the network learned — press <b>Train</b> and watch it bend to fit. Hover a neuron on the left to read its activation.</div>
-      </div>
-    </div>
-  </div>
+ </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -313,11 +313,11 @@ const THEME_KEY = 'finchat_nm_theme';
 let theme = localStorage.getItem(THEME_KEY) || 'warm';
 document.documentElement.setAttribute('data-nm-theme', theme);
 function applyTheme(next) {
-  theme = next;
-  document.documentElement.setAttribute('data-nm-theme', next);
-  localStorage.setItem(THEME_KEY, next);
-  const icon = document.getElementById('themeIcon');
-  if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+ theme = next;
+ document.documentElement.setAttribute('data-nm-theme', next);
+ localStorage.setItem(THEME_KEY, next);
+ const icon = document.getElementById('themeIcon');
+ if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -330,24 +330,24 @@ const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('f
 const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 
 (function initSidebar() {
-  const name = SESSION_USER.name || SESSION_USER.username || 'User';
-  const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
-  document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarAvatarText').textContent = initials;
-  document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
-  const topProfile = document.getElementById('topbarUserIcon');
-  if (topProfile) {
-    if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
-    else topProfile.textContent = initials;
-  }
-  fetch('/api/tokens/balance', { headers: AUTH }).then(r => r.ok ? r.json() : null)
-    .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; }).catch(() => {});
+ const name = SESSION_USER.name || SESSION_USER.username || 'User';
+ const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+ document.getElementById('sidebarName').textContent = name;
+ document.getElementById('sidebarAvatarText').textContent = initials;
+ document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
+ const topProfile = document.getElementById('topbarUserIcon');
+ if (topProfile) {
+  if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
+  else topProfile.textContent = initials;
+ }
+ fetch('/api/tokens/balance', { headers: AUTH }).then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; }).catch(() => {});
 })();
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2600);
+ const t = document.getElementById('toast');
+ t.textContent = msg; t.classList.add('show');
+ setTimeout(() => t.classList.remove('show'), 2600);
 }
 
 const MAP_ID = new URLSearchParams(location.search).get('mapId');
@@ -360,12 +360,12 @@ if (!MAP_ID) window.location.href = 'finchat_neuralmap.html';
 let cfg = NNCore.normalizeConfig({});
 let net = NNCore.createNet(cfg);
 let data = NNCore.buildData(cfg);
-let running = false;      // is Train toggled on
+let running = false;   // is Train toggled on
 let anim = { mode: null, t: 0 };
-let hover = null;         // { l, i } — hovered neuron
+let hover = null;     // { l, i } — hovered neuron
 let frame = 0;
 let lastMetrics = null;
-let dirty = false;        // unsaved changes since last persist
+let dirty = false;    // unsaved changes since last persist
 
 const netCanvas = document.getElementById('netCanvas');
 const nctx = netCanvas.getContext('2d');
@@ -374,14 +374,14 @@ const rctx = regCanvas.getContext('2d');
 let nw = 0, nh = 0, rw = 0, rh = 0, dpr = 1;
 
 function resize() {
-  dpr = window.devicePixelRatio || 1;
-  for (const [c, key] of [[netCanvas, 'net'], [regCanvas, 'reg']]) {
-    const r = c.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) continue;
-    c.width = r.width * dpr; c.height = r.height * dpr;
-    (key === 'net' ? nctx : rctx).setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (key === 'net') { nw = r.width; nh = r.height; } else { rw = r.width; rh = r.height; }
-  }
+ dpr = window.devicePixelRatio || 1;
+ for (const [c, key] of [[netCanvas, 'net'], [regCanvas, 'reg']]) {
+  const r = c.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) continue;
+  c.width = r.width * dpr; c.height = r.height * dpr;
+  (key === 'net' ? nctx : rctx).setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (key === 'net') { nw = r.width; nh = r.height; } else { rw = r.width; rh = r.height; }
+ }
 }
 window.addEventListener('resize', resize);
 
@@ -389,55 +389,55 @@ window.addEventListener('resize', resize);
 // Load / save
 // ══════════════════════════════════════════════════════════
 async function loadNetwork() {
-  try {
-    const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/network`, { headers: AUTH });
-    if (res.status === 404) { showToast('That network no longer exists.'); window.location.href = 'finchat_neuralmap.html'; return; }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const d = await res.json();
-    document.getElementById('mapNameInput').value = d.name;
-    cfg = NNCore.normalizeConfig(d.config);
-    net = NNCore.hydrate(cfg, d.weights);
-    data = NNCore.buildData(cfg);
-    lastMetrics = d.metrics && d.metrics.epoch ? d.metrics : null;
-    syncControlsFromConfig();
-    document.getElementById('loadingVeil').classList.add('hidden');
-    document.getElementById('appBody').classList.remove('hidden');
-    resize();
-    updateMetrics();
-  } catch (err) {
-    document.getElementById('loadingVeil').innerHTML =
-      `<div class="text-center text-sm font-mono px-6" style="color: var(--danger)">Couldn't load this network: ${err.message}</div>`;
-  }
+ try {
+  const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/network`, { headers: AUTH });
+  if (res.status === 404) { showToast('That network no longer exists.'); window.location.href = 'finchat_neuralmap.html'; return; }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const d = await res.json();
+  document.getElementById('mapNameInput').value = d.name;
+  cfg = NNCore.normalizeConfig(d.config);
+  net = NNCore.hydrate(cfg, d.weights);
+  data = NNCore.buildData(cfg);
+  lastMetrics = d.metrics && d.metrics.epoch ? d.metrics : null;
+  syncControlsFromConfig();
+  document.getElementById('loadingVeil').classList.add('hidden');
+  document.getElementById('appBody').classList.remove('hidden');
+  resize();
+  updateMetrics();
+ } catch (err) {
+  document.getElementById('loadingVeil').innerHTML =
+   `<div class="text-center text-sm font-mono px-6" style="color: var(--danger)">Couldn't load this network: ${err.message}</div>`;
+ }
 }
 
 async function persist(withWeights) {
-  try {
-    const body = { config: cfg };
-    if (withWeights) { body.weights = NNCore.serialize(net); body.metrics = lastMetrics || {}; }
-    const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/network`, {
-      method: 'PUT', headers: AUTH, body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    dirty = false;
-  } catch (err) { showToast(`⚠️ Couldn't save: ${err.message}`); }
+ try {
+  const body = { config: cfg };
+  if (withWeights) { body.weights = NNCore.serialize(net); body.metrics = lastMetrics || {}; }
+  const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/network`, {
+   method: 'PUT', headers: AUTH, body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  dirty = false;
+ } catch (err) { showToast(`⚠️ Couldn't save: ${err.message}`); }
 }
 let saveTimer = null;
 function scheduleSave() {
-  dirty = true;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => persist(true), 1500);
+ dirty = true;
+ clearTimeout(saveTimer);
+ saveTimer = setTimeout(() => persist(true), 1500);
 }
 
 let nameTimer = null;
 document.getElementById('mapNameInput').oninput = (e) => {
-  clearTimeout(nameTimer);
-  nameTimer = setTimeout(async () => {
-    try {
-      await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}`, {
-        method: 'PATCH', headers: AUTH, body: JSON.stringify({ name: e.target.value.trim() || 'Untitled network' })
-      });
-    } catch (err) { /* non-critical */ }
-  }, 700);
+ clearTimeout(nameTimer);
+ nameTimer = setTimeout(async () => {
+  try {
+   await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}`, {
+    method: 'PATCH', headers: AUTH, body: JSON.stringify({ name: e.target.value.trim() || 'Untitled network' })
+   });
+  } catch (err) { /* non-critical */ }
+ }, 700);
 };
 
 window.addEventListener('beforeunload', () => { if (dirty) navigator.sendBeacon && persist(true); });
@@ -446,88 +446,88 @@ window.addEventListener('beforeunload', () => { if (dirty) navigator.sendBeacon 
 // Controls
 // ══════════════════════════════════════════════════════════
 function rebuildNet(resetEpoch) {
-  net = NNCore.createNet(cfg);
-  data = NNCore.buildData(cfg);
-  lastMetrics = null;
-  updateMetrics();
-  scheduleSave();
+ net = NNCore.createNet(cfg);
+ data = NNCore.buildData(cfg);
+ lastMetrics = null;
+ updateMetrics();
+ scheduleSave();
 }
 
 function syncControlsFromConfig() {
-  document.getElementById('hiddenVal').textContent = cfg.hidden;
-  document.getElementById('widthVal').textContent = cfg.width;
-  document.getElementById('widthRange').value = cfg.width;
-  document.getElementById('lrVal').textContent = cfg.lr.toFixed(2);
-  document.getElementById('lrRange').value = cfg.lr;
-  document.getElementById('noiseVal').textContent = cfg.noise.toFixed(2);
-  document.getElementById('noiseRange').value = cfg.noise;
-  document.getElementById('samplesVal').textContent = cfg.samples;
-  document.getElementById('samplesRange').value = cfg.samples;
-  document.querySelectorAll('[data-hidden]').forEach(b => b.classList.toggle('on', +b.dataset.hidden === cfg.hidden));
-  document.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', b.dataset.act === cfg.activation));
-  document.querySelectorAll('[data-target]').forEach(b => b.classList.toggle('on', b.dataset.target === cfg.target));
-  document.querySelectorAll('[data-preset]').forEach(b => {
-    const [h, w] = b.dataset.preset.split(',').map(Number);
-    b.classList.toggle('on', cfg.hidden === h && cfg.width === w);
-  });
-  document.getElementById('archLabel').textContent = NNCore.layerSizes(cfg).join(' → ');
+ document.getElementById('hiddenVal').textContent = cfg.hidden;
+ document.getElementById('widthVal').textContent = cfg.width;
+ document.getElementById('widthRange').value = cfg.width;
+ document.getElementById('lrVal').textContent = cfg.lr.toFixed(2);
+ document.getElementById('lrRange').value = cfg.lr;
+ document.getElementById('noiseVal').textContent = cfg.noise.toFixed(2);
+ document.getElementById('noiseRange').value = cfg.noise;
+ document.getElementById('samplesVal').textContent = cfg.samples;
+ document.getElementById('samplesRange').value = cfg.samples;
+ document.querySelectorAll('[data-hidden]').forEach(b => b.classList.toggle('on', +b.dataset.hidden === cfg.hidden));
+ document.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', b.dataset.act === cfg.activation));
+ document.querySelectorAll('[data-target]').forEach(b => b.classList.toggle('on', b.dataset.target === cfg.target));
+ document.querySelectorAll('[data-preset]').forEach(b => {
+  const [h, w] = b.dataset.preset.split(',').map(Number);
+  b.classList.toggle('on', cfg.hidden === h && cfg.width === w);
+ });
+ document.getElementById('archLabel').textContent = NNCore.layerSizes(cfg).join(' → ');
 }
 
 document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => {
-  const [h, w] = btn.dataset.preset.split(',').map(Number);
-  cfg = NNCore.normalizeConfig({ ...cfg, hidden: h, width: w });
-  syncControlsFromConfig(); rebuildNet(true);
+ const [h, w] = btn.dataset.preset.split(',').map(Number);
+ cfg = NNCore.normalizeConfig({ ...cfg, hidden: h, width: w });
+ syncControlsFromConfig(); rebuildNet(true);
 });
 document.querySelectorAll('[data-hidden]').forEach(btn => btn.onclick = () => {
-  cfg = NNCore.normalizeConfig({ ...cfg, hidden: +btn.dataset.hidden });
-  syncControlsFromConfig(); rebuildNet(true);
+ cfg = NNCore.normalizeConfig({ ...cfg, hidden: +btn.dataset.hidden });
+ syncControlsFromConfig(); rebuildNet(true);
 });
 document.querySelectorAll('[data-act]').forEach(btn => btn.onclick = () => {
-  cfg = NNCore.normalizeConfig({ ...cfg, activation: btn.dataset.act });
-  syncControlsFromConfig(); rebuildNet(true);
+ cfg = NNCore.normalizeConfig({ ...cfg, activation: btn.dataset.act });
+ syncControlsFromConfig(); rebuildNet(true);
 });
 document.querySelectorAll('[data-target]').forEach(btn => btn.onclick = () => {
-  cfg = NNCore.normalizeConfig({ ...cfg, target: btn.dataset.target });
-  syncControlsFromConfig(); rebuildNet(true);
+ cfg = NNCore.normalizeConfig({ ...cfg, target: btn.dataset.target });
+ syncControlsFromConfig(); rebuildNet(true);
 });
 document.getElementById('widthRange').oninput = e => {
-  cfg = NNCore.normalizeConfig({ ...cfg, width: +e.target.value });
-  syncControlsFromConfig(); rebuildNet(true);
+ cfg = NNCore.normalizeConfig({ ...cfg, width: +e.target.value });
+ syncControlsFromConfig(); rebuildNet(true);
 };
 document.getElementById('lrRange').oninput = e => {
-  cfg = NNCore.normalizeConfig({ ...cfg, lr: +e.target.value });
-  document.getElementById('lrVal').textContent = cfg.lr.toFixed(2);
-  scheduleSave();
+ cfg = NNCore.normalizeConfig({ ...cfg, lr: +e.target.value });
+ document.getElementById('lrVal').textContent = cfg.lr.toFixed(2);
+ scheduleSave();
 };
 document.getElementById('noiseRange').oninput = e => {
-  cfg = NNCore.normalizeConfig({ ...cfg, noise: +e.target.value });
-  document.getElementById('noiseVal').textContent = cfg.noise.toFixed(2);
-  data = NNCore.buildData(cfg);
-  scheduleSave();
+ cfg = NNCore.normalizeConfig({ ...cfg, noise: +e.target.value });
+ document.getElementById('noiseVal').textContent = cfg.noise.toFixed(2);
+ data = NNCore.buildData(cfg);
+ scheduleSave();
 };
 document.getElementById('samplesRange').oninput = e => {
-  cfg = NNCore.normalizeConfig({ ...cfg, samples: +e.target.value });
-  document.getElementById('samplesVal').textContent = cfg.samples;
-  data = NNCore.buildData(cfg);
-  scheduleSave();
+ cfg = NNCore.normalizeConfig({ ...cfg, samples: +e.target.value });
+ document.getElementById('samplesVal').textContent = cfg.samples;
+ data = NNCore.buildData(cfg);
+ scheduleSave();
 };
 
 document.getElementById('trainBtn').onclick = () => {
-  running = !running;
-  const b = document.getElementById('trainBtn');
-  b.textContent = running ? 'Pause' : 'Train';
-  b.classList.toggle('nm-btn-primary', !running || true);
-  if (running) { b.style.background = 'var(--danger)'; } else { b.style.background = ''; }
+ running = !running;
+ const b = document.getElementById('trainBtn');
+ b.textContent = running ? 'Pause' : 'Train';
+ b.classList.toggle('nm-btn-primary', !running || true);
+ if (running) { b.style.background = 'var(--danger)'; } else { b.style.background = ''; }
 };
 document.getElementById('stepBtn').onclick = () => {
-  for (let k = 0; k < 5; k++) NNCore.trainEpoch(net, data.train);
-  updateMetrics(); scheduleSave();
+ for (let k = 0; k < 5; k++) NNCore.trainEpoch(net, data.train);
+ updateMetrics(); scheduleSave();
 };
 document.getElementById('resetBtn').onclick = () => {
-  running = false;
-  document.getElementById('trainBtn').textContent = 'Train';
-  document.getElementById('trainBtn').style.background = '';
-  rebuildNet(true);
+ running = false;
+ document.getElementById('trainBtn').textContent = 'Train';
+ document.getElementById('trainBtn').style.background = '';
+ rebuildNet(true);
 };
 document.getElementById('playForwardBtn').onclick = () => { anim = { mode: 'forward', t: 0 }; };
 document.getElementById('playBackBtn').onclick = () => { anim = { mode: 'back', t: 0 }; };
@@ -535,204 +535,204 @@ document.getElementById('themeBtn').onclick = () => applyTheme(theme === 'dark' 
 
 // Drawer nav on narrow screens
 function toggleNav(open) {
-  const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop');
-  const show = open === undefined ? !nav.classList.contains('open') : open;
-  nav.classList.toggle('open', show);
-  bd.classList.toggle('hidden', !show);
+ const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop');
+ const show = open === undefined ? !nav.classList.contains('open') : open;
+ nav.classList.toggle('open', show);
+ bd.classList.toggle('hidden', !show);
 }
 document.getElementById('navToggle').onclick = () => toggleNav();
 document.getElementById('navBackdrop').onclick = () => toggleNav(false);
 
 document.getElementById('serverEvalBtn').onclick = async () => {
-  const btn = document.getElementById('serverEvalBtn');
-  btn.disabled = true;
-  document.getElementById('serverEvalNote').textContent = 'Training on the server…';
-  try {
-    // Persist current weights/config first so the server continues from here,
-    // not from whatever was last saved.
-    await persist(true);
-    const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/evaluate`, {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ epochs: 0 })
-    });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    document.getElementById('serverEvalNote').textContent =
-      `Server-verified at ${new Date(d.metrics.evaluatedAt).toLocaleTimeString()} — epoch ${d.metrics.epoch}, independently computed from the same weights.`;
-    showToast('Server-verified evaluation complete.');
-  } catch (err) {
-    document.getElementById('serverEvalNote').textContent = '';
-    showToast(`⚠️ ${err.message}`);
-  } finally { btn.disabled = false; }
+ const btn = document.getElementById('serverEvalBtn');
+ btn.disabled = true;
+ document.getElementById('serverEvalNote').textContent = 'Training on the server…';
+ try {
+  // Persist current weights/config first so the server continues from here,
+  // not from whatever was last saved.
+  await persist(true);
+  const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(MAP_ID)}/evaluate`, {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ epochs: 0 })
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  document.getElementById('serverEvalNote').textContent =
+   `Server-verified at ${new Date(d.metrics.evaluatedAt).toLocaleTimeString()} — epoch ${d.metrics.epoch}, independently computed from the same weights.`;
+  showToast('Server-verified evaluation complete.');
+ } catch (err) {
+  document.getElementById('serverEvalNote').textContent = '';
+  showToast(`⚠️ ${err.message}`);
+ } finally { btn.disabled = false; }
 };
 
 // ══════════════════════════════════════════════════════════
 // Metrics — MSE, RMSE, MAE, R², max error, for BOTH train and held-out test.
 // ══════════════════════════════════════════════════════════
 function updateMetrics() {
-  const trainM = NNCore.evaluate(net, data.train);
-  const testM = NNCore.evaluate(net, data.test);
-  const diag = NNCore.diagnose(trainM, testM);
-  lastMetrics = {
-    epoch: net.epoch, train: trainM, test: testM,
-    bias: diag.bias, variance: diag.variance, verdict: diag.verdict, tone: diag.tone
-  };
+ const trainM = NNCore.evaluate(net, data.train);
+ const testM = NNCore.evaluate(net, data.test);
+ const diag = NNCore.diagnose(trainM, testM);
+ lastMetrics = {
+  epoch: net.epoch, train: trainM, test: testM,
+  bias: diag.bias, variance: diag.variance, verdict: diag.verdict, tone: diag.tone
+ };
 
-  document.getElementById('epochVal').textContent = net.epoch;
-  const vb = document.getElementById('verdictBanner');
-  vb.textContent = diag.verdict;
-  const toneColors = {
-    good: ['rgba(122,138,94,.16)', 'var(--good)'],
-    warn: ['rgba(198,113,57,.16)', 'var(--accent-soft)'],
-    bad: ['rgba(176,71,46,.16)', 'var(--danger)']
-  };
-  const [bg, fg] = toneColors[diag.tone] || toneColors.good;
-  vb.style.background = bg; vb.style.color = fg;
+ document.getElementById('epochVal').textContent = net.epoch;
+ const vb = document.getElementById('verdictBanner');
+ vb.textContent = diag.verdict;
+ const toneColors = {
+  good: ['rgba(122,138,94,.16)', 'var(--good)'],
+  warn: ['rgba(198,113,57,.16)', 'var(--accent-soft)'],
+  bad: ['rgba(176,71,46,.16)', 'var(--danger)']
+ };
+ const [bg, fg] = toneColors[diag.tone] || toneColors.good;
+ vb.style.background = bg; vb.style.color = fg;
 
-  document.getElementById('biasPct').textContent = Math.round(diag.bias * 100) + '%';
-  document.getElementById('biasBar').style.width = Math.round(diag.bias * 100) + '%';
-  document.getElementById('varPct').textContent = Math.round(diag.variance * 100) + '%';
-  document.getElementById('varBar').style.width = Math.round(diag.variance * 100) + '%';
+ document.getElementById('biasPct').textContent = Math.round(diag.bias * 100) + '%';
+ document.getElementById('biasBar').style.width = Math.round(diag.bias * 100) + '%';
+ document.getElementById('varPct').textContent = Math.round(diag.variance * 100) + '%';
+ document.getElementById('varBar').style.width = Math.round(diag.variance * 100) + '%';
 
-  const fmt = (v, d = 4) => Number.isFinite(v) ? v.toFixed(d) : '—';
-  const rows = [
-    ['MSE', fmt(trainM.mse), fmt(testM.mse)],
-    ['RMSE', fmt(trainM.rmse), fmt(testM.rmse)],
-    ['MAE', fmt(trainM.mae), fmt(testM.mae)],
-    ['R²', fmt(trainM.r2, 3), fmt(testM.r2, 3)],
-    ['Max err', fmt(trainM.maxError, 3), fmt(testM.maxError, 3)]
-  ];
-  document.getElementById('metricsGrid').innerHTML =
-    `<div class="text-[10px] nm-sub font-bold uppercase">Metric</div><div class="text-[10px] nm-sub font-bold uppercase grid grid-cols-2 gap-1"><span>Train</span><span>Test</span></div>` +
-    rows.map(([label, tr, te]) => `
-      <div class="metric-tile"><div class="text-[10px] nm-sub uppercase">${label}</div></div>
-      <div class="metric-tile grid grid-cols-2 gap-1">
-        <span class="font-bold text-[12px]" style="color: var(--accent-soft)">${tr}</span>
-        <span class="font-bold text-[12px]" style="color: var(--accent)">${te}</span>
-      </div>`).join('');
+ const fmt = (v, d = 4) => Number.isFinite(v) ? v.toFixed(d) : '—';
+ const rows = [
+  ['MSE', fmt(trainM.mse), fmt(testM.mse)],
+  ['RMSE', fmt(trainM.rmse), fmt(testM.rmse)],
+  ['MAE', fmt(trainM.mae), fmt(testM.mae)],
+  ['R²', fmt(trainM.r2, 3), fmt(testM.r2, 3)],
+  ['Max err', fmt(trainM.maxError, 3), fmt(testM.maxError, 3)]
+ ];
+ document.getElementById('metricsGrid').innerHTML =
+  `<div class="text-[10px] nm-sub font-bold uppercase">Metric</div><div class="text-[10px] nm-sub font-bold uppercase grid grid-cols-2 gap-1"><span>Train</span><span>Test</span></div>` +
+  rows.map(([label, tr, te]) => `
+   <div class="metric-tile"><div class="text-[10px] nm-sub uppercase">${label}</div></div>
+   <div class="metric-tile grid grid-cols-2 gap-1">
+    <span class="font-bold text-[12px]" style="color: var(--accent-soft)">${tr}</span>
+    <span class="font-bold text-[12px]" style="color: var(--accent)">${te}</span>
+   </div>`).join('');
 }
 
 // ══════════════════════════════════════════════════════════
 // Drawing — network diagram
 // ══════════════════════════════════════════════════════════
 function netLayout() {
-  const L = net.L, padX = 88, padY = 46;
-  const cols = L.length, gapX = (nw - padX * 2) / Math.max(1, cols - 1);
-  const pos = [];
-  for (let l = 0; l < cols; l++) {
-    const cnt = L[l], colX = padX + gapX * l, arr = [];
-    const gapY = (nh - padY * 2) / Math.max(1, cnt - 1 || 1);
-    for (let i = 0; i < cnt; i++) arr.push({ x: colX, y: cnt === 1 ? nh / 2 : padY + gapY * i });
-    pos.push(arr);
-  }
-  return pos;
+ const L = net.L, padX = 88, padY = 46;
+ const cols = L.length, gapX = (nw - padX * 2) / Math.max(1, cols - 1);
+ const pos = [];
+ for (let l = 0; l < cols; l++) {
+  const cnt = L[l], colX = padX + gapX * l, arr = [];
+  const gapY = (nh - padY * 2) / Math.max(1, cnt - 1 || 1);
+  for (let i = 0; i < cnt; i++) arr.push({ x: colX, y: cnt === 1 ? nh / 2 : padY + gapY * i });
+  pos.push(arr);
+ }
+ return pos;
 }
 
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 function drawNet() {
-  if (!nw || !nh) return;
-  nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  nctx.clearRect(0, 0, nw, nh);
-  nctx.fillStyle = css('--bg'); nctx.fillRect(0, 0, nw, nh);
+ if (!nw || !nh) return;
+ nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ nctx.clearRect(0, 0, nw, nh);
+ nctx.fillStyle = css('--bg'); nctx.fillRect(0, 0, nw, nh);
 
-  const pos = netLayout();
-  const dispX = 0.55 * Math.sin(frame * 0.012);
-  const act = NNCore.forward(net, dispX);
-  const sweep = anim.mode ? (anim.mode === 'forward' ? anim.t : 1 - anim.t) * (pos.length - 1) : -1;
-  const wpos = css('--wpos'), wneg = css('--wneg'), pulse = css('--pulse');
-  const node = css('--node'), nodeStroke = css('--nodestroke'), nodeText = css('--nodetext'), accent = css('--accent-soft'), sub = css('--sub'), txt = css('--txt'), chrome = css('--chrome'), border = css('--border');
+ const pos = netLayout();
+ const dispX = 0.55 * Math.sin(frame * 0.012);
+ const act = NNCore.forward(net, dispX);
+ const sweep = anim.mode ? (anim.mode === 'forward' ? anim.t : 1 - anim.t) * (pos.length - 1) : -1;
+ const wpos = css('--wpos'), wneg = css('--wneg'), pulse = css('--pulse');
+ const node = css('--node'), nodeStroke = css('--nodestroke'), nodeText = css('--nodetext'), accent = css('--accent-soft'), sub = css('--sub'), txt = css('--txt'), chrome = css('--chrome'), border = css('--border');
 
+ for (let l = 0; l < net.W.length; l++) {
+  for (let i = 0; i < net.W[l].length; i++) {
+   for (let j = 0; j < net.W[l][i].length; j++) {
+    const a = pos[l][j], b = pos[l + 1][i], w = net.W[l][i][j];
+    const mag = Math.min(1, Math.abs(w));
+    nctx.beginPath(); nctx.moveTo(a.x, a.y); nctx.lineTo(b.x, b.y);
+    nctx.strokeStyle = w >= 0 ? wpos : wneg;
+    nctx.globalAlpha = 0.15 + mag * 0.55;
+    nctx.lineWidth = 0.6 + mag * 2.4;
+    nctx.stroke();
+   }
+  }
+ }
+ nctx.globalAlpha = 1;
+
+ if (sweep >= 0) {
   for (let l = 0; l < net.W.length; l++) {
-    for (let i = 0; i < net.W[l].length; i++) {
-      for (let j = 0; j < net.W[l][i].length; j++) {
-        const a = pos[l][j], b = pos[l + 1][i], w = net.W[l][i][j];
-        const mag = Math.min(1, Math.abs(w));
-        nctx.beginPath(); nctx.moveTo(a.x, a.y); nctx.lineTo(b.x, b.y);
-        nctx.strokeStyle = w >= 0 ? wpos : wneg;
-        nctx.globalAlpha = 0.15 + mag * 0.55;
-        nctx.lineWidth = 0.6 + mag * 2.4;
-        nctx.stroke();
-      }
-    }
+   const seg = sweep - l; if (seg < 0 || seg > 1) continue;
+   for (let i = 0; i < net.W[l].length; i++) for (let j = 0; j < net.W[l][i].length; j++) {
+    const a = pos[l][j], b = pos[l + 1][i];
+    const px = a.x + (b.x - a.x) * seg, py = a.y + (b.y - a.y) * seg;
+    nctx.beginPath(); nctx.arc(px, py, 3, 0, 7); nctx.fillStyle = pulse; nctx.fill();
+   }
   }
-  nctx.globalAlpha = 1;
+ }
 
-  if (sweep >= 0) {
-    for (let l = 0; l < net.W.length; l++) {
-      const seg = sweep - l; if (seg < 0 || seg > 1) continue;
-      for (let i = 0; i < net.W[l].length; i++) for (let j = 0; j < net.W[l][i].length; j++) {
-        const a = pos[l][j], b = pos[l + 1][i];
-        const px = a.x + (b.x - a.x) * seg, py = a.y + (b.y - a.y) * seg;
-        nctx.beginPath(); nctx.arc(px, py, 3, 0, 7); nctx.fillStyle = pulse; nctx.fill();
-      }
-    }
-  }
+ for (let l = 0; l < pos.length; l++) {
+  for (let i = 0; i < pos[l].length; i++) {
+   const p = pos[l][i], v = act[l] ? act[l][i] : 0, r = 16;
+   const near = sweep >= 0 && Math.abs(sweep - l) < 0.5;
+   nctx.beginPath(); nctx.arc(p.x, p.y, r + (near ? 4 : 0), 0, 7);
+   nctx.fillStyle = node; nctx.globalAlpha = near ? 0.9 : 1; nctx.fill(); nctx.globalAlpha = 1;
+   nctx.lineWidth = 2.5; nctx.strokeStyle = near ? accent : nodeStroke; nctx.stroke();
+   nctx.fillStyle = nodeText; nctx.font = '700 11px Inter, sans-serif';
+   nctx.textAlign = 'center'; nctx.textBaseline = 'middle';
+   nctx.fillText(v.toFixed(2), p.x, p.y);
 
-  for (let l = 0; l < pos.length; l++) {
-    for (let i = 0; i < pos[l].length; i++) {
-      const p = pos[l][i], v = act[l] ? act[l][i] : 0, r = 16;
-      const near = sweep >= 0 && Math.abs(sweep - l) < 0.5;
-      nctx.beginPath(); nctx.arc(p.x, p.y, r + (near ? 4 : 0), 0, 7);
-      nctx.fillStyle = node; nctx.globalAlpha = near ? 0.9 : 1; nctx.fill(); nctx.globalAlpha = 1;
-      nctx.lineWidth = 2.5; nctx.strokeStyle = near ? accent : nodeStroke; nctx.stroke();
-      nctx.fillStyle = nodeText; nctx.font = '700 11px Inter, sans-serif';
-      nctx.textAlign = 'center'; nctx.textBaseline = 'middle';
-      nctx.fillText(v.toFixed(2), p.x, p.y);
-
-      if (hover && hover.l === l && hover.i === i) {
-        const bias = l > 0 ? net.b[l - 1][i] : 0;
-        const label = 'a=' + v.toFixed(3) + (l > 0 ? '  b=' + bias.toFixed(3) : '  input');
-        nctx.font = '600 11px Inter, sans-serif';
-        const tw = nctx.measureText(label).width + 16;
-        nctx.fillStyle = chrome; nctx.strokeStyle = border;
-        const bx = p.x - tw / 2, by = p.y - r - 26;
-        nctx.beginPath(); nctx.roundRect(bx, by, tw, 20, 6); nctx.fill(); nctx.stroke();
-        nctx.fillStyle = txt; nctx.fillText(label, p.x, by + 10);
-      }
-    }
+   if (hover && hover.l === l && hover.i === i) {
+    const bias = l > 0 ? net.b[l - 1][i] : 0;
+    const label = 'a=' + v.toFixed(3) + (l > 0 ? ' b=' + bias.toFixed(3) : ' input');
+    nctx.font = '600 11px Inter, sans-serif';
+    const tw = nctx.measureText(label).width + 16;
+    nctx.fillStyle = chrome; nctx.strokeStyle = border;
+    const bx = p.x - tw / 2, by = p.y - r - 26;
+    nctx.beginPath(); nctx.roundRect(bx, by, tw, 20, 6); nctx.fill(); nctx.stroke();
+    nctx.fillStyle = txt; nctx.fillText(label, p.x, by + 10);
+   }
   }
-  nctx.fillStyle = sub; nctx.font = '700 11px Inter, sans-serif'; nctx.textAlign = 'center';
-  for (let l = 0; l < pos.length; l++) {
-    const cap = l === 0 ? 'INPUT' : l === pos.length - 1 ? 'OUTPUT' : (pos.length > 3 ? 'HIDDEN ' + l : 'HIDDEN');
-    nctx.fillText(cap, pos[l][0].x, 22);
-  }
+ }
+ nctx.fillStyle = sub; nctx.font = '700 11px Inter, sans-serif'; nctx.textAlign = 'center';
+ for (let l = 0; l < pos.length; l++) {
+  const cap = l === 0 ? 'INPUT' : l === pos.length - 1 ? 'OUTPUT' : (pos.length > 3 ? 'HIDDEN ' + l : 'HIDDEN');
+  nctx.fillText(cap, pos[l][0].x, 22);
+ }
 }
 
 function drawReg() {
-  if (!rw || !rh) return;
-  rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const pad = 14;
-  rctx.clearRect(0, 0, rw, rh);
-  rctx.fillStyle = css('--graphbg'); rctx.fillRect(0, 0, rw, rh);
-  const X = x => pad + (x + 1) / 2 * (rw - pad * 2);
-  const Y = y => rh / 2 - y * (rh / 2 - pad);
+ if (!rw || !rh) return;
+ rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ const pad = 14;
+ rctx.clearRect(0, 0, rw, rh);
+ rctx.fillStyle = css('--graphbg'); rctx.fillRect(0, 0, rw, rh);
+ const X = x => pad + (x + 1) / 2 * (rw - pad * 2);
+ const Y = y => rh / 2 - y * (rh / 2 - pad);
 
-  rctx.strokeStyle = css('--border'); rctx.lineWidth = 1; rctx.globalAlpha = 0.7;
-  rctx.beginPath(); rctx.moveTo(pad, Y(0)); rctx.lineTo(rw - pad, Y(0)); rctx.stroke();
-  rctx.globalAlpha = 1;
+ rctx.strokeStyle = css('--border'); rctx.lineWidth = 1; rctx.globalAlpha = 0.7;
+ rctx.beginPath(); rctx.moveTo(pad, Y(0)); rctx.lineTo(rw - pad, Y(0)); rctx.stroke();
+ rctx.globalAlpha = 1;
 
-  rctx.setLineDash([5, 5]); rctx.strokeStyle = css('--sub'); rctx.lineWidth = 1.5; rctx.beginPath();
-  for (let k = 0; k <= 80; k++) { const x = -1 + 2 * k / 80; const px = X(x), py = Y(NNCore.truth(cfg.target, x)); k ? rctx.lineTo(px, py) : rctx.moveTo(px, py); }
-  rctx.stroke(); rctx.setLineDash([]);
+ rctx.setLineDash([5, 5]); rctx.strokeStyle = css('--sub'); rctx.lineWidth = 1.5; rctx.beginPath();
+ for (let k = 0; k <= 80; k++) { const x = -1 + 2 * k / 80; const px = X(x), py = Y(NNCore.truth(cfg.target, x)); k ? rctx.lineTo(px, py) : rctx.moveTo(px, py); }
+ rctx.stroke(); rctx.setLineDash([]);
 
-  rctx.strokeStyle = css('--accent-soft'); rctx.lineWidth = 2.5; rctx.beginPath();
-  for (let k = 0; k <= 80; k++) { const x = -1 + 2 * k / 80; const py = Y(Math.max(-1.5, Math.min(1.5, NNCore.predict(net, x)))); k ? rctx.lineTo(X(x), py) : rctx.moveTo(X(x), py); }
-  rctx.stroke();
+ rctx.strokeStyle = css('--accent-soft'); rctx.lineWidth = 2.5; rctx.beginPath();
+ for (let k = 0; k <= 80; k++) { const x = -1 + 2 * k / 80; const py = Y(Math.max(-1.5, Math.min(1.5, NNCore.predict(net, x)))); k ? rctx.lineTo(X(x), py) : rctx.moveTo(X(x), py); }
+ rctx.stroke();
 
-  rctx.fillStyle = css('--good');
-  for (const s of data.train) { rctx.beginPath(); rctx.arc(X(s.x), Y(Math.max(-1.5, Math.min(1.5, s.y))), 3, 0, 7); rctx.fill(); }
+ rctx.fillStyle = css('--good');
+ for (const s of data.train) { rctx.beginPath(); rctx.arc(X(s.x), Y(Math.max(-1.5, Math.min(1.5, s.y))), 3, 0, 7); rctx.fill(); }
 }
 
 // ══════════════════════════════════════════════════════════
 // Hover
 // ══════════════════════════════════════════════════════════
 netCanvas.addEventListener('mousemove', ev => {
-  const r = netCanvas.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
-  const pos = netLayout(); hover = null;
-  for (let l = 0; l < pos.length; l++) for (let i = 0; i < pos[l].length; i++) {
-    const p = pos[l][i];
-    if ((p.x - mx) ** 2 + (p.y - my) ** 2 < 400) { hover = { l, i }; return; }
-  }
+ const r = netCanvas.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+ const pos = netLayout(); hover = null;
+ for (let l = 0; l < pos.length; l++) for (let i = 0; i < pos[l].length; i++) {
+  const p = pos[l][i];
+  if ((p.x - mx) ** 2 + (p.y - my) ** 2 < 400) { hover = { l, i }; return; }
+ }
 });
 netCanvas.addEventListener('mouseleave', () => { hover = null; });
 
@@ -741,23 +741,23 @@ netCanvas.addEventListener('mouseleave', () => { hover = null; });
 // ══════════════════════════════════════════════════════════
 let running_ = true;
 function loop() {
-  if (!running_) return;
-  frame++;
-  if (running) {
-    for (let k = 0; k < 3; k++) NNCore.trainEpoch(net, data.train);
-    anim.t += 0.03;
-    if (anim.t > 1) { anim.t = 0; anim.mode = anim.mode === 'back' ? 'forward' : 'back'; }
-    anim.mode = anim.mode || 'forward';
-  } else if (anim.mode) {
-    anim.t += 0.02;
-    if (anim.t >= 1) { anim.t = 0; anim.mode = null; }
-  }
-  document.getElementById('flowStatus').textContent = running
-    ? 'training — signal flowing forward & back'
-    : (anim.mode ? (anim.mode === 'forward' ? 'forward pass…' : 'backpropagating…') : 'idle · press Train');
-  drawNet(); drawReg();
-  if (frame % 6 === 0) { updateMetrics(); if (running) scheduleSave(); }
-  requestAnimationFrame(loop);
+ if (!running_) return;
+ frame++;
+ if (running) {
+  for (let k = 0; k < 3; k++) NNCore.trainEpoch(net, data.train);
+  anim.t += 0.03;
+  if (anim.t > 1) { anim.t = 0; anim.mode = anim.mode === 'back' ? 'forward' : 'back'; }
+  anim.mode = anim.mode || 'forward';
+ } else if (anim.mode) {
+  anim.t += 0.02;
+  if (anim.t >= 1) { anim.t = 0; anim.mode = null; }
+ }
+ document.getElementById('flowStatus').textContent = running
+  ? 'training — signal flowing forward & back'
+  : (anim.mode ? (anim.mode === 'forward' ? 'forward pass…' : 'backpropagating…') : 'idle · press Train');
+ drawNet(); drawReg();
+ if (frame % 6 === 0) { updateMetrics(); if (running) scheduleSave(); }
+ requestAnimationFrame(loop);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -768,22 +768,22 @@ loadNetwork().then(() => { resize(); loop(); });
 
 // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
 (function () {
-  const SOON = ['Governance', 'Support'];
-  document.querySelectorAll('#sideNav a').forEach(a => {
-    const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
-    if (!SOON.includes(label)) return;
-    a.setAttribute('href', 'javascript:void(0)');
-    a.style.opacity = '0.55';
-    a.style.cursor = 'not-allowed';
-    if (!a.querySelector('.soon-badge')) {
-      const b = document.createElement('span');
-      b.className = 'soon-badge';
-      b.textContent = 'Soon';
-      b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
-      a.appendChild(b);
-    }
-    a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
-  });
+ const SOON = ['Governance', 'Support'];
+ document.querySelectorAll('#sideNav a').forEach(a => {
+  const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
+  if (!SOON.includes(label)) return;
+  a.setAttribute('href', 'javascript:void(0)');
+  a.style.opacity = '0.55';
+  a.style.cursor = 'not-allowed';
+  if (!a.querySelector('.soon-badge')) {
+   const b = document.createElement('span');
+   b.className = 'soon-badge';
+   b.textContent = 'Soon';
+   b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
+   a.appendChild(b);
+  }
+  a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
+ });
 })();
 </script>
 <script src="notifications_widget.js"></script>
@@ -791,3 +791,4 @@ loadNetwork().then(() => { resize(); loop(); });
 <script src="knowledge_search.js"></script>
 </body>
 </html>
+

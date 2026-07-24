@@ -15,82 +15,82 @@
 <script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
 </script>
 <style>
-  /* ── Two themes. Warm is FinChat's house palette; dark comes from the
-        Neural Map design (#0b1220 field, #5fd0e6 accent). ───────────── */
-  :root, [data-nm-theme="warm"] {
-    --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
-    --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
-    --danger: #b0472e; --rail: #3a2e23; --rail-txt: #efe8de; --rail-hover: #4a3828;
-    --rail-muted: #c9c0b0; --grid: rgba(58,46,35,.06); --edge: #d6ccbc; --edge-hi: #c67139;
-    --label: #3a2e23; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
-    --cat-agent: #d2691e; --cat-tool: #4f8a52; --cat-chain: #46536b;
-    --cat-entity: #e0a01e; --cat-doc: #6d8ab0; --cat-idea: #c0392b;
-  }
-  [data-nm-theme="dark"] {
-    --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
-    --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
-    --danger: #e8867a; --rail: #131c2e; --rail-txt: #e8eef8; --rail-hover: #1c2942;
-    --rail-muted: #7f93b3; --grid: rgba(255,255,255,.04); --edge: #2c3d57; --edge-hi: #5fd0e6;
-    --label: #dbe6f5; --marquee: rgba(95,208,230,.12); --marquee-line: #5fd0e6;
-    --cat-agent: #f2f6fc; --cat-tool: #4fb06a; --cat-chain: #c79a52;
-    --cat-entity: #5fd0e6; --cat-doc: #9a86e0; --cat-idea: #e8867a;
-  }
+ /* ── Two themes. Warm is FinChat's house palette; dark comes from the
+    Neural Map design (#0b1220 field, #5fd0e6 accent). ───────────── */
+ :root, [data-nm-theme="warm"] {
+  --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
+  --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
+  --danger: #b0472e; --rail: #3a2e23; --rail-txt: #efe8de; --rail-hover: #4a3828;
+  --rail-muted: #c9c0b0; --grid: rgba(58,46,35,.06); --edge: #d6ccbc; --edge-hi: #c67139;
+  --label: #3a2e23; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
+  --cat-agent: #d2691e; --cat-tool: #4f8a52; --cat-chain: #46536b;
+  --cat-entity: #e0a01e; --cat-doc: #6d8ab0; --cat-idea: #c0392b;
+ }
+ [data-nm-theme="dark"] {
+  --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
+  --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
+  --danger: #e8867a; --rail: #131c2e; --rail-txt: #e8eef8; --rail-hover: #1c2942;
+  --rail-muted: #7f93b3; --grid: rgba(255,255,255,.04); --edge: #2c3d57; --edge-hi: #5fd0e6;
+  --label: #dbe6f5; --marquee: rgba(95,208,230,.12); --marquee-line: #5fd0e6;
+  --cat-agent: #f2f6fc; --cat-tool: #4fb06a; --cat-chain: #c79a52;
+  --cat-entity: #5fd0e6; --cat-doc: #9a86e0; --cat-idea: #e8867a;
+ }
 
-  /* Do NOT transition background-color here. Its value is var(--bg), and when
-     the theme flips that var on <html>, Chrome refuses to re-resolve a
-     background-color that has a transition on it — the page stays stuck on the
-     old theme. Transitioning `color` is unaffected, so it stays. */
-  body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
+ /* Do NOT transition background-color here. Its value is var(--bg), and when
+   the theme flips that var on <html>, Chrome refuses to re-resolve a
+   background-color that has a transition on it — the page stays stuck on the
+   old theme. Transitioning `color` is unaffected, so it stays. */
+ body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
+ ::-webkit-scrollbar { width: 6px; height: 6px; }
+ ::-webkit-scrollbar-track { background: transparent; }
+ ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
 
-  /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
-     navigation is reachable on narrow screens. */
-  #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
-  }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
+   navigation is reachable on narrow screens. */
+ #sideNav { transition: transform .25s ease; }
+ @media (max-width: 767px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  #sideNav.open { transform: translateX(0); }
+ }
+ @media (min-width: 768px) { #sideNav { transform: none !important; } }
 
-  #graphCanvas { display: block; touch-action: none; }
-  @keyframes nmpop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
-  .nm-panel { animation: nmpop .22s cubic-bezier(.2,.8,.2,1); }
-  .nm-chip { cursor: pointer; transition: transform .12s ease; }
-  .nm-chip:hover { transform: translateX(2px); }
-  input::placeholder, textarea::placeholder { opacity: .55; }
+ #graphCanvas { display: block; touch-action: none; }
+ @keyframes nmpop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+ .nm-panel { animation: nmpop .22s cubic-bezier(.2,.8,.2,1); }
+ .nm-chip { cursor: pointer; transition: transform .12s ease; }
+ .nm-chip:hover { transform: translateX(2px); }
+ input::placeholder, textarea::placeholder { opacity: .55; }
 
-  /* Themed primitives — used instead of hard-coded Tailwind hex so both
-     themes flow from the variables above. */
-  .nm-rail    { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
-  .nm-chrome  { background: var(--chrome); border-color: var(--border); }
-  .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
-  .nm-field   { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
-  .nm-field:focus { outline: none; border-color: var(--accent); }
-  .nm-sub     { color: var(--sub); }
-  .nm-btn     { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; }
-  .nm-btn:hover { filter: brightness(.96); }
-  [data-nm-theme="dark"] .nm-btn:hover { filter: brightness(1.35); }
-  .nm-btn-primary { background: var(--accent); border: none; transition: filter .12s ease; }
-  .nm-btn-primary:hover { filter: brightness(1.1); }
-  [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
-  [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
-  .nm-rail-link:hover { background: var(--rail-hover); }
-  .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
-  .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
-  .toast.show { opacity:1; transform:translateY(0); }
+ /* Themed primitives — used instead of hard-coded Tailwind hex so both
+   themes flow from the variables above. */
+ .nm-rail  { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
+ .nm-chrome { background: var(--chrome); border-color: var(--border); }
+ .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
+ .nm-field  { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
+ .nm-field:focus { outline: none; border-color: var(--accent); }
+ .nm-sub   { color: var(--sub); }
+ .nm-btn   { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; }
+ .nm-btn:hover { filter: brightness(.96); }
+ [data-nm-theme="dark"] .nm-btn:hover { filter: brightness(1.35); }
+ .nm-btn-primary { background: var(--accent); border: none; transition: filter .12s ease; }
+ .nm-btn-primary:hover { filter: brightness(1.1); }
+ [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
+ [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
+ .nm-rail-link:hover { background: var(--rail-hover); }
+ .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
+ .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
+ .toast.show { opacity:1; transform:translateY(0); }
 </style>
 <script>
 /* file:// fallback — when this page is opened directly from disk (file://),
-   root-relative "/api/…" fetches would resolve to file:///api/… and fail.
-   Route them to the local backend instead. No-op when served over http. */
+  root-relative "/api/…" fetches would resolve to file:///api/… and fail.
+  Route them to the local backend instead. No-op when served over http. */
 (function(){ if(location.protocol==='file:'){ var _f=window.fetch.bind(window);
-  window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
+ window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
 </script>
 </head>
 
-<body class="h-screen overflow-hidden flex">
+<body class="h-screen overflow-hidden ">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
@@ -99,252 +99,252 @@
 <!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
-    <div class="mb-10 px-2">
-        <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
-            FinChat
-        </h1>
-        <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+  <div class="mb-10 px-2">
+    <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
+      FinChat
+    </h1>
+    <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+  </div>
+  <div class="flex-1 overflow-y-auto space-y-1 pr-2">
+    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
+      <span class="material-symbols-outlined text-[20px]">dashboard</span>
+      <span class="font-body-sm font-medium">Operations</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
+      <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+      <span class="font-body-sm font-medium">Agents</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">chat</span>
+      <span class="font-body-sm font-medium">Chat</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
+      <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
+      <span class="font-body-sm font-medium">Neural Map</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">assessment</span>
+      <span class="font-body-sm font-medium">Reports</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">menu_book</span>
+      <span class="font-body-sm font-medium">Knowledge</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">account_balance</span>
+      <span class="font-body-sm font-medium">Governance</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+      <span class="material-symbols-outlined text-[20px]">account_tree</span>
+      <span class="font-body-sm font-medium">Blockchain</span>
+    </a>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
+      <span class="material-symbols-outlined text-[20px]">policy</span>
+      <span class="font-body-sm font-medium">Audit Logs</span>
+    </a>
+    <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
+    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
+      <span class="material-symbols-outlined text-[20px]">settings</span>
+      <span class="font-body-sm font-medium">Settings</span>
+    </a>
+  </div>
+  <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
+    <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
+      <span class="material-symbols-outlined text-[20px]">help</span>
+      <span class="font-body-sm font-medium">Support</span>
+    </a>
+    <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
+      <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
+        <span id="sidebarAvatarText">BT</span>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
+        <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
+      </div>
+      <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
     </div>
-    <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
-            <span class="material-symbols-outlined text-[20px]">dashboard</span>
-            <span class="font-body-sm font-medium">Operations</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_agents.html">
-            <span class="material-symbols-outlined text-[20px]">smart_toy</span>
-            <span class="font-body-sm font-medium">Agents</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">chat</span>
-            <span class="font-body-sm font-medium">Chat</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_neuralmap.html">
-            <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">hub</span>
-            <span class="font-body-sm font-medium">Neural Map</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">assessment</span>
-            <span class="font-body-sm font-medium">Reports</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">menu_book</span>
-            <span class="font-body-sm font-medium">Knowledge</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">account_balance</span>
-            <span class="font-body-sm font-medium">Governance</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-            <span class="material-symbols-outlined text-[20px]">account_tree</span>
-            <span class="font-body-sm font-medium">Blockchain</span>
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_audit.html">
-            <span class="material-symbols-outlined text-[20px]">policy</span>
-            <span class="font-body-sm font-medium">Audit Logs</span>
-        </a>
-        <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-        <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
-            <span class="material-symbols-outlined text-[20px]">settings</span>
-            <span class="font-body-sm font-medium">Settings</span>
-        </a>
-    </div>
-    <div class="mt-auto border-t border-cream-bg/20 pt-4 space-y-1">
-        <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="#">
-            <span class="material-symbols-outlined text-[20px]">help</span>
-            <span class="font-body-sm font-medium">Support</span>
-        </a>
-        <div class="flex items-center gap-3 px-3 py-2 rounded-xl mt-2 bg-cream-bg/10 cursor-pointer hover:bg-cream-bg/20 transition-colors" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}">
-            <div id="sidebarAvatar" class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg text-[#3a2e23] font-bold text-xs shrink-0">
-                <span id="sidebarAvatarText">BT</span>
-            </div>
-            <div class="flex-1 overflow-hidden">
-                <div id="sidebarName" class="font-body-sm font-bold text-cream-bg text-[13px] truncate">Bro Test</div>
-                <div id="sidebarRole" class="font-body-sm text-cream-bg/60 text-[11px] truncate">Staff • Internal</div>
-            </div>
-            <div class="text-[10px] font-mono bg-[#052e16] text-[#86efac] border border-[#14532d] px-2 py-0.5 rounded-full font-bold" id="sidebarToken">—</div>
-        </div>
-    </div>
+  </div>
 </nav>
 
 <!-- ═══════════════════════════════════ -->
-<!-- MAIN                                -->
+<!-- MAIN                -->
 <!-- ═══════════════════════════════════ -->
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
-  <!-- Top App Bar -->
-  <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
-    <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[18px]">menu</span>
-    </button>
-    <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--accent-soft);">Neural Map</h1>
-    <span class="text-[10px] uppercase tracking-widest font-mono hidden xl:inline-block nm-sub truncate min-w-0" style="max-width:220px" id="mapStats">loading…</span>
+ <!-- Top App Bar -->
+ <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
+  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[18px]">menu</span>
+  </button>
+  <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--accent-soft);">Neural Map</h1>
+  <span class="text-[10px] uppercase tracking-widest font-mono hidden xl:inline-block nm-sub truncate min-w-0" style="max-width:220px" id="mapStats">loading…</span>
 
-    <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
+  <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
 
-    <!-- Search -->
-    <div class="relative flex-1 min-w-[110px] max-w-[210px]">
-      <span class="material-symbols-outlined text-[18px] nm-sub absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
-      <input id="searchInput" placeholder="Search nodes…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" />
+  <!-- Search -->
+  <div class="relative flex-1 min-w-[110px] max-w-[210px]">
+   <span class="material-symbols-outlined text-[18px] nm-sub absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
+   <input id="searchInput" placeholder="Search nodes…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" />
+  </div>
+
+  <!-- Recognize -->
+  <div class="relative flex-1 min-w-[130px] max-w-[210px] hidden lg:block">
+   <span class="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--accent-soft);">smart_toy</span>
+   <input id="recognizeInput" list="nm-known" placeholder="Jump to a node…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" style="border-style: dashed; border-color: var(--accent-soft);" />
+   <datalist id="nm-known"></datalist>
+  </div>
+
+  <div class="flex-1"></div>
+
+  <button id="addNodeBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+   <span class="material-symbols-outlined text-[16px]">add</span> New node
+  </button>
+  <button id="addDocBtn" title="Add one of your uploaded documents to the map" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+   <span class="material-symbols-outlined text-[16px]">description</span> Add document
+  </button>
+  <button id="selectAllBtn" title="Select all nodes (Ctrl+A) — then drag any of them to move the whole set" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">select_all</span>
+  </button>
+  <button id="resetViewBtn" title="Reset view" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">recenter</span>
+  </button>
+  <button id="heatmapBtn" title="Knowledge heatmap — colour concepts by how recently the AI used them" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">local_fire_department</span>
+  </button>
+  <button id="neighborhoodsBtn" title="Neighborhoods — colour concepts by the community they belong to" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">workspaces</span>
+  </button>
+  <button id="insightsBtn" title="Insights — knowledge gaps &amp; contradictions the AI found" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0 relative">
+   <span class="material-symbols-outlined text-[16px]">emoji_objects</span>
+   <span id="insightsDot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full" style="background: var(--danger, #ef4444)"></span>
+  </button>
+  <button id="dreamBtn" title="Dream — consolidate memory now (merge duplicates, fade stale links, find gaps)" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">bedtime</span>
+  </button>
+  <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
+  </button>
+  <button id="reloadBtn" title="Rebuild from live system state" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
+   <span class="material-symbols-outlined text-[16px]">sync</span>
+  </button>
+  <!-- Notification bell -->
+  <div class="relative shrink-0">
+   <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
+    <span class="material-symbols-outlined text-[16px]">notifications</span>
+    <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+   </button>
+   <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+    <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+     <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+     <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
     </div>
+    <div id="notifList"></div>
+   </div>
+  </div>
+  <!-- Profile -->
+  <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;" data-profile-initials></div>
+ </header>
 
-    <!-- Recognize -->
-    <div class="relative flex-1 min-w-[130px] max-w-[210px] hidden lg:block">
-      <span class="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--accent-soft);">smart_toy</span>
-      <input id="recognizeInput" list="nm-known" placeholder="Jump to a node…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" style="border-style: dashed; border-color: var(--accent-soft);" />
-      <datalist id="nm-known"></datalist>
-    </div>
+ <!-- Map switcher — like a tab strip of chats: the built-in System Map, then
+    every map you've created, then a button to start a new one. -->
+ <div class="nm-chrome flex items-center gap-2 w-full px-4 py-2 border-b shrink-0 overflow-x-auto" id="mapTabs" style="scrollbar-width: thin;"></div>
 
-    <div class="flex-1"></div>
+ <!-- Canvas stage -->
+ <main class="flex-1 relative min-h-0" style="background: var(--bg);">
+  <canvas id="graphCanvas" class="w-full h-full"></canvas>
 
-    <button id="addNodeBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
-      <span class="material-symbols-outlined text-[16px]">add</span> New node
-    </button>
-    <button id="addDocBtn" title="Add one of your uploaded documents to the map" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
-      <span class="material-symbols-outlined text-[16px]">description</span> Add document
-    </button>
-    <button id="selectAllBtn" title="Select all nodes (Ctrl+A) — then drag any of them to move the whole set" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">select_all</span>
-    </button>
-    <button id="resetViewBtn" title="Reset view" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">recenter</span>
-    </button>
-    <button id="heatmapBtn" title="Knowledge heatmap — colour concepts by how recently the AI used them" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">local_fire_department</span>
-    </button>
-    <button id="neighborhoodsBtn" title="Neighborhoods — colour concepts by the community they belong to" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">workspaces</span>
-    </button>
-    <button id="insightsBtn" title="Insights — knowledge gaps &amp; contradictions the AI found" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0 relative">
-      <span class="material-symbols-outlined text-[16px]">emoji_objects</span>
-      <span id="insightsDot" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full" style="background: var(--danger, #ef4444)"></span>
-    </button>
-    <button id="dreamBtn" title="Dream — consolidate memory now (merge duplicates, fade stale links, find gaps)" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">bedtime</span>
-    </button>
-    <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]" id="themeIcon">dark_mode</span>
-    </button>
-    <button id="reloadBtn" title="Rebuild from live system state" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
-      <span class="material-symbols-outlined text-[16px]">sync</span>
-    </button>
-    <!-- Notification bell -->
-    <div class="relative shrink-0">
-      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
-        <span class="material-symbols-outlined text-[16px]">notifications</span>
-        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
-      </button>
-      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
-        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
-          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
-          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
-        </div>
-        <div id="notifList"></div>
-      </div>
-    </div>
-    <!-- Profile -->
-    <div id="topbarUserIcon" title="Open chat" onclick="if(typeof openSettings === 'function'){openSettings();}else{window.location.href='finchat_chat.html?settings=1';}" class="w-9 h-9 rounded-full shrink-0 cursor-pointer overflow-hidden flex items-center justify-center" style="background:var(--field);border:1px solid var(--border);color:var(--txt);font-weight:700;font-size:12px;" data-profile-initials></div>
-  </header>
+  <!-- Hints -->
+  <div class="absolute left-4 bottom-3 flex flex-col gap-1 text-[11px] nm-sub pointer-events-none leading-relaxed">
+   <div>drag a node to move it · let go and it settles back · hover to trace its chain</div>
+   <div>scroll to zoom · drag background to pan · shift-drag to box-select · double-click to reshuffle</div>
+  </div>
 
-  <!-- Map switcher — like a tab strip of chats: the built-in System Map, then
-       every map you've created, then a button to start a new one. -->
-  <div class="nm-chrome flex items-center gap-2 w-full px-4 py-2 border-b shrink-0 overflow-x-auto" id="mapTabs" style="scrollbar-width: thin;"></div>
+  <!-- Legend -->
+  <div id="legend" class="nm-surface absolute right-4 bottom-3 flex gap-3 text-[11px] px-4 py-2 rounded-full"></div>
 
-  <!-- Canvas stage -->
-  <main class="flex-1 relative min-h-0" style="background: var(--bg);">
-    <canvas id="graphCanvas" class="w-full h-full"></canvas>
+  <!-- Selection banner -->
+  <div id="selBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30 flex items-center gap-3">
+   <span id="selCount">0 selected</span>
+   <span class="opacity-60">·</span>
+   <span id="selPin" class="underline cursor-pointer opacity-90">pin where they are</span>
+   <span class="opacity-60">·</span>
+   <span id="selRelease" class="underline cursor-pointer opacity-90">let them float</span>
+   <span class="opacity-60">·</span>
+   <span id="selClear" class="underline cursor-pointer opacity-90">clear</span>
+  </div>
 
-    <!-- Hints -->
-    <div class="absolute left-4 bottom-3 flex flex-col gap-1 text-[11px] nm-sub pointer-events-none leading-relaxed">
-      <div>drag a node to move it · let go and it settles back · hover to trace its chain</div>
-      <div>scroll to zoom · drag background to pan · shift-drag to box-select · double-click to reshuffle</div>
-    </div>
+  <!-- Link-mode banner -->
+  <div id="linkBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30">
+   Click another node to connect · <span id="cancelLink" class="opacity-80 underline cursor-pointer">cancel</span>
+  </div>
 
-    <!-- Legend -->
-    <div id="legend" class="nm-surface absolute right-4 bottom-3 flex gap-3 text-[11px] px-4 py-2 rounded-full"></div>
+  <!-- Loading -->
+  <div id="loadingVeil" class="absolute inset-0 flex items-center justify-center z-40" style="background: var(--bg);">
+   <div class="flex items-center gap-3 nm-sub text-sm font-mono">
+    <span class="material-symbols-outlined animate-spin">progress_activity</span> Building the map from live system state…
+   </div>
+  </div>
 
-    <!-- Selection banner -->
-    <div id="selBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30 flex items-center gap-3">
-      <span id="selCount">0 selected</span>
-      <span class="opacity-60">·</span>
-      <span id="selPin" class="underline cursor-pointer opacity-90">pin where they are</span>
-      <span class="opacity-60">·</span>
-      <span id="selRelease" class="underline cursor-pointer opacity-90">let them float</span>
-      <span class="opacity-60">·</span>
-      <span id="selClear" class="underline cursor-pointer opacity-90">clear</span>
-    </div>
-
-    <!-- Link-mode banner -->
-    <div id="linkBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 nm-btn-primary px-5 py-2 rounded-full text-[13px] font-semibold shadow-lg z-30">
-      Click another node to connect · <span id="cancelLink" class="opacity-80 underline cursor-pointer">cancel</span>
-    </div>
-
-    <!-- Loading -->
-    <div id="loadingVeil" class="absolute inset-0 flex items-center justify-center z-40" style="background: var(--bg);">
-      <div class="flex items-center gap-3 nm-sub text-sm font-mono">
-        <span class="material-symbols-outlined animate-spin">progress_activity</span> Building the map from live system state…
-      </div>
-    </div>
-
-    <div id="nodePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
-    <div id="edgePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
-    <div id="insightsPanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[360px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
-  </main>
+  <div id="nodePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
+  <div id="edgePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
+  <div id="insightsPanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[360px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
+ </main>
 </div>
 
 <!-- New Map picker — the "what kind of map" question, like picking a model
-     before starting a new chat. -->
+   before starting a new chat. -->
 <div id="newMapModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6" style="background: rgba(0,0,0,.45);">
-  <div class="nm-panel nm-surface w-full max-w-[560px] rounded-2xl shadow-2xl overflow-hidden">
-    <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
-      <div>
-        <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">New map</div>
-        <div class="text-[12px] nm-sub mt-0.5">What do you want to build?</div>
-      </div>
-      <button id="newMapClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
-    </div>
-    <div class="p-5 flex flex-col gap-3">
-      <button id="pickKnowledge" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
-        <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-entity); color: var(--bg)">
-          <span class="material-symbols-outlined text-[20px]">hub</span>
-        </span>
-        <span>
-          <span class="block text-[15px] font-bold" style="color: var(--txt)">Knowledge map</span>
-          <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">A blank node-and-edge canvas. Add your own nodes, connect them, and take notes — like the System Map, but yours from scratch.</span>
-        </span>
-      </button>
-      <button id="pickNetwork" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
-        <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-agent); color: var(--bg)">
-          <span class="material-symbols-outlined text-[20px]">network_intelligence</span>
-        </span>
-        <span>
-          <span class="block text-[15px] font-bold" style="color: var(--txt)">ML neural network</span>
-          <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">Configure and train a real feed-forward network — layers, learning rate, activation — and watch it fit a curve with live loss, R², bias/variance, and generalisation metrics.</span>
-        </span>
-      </button>
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5 mt-1">Name it</div>
-        <input id="newMapName" placeholder="e.g. Portfolio ideas, or Sine regressor" class="nm-field w-full px-3 py-2.5 rounded-xl text-[14px]" />
-      </div>
-    </div>
+ <div class="nm-panel nm-surface w-full max-w-[560px] rounded-2xl shadow-2xl overflow-hidden">
+  <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
+   <div>
+    <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">New map</div>
+    <div class="text-[12px] nm-sub mt-0.5">What do you want to build?</div>
+   </div>
+   <button id="newMapClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
   </div>
+  <div class="p-5 flex flex-col gap-3">
+   <button id="pickKnowledge" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
+    <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-entity); color: var(--bg)">
+     <span class="material-symbols-outlined text-[20px]">hub</span>
+    </span>
+    <span>
+     <span class="block text-[15px] font-bold" style="color: var(--txt)">Knowledge map</span>
+     <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">A blank node-and-edge canvas. Add your own nodes, connect them, and take notes — like the System Map, but yours from scratch.</span>
+    </span>
+   </button>
+   <button id="pickNetwork" class="nm-field text-left rounded-2xl p-4 flex items-start gap-3 transition-all" style="cursor:pointer">
+    <span class="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-agent); color: var(--bg)">
+     <span class="material-symbols-outlined text-[20px]">network_intelligence</span>
+    </span>
+    <span>
+     <span class="block text-[15px] font-bold" style="color: var(--txt)">ML neural network</span>
+     <span class="block text-[12px] nm-sub mt-0.5 leading-relaxed">Configure and train a real feed-forward network — layers, learning rate, activation — and watch it fit a curve with live loss, R², bias/variance, and generalisation metrics.</span>
+    </span>
+   </button>
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5 mt-1">Name it</div>
+    <input id="newMapName" placeholder="e.g. Portfolio ideas, or Sine regressor" class="nm-field w-full px-3 py-2.5 rounded-xl text-[14px]" />
+   </div>
+  </div>
+ </div>
 </div>
 
 <!-- Document picker — drop one of your uploaded files onto the map as a node. -->
 <div id="docModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6" style="background: rgba(0,0,0,.45);">
-  <div class="nm-panel nm-surface w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col" style="max-height:80vh;">
-    <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
-      <div>
-        <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">Add a document</div>
-        <div class="text-[12px] nm-sub mt-0.5">Pick one of your uploaded files — it joins the map as a Document node you can connect.</div>
-      </div>
-      <button id="docModalClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
-    </div>
-    <div id="docList" class="p-4 flex flex-col gap-2 overflow-y-auto">
-      <div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>
-    </div>
+ <div class="nm-panel nm-surface w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col" style="max-height:80vh;">
+  <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
+   <div>
+    <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">Add a document</div>
+    <div class="text-[12px] nm-sub mt-0.5">Pick one of your uploaded files — it joins the map as a Document node you can connect.</div>
+   </div>
+   <button id="docModalClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
   </div>
+  <div id="docList" class="p-4 flex flex-col gap-2 overflow-y-auto">
+   <div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>
+  </div>
+ </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -361,16 +361,16 @@ let theme = localStorage.getItem(THEME_KEY) || 'warm';
 document.documentElement.setAttribute('data-nm-theme', theme);
 
 function applyTheme(next) {
-  theme = next;
-  document.documentElement.setAttribute('data-nm-theme', next);
-  localStorage.setItem(THEME_KEY, next);
-  const icon = document.getElementById('themeIcon');
-  if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
-  refreshPalette();
-  renderLegend();
-  // Panels bake colours in at render time, so re-render whichever is open.
-  if (selectedNode) openNode(selectedNode);
-  else if (selectedEdge) openEdge(selectedEdge);
+ theme = next;
+ document.documentElement.setAttribute('data-nm-theme', next);
+ localStorage.setItem(THEME_KEY, next);
+ const icon = document.getElementById('themeIcon');
+ if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+ refreshPalette();
+ renderLegend();
+ // Panels bake colours in at render time, so re-render whichever is open.
+ if (selectedNode) openNode(selectedNode);
+ else if (selectedEdge) openEdge(selectedEdge);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -389,36 +389,36 @@ const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/
 // ══════════════════════════════════════════════════════════
 let currentMapId = new URLSearchParams(location.search).get('mapId') || 'system';
 let currentMapName = 'System Map';
-let myMaps = [];   // cache from GET /maps, refreshed on load and after create/rename/delete
+let myMaps = [];  // cache from GET /maps, refreshed on load and after create/rename/delete
 const withMap = (url) => url + (url.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(currentMapId);
 function setUrlMapId(mapId) {
-  const u = new URL(location.href);
-  if (mapId === 'system') u.searchParams.delete('mapId'); else u.searchParams.set('mapId', mapId);
-  history.replaceState(null, '', u);
+ const u = new URL(location.href);
+ if (mapId === 'system') u.searchParams.delete('mapId'); else u.searchParams.set('mapId', mapId);
+ history.replaceState(null, '', u);
 }
 
 (function initSidebar() {
-  const name = SESSION_USER.name || SESSION_USER.username || 'User';
-  const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
-  document.getElementById('sidebarName').textContent = name;
-  document.getElementById('sidebarAvatarText').textContent = initials;
-  document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
-  // Topbar profile: avatar if set, else initials.
-  const topProfile = document.getElementById('topbarUserIcon');
-  if (topProfile) {
-    if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
-    else topProfile.textContent = initials;
-  }
-  fetch('/api/tokens/balance', { headers: AUTH })
-    .then(r => r.ok ? r.json() : null)
-    .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; })
-    .catch(() => {});
+ const name = SESSION_USER.name || SESSION_USER.username || 'User';
+ const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+ document.getElementById('sidebarName').textContent = name;
+ document.getElementById('sidebarAvatarText').textContent = initials;
+ document.getElementById('sidebarRole').textContent = `${SESSION_USER.role || 'Staff'} · Internal`;
+ // Topbar profile: avatar if set, else initials.
+ const topProfile = document.getElementById('topbarUserIcon');
+ if (topProfile) {
+  if (SESSION_USER.avatar_url) topProfile.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
+  else topProfile.textContent = initials;
+ }
+ fetch('/api/tokens/balance', { headers: AUTH })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && typeof d.balance === 'number') document.getElementById('sidebarToken').textContent = d.balance; })
+  .catch(() => {});
 })();
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2600);
+ const t = document.getElementById('toast');
+ t.textContent = msg; t.classList.add('show');
+ setTimeout(() => t.classList.remove('show'), 2600);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -427,53 +427,53 @@ function showToast(msg) {
 // ══════════════════════════════════════════════════════════
 let T = {};
 function refreshPalette() {
-  const s = getComputedStyle(document.documentElement);
-  const v = n => s.getPropertyValue(n).trim();
-  T = {
-    bg: v('--bg'), label: v('--label'), sub: v('--sub'), accent: v('--accent'),
-    edge: v('--edge'), edgeHi: v('--edge-hi'), grid: v('--grid'),
-    marquee: v('--marquee'), marqueeLine: v('--marquee-line'), match: v('--cat-tool'),
-    cat: {
-      agent: v('--cat-agent'), tool: v('--cat-tool'), chain: v('--cat-chain'),
-      entity: v('--cat-entity'), doc: v('--cat-doc'), idea: v('--cat-idea')
-    }
-  };
+ const s = getComputedStyle(document.documentElement);
+ const v = n => s.getPropertyValue(n).trim();
+ T = {
+  bg: v('--bg'), label: v('--label'), sub: v('--sub'), accent: v('--accent'),
+  edge: v('--edge'), edgeHi: v('--edge-hi'), grid: v('--grid'),
+  marquee: v('--marquee'), marqueeLine: v('--marquee-line'), match: v('--cat-tool'),
+  cat: {
+   agent: v('--cat-agent'), tool: v('--cat-tool'), chain: v('--cat-chain'),
+   entity: v('--cat-entity'), doc: v('--cat-doc'), idea: v('--cat-idea')
+  }
+ };
 }
 refreshPalette();
 
 const TYPE_LABEL = {
-  agent: 'AI Agent', tool: 'Wired Tool', chain: 'On-chain',
-  entity: 'Learned Concept', doc: 'Document', idea: 'My note / idea'
+ agent: 'AI Agent', tool: 'Wired Tool', chain: 'On-chain',
+ entity: 'Learned Concept', doc: 'Document', idea: 'My note / idea'
 };
 // Legend shows live counts of what is actually on the CURRENT map — only the
 // types present, each with its count — instead of a static list of all six.
 function renderLegend() {
-  // Heatmap mode swaps the legend: colours mean recency of recall, not type.
-  if (heatmapMode) {
-    document.getElementById('legend').innerHTML = [
-      ['#ef4444', 'used today'], ['#f97316', 'this week'], ['#22c55e', 'sometimes'], ['#64748b', 'forgotten']
-    ].map(([c, l]) =>
-      `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${c}"></span>${l}</span>`
-    ).join('');
-    return;
-  }
-  // Neighborhoods mode: the legend becomes the list of named territories.
-  if (neighborhoodMode) {
-    document.getElementById('legend').innerHTML = communities.length
-      ? communities.slice(0, 8).map(c =>
-          `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)" title="${(c.summary || '').replace(/"/g, '&quot;')}"><span class="w-2.5 h-2.5 rounded-full" style="background:${c.color}"></span>${c.label} × ${c.size}</span>`
-        ).join('')
-      : `<span style="color: var(--sub)">No neighborhoods yet — run a Dream to cluster.</span>`;
-    return;
-  }
-  const counts = {};
-  for (const n of nodes) counts[n.type] = (counts[n.type] || 0) + 1;
-  const present = Object.entries(TYPE_LABEL).filter(([k]) => counts[k]);
-  document.getElementById('legend').innerHTML = present.length
-    ? present.map(([k, v]) =>
-        `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${T.cat[k]}"></span>${v.replace(' / idea', '')} × ${counts[k]}</span>`
-      ).join('')
-    : `<span style="color: var(--sub)">Empty map — add your first node</span>`;
+ // Heatmap mode swaps the legend: colours mean recency of recall, not type.
+ if (heatmapMode) {
+  document.getElementById('legend').innerHTML = [
+   ['#ef4444', 'used today'], ['#f97316', 'this week'], ['#22c55e', 'sometimes'], ['#64748b', 'forgotten']
+  ].map(([c, l]) =>
+   `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${c}"></span>${l}</span>`
+  ).join('');
+  return;
+ }
+ // Neighborhoods mode: the legend becomes the list of named territories.
+ if (neighborhoodMode) {
+  document.getElementById('legend').innerHTML = communities.length
+   ? communities.slice(0, 8).map(c =>
+     `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)" title="${(c.summary || '').replace(/"/g, '&quot;')}"><span class="w-2.5 h-2.5 rounded-full" style="background:${c.color}"></span>${c.label} × ${c.size}</span>`
+    ).join('')
+   : `<span style="color: var(--sub)">No neighborhoods yet — run a Dream to cluster.</span>`;
+  return;
+ }
+ const counts = {};
+ for (const n of nodes) counts[n.type] = (counts[n.type] || 0) + 1;
+ const present = Object.entries(TYPE_LABEL).filter(([k]) => counts[k]);
+ document.getElementById('legend').innerHTML = present.length
+  ? present.map(([k, v]) =>
+    `<span class="inline-flex items-center gap-1.5" style="color: var(--sub)"><span class="w-2.5 h-2.5 rounded-full" style="background:${T.cat[k]}"></span>${v.replace(' / idea', '')} × ${counts[k]}</span>`
+   ).join('')
+  : `<span style="color: var(--sub)">Empty map — add your first node</span>`;
 }
 // (First render happens in applyTheme() at the bottom, after `nodes` exists —
 // calling it here would hit the temporal dead zone of `let nodes`.)
@@ -485,30 +485,30 @@ let nodes = [], edges = [];
 const view = { scale: 1, panX: 0, panY: 0 };
 let hoverId = null, dragging = null, panning = null, marquee = null, centered = false;
 let selectedNode = null, selectedEdge = null, linkMode = false;
-let selection = new Set();   // node keys picked via box-select / select-all
+let selection = new Set();  // node keys picked via box-select / select-all
 let searchQuery = '';
 
 // Sprint X · Cognitive Memory Engine view state
 let heatmapMode = false;
 let neighborhoodMode = false;
-let communities = [];   // [{id,label,summary,color,size}] from the last load
+let communities = [];  // [{id,label,summary,color,size}] from the last load
 // Colour a concept by its neighborhood; structure/unclustered nodes stay neutral.
 function neighColor(n) {
-  const c = n.living && n.living.community;
-  return c ? c.color : 'rgba(120,130,145,0.4)';
+ const c = n.living && n.living.community;
+ return c ? c.color : 'rgba(120,130,145,0.4)';
 }
-const pulseAt = new Map();   // node key → ms when its activation pulse started (animation clock)
+const pulseAt = new Map();  // node key → ms when its activation pulse started (animation clock)
 const pulseSeen = new Map(); // node key → newest server activation ts we've already pulsed for
-const flowAt = new Map();    // edge key → ms when its retrieval-path glow started
+const flowAt = new Map();  // edge key → ms when its retrieval-path glow started
 const HEAT = { hot: '#ef4444', warm: '#f97316', cool: '#22c55e', cold: '#64748b' };
 function heatColor(n) {
-  if (n.type !== 'entity' || !n.living) return 'rgba(120,130,145,0.45)'; // structure stays visible, but neutral
-  const ts = n.living.lastActivatedAt;
-  const age = ts ? Date.now() - new Date(ts).getTime() : Infinity;
-  if (age < 24 * 3600e3) return HEAT.hot;             // used today
-  if (age < 7 * 86400e3) return HEAT.warm;            // used this week
-  if ((n.living.activationCount || 0) > 0) return HEAT.cool; // used at some point
-  return HEAT.cold;                                    // never recalled — forgotten
+ if (n.type !== 'entity' || !n.living) return 'rgba(120,130,145,0.45)'; // structure stays visible, but neutral
+ const ts = n.living.lastActivatedAt;
+ const age = ts ? Date.now() - new Date(ts).getTime() : Infinity;
+ if (age < 24 * 3600e3) return HEAT.hot;       // used today
+ if (age < 7 * 86400e3) return HEAT.warm;      // used this week
+ if ((n.living.activationCount || 0) > 0) return HEAT.cool; // used at some point
+ return HEAT.cold;                  // never recalled — forgotten
 }
 
 const canvas = document.getElementById('graphCanvas');
@@ -519,12 +519,12 @@ const byKey = k => nodes.find(n => n.key === k);
 const radiusOf = n => n.key === 'user:me' ? 30 : n.type === 'agent' ? 19 : n.type === 'chain' ? 14 : n.type === 'idea' ? 13 : 12;
 
 function resize() {
-  const r = canvas.getBoundingClientRect();
-  dpr = window.devicePixelRatio || 1;
-  canvas.width = r.width * dpr; canvas.height = r.height * dpr;
-  cw = r.width; ch = r.height;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (!centered && cw > 0) { view.panX = cw / 2; view.panY = ch / 2; centered = true; }
+ const r = canvas.getBoundingClientRect();
+ dpr = window.devicePixelRatio || 1;
+ canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+ cw = r.width; ch = r.height;
+ ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ if (!centered && cw > 0) { view.panX = cw / 2; view.panY = ch / 2; centered = true; }
 }
 window.addEventListener('resize', resize);
 
@@ -532,53 +532,53 @@ window.addEventListener('resize', resize);
 // Load real graph from the backend
 // ══════════════════════════════════════════════════════════
 async function loadGraph() {
-  try {
-    const res = await fetch(withMap('/api/neural-map'), { headers: AUTH });
-    if (res.status === 400) {
-      // Someone navigated straight to a network map's id on this page — send
-      // them to the page that actually renders it.
-      window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(currentMapId);
-      return;
-    }
-    if (res.status === 404) {
-      showToast('That map no longer exists — back to the System Map.');
-      currentMapId = 'system'; setUrlMapId('system');
-      return loadGraph();
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    currentMapName = data.map?.name || 'System Map';
-    nodes = data.nodes.map(n => ({
-      ...n,
-      x: Number.isFinite(n.x) ? n.x : (Math.random() - .5) * 520,
-      y: Number.isFinite(n.y) ? n.y : (Math.random() - .5) * 380,
-      pinned: Number.isFinite(n.x) && Number.isFinite(n.y),
-      vx: 0, vy: 0
-    }));
-    edges = data.edges.slice();
-    communities = data.communities || [];
-    selection.clear(); syncSelBanner(); closePanels();
-    centered = false; view.scale = 1;
-
-    const s = data.stats || {};
-    const statsText = data.map?.builtIn
-      ? `${s.agents || 0} agents · ${s.tools || 0} tools · ${s.entities || 0} learned · chain ${s.chainHeight || 0}`
-      : `${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} connection${edges.length === 1 ? '' : 's'}`;
-    const statsEl = document.getElementById('mapStats');
-    statsEl.textContent = statsText;
-    statsEl.title = statsText; // full text on hover when truncated
-    document.getElementById('nm-known').innerHTML =
-      nodes.map(n => `<option value="${n.label.replace(/"/g, '&quot;')}"></option>`).join('');
-
-    renderLegend();
-    document.getElementById('loadingVeil').classList.add('hidden');
-    resize();
-  } catch (err) {
-    document.getElementById('loadingVeil').classList.remove('hidden');
-    document.getElementById('loadingVeil').innerHTML =
-      `<div class="text-center text-sm font-mono px-6" style="color: var(--danger)">Couldn't load the map: ${err.message}<br><span class="nm-sub">Is the backend running?</span></div>`;
+ try {
+  const res = await fetch(withMap('/api/neural-map'), { headers: AUTH });
+  if (res.status === 400) {
+   // Someone navigated straight to a network map's id on this page — send
+   // them to the page that actually renders it.
+   window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(currentMapId);
+   return;
   }
+  if (res.status === 404) {
+   showToast('That map no longer exists — back to the System Map.');
+   currentMapId = 'system'; setUrlMapId('system');
+   return loadGraph();
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  currentMapName = data.map?.name || 'System Map';
+  nodes = data.nodes.map(n => ({
+   ...n,
+   x: Number.isFinite(n.x) ? n.x : (Math.random() - .5) * 520,
+   y: Number.isFinite(n.y) ? n.y : (Math.random() - .5) * 380,
+   pinned: Number.isFinite(n.x) && Number.isFinite(n.y),
+   vx: 0, vy: 0
+  }));
+  edges = data.edges.slice();
+  communities = data.communities || [];
+  selection.clear(); syncSelBanner(); closePanels();
+  centered = false; view.scale = 1;
+
+  const s = data.stats || {};
+  const statsText = data.map?.builtIn
+   ? `${s.agents || 0} agents · ${s.tools || 0} tools · ${s.entities || 0} learned · chain ${s.chainHeight || 0}`
+   : `${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} connection${edges.length === 1 ? '' : 's'}`;
+  const statsEl = document.getElementById('mapStats');
+  statsEl.textContent = statsText;
+  statsEl.title = statsText; // full text on hover when truncated
+  document.getElementById('nm-known').innerHTML =
+   nodes.map(n => `<option value="${n.label.replace(/"/g, '&quot;')}"></option>`).join('');
+
+  renderLegend();
+  document.getElementById('loadingVeil').classList.add('hidden');
+  resize();
+ } catch (err) {
+  document.getElementById('loadingVeil').classList.remove('hidden');
+  document.getElementById('loadingVeil').innerHTML =
+   `<div class="text-center text-sm font-mono px-6" style="color: var(--danger)">Couldn't load the map: ${err.message}<br><span class="nm-sub">Is the backend running?</span></div>`;
+ }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -586,190 +586,190 @@ async function loadGraph() {
 // map you've made, then a button to create another.
 // ══════════════════════════════════════════════════════════
 async function loadMapList() {
-  try {
-    const res = await fetch('/api/neural-map/maps', { headers: AUTH });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    myMaps = (await res.json()).maps;
-    renderMapTabs();
-  } catch (err) {
-    showToast(`⚠️ Couldn't load your maps: ${err.message}`);
-  }
+ try {
+  const res = await fetch('/api/neural-map/maps', { headers: AUTH });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  myMaps = (await res.json()).maps;
+  renderMapTabs();
+ } catch (err) {
+  showToast(`⚠️ Couldn't load your maps: ${err.message}`);
+ }
 }
 
 function renderMapTabs() {
-  const bar = document.getElementById('mapTabs');
-  const tab = (m) => {
-    const active = m.mapId === currentMapId;
-    const icon = m.builtIn ? 'hub' : (m.kind === 'network' ? 'network_intelligence' : 'hub');
-    const edit = m.builtIn ? '' : `
-      <span class="nm-tab-edit inline-flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity ml-0.5" data-edit="${m.mapId}"
-        title="Rename map" style="width:16px;height:16px;cursor:pointer;">
-        <span class="material-symbols-outlined" style="font-size:13px;">edit</span>
-      </span>`;
-    const del = m.builtIn ? '' : `
-      <span class="nm-tab-del inline-flex items-center justify-center rounded-full -mr-1" data-del="${m.mapId}" data-name="${esc(m.name)}"
-        title="Delete this map" style="width:16px;height:16px;">
-        <span class="material-symbols-outlined" style="font-size:14px;">close</span>
-      </span>`;
-    return `
-      <span class="nm-tab inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 whitespace-nowrap"
-        data-map="${m.mapId}" data-kind="${m.kind}"
-        style="cursor:pointer; ${active
-          ? 'background: var(--accent); color: var(--bg); border: none'
-          : 'background: var(--field); color: var(--txt); border: 1px solid var(--border)'}">
-        <span class="material-symbols-outlined text-[14px]">${icon}</span>
-        <span class="nm-tab-label" title="${m.builtIn ? '' : 'Double-click to rename'}">${esc(m.name)}</span>${edit}${del}
-      </span>`;
-  };
-  bar.innerHTML = myMaps.map(tab).join('') + `
-    <button id="newMapBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 nm-btn">
-      <span class="material-symbols-outlined text-[14px]">add</span> New map
-    </button>`;
+ const bar = document.getElementById('mapTabs');
+ const tab = (m) => {
+  const active = m.mapId === currentMapId;
+  const icon = m.builtIn ? 'hub' : (m.kind === 'network' ? 'network_intelligence' : 'hub');
+  const edit = m.builtIn ? '' : `
+   <span class="nm-tab-edit inline-flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity ml-0.5" data-edit="${m.mapId}"
+    title="Rename map" style="width:16px;height:16px;cursor:pointer;">
+    <span class="material-symbols-outlined" style="font-size:13px;">edit</span>
+   </span>`;
+  const del = m.builtIn ? '' : `
+   <span class="nm-tab-del inline-flex items-center justify-center rounded-full -mr-1" data-del="${m.mapId}" data-name="${esc(m.name)}"
+    title="Delete this map" style="width:16px;height:16px;">
+    <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+   </span>`;
+  return `
+   <span class="nm-tab inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 whitespace-nowrap"
+    data-map="${m.mapId}" data-kind="${m.kind}"
+    style="cursor:pointer; ${active
+     ? 'background: var(--accent); color: var(--bg); border: none'
+     : 'background: var(--field); color: var(--txt); border: 1px solid var(--border)'}">
+    <span class="material-symbols-outlined text-[14px]">${icon}</span>
+    <span class="nm-tab-label" title="${m.builtIn ? '' : 'Double-click to rename'}">${esc(m.name)}</span>${edit}${del}
+   </span>`;
+ };
+ bar.innerHTML = myMaps.map(tab).join('') + `
+  <button id="newMapBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 nm-btn">
+   <span class="material-symbols-outlined text-[14px]">add</span> New map
+  </button>`;
 
-  bar.querySelectorAll('.nm-tab').forEach(btn => {
-    btn.onclick = (e) => {
-      if (e.target.closest('[data-del]') || e.target.closest('[data-edit]') || btn.querySelector('.nm-tab-label').isContentEditable) return;
-      switchToMap(btn.dataset.map, btn.dataset.kind);
-    };
-  });
-  bar.querySelectorAll('[data-del]').forEach(x => {
-    x.onclick = (e) => { e.stopPropagation(); deleteMap(x.dataset.del, x.dataset.name); };
-  });
-  bar.querySelectorAll('[data-edit]').forEach(x => {
-    x.onclick = (e) => { e.stopPropagation(); startRenameMap(x.dataset.edit); };
-  });
-  bar.querySelectorAll('.nm-tab-label').forEach(lbl => {
-    const btn = lbl.closest('.nm-tab');
-    if (btn && btn.dataset.map !== 'system') {
-      lbl.ondblclick = (e) => {
-        e.stopPropagation();
-        startRenameMap(btn.dataset.map);
-      };
-    }
-  });
-  document.getElementById('newMapBtn').onclick = openNewMapModal;
+ bar.querySelectorAll('.nm-tab').forEach(btn => {
+  btn.onclick = (e) => {
+   if (e.target.closest('[data-del]') || e.target.closest('[data-edit]') || btn.querySelector('.nm-tab-label').isContentEditable) return;
+   switchToMap(btn.dataset.map, btn.dataset.kind);
+  };
+ });
+ bar.querySelectorAll('[data-del]').forEach(x => {
+  x.onclick = (e) => { e.stopPropagation(); deleteMap(x.dataset.del, x.dataset.name); };
+ });
+ bar.querySelectorAll('[data-edit]').forEach(x => {
+  x.onclick = (e) => { e.stopPropagation(); startRenameMap(x.dataset.edit); };
+ });
+ bar.querySelectorAll('.nm-tab-label').forEach(lbl => {
+  const btn = lbl.closest('.nm-tab');
+  if (btn && btn.dataset.map !== 'system') {
+   lbl.ondblclick = (e) => {
+    e.stopPropagation();
+    startRenameMap(btn.dataset.map);
+   };
+  }
+ });
+ document.getElementById('newMapBtn').onclick = openNewMapModal;
 }
 
 function startRenameMap(mapId) {
-  const bar = document.getElementById('mapTabs');
-  const btn = bar.querySelector(`.nm-tab[data-map="${mapId}"]`);
-  if (!btn) return;
-  const lbl = btn.querySelector('.nm-tab-label');
-  if (!lbl || lbl.isContentEditable) return;
+ const bar = document.getElementById('mapTabs');
+ const btn = bar.querySelector(`.nm-tab[data-map="${mapId}"]`);
+ if (!btn) return;
+ const lbl = btn.querySelector('.nm-tab-label');
+ if (!lbl || lbl.isContentEditable) return;
 
-  const oldName = lbl.textContent.trim();
-  lbl.contentEditable = true;
-  lbl.style.outline = '1px solid currentColor';
-  lbl.style.padding = '0 4px';
-  lbl.style.borderRadius = '4px';
-  lbl.focus();
+ const oldName = lbl.textContent.trim();
+ lbl.contentEditable = true;
+ lbl.style.outline = '1px solid currentColor';
+ lbl.style.padding = '0 4px';
+ lbl.style.borderRadius = '4px';
+ lbl.focus();
 
-  const range = document.createRange();
-  range.selectNodeContents(lbl);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+ const range = document.createRange();
+ range.selectNodeContents(lbl);
+ const sel = window.getSelection();
+ sel.removeAllRanges();
+ sel.addRange(range);
 
-  const finish = async () => {
-    if (!lbl.isContentEditable) return;
-    lbl.contentEditable = false;
-    lbl.style.outline = 'none';
-    lbl.style.padding = '0';
-    const newName = lbl.textContent.trim();
-    if (!newName || newName === oldName) {
-      lbl.textContent = oldName;
-      return;
-    }
-    try {
-      const token = typeof _session !== 'undefined' ? _session?.token : null;
-      const r = await fetch(`/api/neural-map/maps/${mapId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : AUTH) },
-        body: JSON.stringify({ name: newName })
-      });
-      if (r.ok) {
-        const m = myMaps.find(m => m.mapId === mapId);
-        if (m) m.name = newName;
-        if (currentMapId === mapId) currentMapName = newName;
-        showToast('Renamed map to “' + newName + '”');
-      } else {
-        lbl.textContent = oldName;
-        showToast('Failed to rename map', 'danger');
-      }
-    } catch {
-      lbl.textContent = oldName;
-      showToast('Network error while renaming map', 'danger');
-    }
-  };
+ const finish = async () => {
+  if (!lbl.isContentEditable) return;
+  lbl.contentEditable = false;
+  lbl.style.outline = 'none';
+  lbl.style.padding = '0';
+  const newName = lbl.textContent.trim();
+  if (!newName || newName === oldName) {
+   lbl.textContent = oldName;
+   return;
+  }
+  try {
+   const token = typeof _session !== 'undefined' ? _session?.token : null;
+   const r = await fetch(`/api/neural-map/maps/${mapId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : AUTH) },
+    body: JSON.stringify({ name: newName })
+   });
+   if (r.ok) {
+    const m = myMaps.find(m => m.mapId === mapId);
+    if (m) m.name = newName;
+    if (currentMapId === mapId) currentMapName = newName;
+    showToast('Renamed map to “' + newName + '”');
+   } else {
+    lbl.textContent = oldName;
+    showToast('Failed to rename map', 'danger');
+   }
+  } catch {
+   lbl.textContent = oldName;
+   showToast('Network error while renaming map', 'danger');
+  }
+ };
 
-  lbl.onblur = finish;
-  lbl.onkeydown = (ev) => {
-    if (ev.key === 'Enter') {
-      ev.preventDefault();
-      finish();
-    } else if (ev.key === 'Escape') {
-      lbl.contentEditable = false;
-      lbl.style.outline = 'none';
-      lbl.style.padding = '0';
-      lbl.textContent = oldName;
-    }
-  };
+ lbl.onblur = finish;
+ lbl.onkeydown = (ev) => {
+  if (ev.key === 'Enter') {
+   ev.preventDefault();
+   finish();
+  } else if (ev.key === 'Escape') {
+   lbl.contentEditable = false;
+   lbl.style.outline = 'none';
+   lbl.style.padding = '0';
+   lbl.textContent = oldName;
+  }
+ };
 }
 
 async function deleteMap(mapId, name) {
-  if (!confirm(`Delete “${name}”? This removes the map and everything in it. This can’t be undone.`)) return;
-  try {
-    const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(mapId)}`, { method: 'DELETE', headers: AUTH });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    // If we were viewing the deleted map, fall back to the System Map.
-    if (currentMapId === mapId) {
-      currentMapId = 'system'; setUrlMapId('system');
-      document.getElementById('loadingVeil').classList.remove('hidden');
-      await loadGraph();
-    }
-    await loadMapList();
-    showToast(`Deleted “${name}”.`);
-  } catch (err) { showToast(`⚠️ Couldn't delete map: ${err.message}`); }
+ if (!confirm(`Delete “${name}”? This removes the map and everything in it. This can’t be undone.`)) return;
+ try {
+  const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(mapId)}`, { method: 'DELETE', headers: AUTH });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  // If we were viewing the deleted map, fall back to the System Map.
+  if (currentMapId === mapId) {
+   currentMapId = 'system'; setUrlMapId('system');
+   document.getElementById('loadingVeil').classList.remove('hidden');
+   await loadGraph();
+  }
+  await loadMapList();
+  showToast(`Deleted “${name}”.`);
+ } catch (err) { showToast(`⚠️ Couldn't delete map: ${err.message}`); }
 }
 
 function switchToMap(mapId, kind) {
-  if (mapId === currentMapId) return;
-  if (kind === 'network') {
-    window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(mapId);
-    return;
-  }
-  currentMapId = mapId;
-  setUrlMapId(mapId);
-  document.getElementById('loadingVeil').classList.remove('hidden');
-  loadGraph().then(renderMapTabs);
+ if (mapId === currentMapId) return;
+ if (kind === 'network') {
+  window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(mapId);
+  return;
+ }
+ currentMapId = mapId;
+ setUrlMapId(mapId);
+ document.getElementById('loadingVeil').classList.remove('hidden');
+ loadGraph().then(renderMapTabs);
 }
 
 function openNewMapModal() {
-  document.getElementById('newMapName').value = '';
-  document.getElementById('newMapModal').classList.remove('hidden');
-  document.getElementById('newMapName').focus();
+ document.getElementById('newMapName').value = '';
+ document.getElementById('newMapModal').classList.remove('hidden');
+ document.getElementById('newMapName').focus();
 }
 function closeNewMapModal() { document.getElementById('newMapModal').classList.add('hidden'); }
 
 async function createMap(kind) {
-  const name = document.getElementById('newMapName').value.trim();
-  try {
-    const res = await fetch('/api/neural-map/maps', {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ name, kind })
-    });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    closeNewMapModal();
-    await loadMapList();
-    if (kind === 'network') {
-      window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(d.mapId);
-    } else {
-      switchToMap(d.mapId, 'knowledge');
-    }
-  } catch (err) {
-    showToast(`⚠️ Couldn't create map: ${err.message}`);
+ const name = document.getElementById('newMapName').value.trim();
+ try {
+  const res = await fetch('/api/neural-map/maps', {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ name, kind })
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  closeNewMapModal();
+  await loadMapList();
+  if (kind === 'network') {
+   window.location.href = 'finchat_neuralnetwork.html?mapId=' + encodeURIComponent(d.mapId);
+  } else {
+   switchToMap(d.mapId, 'knowledge');
   }
+ } catch (err) {
+  showToast(`⚠️ Couldn't create map: ${err.message}`);
+ }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -783,188 +783,188 @@ async function createMap(kind) {
 const isHeld = n => n.pinned || (dragging && (dragging.key === n.key || (dragging.keys && dragging.keys.includes(n.key))));
 
 function step() {
-  for (let i = 0; i < nodes.length; i++) {
-    const a = nodes[i];
-    for (let j = i + 1; j < nodes.length; j++) {
-      const b = nodes[j];
-      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-      if (d2 < 1) { d2 = 1; dx = Math.random(); dy = Math.random(); }
-      const f = 5200 / d2, d = Math.sqrt(d2);
-      const fx = (dx / d) * f, fy = (dy / d) * f;
-      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-    }
-    a.vx -= a.x * 0.008; a.vy -= a.y * 0.008;
+ for (let i = 0; i < nodes.length; i++) {
+  const a = nodes[i];
+  for (let j = i + 1; j < nodes.length; j++) {
+   const b = nodes[j];
+   let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+   if (d2 < 1) { d2 = 1; dx = Math.random(); dy = Math.random(); }
+   const f = 5200 / d2, d = Math.sqrt(d2);
+   const fx = (dx / d) * f, fy = (dy / d) * f;
+   a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
   }
-  for (const e of edges) {
-    const a = byKey(e.from), b = byKey(e.to);
-    if (!a || !b) continue;
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const d = Math.sqrt(dx * dx + dy * dy) || 1;
-    const f = (d - 118) * 0.015;
-    const fx = (dx / d) * f, fy = (dy / d) * f;
-    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-  }
-  for (const n of nodes) {
-    if (isHeld(n)) { n.vx = 0; n.vy = 0; continue; }
-    n.vx *= 0.86; n.vy *= 0.86;
-    n.vx = Math.max(-40, Math.min(40, n.vx));
-    n.vy = Math.max(-40, Math.min(40, n.vy));
-    n.x += n.vx * 0.1; n.y += n.vy * 0.1;
-  }
+  a.vx -= a.x * 0.008; a.vy -= a.y * 0.008;
+ }
+ for (const e of edges) {
+  const a = byKey(e.from), b = byKey(e.to);
+  if (!a || !b) continue;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const f = (d - 118) * 0.015;
+  const fx = (dx / d) * f, fy = (dy / d) * f;
+  a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+ }
+ for (const n of nodes) {
+  if (isHeld(n)) { n.vx = 0; n.vy = 0; continue; }
+  n.vx *= 0.86; n.vy *= 0.86;
+  n.vx = Math.max(-40, Math.min(40, n.vx));
+  n.vy = Math.max(-40, Math.min(40, n.vy));
+  n.x += n.vx * 0.1; n.y += n.vy * 0.1;
+ }
 }
 
 function neighborSet(key) {
-  const ns = new Set([key]), es = new Set();
-  for (const e of edges) {
-    if (e.from === key) { ns.add(e.to); es.add(e.key); }
-    if (e.to === key) { ns.add(e.from); es.add(e.key); }
-  }
-  return { nodes: ns, edges: es };
+ const ns = new Set([key]), es = new Set();
+ for (const e of edges) {
+  if (e.from === key) { ns.add(e.to); es.add(e.key); }
+  if (e.to === key) { ns.add(e.from); es.add(e.key); }
+ }
+ return { nodes: ns, edges: es };
 }
 
 function draw() {
-  if (!ctx || cw === 0) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cw, ch);
-  ctx.fillStyle = T.bg; ctx.fillRect(0, 0, cw, ch);
+ if (!ctx || cw === 0) return;
+ ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ ctx.clearRect(0, 0, cw, ch);
+ ctx.fillStyle = T.bg; ctx.fillRect(0, 0, cw, ch);
 
-  ctx.fillStyle = T.grid;
-  const gs = 34 * view.scale;
-  if (gs > 8) {
-    const ox = view.panX % gs, oy = view.panY % gs;
-    for (let x = ox; x < cw; x += gs) for (let y = oy; y < ch; y += gs) {
-      ctx.beginPath(); ctx.arc(x, y, 1, 0, 7); ctx.fill();
-    }
+ ctx.fillStyle = T.grid;
+ const gs = 34 * view.scale;
+ if (gs > 8) {
+  const ox = view.panX % gs, oy = view.panY % gs;
+  for (let x = ox; x < cw; x += gs) for (let y = oy; y < ch; y += gs) {
+   ctx.beginPath(); ctx.arc(x, y, 1, 0, 7); ctx.fill();
   }
+ }
 
-  ctx.save();
-  ctx.translate(view.panX, view.panY);
-  ctx.scale(view.scale, view.scale);
+ ctx.save();
+ ctx.translate(view.panX, view.panY);
+ ctx.scale(view.scale, view.scale);
 
-  const q = searchQuery.trim().toLowerCase();
-  const focus = hoverId || (selectedNode && selectedNode.key);
-  const hi = focus ? neighborSet(focus) : null;
-  // When searching, everything that doesn't match fades back so the hits stand
-  // out — this is what makes typing in the search box visibly "do something".
-  const searchHits = q ? new Set(nodes.filter(n => n.label.toLowerCase().includes(q)).map(n => n.key)) : null;
-  const dimmed = n => (hi && !hi.nodes.has(n.key)) || (searchHits && !searchHits.has(n.key));
+ const q = searchQuery.trim().toLowerCase();
+ const focus = hoverId || (selectedNode && selectedNode.key);
+ const hi = focus ? neighborSet(focus) : null;
+ // When searching, everything that doesn't match fades back so the hits stand
+ // out — this is what makes typing in the search box visibly "do something".
+ const searchHits = q ? new Set(nodes.filter(n => n.label.toLowerCase().includes(q)).map(n => n.key)) : null;
+ const dimmed = n => (hi && !hi.nodes.has(n.key)) || (searchHits && !searchHits.has(n.key));
 
-  for (const e of edges) {
-    const a = byKey(e.from), b = byKey(e.to);
-    if (!a || !b) continue;
-    const active = hi ? hi.edges.has(e.key) : true;
-    const sel = selectedEdge && selectedEdge.key === e.key;
-    const faded = (hi && !active) || (searchHits && !(searchHits.has(e.from) && searchHits.has(e.to)));
+ for (const e of edges) {
+  const a = byKey(e.from), b = byKey(e.to);
+  if (!a || !b) continue;
+  const active = hi ? hi.edges.has(e.key) : true;
+  const sel = selectedEdge && selectedEdge.key === e.key;
+  const faded = (hi && !active) || (searchHits && !(searchHits.has(e.from) && searchHits.has(e.to)));
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  // Every edge draws as a straight SOLID line unless the user explicitly set
+  // this edge to dashed. Your own edges read slightly stronger than derived
+  // ones so the distinction survives without the old broken-line look.
+  if (e.style === 'dashed') ctx.setLineDash([5 / view.scale, 4 / view.scale]);
+  ctx.strokeStyle = sel ? T.edgeHi : (hi && active ? T.edgeHi : T.edge);
+  ctx.globalAlpha = faded ? 0.1 : (sel ? 1 : (hi ? 0.9 : (e.derived ? 0.55 : 0.75)));
+  ctx.lineWidth = (sel ? 3 : (hi && active ? 2 : 1.2)) / view.scale;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Retrieval-path glow: a dot travels along edges the AI just thought across.
+  const fs = flowAt.get(e.key);
+  if (fs) {
+   const fdt = (Date.now() - fs) / 1000;
+   if (fdt < 4) {
+    const ft = (fdt % 1.1) / 1.1;
+    const px = a.x + (b.x - a.x) * ft, py = a.y + (b.y - a.y) * ft;
+    // brighten the edge itself
     ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-    // Every edge draws as a straight SOLID line unless the user explicitly set
-    // this edge to dashed. Your own edges read slightly stronger than derived
-    // ones so the distinction survives without the old broken-line look.
-    if (e.style === 'dashed') ctx.setLineDash([5 / view.scale, 4 / view.scale]);
-    ctx.strokeStyle = sel ? T.edgeHi : (hi && active ? T.edgeHi : T.edge);
-    ctx.globalAlpha = faded ? 0.1 : (sel ? 1 : (hi ? 0.9 : (e.derived ? 0.55 : 0.75)));
-    ctx.lineWidth = (sel ? 3 : (hi && active ? 2 : 1.2)) / view.scale;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Retrieval-path glow: a dot travels along edges the AI just thought across.
-    const fs = flowAt.get(e.key);
-    if (fs) {
-      const fdt = (Date.now() - fs) / 1000;
-      if (fdt < 4) {
-        const ft = (fdt % 1.1) / 1.1;
-        const px = a.x + (b.x - a.x) * ft, py = a.y + (b.y - a.y) * ft;
-        // brighten the edge itself
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = T.accent; ctx.globalAlpha = 0.35 * (1 - fdt / 4);
-        ctx.lineWidth = 2.2 / view.scale; ctx.stroke();
-        // the traveling thought
-        ctx.beginPath(); ctx.arc(px, py, 3 / view.scale + 1.6, 0, 7);
-        ctx.fillStyle = T.accent; ctx.globalAlpha = 0.9 * (1 - fdt / 4);
-        ctx.fill();
-      } else {
-        flowAt.delete(e.key);
-      }
-    }
+    ctx.strokeStyle = T.accent; ctx.globalAlpha = 0.35 * (1 - fdt / 4);
+    ctx.lineWidth = 2.2 / view.scale; ctx.stroke();
+    // the traveling thought
+    ctx.beginPath(); ctx.arc(px, py, 3 / view.scale + 1.6, 0, 7);
+    ctx.fillStyle = T.accent; ctx.globalAlpha = 0.9 * (1 - fdt / 4);
+    ctx.fill();
+   } else {
+    flowAt.delete(e.key);
+   }
   }
-  ctx.globalAlpha = 1;
+ }
+ ctx.globalAlpha = 1;
 
-  for (const n of nodes) {
-    const r = radiusOf(n);
-    const dim = dimmed(n);
-    const match = q && n.label.toLowerCase().includes(q);
-    const picked = selection.has(n.key);
-    const col = heatmapMode ? heatColor(n)
-      : neighborhoodMode ? neighColor(n)
-      : (n.color || T.cat[n.type] || T.accent);
+ for (const n of nodes) {
+  const r = radiusOf(n);
+  const dim = dimmed(n);
+  const match = q && n.label.toLowerCase().includes(q);
+  const picked = selection.has(n.key);
+  const col = heatmapMode ? heatColor(n)
+   : neighborhoodMode ? neighColor(n)
+   : (n.color || T.cat[n.type] || T.accent);
+  ctx.globalAlpha = dim ? 0.2 : 1;
+
+  // Cognitive Memory Engine: activation pulse — a fading, expanding ring on
+  // nodes the AI just used while thinking.
+  const pulse = pulseAt.get(n.key);
+  if (pulse) {
+   const dt = (Date.now() - pulse) / 1000;
+   if (dt < 4) {
+    const phase = (dt % 1.3) / 1.3;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r + 5 + phase * 16, 0, 7);
+    ctx.strokeStyle = heatmapMode ? HEAT.hot : (T.accent || '#f59e0b');
+    ctx.globalAlpha = Math.max(0, (1 - phase) * 0.75 * (1 - dt / 4));
+    ctx.lineWidth = 2.5 / view.scale;
+    ctx.stroke();
     ctx.globalAlpha = dim ? 0.2 : 1;
-
-    // Cognitive Memory Engine: activation pulse — a fading, expanding ring on
-    // nodes the AI just used while thinking.
-    const pulse = pulseAt.get(n.key);
-    if (pulse) {
-      const dt = (Date.now() - pulse) / 1000;
-      if (dt < 4) {
-        const phase = (dt % 1.3) / 1.3;
-        ctx.beginPath(); ctx.arc(n.x, n.y, r + 5 + phase * 16, 0, 7);
-        ctx.strokeStyle = heatmapMode ? HEAT.hot : (T.accent || '#f59e0b');
-        ctx.globalAlpha = Math.max(0, (1 - phase) * 0.75 * (1 - dt / 4));
-        ctx.lineWidth = 2.5 / view.scale;
-        ctx.stroke();
-        ctx.globalAlpha = dim ? 0.2 : 1;
-      } else {
-        pulseAt.delete(n.key);
-      }
-    }
-
-    if (match || n.key === focus) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 7, 0, 7);
-      ctx.fillStyle = match ? T.match : col;
-      ctx.globalAlpha = dim ? 0.2 : 0.22; ctx.fill();
-      ctx.globalAlpha = dim ? 0.2 : 1;
-    }
-
-    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 7);
-    ctx.fillStyle = col; ctx.fill();
-    if (selectedNode && n.key === selectedNode.key) {
-      ctx.lineWidth = 3 / view.scale; ctx.strokeStyle = T.accent;
-    } else {
-      ctx.lineWidth = 2 / view.scale; ctx.strokeStyle = T.bg;
-    }
-    ctx.stroke();
-
-    // box-selected → dashed accent ring
-    if (picked) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, r + 4.5, 0, 7);
-      ctx.setLineDash([3 / view.scale, 2.5 / view.scale]);
-      ctx.lineWidth = 1.8 / view.scale; ctx.strokeStyle = T.marqueeLine;
-      ctx.stroke(); ctx.setLineDash([]);
-    }
-    // pinned → small dot, so "held in place" is visible
-    if (n.pinned) {
-      ctx.beginPath(); ctx.arc(n.x + r * 0.78, n.y - r * 0.78, 2.6 / view.scale + 1.4, 0, 7);
-      ctx.fillStyle = T.accent; ctx.fill();
-    }
-
-    if (view.scale > 0.45) {
-      ctx.globalAlpha = dim ? 0.25 : 1;
-      ctx.fillStyle = T.label;
-      const bold = n.type === 'agent' || n.key === 'user:me';
-      ctx.font = `${bold ? '700' : '600'} ${bold ? 13 : 12}px Inter, sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(n.label, n.x, n.y + r + 4);
-    }
+   } else {
+    pulseAt.delete(n.key);
+   }
   }
-  ctx.globalAlpha = 1;
-  ctx.restore();
 
-  // marquee box (screen space)
-  if (marquee) {
-    const x = Math.min(marquee.x0, marquee.x1), y = Math.min(marquee.y0, marquee.y1);
-    const w = Math.abs(marquee.x1 - marquee.x0), h = Math.abs(marquee.y1 - marquee.y0);
-    ctx.fillStyle = T.marquee; ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = T.marqueeLine; ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+  if (match || n.key === focus) {
+   ctx.beginPath(); ctx.arc(n.x, n.y, r + 7, 0, 7);
+   ctx.fillStyle = match ? T.match : col;
+   ctx.globalAlpha = dim ? 0.2 : 0.22; ctx.fill();
+   ctx.globalAlpha = dim ? 0.2 : 1;
   }
+
+  ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 7);
+  ctx.fillStyle = col; ctx.fill();
+  if (selectedNode && n.key === selectedNode.key) {
+   ctx.lineWidth = 3 / view.scale; ctx.strokeStyle = T.accent;
+  } else {
+   ctx.lineWidth = 2 / view.scale; ctx.strokeStyle = T.bg;
+  }
+  ctx.stroke();
+
+  // box-selected → dashed accent ring
+  if (picked) {
+   ctx.beginPath(); ctx.arc(n.x, n.y, r + 4.5, 0, 7);
+   ctx.setLineDash([3 / view.scale, 2.5 / view.scale]);
+   ctx.lineWidth = 1.8 / view.scale; ctx.strokeStyle = T.marqueeLine;
+   ctx.stroke(); ctx.setLineDash([]);
+  }
+  // pinned → small dot, so "held in place" is visible
+  if (n.pinned) {
+   ctx.beginPath(); ctx.arc(n.x + r * 0.78, n.y - r * 0.78, 2.6 / view.scale + 1.4, 0, 7);
+   ctx.fillStyle = T.accent; ctx.fill();
+  }
+
+  if (view.scale > 0.45) {
+   ctx.globalAlpha = dim ? 0.25 : 1;
+   ctx.fillStyle = T.label;
+   const bold = n.type === 'agent' || n.key === 'user:me';
+   ctx.font = `${bold ? '700' : '600'} ${bold ? 13 : 12}px Inter, sans-serif`;
+   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+   ctx.fillText(n.label, n.x, n.y + r + 4);
+  }
+ }
+ ctx.globalAlpha = 1;
+ ctx.restore();
+
+ // marquee box (screen space)
+ if (marquee) {
+  const x = Math.min(marquee.x0, marquee.x1), y = Math.min(marquee.y0, marquee.y1);
+  const w = Math.abs(marquee.x1 - marquee.x0), h = Math.abs(marquee.y1 - marquee.y0);
+  ctx.fillStyle = T.marquee; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = T.marqueeLine; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]); ctx.strokeRect(x, y, w, h); ctx.setLineDash([]);
+ }
 }
 
 let running = true;
@@ -977,184 +977,184 @@ const toWorld = (x, y) => ({ x: (x - view.panX) / view.scale, y: (y - view.panY)
 const localXY = ev => { const r = canvas.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
 
 function hitNode(wx, wy) {
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const n = nodes[i], r = radiusOf(n) + 4;
-    if ((n.x - wx) ** 2 + (n.y - wy) ** 2 <= r * r) return n;
-  }
-  return null;
+ for (let i = nodes.length - 1; i >= 0; i--) {
+  const n = nodes[i], r = radiusOf(n) + 4;
+  if ((n.x - wx) ** 2 + (n.y - wy) ** 2 <= r * r) return n;
+ }
+ return null;
 }
 function hitEdge(wx, wy) {
-  let best = null, bd = 7 / view.scale;
-  for (const e of edges) {
-    const a = byKey(e.from), b = byKey(e.to);
-    if (!a || !b) continue;
-    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
-    let t = ((wx - a.x) * dx + (wy - a.y) * dy) / L2;
-    t = Math.max(0, Math.min(1, t));
-    const d = Math.hypot(wx - (a.x + t * dx), wy - (a.y + t * dy));
-    if (d < bd) { bd = d; best = e; }
-  }
-  return best;
+ let best = null, bd = 7 / view.scale;
+ for (const e of edges) {
+  const a = byKey(e.from), b = byKey(e.to);
+  if (!a || !b) continue;
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+  let t = ((wx - a.x) * dx + (wy - a.y) * dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  const d = Math.hypot(wx - (a.x + t * dx), wy - (a.y + t * dy));
+  if (d < bd) { bd = d; best = e; }
+ }
+ return best;
 }
 
 canvas.addEventListener('mousedown', ev => {
-  const { x, y } = localXY(ev), w = toWorld(x, y);
-  const n = hitNode(w.x, w.y);
+ const { x, y } = localXY(ev), w = toWorld(x, y);
+ const n = hitNode(w.x, w.y);
 
-  if (n) {
-    if (linkMode) { finishLink(n); return; }
-    // Grabbing a node that's part of a selection drags the whole set.
-    if (selection.has(n.key) && selection.size > 1) {
-      dragging = {
-        keys: [...selection], moved: false, group: true, anchor: n.key,
-        start: { x: w.x, y: w.y },
-        orig: [...selection].map(k => { const m = byKey(k); return { key: k, x: m.x, y: m.y }; })
-      };
-    } else {
-      dragging = { key: n.key, moved: false };
-    }
-    return;
+ if (n) {
+  if (linkMode) { finishLink(n); return; }
+  // Grabbing a node that's part of a selection drags the whole set.
+  if (selection.has(n.key) && selection.size > 1) {
+   dragging = {
+    keys: [...selection], moved: false, group: true, anchor: n.key,
+    start: { x: w.x, y: w.y },
+    orig: [...selection].map(k => { const m = byKey(k); return { key: k, x: m.x, y: m.y }; })
+   };
+  } else {
+   dragging = { key: n.key, moved: false };
   }
+  return;
+ }
 
-  // Shift-drag on empty space draws a selection box.
-  if (ev.shiftKey) { marquee = { x0: x, y0: y, x1: x, y1: y }; return; }
+ // Shift-drag on empty space draws a selection box.
+ if (ev.shiftKey) { marquee = { x0: x, y0: y, x1: x, y1: y }; return; }
 
-  const e = hitEdge(w.x, w.y);
-  if (e) { openEdge(e); return; }
-  panning = { x: ev.clientX, y: ev.clientY, px: view.panX, py: view.panY };
+ const e = hitEdge(w.x, w.y);
+ if (e) { openEdge(e); return; }
+ panning = { x: ev.clientX, y: ev.clientY, px: view.panX, py: view.panY };
 });
 
 window.addEventListener('mousemove', ev => {
-  if (marquee) {
-    const { x, y } = localXY(ev);
-    marquee.x1 = x; marquee.y1 = y;
-    return;
-  }
-  if (dragging) {
-    const { x, y } = localXY(ev), w = toWorld(x, y);
-    if (dragging.group) {
-      const dx = w.x - dragging.start.x, dy = w.y - dragging.start.y;
-      for (const o of dragging.orig) {
-        const m = byKey(o.key);
-        if (m) { m.x = o.x + dx; m.y = o.y + dy; m.vx = 0; m.vy = 0; }
-      }
-      if (Math.abs(dx) + Math.abs(dy) > 1) dragging.moved = true;
-    } else {
-      const n = byKey(dragging.key);
-      if (n) { n.x = w.x; n.y = w.y; n.vx = 0; n.vy = 0; dragging.moved = true; }
-    }
-    return;
-  }
-  if (panning) {
-    view.panX = panning.px + (ev.clientX - panning.x);
-    view.panY = panning.py + (ev.clientY - panning.y);
-    return;
-  }
-  const r = canvas.getBoundingClientRect();
-  if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) {
-    hoverId = null; return;
-  }
+ if (marquee) {
+  const { x, y } = localXY(ev);
+  marquee.x1 = x; marquee.y1 = y;
+  return;
+ }
+ if (dragging) {
   const { x, y } = localXY(ev), w = toWorld(x, y);
-  const hn = hitNode(w.x, w.y);
-  hoverId = hn ? hn.key : null;
-  canvas.style.cursor = hn ? 'pointer' : (hitEdge(w.x, w.y) ? 'pointer' : 'grab');
+  if (dragging.group) {
+   const dx = w.x - dragging.start.x, dy = w.y - dragging.start.y;
+   for (const o of dragging.orig) {
+    const m = byKey(o.key);
+    if (m) { m.x = o.x + dx; m.y = o.y + dy; m.vx = 0; m.vy = 0; }
+   }
+   if (Math.abs(dx) + Math.abs(dy) > 1) dragging.moved = true;
+  } else {
+   const n = byKey(dragging.key);
+   if (n) { n.x = w.x; n.y = w.y; n.vx = 0; n.vy = 0; dragging.moved = true; }
+  }
+  return;
+ }
+ if (panning) {
+  view.panX = panning.px + (ev.clientX - panning.x);
+  view.panY = panning.py + (ev.clientY - panning.y);
+  return;
+ }
+ const r = canvas.getBoundingClientRect();
+ if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) {
+  hoverId = null; return;
+ }
+ const { x, y } = localXY(ev), w = toWorld(x, y);
+ const hn = hitNode(w.x, w.y);
+ hoverId = hn ? hn.key : null;
+ canvas.style.cursor = hn ? 'pointer' : (hitEdge(w.x, w.y) ? 'pointer' : 'grab');
 });
 
 window.addEventListener('mouseup', () => {
-  if (marquee) {
-    const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
-    const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
-    if (Math.abs(x1 - x0) > 4 && Math.abs(y1 - y0) > 4) {
-      const a = toWorld(x0, y0), b = toWorld(x1, y1);
-      selection.clear();
-      for (const n of nodes) {
-        if (n.x >= a.x && n.x <= b.x && n.y >= a.y && n.y <= b.y) selection.add(n.key);
-      }
-      syncSelBanner();
-    }
-    marquee = null;
-    return;
+ if (marquee) {
+  const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
+  const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
+  if (Math.abs(x1 - x0) > 4 && Math.abs(y1 - y0) > 4) {
+   const a = toWorld(x0, y0), b = toWorld(x1, y1);
+   selection.clear();
+   for (const n of nodes) {
+    if (n.x >= a.x && n.x <= b.x && n.y >= a.y && n.y <= b.y) selection.add(n.key);
+   }
+   syncSelBanner();
   }
+  marquee = null;
+  return;
+ }
 
-  if (dragging) {
-    if (dragging.group) {
-      if (dragging.moved) {
-        // Moving a set is a deliberate arrangement — hold it and remember it.
-        const positions = dragging.orig.map(o => {
-          const m = byKey(o.key);
-          if (m) m.pinned = true;
-          return m ? { key: o.key, x: Math.round(m.x), y: Math.round(m.y) } : null;
-        }).filter(Boolean);
-        savePositions(positions);
-      }
-    } else if (!dragging.moved) {
-      openNode(byKey(dragging.key));
-    }
-    // A single dragged node is deliberately NOT pinned — it settles back into
-    // the graph on release. Use the panel's pin button to hold one in place.
-    dragging = null;
-    return;
+ if (dragging) {
+  if (dragging.group) {
+   if (dragging.moved) {
+    // Moving a set is a deliberate arrangement — hold it and remember it.
+    const positions = dragging.orig.map(o => {
+     const m = byKey(o.key);
+     if (m) m.pinned = true;
+     return m ? { key: o.key, x: Math.round(m.x), y: Math.round(m.y) } : null;
+    }).filter(Boolean);
+    savePositions(positions);
+   }
+  } else if (!dragging.moved) {
+   openNode(byKey(dragging.key));
   }
-  panning = null;
+  // A single dragged node is deliberately NOT pinned — it settles back into
+  // the graph on release. Use the panel's pin button to hold one in place.
+  dragging = null;
+  return;
+ }
+ panning = null;
 });
 
 canvas.addEventListener('wheel', ev => {
-  ev.preventDefault();
-  const { x, y } = localXY(ev);
-  const before = toWorld(x, y);
-  view.scale = Math.max(0.25, Math.min(3, view.scale * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
-  const after = toWorld(x, y);
-  view.panX += (after.x - before.x) * view.scale;
-  view.panY += (after.y - before.y) * view.scale;
+ ev.preventDefault();
+ const { x, y } = localXY(ev);
+ const before = toWorld(x, y);
+ view.scale = Math.max(0.25, Math.min(3, view.scale * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+ const after = toWorld(x, y);
+ view.panX += (after.x - before.x) * view.scale;
+ view.panY += (after.y - before.y) * view.scale;
 }, { passive: false });
 
 canvas.addEventListener('dblclick', ev => {
-  const { x, y } = localXY(ev), w = toWorld(x, y);
-  if (hitNode(w.x, w.y) || hitEdge(w.x, w.y)) return;
-  for (const n of nodes) {
-    if (n.pinned) continue; // a pinned node stays where you put it
-    n.x = (Math.random() - .5) * 520; n.y = (Math.random() - .5) * 380; n.vx = 0; n.vy = 0;
-  }
+ const { x, y } = localXY(ev), w = toWorld(x, y);
+ if (hitNode(w.x, w.y) || hitEdge(w.x, w.y)) return;
+ for (const n of nodes) {
+  if (n.pinned) continue; // a pinned node stays where you put it
+  n.x = (Math.random() - .5) * 520; n.y = (Math.random() - .5) * 380; n.vx = 0; n.vy = 0;
+ }
 });
 
 // ══════════════════════════════════════════════════════════
 // Selection
 // ══════════════════════════════════════════════════════════
 function syncSelBanner() {
-  const b = document.getElementById('selBanner');
-  if (!selection.size) { b.classList.add('hidden'); return; }
-  document.getElementById('selCount').textContent =
-    `${selection.size} node${selection.size === 1 ? '' : 's'} selected`;
-  b.classList.remove('hidden');
+ const b = document.getElementById('selBanner');
+ if (!selection.size) { b.classList.add('hidden'); return; }
+ document.getElementById('selCount').textContent =
+  `${selection.size} node${selection.size === 1 ? '' : 's'} selected`;
+ b.classList.remove('hidden');
 }
 function selectAll() {
-  selection = new Set(nodes.map(n => n.key));
-  syncSelBanner();
-  showToast(`${selection.size} nodes selected — drag any one to move them all.`);
+ selection = new Set(nodes.map(n => n.key));
+ syncSelBanner();
+ showToast(`${selection.size} nodes selected — drag any one to move them all.`);
 }
 async function pinSelection() {
-  const positions = [...selection].map(k => {
-    const n = byKey(k);
-    if (n) n.pinned = true;
-    return n ? { key: k, x: Math.round(n.x), y: Math.round(n.y) } : null;
-  }).filter(Boolean);
-  await savePositions(positions);
-  showToast(`Pinned ${positions.length} nodes — they'll be here next time.`);
+ const positions = [...selection].map(k => {
+  const n = byKey(k);
+  if (n) n.pinned = true;
+  return n ? { key: k, x: Math.round(n.x), y: Math.round(n.y) } : null;
+ }).filter(Boolean);
+ await savePositions(positions);
+ showToast(`Pinned ${positions.length} nodes — they'll be here next time.`);
 }
 async function releaseSelection() {
-  const keys = [...selection];
-  for (const k of keys) { const n = byKey(k); if (n) n.pinned = false; }
-  await savePositions([], keys);
-  showToast('Released — they’ll drift back into the layout.');
+ const keys = [...selection];
+ for (const k of keys) { const n = byKey(k); if (n) n.pinned = false; }
+ await savePositions([], keys);
+ showToast('Released — they’ll drift back into the layout.');
 }
 async function savePositions(positions, unpin = []) {
-  if (!positions.length && !unpin.length) return;
-  try {
-    const res = await fetch(withMap('/api/neural-map/positions'), {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ positions, unpin })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  } catch (err) { showToast(`⚠️ Couldn't save positions: ${err.message}`); }
+ if (!positions.length && !unpin.length) return;
+ try {
+  const res = await fetch(withMap('/api/neural-map/positions'), {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ positions, unpin })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ } catch (err) { showToast(`⚠️ Couldn't save positions: ${err.message}`); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1162,24 +1162,24 @@ async function savePositions(positions, unpin = []) {
 // ══════════════════════════════════════════════════════════
 const debouncers = {};
 function debounce(id, fn, ms = 600) {
-  clearTimeout(debouncers[id]);
-  debouncers[id] = setTimeout(fn, ms);
+ clearTimeout(debouncers[id]);
+ debouncers[id] = setTimeout(fn, ms);
 }
 async function saveNode(key, body) {
-  try {
-    const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(key)}`), {
-      method: 'PUT', headers: AUTH, body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  } catch (err) { showToast(`⚠️ Couldn't save node: ${err.message}`); }
+ try {
+  const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(key)}`), {
+   method: 'PUT', headers: AUTH, body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ } catch (err) { showToast(`⚠️ Couldn't save node: ${err.message}`); }
 }
 async function saveEdge(key, body) {
-  try {
-    const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(key)}`), {
-      method: 'PUT', headers: AUTH, body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  } catch (err) { showToast(`⚠️ Couldn't save connection: ${err.message}`); }
+ try {
+  const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(key)}`), {
+   method: 'PUT', headers: AUTH, body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ } catch (err) { showToast(`⚠️ Couldn't save connection: ${err.message}`); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1190,447 +1190,447 @@ const nodePanel = document.getElementById('nodePanel');
 const edgePanel = document.getElementById('edgePanel');
 
 function closePanels() {
-  selectedNode = null; selectedEdge = null; linkMode = false;
-  nodePanel.classList.add('hidden'); edgePanel.classList.add('hidden');
-  document.getElementById('insightsPanel').classList.add('hidden');
-  document.getElementById('linkBanner').classList.add('hidden');
+ selectedNode = null; selectedEdge = null; linkMode = false;
+ nodePanel.classList.add('hidden'); edgePanel.classList.add('hidden');
+ document.getElementById('insightsPanel').classList.add('hidden');
+ document.getElementById('linkBanner').classList.add('hidden');
 }
 
 function openNode(n) {
-  if (!n) return;
-  selectedNode = n; selectedEdge = null;
-  edgePanel.classList.add('hidden');
-  const col = n.color || T.cat[n.type] || T.accent;
-  // Swatch row: the six type colours plus a few extras; custom picker beside it.
-  const SWATCHES = [...new Set([
-    T.cat.agent, T.cat.tool, T.cat.chain, T.cat.entity, T.cat.doc, T.cat.idea,
-    '#7c3aed', '#0ea5e9', '#ec4899', '#64748b'
-  ])];
-  const conns = edges.filter(e => e.from === n.key || e.to === n.key)
-    .map(e => ({ edge: e, other: byKey(e.from === n.key ? e.to : e.from) }))
-    .filter(c => c.other);
+ if (!n) return;
+ selectedNode = n; selectedEdge = null;
+ edgePanel.classList.add('hidden');
+ const col = n.color || T.cat[n.type] || T.accent;
+ // Swatch row: the six type colours plus a few extras; custom picker beside it.
+ const SWATCHES = [...new Set([
+  T.cat.agent, T.cat.tool, T.cat.chain, T.cat.entity, T.cat.doc, T.cat.idea,
+  '#7c3aed', '#0ea5e9', '#ec4899', '#64748b'
+ ])];
+ const conns = edges.filter(e => e.from === n.key || e.to === n.key)
+  .map(e => ({ edge: e, other: byKey(e.from === n.key ? e.to : e.from) }))
+  .filter(c => c.other);
 
-  nodePanel.innerHTML = `
-    <div class="p-4 border-b" style="border-color: var(--border)">
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <span class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-[15px]" style="background:${col}; color: var(--bg)">${esc(n.label.charAt(0).toUpperCase())}</span>
-          <div class="min-w-0">
-            <input id="npLabel" value="${esc(n.label)}" class="w-full border-0 bg-transparent text-[19px] font-bold outline-none p-0" style="font-family: Georgia, serif; color: var(--txt)" />
-            <div class="text-[10px] uppercase tracking-widest mt-0.5" style="color:${col}">${esc(TYPE_LABEL[n.type] || n.type)}${n.derived ? '' : ' · yours'}</div>
-          </div>
-        </div>
-        <button id="npClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
-      </div>
+ nodePanel.innerHTML = `
+  <div class="p-4 border-b" style="border-color: var(--border)">
+   <div class="flex items-start justify-between gap-2">
+    <div class="flex items-center gap-2.5 min-w-0">
+     <span class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-[15px]" style="background:${col}; color: var(--bg)">${esc(n.label.charAt(0).toUpperCase())}</span>
+     <div class="min-w-0">
+      <input id="npLabel" value="${esc(n.label)}" class="w-full border-0 bg-transparent text-[19px] font-bold outline-none p-0" style="font-family: Georgia, serif; color: var(--txt)" />
+      <div class="text-[10px] uppercase tracking-widest mt-0.5" style="color:${col}">${esc(TYPE_LABEL[n.type] || n.type)}${n.derived ? '' : ' · yours'}</div>
+     </div>
     </div>
-    <div class="p-4 flex flex-col gap-4">
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Note</div>
-        <textarea id="npNote" placeholder="Add your own note about this node…" class="nm-field w-full min-h-[78px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(n.note)}</textarea>
-        <div class="text-[10px] nm-sub mt-1 font-mono" id="npSaved">saves automatically</div>
-      </div>
+    <button id="npClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
+   </div>
+  </div>
+  <div class="p-4 flex flex-col gap-4">
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Note</div>
+    <textarea id="npNote" placeholder="Add your own note about this node…" class="nm-field w-full min-h-[78px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(n.note)}</textarea>
+    <div class="text-[10px] nm-sub mt-1 font-mono" id="npSaved">saves automatically</div>
+   </div>
 
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Colour</div>
-        <div class="flex items-center gap-1.5 flex-wrap">
-          ${SWATCHES.map(c => `
-            <button class="np-swatch w-6 h-6 rounded-full shrink-0" data-color="${esc(c)}" title="${esc(c)}"
-              style="background:${esc(c)}; border: 2px solid ${n.color && n.color.toLowerCase() === c.toLowerCase() ? 'var(--txt)' : 'var(--border)'}; cursor:pointer"></button>`).join('')}
-          <label class="w-6 h-6 rounded-full shrink-0 overflow-hidden relative" title="Custom colour"
-            style="border: 2px dashed var(--border); cursor:pointer; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red)">
-            <input id="npColorPick" type="color" value="${esc(n.color || col)}" style="position:absolute; inset:-6px; opacity:0; cursor:pointer;">
-          </label>
-          ${n.color ? `<button id="npColorReset" class="text-[11px] font-semibold nm-sub hover:underline ml-1" style="cursor:pointer">reset</button>` : ''}
-        </div>
-      </div>
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Colour</div>
+    <div class="flex items-center gap-1.5 flex-wrap">
+     ${SWATCHES.map(c => `
+      <button class="np-swatch w-6 h-6 rounded-full shrink-0" data-color="${esc(c)}" title="${esc(c)}"
+       style="background:${esc(c)}; border: 2px solid ${n.color && n.color.toLowerCase() === c.toLowerCase() ? 'var(--txt)' : 'var(--border)'}; cursor:pointer"></button>`).join('')}
+     <label class="w-6 h-6 rounded-full shrink-0 overflow-hidden relative" title="Custom colour"
+      style="border: 2px dashed var(--border); cursor:pointer; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red)">
+      <input id="npColorPick" type="color" value="${esc(n.color || col)}" style="position:absolute; inset:-6px; opacity:0; cursor:pointer;">
+     </label>
+     ${n.color ? `<button id="npColorReset" class="text-[11px] font-semibold nm-sub hover:underline ml-1" style="cursor:pointer">reset</button>` : ''}
+    </div>
+   </div>
 
-      ${n.living ? '<div id="npLiving"><div class="text-[11px] nm-sub italic">Opening living memory…</div></div>' : ''}
+   ${n.living ? '<div id="npLiving"><div class="text-[11px] nm-sub italic">Opening living memory…</div></div>' : ''}
 
-      ${(n.meta && n.meta.length) ? `
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Live metadata</div>
-        <div class="grid grid-cols-2 gap-1.5">
-          ${n.meta.map(m => `
-            <div class="nm-field rounded-lg px-2.5 py-1.5">
-              <div class="text-[9px] uppercase tracking-wider nm-sub">${esc(m[0])}</div>
-              <div class="text-[13px] font-semibold" style="color: var(--txt)">${esc(m[1])}</div>
-            </div>`).join('')}
-        </div>
-      </div>` : ''}
+   ${(n.meta && n.meta.length) ? `
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Live metadata</div>
+    <div class="grid grid-cols-2 gap-1.5">
+     ${n.meta.map(m => `
+      <div class="nm-field rounded-lg px-2.5 py-1.5">
+       <div class="text-[9px] uppercase tracking-wider nm-sub">${esc(m[0])}</div>
+       <div class="text-[13px] font-semibold" style="color: var(--txt)">${esc(m[1])}</div>
+      </div>`).join('')}
+    </div>
+   </div>` : ''}
 
-      ${(n.apis && n.apis.length) ? `
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Linked APIs / namespaces</div>
-        <div class="flex flex-col gap-1.5">
-          ${n.apis.map(a => `
-            <div class="nm-field flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-mono break-all">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--cat-tool)"></span>${esc(a)}
-            </div>`).join('')}
-        </div>
-      </div>` : ''}
+   ${(n.apis && n.apis.length) ? `
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Linked APIs / namespaces</div>
+    <div class="flex flex-col gap-1.5">
+     ${n.apis.map(a => `
+      <div class="nm-field flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-mono break-all">
+       <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background: var(--cat-tool)"></span>${esc(a)}
+      </div>`).join('')}
+    </div>
+   </div>` : ''}
 
-      <div>
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="text-[10px] font-bold tracking-widest uppercase nm-sub">Connections (${conns.length})</span>
-          <button id="npLink" class="flex items-center gap-1 text-[12px] font-semibold hover:underline" style="color: var(--accent-soft)">
-            <span class="material-symbols-outlined text-[13px]">add</span>connect
-          </button>
-        </div>
-        <div class="flex flex-col gap-1">
-          ${conns.map((c, i) => `
-            <div class="nm-chip nm-field flex items-center gap-2 rounded-xl px-2.5 py-2" data-conn="${i}">
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${c.other.color || T.cat[c.other.type] || T.accent}"></span>
-              <span class="text-[13px] font-semibold flex-1 truncate" style="color: var(--txt)">${esc(c.other.label)}</span>
-              <span class="material-symbols-outlined text-[14px] nm-sub">chevron_right</span>
-            </div>`).join('') || '<div class="text-[12px] nm-sub italic">No connections yet.</div>'}
-        </div>
-      </div>
+   <div>
+    <div class="flex items-center justify-between mb-1.5">
+     <span class="text-[10px] font-bold tracking-widest uppercase nm-sub">Connections (${conns.length})</span>
+     <button id="npLink" class="flex items-center gap-1 text-[12px] font-semibold hover:underline" style="color: var(--accent-soft)">
+      <span class="material-symbols-outlined text-[13px]">add</span>connect
+     </button>
+    </div>
+    <div class="flex flex-col gap-1">
+     ${conns.map((c, i) => `
+      <div class="nm-chip nm-field flex items-center gap-2 rounded-xl px-2.5 py-2" data-conn="${i}">
+       <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${c.other.color || T.cat[c.other.type] || T.accent}"></span>
+       <span class="text-[13px] font-semibold flex-1 truncate" style="color: var(--txt)">${esc(c.other.label)}</span>
+       <span class="material-symbols-outlined text-[14px] nm-sub">chevron_right</span>
+      </div>`).join('') || '<div class="text-[12px] nm-sub italic">No connections yet.</div>'}
+    </div>
+   </div>
 
-      <button id="npPin" class="nm-btn flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold">
-        <span class="material-symbols-outlined text-[14px]">${n.pinned ? 'push_pin' : 'radio_button_unchecked'}</span>
-        ${n.pinned ? 'Pinned here — click to let it float' : 'Pin this node where it is'}
-      </button>
+   <button id="npPin" class="nm-btn flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold">
+    <span class="material-symbols-outlined text-[14px]">${n.pinned ? 'push_pin' : 'radio_button_unchecked'}</span>
+    ${n.pinned ? 'Pinned here — click to let it float' : 'Pin this node where it is'}
+   </button>
 
-      <button id="npDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
-        <span class="material-symbols-outlined text-[14px]">${n.derived ? 'visibility_off' : 'delete'}</span>
-        ${n.derived ? 'Hide from my map' : 'Delete node'}
-      </button>
-      ${n.derived ? '<div class="text-[10px] nm-sub text-center -mt-2">This node is derived from real system state, so it can be hidden but not deleted.</div>' : ''}
-    </div>`;
+   <button id="npDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
+    <span class="material-symbols-outlined text-[14px]">${n.derived ? 'visibility_off' : 'delete'}</span>
+    ${n.derived ? 'Hide from my map' : 'Delete node'}
+   </button>
+   ${n.derived ? '<div class="text-[10px] nm-sub text-center -mt-2">This node is derived from real system state, so it can be hidden but not deleted.</div>' : ''}
+  </div>`;
 
-  nodePanel.classList.remove('hidden');
+ nodePanel.classList.remove('hidden');
 
-  document.getElementById('npClose').onclick = closePanels;
-  document.getElementById('npLabel').oninput = e => {
-    n.label = e.target.value;
-    debounce('label' + n.key, () => saveNode(n.key, { label: n.label }));
-  };
-  document.getElementById('npNote').oninput = e => {
-    n.note = e.target.value;
-    document.getElementById('npSaved').textContent = 'saving…';
-    debounce('note' + n.key, async () => {
-      await saveNode(n.key, { note: n.note });
-      const el = document.getElementById('npSaved');
-      if (el) el.textContent = 'saved ✓';
-    });
-  };
-  const setColor = async (c) => {
-    n.color = c || null;
-    await saveNode(n.key, { color: c ?? '' });
-    openNode(n); // re-render swatch selection + header dot
-  };
-  nodePanel.querySelectorAll('.np-swatch').forEach(b => { b.onclick = () => setColor(b.dataset.color); });
-  document.getElementById('npColorPick').onchange = e => setColor(e.target.value);
-  const npReset = document.getElementById('npColorReset');
-  if (npReset) npReset.onclick = () => setColor('');
-  document.getElementById('npPin').onclick = async () => {
-    n.pinned = !n.pinned;
-    if (n.pinned) await savePositions([{ key: n.key, x: Math.round(n.x), y: Math.round(n.y) }]);
-    else await savePositions([], [n.key]);
-    openNode(n);
-    showToast(n.pinned ? 'Pinned.' : 'Released — it’ll settle back into the graph.');
-  };
-  document.getElementById('npLink').onclick = () => {
-    linkMode = true;
-    document.getElementById('linkBanner').classList.remove('hidden');
-  };
-  document.getElementById('npDelete').onclick = () => deleteNode(n);
-  nodePanel.querySelectorAll('[data-conn]').forEach(el => {
-    el.onclick = () => openNode(conns[parseInt(el.dataset.conn)].other);
+ document.getElementById('npClose').onclick = closePanels;
+ document.getElementById('npLabel').oninput = e => {
+  n.label = e.target.value;
+  debounce('label' + n.key, () => saveNode(n.key, { label: n.label }));
+ };
+ document.getElementById('npNote').oninput = e => {
+  n.note = e.target.value;
+  document.getElementById('npSaved').textContent = 'saving…';
+  debounce('note' + n.key, async () => {
+   await saveNode(n.key, { note: n.note });
+   const el = document.getElementById('npSaved');
+   if (el) el.textContent = 'saved ✓';
   });
+ };
+ const setColor = async (c) => {
+  n.color = c || null;
+  await saveNode(n.key, { color: c ?? '' });
+  openNode(n); // re-render swatch selection + header dot
+ };
+ nodePanel.querySelectorAll('.np-swatch').forEach(b => { b.onclick = () => setColor(b.dataset.color); });
+ document.getElementById('npColorPick').onchange = e => setColor(e.target.value);
+ const npReset = document.getElementById('npColorReset');
+ if (npReset) npReset.onclick = () => setColor('');
+ document.getElementById('npPin').onclick = async () => {
+  n.pinned = !n.pinned;
+  if (n.pinned) await savePositions([{ key: n.key, x: Math.round(n.x), y: Math.round(n.y) }]);
+  else await savePositions([], [n.key]);
+  openNode(n);
+  showToast(n.pinned ? 'Pinned.' : 'Released — it’ll settle back into the graph.');
+ };
+ document.getElementById('npLink').onclick = () => {
+  linkMode = true;
+  document.getElementById('linkBanner').classList.remove('hidden');
+ };
+ document.getElementById('npDelete').onclick = () => deleteNode(n);
+ nodePanel.querySelectorAll('[data-conn]').forEach(el => {
+  el.onclick = () => openNode(conns[parseInt(el.dataset.conn)].other);
+ });
 
-  if (n.living) loadLivingProfile(n);
+ if (n.living) loadLivingProfile(n);
 }
 
 // ══════════════════════════════════════════════════════════
 // Sprint X · Cognitive Memory Engine — living node profile
 // ══════════════════════════════════════════════════════════
 const fmtAgo = (ts) => {
-  if (!ts) return 'never';
-  const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+ if (!ts) return 'never';
+ const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
+ if (s < 60) return 'just now';
+ if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+ if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+ return `${Math.floor(s / 86400)}d ago`;
 };
 
 const EVENT_ICON = {
-  created: 'auto_awesome', mentioned: 'chat_bubble', activated: 'bolt',
-  updated: 'edit', merged: 'merge', contradiction: 'warning'
+ created: 'auto_awesome', mentioned: 'chat_bubble', activated: 'bolt',
+ updated: 'edit', merged: 'merge', contradiction: 'warning'
 };
 
 async function loadLivingProfile(n) {
-  const holder = document.getElementById('npLiving');
-  if (!holder || !n.living?.entityId) return;
-  try {
-    const res = await fetch('/api/knowledge/nodes/' + encodeURIComponent(n.living.entityId), { headers: AUTH });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const p = await res.json();
-    if (selectedNode?.key !== n.key) return; // user moved on while we fetched
-    const node = p.node;
-    const meter = (label, val, max, col) => `
-      <div class="flex items-center gap-2">
-        <span class="text-[10px] nm-sub w-[74px] shrink-0 uppercase tracking-wider">${label}</span>
-        <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background: var(--border)">
-          <div class="h-full rounded-full" style="width:${Math.round((val / max) * 100)}%; background:${col}"></div>
+ const holder = document.getElementById('npLiving');
+ if (!holder || !n.living?.entityId) return;
+ try {
+  const res = await fetch('/api/knowledge/nodes/' + encodeURIComponent(n.living.entityId), { headers: AUTH });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const p = await res.json();
+  if (selectedNode?.key !== n.key) return; // user moved on while we fetched
+  const node = p.node;
+  const meter = (label, val, max, col) => `
+   <div class="flex items-center gap-2">
+    <span class="text-[10px] nm-sub w-[74px] shrink-0 uppercase tracking-wider">${label}</span>
+    <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background: var(--border)">
+     <div class="h-full rounded-full" style="width:${Math.round((val / max) * 100)}%; background:${col}"></div>
+    </div>
+    <span class="text-[11px] font-mono nm-sub w-9 text-right">${max === 1 ? Math.round(val * 100) + '%' : (Math.round(val * 10) / 10)}</span>
+   </div>`;
+
+  holder.innerHTML = `
+   <div class="rounded-xl p-3 flex flex-col gap-2.5" style="border: 1px solid var(--border)">
+    <div class="flex items-center justify-between">
+     <span class="text-[10px] font-bold tracking-widest uppercase" style="color: var(--accent-soft)">Living memory</span>
+     <span class="text-[10px] nm-sub font-mono">${node.ownerAgent ? 'curated by ' + esc(node.ownerAgent) : ''}</span>
+    </div>
+    ${node.summary ? `<div class="text-[13px] leading-relaxed" style="color: var(--txt)">${esc(node.summary)}</div>` : ''}
+    ${meter('Importance', node.importance, 10, 'var(--cat-agent)')}
+    ${meter('Confidence', node.confidence, 1, 'var(--cat-tool)')}
+    <div class="grid grid-cols-3 gap-1.5 text-center">
+     <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${node.mentionCount}</div><div class="text-[9px] uppercase nm-sub">mentions</div></div>
+     <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${node.activationCount}</div><div class="text-[9px] uppercase nm-sub">recalls</div></div>
+     <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${fmtAgo(node.lastActivatedAt)}</div><div class="text-[9px] uppercase nm-sub">last used</div></div>
+    </div>
+
+    ${p.connections.length ? `
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Why it's linked</div>
+     <div class="flex flex-col gap-1 max-h-[130px] overflow-y-auto">
+      ${p.connections.slice(0, 6).map(c => `
+       <div class="nm-field rounded-lg px-2 py-1.5">
+        <div class="text-[11px] font-semibold" style="color: var(--txt)">
+         ${c.direction === 'out' ? '' : '← '}${esc(c.type.replace(/_/g, ' '))} <span style="color: var(--accent-soft)">${esc(c.other.name)}</span>
+         <span class="nm-sub font-mono text-[9px]">· ${Math.round(c.strength * 100)}%</span>
         </div>
-        <span class="text-[11px] font-mono nm-sub w-9 text-right">${max === 1 ? Math.round(val * 100) + '%' : (Math.round(val * 10) / 10)}</span>
-      </div>`;
+        ${c.reason ? `<div class="text-[10px] nm-sub leading-snug">${esc(c.reason)}</div>` : ''}
+       </div>`).join('')}
+     </div>
+    </div>` : ''}
 
-    holder.innerHTML = `
-      <div class="rounded-xl p-3 flex flex-col gap-2.5" style="border: 1px solid var(--border)">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] font-bold tracking-widest uppercase" style="color: var(--accent-soft)">Living memory</span>
-          <span class="text-[10px] nm-sub font-mono">${node.ownerAgent ? 'curated by ' + esc(node.ownerAgent) : ''}</span>
+    ${p.provenance.length ? `
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Learned from</div>
+     <div class="flex flex-wrap gap-1">
+      ${p.provenance.slice(0, 6).map(l => `
+       <span class="nm-field rounded-full px-2 py-0.5 text-[10px] nm-sub" title="${esc(l.link_ref)}">
+        ${esc(l.link_type.replace('_', ' '))}${l.count > 1 ? ' ×' + l.count : ''}</span>`).join('')}
+     </div>
+    </div>` : ''}
+
+    ${p.timeline.length ? `
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Timeline</div>
+     <div class="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
+      ${p.timeline.slice(0, 10).map(ev => `
+       <div class="flex items-start gap-1.5">
+        <span class="material-symbols-outlined text-[13px] mt-0.5" style="color: var(--accent-soft)">${EVENT_ICON[ev.event_type] || 'circle'}</span>
+        <div class="min-w-0">
+         <span class="text-[11px]" style="color: var(--txt)">${esc(ev.detail || ev.event_type)}</span>
+         <span class="text-[9px] nm-sub font-mono"> · ${fmtAgo(ev.created_at)}${ev.agent_id ? ' · ' + esc(ev.agent_id) : ''}</span>
         </div>
-        ${node.summary ? `<div class="text-[13px] leading-relaxed" style="color: var(--txt)">${esc(node.summary)}</div>` : ''}
-        ${meter('Importance', node.importance, 10, 'var(--cat-agent)')}
-        ${meter('Confidence', node.confidence, 1, 'var(--cat-tool)')}
-        <div class="grid grid-cols-3 gap-1.5 text-center">
-          <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${node.mentionCount}</div><div class="text-[9px] uppercase nm-sub">mentions</div></div>
-          <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${node.activationCount}</div><div class="text-[9px] uppercase nm-sub">recalls</div></div>
-          <div class="nm-field rounded-lg py-1.5"><div class="text-[14px] font-bold" style="color: var(--txt)">${fmtAgo(node.lastActivatedAt)}</div><div class="text-[9px] uppercase nm-sub">last used</div></div>
-        </div>
-
-        ${p.connections.length ? `
-        <div>
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Why it's linked</div>
-          <div class="flex flex-col gap-1 max-h-[130px] overflow-y-auto">
-            ${p.connections.slice(0, 6).map(c => `
-              <div class="nm-field rounded-lg px-2 py-1.5">
-                <div class="text-[11px] font-semibold" style="color: var(--txt)">
-                  ${c.direction === 'out' ? '' : '← '}${esc(c.type.replace(/_/g, ' '))} <span style="color: var(--accent-soft)">${esc(c.other.name)}</span>
-                  <span class="nm-sub font-mono text-[9px]">· ${Math.round(c.strength * 100)}%</span>
-                </div>
-                ${c.reason ? `<div class="text-[10px] nm-sub leading-snug">${esc(c.reason)}</div>` : ''}
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
-
-        ${p.provenance.length ? `
-        <div>
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Learned from</div>
-          <div class="flex flex-wrap gap-1">
-            ${p.provenance.slice(0, 6).map(l => `
-              <span class="nm-field rounded-full px-2 py-0.5 text-[10px] nm-sub" title="${esc(l.link_ref)}">
-                ${esc(l.link_type.replace('_', ' '))}${l.count > 1 ? ' ×' + l.count : ''}</span>`).join('')}
-          </div>
-        </div>` : ''}
-
-        ${p.timeline.length ? `
-        <div>
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">Timeline</div>
-          <div class="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-            ${p.timeline.slice(0, 10).map(ev => `
-              <div class="flex items-start gap-1.5">
-                <span class="material-symbols-outlined text-[13px] mt-0.5" style="color: var(--accent-soft)">${EVENT_ICON[ev.event_type] || 'circle'}</span>
-                <div class="min-w-0">
-                  <span class="text-[11px]" style="color: var(--txt)">${esc(ev.detail || ev.event_type)}</span>
-                  <span class="text-[9px] nm-sub font-mono"> · ${fmtAgo(ev.created_at)}${ev.agent_id ? ' · ' + esc(ev.agent_id) : ''}</span>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
-      </div>`;
-  } catch (err) {
-    holder.innerHTML = `<div class="text-[11px] nm-sub italic">Couldn't load living memory (${esc(err.message)}).</div>`;
-  }
+       </div>`).join('')}
+     </div>
+    </div>` : ''}
+   </div>`;
+ } catch (err) {
+  holder.innerHTML = `<div class="text-[11px] nm-sub italic">Couldn't load living memory (${esc(err.message)}).</div>`;
+ }
 }
 
 function openEdge(e) {
-  selectedEdge = e; selectedNode = null;
-  nodePanel.classList.add('hidden');
-  const a = byKey(e.from), b = byKey(e.to);
+ selectedEdge = e; selectedNode = null;
+ nodePanel.classList.add('hidden');
+ const a = byKey(e.from), b = byKey(e.to);
 
-  edgePanel.innerHTML = `
-    <div class="p-4 border-b flex items-start justify-between gap-2" style="border-color: var(--border)">
-      <div>
-        <div class="text-[10px] uppercase tracking-widest nm-sub">Connection${e.derived ? '' : ' · yours'}</div>
-        <div class="flex items-center gap-2 mt-1 text-[16px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">
-          <span>${esc(a ? a.label : '?')}</span>
-          <span class="material-symbols-outlined text-[18px]" style="color: var(--accent-soft)">arrow_forward</span>
-          <span>${esc(b ? b.label : '?')}</span>
-        </div>
-      </div>
-      <button id="epClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
+ edgePanel.innerHTML = `
+  <div class="p-4 border-b flex items-start justify-between gap-2" style="border-color: var(--border)">
+   <div>
+    <div class="text-[10px] uppercase tracking-widest nm-sub">Connection${e.derived ? '' : ' · yours'}</div>
+    <div class="flex items-center gap-2 mt-1 text-[16px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">
+     <span>${esc(a ? a.label : '?')}</span>
+     <span class="material-symbols-outlined text-[18px]" style="color: var(--accent-soft)">arrow_forward</span>
+     <span>${esc(b ? b.label : '?')}</span>
     </div>
-    <div class="p-4 flex flex-col gap-4">
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Your note on this link</div>
-        <textarea id="epNote" placeholder="How are these connected? Why does this link exist?" class="nm-field w-full min-h-[70px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(e.note)}</textarea>
-      </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Endpoint</div>
-          <input id="epApi" value="${esc(e.api)}" placeholder="/api/…" class="nm-field w-full px-2.5 py-2 rounded-lg font-mono text-[12px]" />
-        </div>
-        <div>
-          <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Data flow</div>
-          <input id="epFlow" value="${esc(e.flow)}" placeholder="bidirectional" class="nm-field w-full px-2.5 py-2 rounded-lg text-[12px]" />
-        </div>
-      </div>
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">JSON payload / schema</div>
-        <textarea id="epJson" placeholder="{ }" class="nm-field w-full min-h-[90px] resize-y rounded-xl font-mono text-[12px] leading-relaxed p-2.5">${esc(e.payload)}</textarea>
-      </div>
-      <div>
-        <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Line style</div>
-        <div class="flex gap-2">
-          <button id="epSolid" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${(e.style || 'solid') === 'solid' ? 'border-color: var(--accent); color: var(--accent)' : ''}">— Solid</button>
-          <button id="epDashed" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${e.style === 'dashed' ? 'border-color: var(--accent); color: var(--accent)' : ''}">- - Dashed</button>
-        </div>
-      </div>
-      ${e.derived ? '' : `
-      <button id="epDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
-        <span class="material-symbols-outlined text-[14px]">close</span> Remove connection
-      </button>`}
-    </div>`;
+   </div>
+   <button id="epClose" class="nm-sub shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button>
+  </div>
+  <div class="p-4 flex flex-col gap-4">
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Your note on this link</div>
+    <textarea id="epNote" placeholder="How are these connected? Why does this link exist?" class="nm-field w-full min-h-[70px] resize-y rounded-xl text-[13px] leading-relaxed p-2.5">${esc(e.note)}</textarea>
+   </div>
+   <div class="grid grid-cols-2 gap-2">
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Endpoint</div>
+     <input id="epApi" value="${esc(e.api)}" placeholder="/api/…" class="nm-field w-full px-2.5 py-2 rounded-lg font-mono text-[12px]" />
+    </div>
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Data flow</div>
+     <input id="epFlow" value="${esc(e.flow)}" placeholder="bidirectional" class="nm-field w-full px-2.5 py-2 rounded-lg text-[12px]" />
+    </div>
+   </div>
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">JSON payload / schema</div>
+    <textarea id="epJson" placeholder="{ }" class="nm-field w-full min-h-[90px] resize-y rounded-xl font-mono text-[12px] leading-relaxed p-2.5">${esc(e.payload)}</textarea>
+   </div>
+   <div>
+    <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1.5">Line style</div>
+    <div class="flex gap-2">
+     <button id="epSolid" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${(e.style || 'solid') === 'solid' ? 'border-color: var(--accent); color: var(--accent)' : ''}">— Solid</button>
+     <button id="epDashed" class="flex-1 py-2 rounded-full text-[12px] font-semibold nm-btn" style="${e.style === 'dashed' ? 'border-color: var(--accent); color: var(--accent)' : ''}">- - Dashed</button>
+    </div>
+   </div>
+   ${e.derived ? '' : `
+   <button id="epDelete" class="flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold" style="border: 1px solid var(--border); color: var(--danger)">
+    <span class="material-symbols-outlined text-[14px]">close</span> Remove connection
+   </button>`}
+  </div>`;
 
-  edgePanel.classList.remove('hidden');
-  document.getElementById('epClose').onclick = closePanels;
+ edgePanel.classList.remove('hidden');
+ document.getElementById('epClose').onclick = closePanels;
 
-  const bind = (id, field) => {
-    document.getElementById(id).oninput = ev => {
-      e[field] = ev.target.value;
-      debounce(field + e.key, () => saveEdge(e.key, { [field]: e[field] }));
-    };
+ const bind = (id, field) => {
+  document.getElementById(id).oninput = ev => {
+   e[field] = ev.target.value;
+   debounce(field + e.key, () => saveEdge(e.key, { [field]: e[field] }));
   };
-  bind('epNote', 'note'); bind('epApi', 'api'); bind('epFlow', 'flow'); bind('epJson', 'payload');
-  const setStyle = async (s) => {
-    e.style = s;
-    await saveEdge(e.key, { style: s });
-    openEdge(e); // re-render the toggle highlight
-  };
-  document.getElementById('epSolid').onclick = () => setStyle('solid');
-  document.getElementById('epDashed').onclick = () => setStyle('dashed');
-  const del = document.getElementById('epDelete');
-  if (del) del.onclick = () => deleteEdge(e);
+ };
+ bind('epNote', 'note'); bind('epApi', 'api'); bind('epFlow', 'flow'); bind('epJson', 'payload');
+ const setStyle = async (s) => {
+  e.style = s;
+  await saveEdge(e.key, { style: s });
+  openEdge(e); // re-render the toggle highlight
+ };
+ document.getElementById('epSolid').onclick = () => setStyle('solid');
+ document.getElementById('epDashed').onclick = () => setStyle('dashed');
+ const del = document.getElementById('epDelete');
+ if (del) del.onclick = () => deleteEdge(e);
 }
 
 // ══════════════════════════════════════════════════════════
 // Mutations
 // ══════════════════════════════════════════════════════════
 async function addNode() {
-  try {
-    const res = await fetch(withMap('/api/neural-map/nodes'), {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ label: 'New node', type: 'idea' })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const d = await res.json();
-    const w = toWorld(cw / 2, ch / 2);
-    const n = {
-      key: d.key, label: d.label, type: d.type, note: '', meta: [], apis: [], derived: false,
-      x: w.x + (Math.random() - .5) * 40, y: w.y + (Math.random() - .5) * 40, vx: 0, vy: 0, pinned: false
-    };
-    nodes.push(n);
-    renderLegend();
-    openNode(n);
-    showToast('Node created — it will be here when you come back.');
-  } catch (err) { showToast(`⚠️ Couldn't create node: ${err.message}`); }
+ try {
+  const res = await fetch(withMap('/api/neural-map/nodes'), {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ label: 'New node', type: 'idea' })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const d = await res.json();
+  const w = toWorld(cw / 2, ch / 2);
+  const n = {
+   key: d.key, label: d.label, type: d.type, note: '', meta: [], apis: [], derived: false,
+   x: w.x + (Math.random() - .5) * 40, y: w.y + (Math.random() - .5) * 40, vx: 0, vy: 0, pinned: false
+  };
+  nodes.push(n);
+  renderLegend();
+  openNode(n);
+  showToast('Node created — it will be here when you come back.');
+ } catch (err) { showToast(`⚠️ Couldn't create node: ${err.message}`); }
 }
 
 // ── Documents → map nodes ─────────────────────────────────────
 async function openDocPicker() {
-  const modal = document.getElementById('docModal');
-  const list = document.getElementById('docList');
-  modal.classList.remove('hidden');
-  list.innerHTML = '<div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>';
-  const esc = s => (s || '').toString().replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const size = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
-  try {
-    const res = await fetch('/api/neural-map/documents', { headers: AUTH });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const docs = (await res.json()).documents || [];
-    if (!docs.length) {
-      list.innerHTML = '<div class="text-center text-sm nm-sub py-8">No uploaded documents yet.<br><span class="text-[12px]">Attach a file in Chat and it’ll show up here.</span></div>';
-      return;
-    }
-    list.innerHTML = docs.map(doc => `
-      <button class="nm-field text-left rounded-xl p-3 flex items-center gap-3 transition-all doc-pick" style="cursor:pointer"
-              data-name="${esc(doc.filename)}" data-mime="${esc(doc.mimetype || '')}">
-        <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-doc); color: var(--bg)">
-          <span class="material-symbols-outlined text-[18px]">description</span>
-        </span>
-        <span class="min-w-0">
-          <span class="block text-[13px] font-bold truncate" style="color: var(--txt)">${esc(doc.filename)}</span>
-          <span class="block text-[11px] nm-sub">${esc(doc.mimetype || 'file')} · ${size(Number(doc.size) || 0)}</span>
-        </span>
-      </button>`).join('');
-    list.querySelectorAll('.doc-pick').forEach(el => {
-      el.onclick = () => addDocumentNode(el.dataset.name, el.dataset.mime);
-    });
-  } catch (err) {
-    list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">Couldn't load documents: ${esc(err.message)}</div>`;
+ const modal = document.getElementById('docModal');
+ const list = document.getElementById('docList');
+ modal.classList.remove('hidden');
+ list.innerHTML = '<div class="text-center text-sm nm-sub font-mono py-8">Loading your documents…</div>';
+ const esc = s => (s || '').toString().replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+ const size = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+ try {
+  const res = await fetch('/api/neural-map/documents', { headers: AUTH });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const docs = (await res.json()).documents || [];
+  if (!docs.length) {
+   list.innerHTML = '<div class="text-center text-sm nm-sub py-8">No uploaded documents yet.<br><span class="text-[12px]">Attach a file in Chat and it’ll show up here.</span></div>';
+   return;
   }
+  list.innerHTML = docs.map(doc => `
+   <button class="nm-field text-left rounded-xl p-3 flex items-center gap-3 transition-all doc-pick" style="cursor:pointer"
+       data-name="${esc(doc.filename)}" data-mime="${esc(doc.mimetype || '')}">
+    <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background: var(--cat-doc); color: var(--bg)">
+     <span class="material-symbols-outlined text-[18px]">description</span>
+    </span>
+    <span class="min-w-0">
+     <span class="block text-[13px] font-bold truncate" style="color: var(--txt)">${esc(doc.filename)}</span>
+     <span class="block text-[11px] nm-sub">${esc(doc.mimetype || 'file')} · ${size(Number(doc.size) || 0)}</span>
+    </span>
+   </button>`).join('');
+  list.querySelectorAll('.doc-pick').forEach(el => {
+   el.onclick = () => addDocumentNode(el.dataset.name, el.dataset.mime);
+  });
+ } catch (err) {
+  list.innerHTML = `<div class="text-center text-sm py-8" style="color:var(--danger)">Couldn't load documents: ${esc(err.message)}</div>`;
+ }
 }
 
 async function addDocumentNode(name, mime) {
-  const note = `Uploaded document · ${mime || 'file'}`;
-  try {
-    const res = await fetch(withMap('/api/neural-map/nodes'), {
-      method: 'POST', headers: AUTH,
-      body: JSON.stringify({ label: name, type: 'doc', note })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const d = await res.json();
-    const w = toWorld(cw / 2, ch / 2);
-    const n = {
-      key: d.key, label: d.label, type: d.type, note, meta: [], apis: [], derived: false,
-      x: w.x + (Math.random() - .5) * 60, y: w.y + (Math.random() - .5) * 60, vx: 0, vy: 0, pinned: false
-    };
-    nodes.push(n);
-    renderLegend();
-    document.getElementById('docModal').classList.add('hidden');
-    openNode(n);
-    showToast(`Added “${name}” — open it and hit Connect to link it.`);
-  } catch (err) { showToast(`⚠️ Couldn't add document: ${err.message}`); }
+ const note = `Uploaded document · ${mime || 'file'}`;
+ try {
+  const res = await fetch(withMap('/api/neural-map/nodes'), {
+   method: 'POST', headers: AUTH,
+   body: JSON.stringify({ label: name, type: 'doc', note })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const d = await res.json();
+  const w = toWorld(cw / 2, ch / 2);
+  const n = {
+   key: d.key, label: d.label, type: d.type, note, meta: [], apis: [], derived: false,
+   x: w.x + (Math.random() - .5) * 60, y: w.y + (Math.random() - .5) * 60, vx: 0, vy: 0, pinned: false
+  };
+  nodes.push(n);
+  renderLegend();
+  document.getElementById('docModal').classList.add('hidden');
+  openNode(n);
+  showToast(`Added “${name}” — open it and hit Connect to link it.`);
+ } catch (err) { showToast(`⚠️ Couldn't add document: ${err.message}`); }
 }
 
 async function finishLink(target) {
-  const src = selectedNode;
-  linkMode = false;
-  document.getElementById('linkBanner').classList.add('hidden');
-  if (!src || target.key === src.key) return;
-  if (edges.find(e => (e.from === src.key && e.to === target.key) || (e.to === src.key && e.from === target.key))) {
-    showToast('Those two are already connected.');
-    return;
-  }
-  try {
-    const res = await fetch(withMap('/api/neural-map/edges'), {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ from: src.key, to: target.key })
-    });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    const e = { key: d.key, from: src.key, to: target.key, note: '', api: '', flow: '', payload: '', derived: false };
-    edges.push(e);
-    openEdge(e);
-    showToast(`Connected ${src.label} → ${target.label}`);
-  } catch (err) { showToast(`⚠️ ${err.message}`); }
+ const src = selectedNode;
+ linkMode = false;
+ document.getElementById('linkBanner').classList.add('hidden');
+ if (!src || target.key === src.key) return;
+ if (edges.find(e => (e.from === src.key && e.to === target.key) || (e.to === src.key && e.from === target.key))) {
+  showToast('Those two are already connected.');
+  return;
+ }
+ try {
+  const res = await fetch(withMap('/api/neural-map/edges'), {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ from: src.key, to: target.key })
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  const e = { key: d.key, from: src.key, to: target.key, note: '', api: '', flow: '', payload: '', derived: false };
+  edges.push(e);
+  openEdge(e);
+  showToast(`Connected ${src.label} → ${target.label}`);
+ } catch (err) { showToast(`⚠️ ${err.message}`); }
 }
 
 async function deleteNode(n) {
-  try {
-    const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(n.key)}`), { method: 'DELETE', headers: AUTH });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    nodes = nodes.filter(x => x.key !== n.key);
-    edges = edges.filter(e => e.from !== n.key && e.to !== n.key);
-    selection.delete(n.key); syncSelBanner();
-    renderLegend();
-    closePanels();
-    showToast(d.mode === 'hidden' ? `${n.label} hidden from your map.` : `${n.label} deleted.`);
-  } catch (err) { showToast(`⚠️ ${err.message}`); }
+ try {
+  const res = await fetch(withMap(`/api/neural-map/nodes/${encodeURIComponent(n.key)}`), { method: 'DELETE', headers: AUTH });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  nodes = nodes.filter(x => x.key !== n.key);
+  edges = edges.filter(e => e.from !== n.key && e.to !== n.key);
+  selection.delete(n.key); syncSelBanner();
+  renderLegend();
+  closePanels();
+  showToast(d.mode === 'hidden' ? `${n.label} hidden from your map.` : `${n.label} deleted.`);
+ } catch (err) { showToast(`⚠️ ${err.message}`); }
 }
 
 async function deleteEdge(e) {
-  try {
-    const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(e.key)}`), { method: 'DELETE', headers: AUTH });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    edges = edges.filter(x => x.key !== e.key);
-    closePanels();
-    showToast('Connection removed.');
-  } catch (err) { showToast(`⚠️ ${err.message}`); }
+ try {
+  const res = await fetch(withMap(`/api/neural-map/edges/${encodeURIComponent(e.key)}`), { method: 'DELETE', headers: AUTH });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+  edges = edges.filter(x => x.key !== e.key);
+  closePanels();
+  showToast('Connection removed.');
+ } catch (err) { showToast(`⚠️ ${err.message}`); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1639,18 +1639,18 @@ async function deleteEdge(e) {
 const searchInput = document.getElementById('searchInput');
 searchInput.oninput = e => { searchQuery = e.target.value; };
 searchInput.onkeydown = e => {
-  if (e.key !== 'Enter') return;
-  const q = searchQuery.trim().toLowerCase();
-  if (!q) return;
-  // Jump to (and open) the first matching node.
-  const hit = nodes.find(n => n.label.toLowerCase() === q) || nodes.find(n => n.label.toLowerCase().includes(q));
-  if (hit) {
-    view.panX = cw / 2 - hit.x * view.scale;
-    view.panY = ch / 2 - hit.y * view.scale;
-    openNode(hit);
-  } else {
-    showToast(`No node matches “${searchQuery.trim()}”.`);
-  }
+ if (e.key !== 'Enter') return;
+ const q = searchQuery.trim().toLowerCase();
+ if (!q) return;
+ // Jump to (and open) the first matching node.
+ const hit = nodes.find(n => n.label.toLowerCase() === q) || nodes.find(n => n.label.toLowerCase().includes(q));
+ if (hit) {
+  view.panX = cw / 2 - hit.x * view.scale;
+  view.panY = ch / 2 - hit.y * view.scale;
+  openNode(hit);
+ } else {
+  showToast(`No node matches “${searchQuery.trim()}”.`);
+ }
 };
 document.getElementById('addNodeBtn').onclick = addNode;
 document.getElementById('addDocBtn').onclick = openDocPicker;
@@ -1661,10 +1661,10 @@ document.getElementById('themeBtn').onclick = () => applyTheme(theme === 'dark' 
 
 // Drawer nav on narrow screens
 function toggleNav(open) {
-  const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop');
-  const show = open === undefined ? !nav.classList.contains('open') : open;
-  nav.classList.toggle('open', show);
-  bd.classList.toggle('hidden', !show);
+ const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop');
+ const show = open === undefined ? !nav.classList.contains('open') : open;
+ nav.classList.toggle('open', show);
+ bd.classList.toggle('hidden', !show);
 }
 document.getElementById('navToggle').onclick = () => toggleNav();
 document.getElementById('navBackdrop').onclick = () => toggleNav(false);
@@ -1672,237 +1672,237 @@ document.getElementById('selPin').onclick = pinSelection;
 document.getElementById('selRelease').onclick = releaseSelection;
 document.getElementById('selClear').onclick = () => { selection.clear(); syncSelBanner(); };
 document.getElementById('cancelLink').onclick = () => {
-  linkMode = false;
-  document.getElementById('linkBanner').classList.add('hidden');
+ linkMode = false;
+ document.getElementById('linkBanner').classList.add('hidden');
 };
 document.getElementById('resetViewBtn').onclick = () => {
-  view.scale = 1; view.panX = cw / 2; view.panY = ch / 2;
+ view.scale = 1; view.panX = cw / 2; view.panY = ch / 2;
 };
 // ══════════════════════════════════════════════════════════
 // Sprint X · Cognitive Memory Engine — heatmap, pulses, insights, dream
 // ══════════════════════════════════════════════════════════
 document.getElementById('heatmapBtn').onclick = () => {
-  heatmapMode = !heatmapMode;
-  if (heatmapMode && neighborhoodMode) { neighborhoodMode = false; document.getElementById('neighborhoodsBtn').style.background = ''; }
-  document.getElementById('heatmapBtn').style.background = heatmapMode ? 'var(--accent)' : '';
-  renderLegend();
-  showToast(heatmapMode
-    ? 'Knowledge heatmap: red = used today, orange = this week, green = sometimes, gray = forgotten.'
-    : 'Back to type colours.');
+ heatmapMode = !heatmapMode;
+ if (heatmapMode && neighborhoodMode) { neighborhoodMode = false; document.getElementById('neighborhoodsBtn').style.background = ''; }
+ document.getElementById('heatmapBtn').style.background = heatmapMode ? 'var(--accent)' : '';
+ renderLegend();
+ showToast(heatmapMode
+  ? 'Knowledge heatmap: red = used today, orange = this week, green = sometimes, gray = forgotten.'
+  : 'Back to type colours.');
 };
 
 document.getElementById('neighborhoodsBtn').onclick = () => {
-  neighborhoodMode = !neighborhoodMode;
-  if (neighborhoodMode && heatmapMode) { heatmapMode = false; document.getElementById('heatmapBtn').style.background = ''; }
-  document.getElementById('neighborhoodsBtn').style.background = neighborhoodMode ? 'var(--accent)' : '';
-  renderLegend();
-  if (neighborhoodMode) {
-    showToast(communities.length
-      ? `${communities.length} neighborhoods: ${communities.slice(0, 4).map(c => c.label).join(', ')}${communities.length > 4 ? '…' : ''}`
-      : 'No neighborhoods yet — run a Dream to cluster the graph.');
-  } else {
-    showToast('Back to type colours.');
-  }
+ neighborhoodMode = !neighborhoodMode;
+ if (neighborhoodMode && heatmapMode) { heatmapMode = false; document.getElementById('heatmapBtn').style.background = ''; }
+ document.getElementById('neighborhoodsBtn').style.background = neighborhoodMode ? 'var(--accent)' : '';
+ renderLegend();
+ if (neighborhoodMode) {
+  showToast(communities.length
+   ? `${communities.length} neighborhoods: ${communities.slice(0, 4).map(c => c.label).join(', ')}${communities.length > 4 ? '…' : ''}`
+   : 'No neighborhoods yet — run a Dream to cluster the graph.');
+ } else {
+  showToast('Back to type colours.');
+ }
 };
 
 // Live thinking: poll for freshly activated nodes and pulse them on the canvas.
 async function pollActivity() {
-  if (document.hidden || currentMapId !== 'system') return;
-  try {
-    const res = await fetch('/api/knowledge/activity?sinceSeconds=90', { headers: AUTH });
-    if (!res.ok) return;
-    const d = await res.json();
-    const groups = new Map(); // source_id → node keys activated together (one thinking path)
-    for (const a of (d.activations || [])) {
-      const key = 'entity:' + a.entity_id;
-      const t = new Date(a.at).getTime();
-      if ((pulseSeen.get(key) || 0) < t) {
-        pulseSeen.set(key, t);
-        pulseAt.set(key, Date.now());
-        const n = byKey(key);
-        if (n && n.living) {
-          n.living.lastActivatedAt = a.at;
-          n.living.activationCount = (n.living.activationCount || 0) + 1;
-        }
-        const g = a.source_id || 'nosrc';
-        if (!groups.has(g)) groups.set(g, []);
-        groups.get(g).push(key);
-      }
+ if (document.hidden || currentMapId !== 'system') return;
+ try {
+  const res = await fetch('/api/knowledge/activity?sinceSeconds=90', { headers: AUTH });
+  if (!res.ok) return;
+  const d = await res.json();
+  const groups = new Map(); // source_id → node keys activated together (one thinking path)
+  for (const a of (d.activations || [])) {
+   const key = 'entity:' + a.entity_id;
+   const t = new Date(a.at).getTime();
+   if ((pulseSeen.get(key) || 0) < t) {
+    pulseSeen.set(key, t);
+    pulseAt.set(key, Date.now());
+    const n = byKey(key);
+    if (n && n.living) {
+     n.living.lastActivatedAt = a.at;
+     n.living.activationCount = (n.living.activationCount || 0) + 1;
     }
-    // Retrieval-path animation: edges between nodes activated by the SAME
-    // retrieval (one chat turn) light up with a traveling glow — the AI's
-    // visible train of thought.
-    for (const keys of groups.values()) {
-      if (keys.length < 2) continue;
-      const set = new Set(keys);
-      for (const e of edges) {
-        if (set.has(e.from) && set.has(e.to)) flowAt.set(e.key, Date.now());
-      }
-    }
-  } catch (e) { /* map still works without the pulse feed */ }
+    const g = a.source_id || 'nosrc';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(key);
+   }
+  }
+  // Retrieval-path animation: edges between nodes activated by the SAME
+  // retrieval (one chat turn) light up with a traveling glow — the AI's
+  // visible train of thought.
+  for (const keys of groups.values()) {
+   if (keys.length < 2) continue;
+   const set = new Set(keys);
+   for (const e of edges) {
+    if (set.has(e.from) && set.has(e.to)) flowAt.set(e.key, Date.now());
+   }
+  }
+ } catch (e) { /* map still works without the pulse feed */ }
 }
 setInterval(pollActivity, 6000);
 
 const KIND_META = {
-  gap: { icon: 'extension', label: 'Knowledge gap', color: 'var(--cat-tool)' },
-  contradiction: { icon: 'warning', label: 'Contradiction', color: 'var(--danger, #ef4444)' },
-  duplicate: { icon: 'merge', label: 'Duplicate', color: 'var(--cat-chain)' },
-  dream_report: { icon: 'bedtime', label: 'Dream report', color: 'var(--cat-idea)' }
+ gap: { icon: 'extension', label: 'Knowledge gap', color: 'var(--cat-tool)' },
+ contradiction: { icon: 'warning', label: 'Contradiction', color: 'var(--danger, #ef4444)' },
+ duplicate: { icon: 'merge', label: 'Duplicate', color: 'var(--cat-chain)' },
+ dream_report: { icon: 'bedtime', label: 'Dream report', color: 'var(--cat-idea)' }
 };
 
 async function refreshInsightsDot() {
-  try {
-    const res = await fetch('/api/knowledge/insights', { headers: AUTH });
-    if (!res.ok) return;
-    const d = await res.json();
-    document.getElementById('insightsDot').classList.toggle('hidden', (d.insights || []).length === 0);
-  } catch (e) { }
+ try {
+  const res = await fetch('/api/knowledge/insights', { headers: AUTH });
+  if (!res.ok) return;
+  const d = await res.json();
+  document.getElementById('insightsDot').classList.toggle('hidden', (d.insights || []).length === 0);
+ } catch (e) { }
 }
 
 async function openInsights() {
-  closePanels();
-  const panel = document.getElementById('insightsPanel');
-  panel.innerHTML = '<div class="p-4 text-[12px] nm-sub italic">Looking for gaps and contradictions…</div>';
-  panel.classList.remove('hidden');
-  let insights = [];
-  try {
-    const res = await fetch('/api/knowledge/insights', { headers: AUTH });
-    insights = (await res.json()).insights || [];
-  } catch (e) { }
+ closePanels();
+ const panel = document.getElementById('insightsPanel');
+ panel.innerHTML = '<div class="p-4 text-[12px] nm-sub italic">Looking for gaps and contradictions…</div>';
+ panel.classList.remove('hidden');
+ let insights = [];
+ try {
+  const res = await fetch('/api/knowledge/insights', { headers: AUTH });
+  insights = (await res.json()).insights || [];
+ } catch (e) { }
 
-  panel.innerHTML = `
-    <div class="p-4 border-b flex items-center justify-between" style="border-color: var(--border)">
-      <div>
-        <div class="text-[17px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">What your AI noticed</div>
-        <div class="text-[11px] nm-sub">Gaps, contradictions and dream reports from the memory engine</div>
-      </div>
-      <button id="insClose" class="nm-sub"><span class="material-symbols-outlined text-[18px]">close</span></button>
-    </div>
-    <div class="p-3 flex flex-col gap-2">
-      ${insights.length ? insights.map(i => {
-        const k = KIND_META[i.kind] || { icon: 'circle', label: i.kind, color: 'var(--sub)' };
-        return `
-        <div class="nm-field rounded-xl p-3">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="material-symbols-outlined text-[15px]" style="color:${k.color}">${k.icon}</span>
-            <span class="text-[10px] font-bold uppercase tracking-widest" style="color:${k.color}">${k.label}</span>
-            <span class="text-[9px] nm-sub font-mono ml-auto">${fmtAgo(i.created_at)}</span>
-          </div>
-          <div class="text-[13px] font-semibold mb-0.5" style="color: var(--txt)">${esc(i.title)}</div>
-          ${i.detail ? `<div class="text-[11px] nm-sub leading-snug mb-2">${esc(i.detail)}</div>` : ''}
-          <div class="flex gap-1.5">
-            ${i.kind === 'gap' ? `<button class="ins-learn nm-btn-primary px-3 py-1 rounded-full text-[11px] font-semibold" data-id="${esc(i.insight_id)}" title="Create this concept as a real node, wired to its neighbours">Learn it</button>` : ''}
-            <button class="ins-act nm-btn px-3 py-1 rounded-full text-[11px] font-semibold" data-id="${esc(i.insight_id)}" data-act="accepted">Got it</button>
-            <button class="ins-act px-3 py-1 rounded-full text-[11px] font-semibold nm-sub" style="border: 1px solid var(--border)" data-id="${esc(i.insight_id)}" data-act="dismissed">Dismiss</button>
-          </div>
-        </div>`;
-      }).join('') : `
-        <div class="p-4 text-center">
-          <span class="material-symbols-outlined text-[28px] nm-sub">psychology</span>
-          <div class="text-[12px] nm-sub mt-1">Nothing right now. Chat more, or run a dream cycle — consolidation is when insights surface.</div>
-        </div>`}
-      <button id="insGaps" class="nm-btn flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold">
-        <span class="material-symbols-outlined text-[14px]">search_insights</span>Hunt for knowledge gaps now
-      </button>
+ panel.innerHTML = `
+  <div class="p-4 border-b flex items-center justify-between" style="border-color: var(--border)">
+   <div>
+    <div class="text-[17px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">What your AI noticed</div>
+    <div class="text-[11px] nm-sub">Gaps, contradictions and dream reports from the memory engine</div>
+   </div>
+   <button id="insClose" class="nm-sub"><span class="material-symbols-outlined text-[18px]">close</span></button>
+  </div>
+  <div class="p-3 flex flex-col gap-2">
+   ${insights.length ? insights.map(i => {
+    const k = KIND_META[i.kind] || { icon: 'circle', label: i.kind, color: 'var(--sub)' };
+    return `
+    <div class="nm-field rounded-xl p-3">
+     <div class="flex items-center gap-1.5 mb-1">
+      <span class="material-symbols-outlined text-[15px]" style="color:${k.color}">${k.icon}</span>
+      <span class="text-[10px] font-bold uppercase tracking-widest" style="color:${k.color}">${k.label}</span>
+      <span class="text-[9px] nm-sub font-mono ml-auto">${fmtAgo(i.created_at)}</span>
+     </div>
+     <div class="text-[13px] font-semibold mb-0.5" style="color: var(--txt)">${esc(i.title)}</div>
+     ${i.detail ? `<div class="text-[11px] nm-sub leading-snug mb-2">${esc(i.detail)}</div>` : ''}
+     <div class="flex gap-1.5">
+      ${i.kind === 'gap' ? `<button class="ins-learn nm-btn-primary px-3 py-1 rounded-full text-[11px] font-semibold" data-id="${esc(i.insight_id)}" title="Create this concept as a real node, wired to its neighbours">Learn it</button>` : ''}
+      <button class="ins-act nm-btn px-3 py-1 rounded-full text-[11px] font-semibold" data-id="${esc(i.insight_id)}" data-act="accepted">Got it</button>
+      <button class="ins-act px-3 py-1 rounded-full text-[11px] font-semibold nm-sub" style="border: 1px solid var(--border)" data-id="${esc(i.insight_id)}" data-act="dismissed">Dismiss</button>
+     </div>
     </div>`;
+   }).join('') : `
+    <div class="p-4 text-center">
+     <span class="material-symbols-outlined text-[28px] nm-sub">psychology</span>
+     <div class="text-[12px] nm-sub mt-1">Nothing right now. Chat more, or run a dream cycle — consolidation is when insights surface.</div>
+    </div>`}
+   <button id="insGaps" class="nm-btn flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold">
+    <span class="material-symbols-outlined text-[14px]">search_insights</span>Hunt for knowledge gaps now
+   </button>
+  </div>`;
 
-  document.getElementById('insClose').onclick = closePanels;
-  document.getElementById('insGaps').onclick = async () => {
-    showToast('Scanning the graph for missing concepts…');
-    try {
-      const res = await fetch('/api/knowledge/gaps', { method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' } });
-      const d = await res.json();
-      showToast(d.gaps?.length ? `Found ${d.gaps.length} gap(s): ${d.gaps.map(g => g.concept).join(', ')}` : 'No obvious gaps found.');
-      openInsights();
-    } catch (e) { showToast('Gap hunt failed.'); }
+ document.getElementById('insClose').onclick = closePanels;
+ document.getElementById('insGaps').onclick = async () => {
+  showToast('Scanning the graph for missing concepts…');
+  try {
+   const res = await fetch('/api/knowledge/gaps', { method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' } });
+   const d = await res.json();
+   showToast(d.gaps?.length ? `Found ${d.gaps.length} gap(s): ${d.gaps.map(g => g.concept).join(', ')}` : 'No obvious gaps found.');
+   openInsights();
+  } catch (e) { showToast('Gap hunt failed.'); }
+ };
+ panel.querySelectorAll('.ins-act').forEach(b => {
+  b.onclick = async () => {
+   try {
+    await fetch(`/api/knowledge/insights/${encodeURIComponent(b.dataset.id)}/resolve`, {
+     method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' },
+     body: JSON.stringify({ action: b.dataset.act })
+    });
+   } catch (e) { }
+   openInsights(); refreshInsightsDot();
   };
-  panel.querySelectorAll('.ins-act').forEach(b => {
-    b.onclick = async () => {
-      try {
-        await fetch(`/api/knowledge/insights/${encodeURIComponent(b.dataset.id)}/resolve`, {
-          method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: b.dataset.act })
-        });
-      } catch (e) { }
-      openInsights(); refreshInsightsDot();
-    };
-  });
-  panel.querySelectorAll('.ins-learn').forEach(b => {
-    b.onclick = async () => {
-      b.disabled = true; b.textContent = 'Learning…';
-      try {
-        const res = await fetch(`/api/knowledge/insights/${encodeURIComponent(b.dataset.id)}/learn`, {
-          method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' }
-        });
-        const d = await res.json();
-        if (d.ok) {
-          showToast(`Learned "${d.concept}"${d.wiredTo?.length ? ' — linked to ' + d.wiredTo.join(', ') : ''}.`);
-          await loadGraph();
-        } else {
-          showToast(d.error || 'Could not learn that concept.');
-        }
-      } catch (e) { showToast('Could not learn that concept.'); }
-      openInsights(); refreshInsightsDot();
-    };
-  });
+ });
+ panel.querySelectorAll('.ins-learn').forEach(b => {
+  b.onclick = async () => {
+   b.disabled = true; b.textContent = 'Learning…';
+   try {
+    const res = await fetch(`/api/knowledge/insights/${encodeURIComponent(b.dataset.id)}/learn`, {
+     method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' }
+    });
+    const d = await res.json();
+    if (d.ok) {
+     showToast(`Learned "${d.concept}"${d.wiredTo?.length ? ' — linked to ' + d.wiredTo.join(', ') : ''}.`);
+     await loadGraph();
+    } else {
+     showToast(d.error || 'Could not learn that concept.');
+    }
+   } catch (e) { showToast('Could not learn that concept.'); }
+   openInsights(); refreshInsightsDot();
+  };
+ });
 }
 document.getElementById('insightsBtn').onclick = openInsights;
 
 document.getElementById('dreamBtn').onclick = async () => {
-  const icon = document.querySelector('#dreamBtn .material-symbols-outlined');
-  icon.textContent = 'hourglass_top';
-  showToast('Dreaming — merging duplicates, fading stale links, hunting gaps…');
-  try {
-    const res = await fetch('/api/knowledge/dream', { method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' } });
-    const d = await res.json();
-    const r = d.report || {};
-    showToast(`Dream done: ${r.merged || 0} merged · ${r.edgesDecayed || 0} faded · ${r.edgesStrengthened || 0} reinforced · ${r.gapsFound || 0} gap(s) found.`);
-    await loadGraph();
-    refreshInsightsDot();
-  } catch (e) {
-    showToast('Dream cycle failed — is the backend awake?');
-  }
-  icon.textContent = 'bedtime';
+ const icon = document.querySelector('#dreamBtn .material-symbols-outlined');
+ icon.textContent = 'hourglass_top';
+ showToast('Dreaming — merging duplicates, fading stale links, hunting gaps…');
+ try {
+  const res = await fetch('/api/knowledge/dream', { method: 'POST', headers: { ...AUTH, 'Content-Type': 'application/json' } });
+  const d = await res.json();
+  const r = d.report || {};
+  showToast(`Dream done: ${r.merged || 0} merged · ${r.edgesDecayed || 0} faded · ${r.edgesStrengthened || 0} reinforced · ${r.gapsFound || 0} gap(s) found.`);
+  await loadGraph();
+  refreshInsightsDot();
+ } catch (e) {
+  showToast('Dream cycle failed — is the backend awake?');
+ }
+ icon.textContent = 'bedtime';
 };
 refreshInsightsDot();
 
 document.getElementById('reloadBtn').onclick = async () => {
-  closePanels();
-  document.getElementById('loadingVeil').classList.remove('hidden');
-  await loadGraph();
-  showToast(currentMapId === 'system' ? 'Map rebuilt from live system state.' : 'Map reloaded.');
+ closePanels();
+ document.getElementById('loadingVeil').classList.remove('hidden');
+ await loadGraph();
+ showToast(currentMapId === 'system' ? 'Map rebuilt from live system state.' : 'Map reloaded.');
 };
 document.getElementById('newMapClose').onclick = closeNewMapModal;
 document.getElementById('newMapModal').addEventListener('click', e => { if (e.target.id === 'newMapModal') closeNewMapModal(); });
 document.getElementById('pickKnowledge').onclick = () => createMap('knowledge');
 document.getElementById('pickNetwork').onclick = () => createMap('network');
 document.getElementById('recognizeInput').onchange = e => {
-  const v = e.target.value.trim().toLowerCase();
-  const n = nodes.find(x => x.label.toLowerCase() === v);
-  if (!n) return;
-  view.panX = cw / 2 - n.x * view.scale;
-  view.panY = ch / 2 - n.y * view.scale;
-  openNode(n);
-  e.target.value = '';
+ const v = e.target.value.trim().toLowerCase();
+ const n = nodes.find(x => x.label.toLowerCase() === v);
+ if (!n) return;
+ view.panX = cw / 2 - n.x * view.scale;
+ view.panY = ch / 2 - n.y * view.scale;
+ openNode(n);
+ e.target.value = '';
 };
 
 document.addEventListener('keydown', e => {
-  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
-  if (e.key === 'Escape') {
-    if (!document.getElementById('newMapModal').classList.contains('hidden')) { closeNewMapModal(); return; }
-    if (selection.size) { selection.clear(); syncSelBanner(); }
-    closePanels();
-    return;
-  }
-  if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-    e.preventDefault(); selectAll();
-  }
+ const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
+ if (e.key === 'Escape') {
+  if (!document.getElementById('newMapModal').classList.contains('hidden')) { closeNewMapModal(); return; }
+  if (selection.size) { selection.clear(); syncSelBanner(); }
+  closePanels();
+  return;
+ }
+ if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+  e.preventDefault(); selectAll();
+ }
 });
 
 // ══════════════════════════════════════════════════════════
 // Go
 // ══════════════════════════════════════════════════════════
-applyTheme(theme);   // now that palette, legend and panel state all exist
+applyTheme(theme);  // now that palette, legend and panel state all exist
 resize();
 loadGraph().then(() => { resize(); });
 loadMapList();
@@ -1910,23 +1910,23 @@ loop();
 
 // "Soon" badges on not-yet-shipped nav items — mirrors the Operations sidebar.
 (function () {
-  const SOON = ['Governance', 'Support'];
-  document.querySelectorAll('#sideNav a').forEach(a => {
-    // label = only the text nodes, so the material-symbols ligature is ignored
-    const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
-    if (!SOON.includes(label)) return;
-    a.setAttribute('href', 'javascript:void(0)');
-    a.style.opacity = '0.55';
-    a.style.cursor = 'not-allowed';
-    if (!a.querySelector('.soon-badge')) {
-      const b = document.createElement('span');
-      b.className = 'soon-badge';
-      b.textContent = 'Soon';
-      b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
-      a.appendChild(b);
-    }
-    a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
-  });
+ const SOON = ['Governance', 'Support'];
+ document.querySelectorAll('#sideNav a').forEach(a => {
+  // label = only the text nodes, so the material-symbols ligature is ignored
+  const label = [...a.childNodes].filter(nd => nd.nodeType === 3).map(nd => nd.textContent).join('').trim();
+  if (!SOON.includes(label)) return;
+  a.setAttribute('href', 'javascript:void(0)');
+  a.style.opacity = '0.55';
+  a.style.cursor = 'not-allowed';
+  if (!a.querySelector('.soon-badge')) {
+   const b = document.createElement('span');
+   b.className = 'soon-badge';
+   b.textContent = 'Soon';
+   b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:var(--rail-hover);color:var(--rail-muted);';
+   a.appendChild(b);
+  }
+  a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
+ });
 })();
 </script>
 <script src="notifications_widget.js"></script>
@@ -1934,3 +1934,4 @@ loop();
 <script src="knowledge_search.js"></script>
 </body>
 </html>
+

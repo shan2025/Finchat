@@ -12,47 +12,47 @@
 <script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}}}};</script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-  if (typeof io === 'undefined') {
-    document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
-  }
+ if (typeof io === 'undefined') {
+  document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
+ }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 <style>
-  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
-  :root {
-    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc;
-    --accent: #4a3828; --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
-  }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
-  /* Tailwind's forms plugin paints a blue focus ring on inputs — off-theme here */
-  textarea:focus, input:focus, select:focus {
-    outline: none !important; box-shadow: none !important;
-    border-color: var(--border) !important; --tw-ring-color: transparent !important;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes typingDot { 0%, 60%, 100% { transform: translateY(0); opacity:.4; } 30% { transform: translateY(-4px); opacity:1; } }
-  .typing-dot { width:6px; height:6px; border-radius:50%; background:#8c7a6b; display:inline-block; animation: typingDot 1.2s infinite; }
-  .typing-dot:nth-child(2) { animation-delay:.15s; } .typing-dot:nth-child(3) { animation-delay:.3s; }
-  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(58,46,35,0.25); transform:translateY(20px); }
-  .toast.show { opacity:1; transform:translateY(0); }
-  .markdown-body p { margin: 0 0 6px; } .markdown-body p:last-child { margin-bottom: 0; }
-  .markdown-body ul, .markdown-body ol { margin: 4px 0 6px 18px; } .markdown-body li { margin-bottom: 2px; }
-  .markdown-body code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
-  .markdown-body a { color: #b45309; text-decoration: underline; }
-  #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
-    #groupListCol { display: none; }
-    #groupListCol.open-mobile { display: flex; position: fixed; inset: 0; z-index: 50; background: var(--bg); }
-  }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
+ :root {
+  --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc;
+  --accent: #4a3828; --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
+ }
+ ::-webkit-scrollbar { width: 6px; height: 6px; }
+ ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
+ /* Tailwind's forms plugin paints a blue focus ring on inputs — off-theme here */
+ textarea:focus, input:focus, select:focus {
+  outline: none !important; box-shadow: none !important;
+  border-color: var(--border) !important; --tw-ring-color: transparent !important;
+ }
+ @keyframes spin { to { transform: rotate(360deg); } }
+ @keyframes typingDot { 0%, 60%, 100% { transform: translateY(0); opacity:.4; } 30% { transform: translateY(-4px); opacity:1; } }
+ .typing-dot { width:6px; height:6px; border-radius:50%; background:#8c7a6b; display:inline-block; animation: typingDot 1.2s infinite; }
+ .typing-dot:nth-child(2) { animation-delay:.15s; } .typing-dot:nth-child(3) { animation-delay:.3s; }
+ .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(58,46,35,0.25); transform:translateY(20px); }
+ .toast.show { opacity:1; transform:translateY(0); }
+ .markdown-body p { margin: 0 0 6px; } .markdown-body p:last-child { margin-bottom: 0; }
+ .markdown-body ul, .markdown-body ol { margin: 4px 0 6px 18px; } .markdown-body li { margin-bottom: 2px; }
+ .markdown-body code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+ .markdown-body a { color: #b45309; text-decoration: underline; }
+ #sideNav { transition: transform .25s ease; }
+ @media (max-width: 767px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  #sideNav.open { transform: translateX(0); }
+  #groupListCol { display: none; }
+  #groupListCol.open-mobile { display: flex; position: fixed; inset: 0; z-index: 50; background: var(--bg); }
+ }
+ @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
 </head>
 
-<body class="bg-cream-bg h-screen overflow-hidden flex">
+<body class="bg-cream-bg h-screen overflow-hidden ">
 
 <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
@@ -61,460 +61,461 @@
 
 <div class="flex-1 flex flex-col md:ml-64 h-full min-w-0">
 
-  <!-- Top bar -->
-  <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
-    <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
-      <span class="material-symbols-outlined text-[18px]">menu</span>
-    </button>
-    <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Group Chat</h1>
-    <span id="hdrSub" class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:240px;">agents + you, one room</span>
-    <div class="flex-1"></div>
-    <button onclick="openCreateModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#3a2e23;">
-      <span class="material-symbols-outlined text-[16px]">group_add</span> New group
-    </button>
-    <div class="relative shrink-0">
-      <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
-        <span class="material-symbols-outlined text-[16px]">notifications</span>
-        <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
-      </button>
-      <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
-        <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
-          <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
-          <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
-        </div>
-        <div id="notifList"></div>
-      </div>
+ <!-- Top bar -->
+ <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
+  <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
+   <span class="material-symbols-outlined text-[18px]">menu</span>
+  </button>
+  <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Group Chat</h1>
+  <span id="hdrSub" class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:240px;">agents + you, one room</span>
+  <div class="flex-1"></div>
+  <button onclick="openCreateModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#3a2e23;">
+   <span class="material-symbols-outlined text-[16px]">group_add</span> New group
+  </button>
+  <div class="relative shrink-0">
+   <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
+    <span class="material-symbols-outlined text-[16px]">notifications</span>
+    <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
+   </button>
+   <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
+    <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
+     <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
+     <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
     </div>
-  </header>
-
-  <div class="flex-1 flex min-h-0">
-
-    <!-- Group list -->
-    <aside id="groupListCol" class="w-72 border-r flex flex-col shrink-0" style="background:var(--surface2); border-color:var(--border);">
-      <div class="px-4 py-3 text-[10px] uppercase tracking-widest font-mono font-bold" style="color:var(--text3);">Your groups</div>
-      <div id="groupList" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
-        <div class="px-3 py-2 text-xs" style="color:var(--text3);">Loading…</div>
-      </div>
-    </aside>
-
-    <!-- Chat area -->
-    <main class="flex-1 flex flex-col min-w-0" style="background:var(--bg);">
-
-      <!-- Empty state -->
-      <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center px-6">
-        <span class="material-symbols-outlined" style="font-size:56px; color:#c9c0b0;">forum</span>
-        <div class="mt-3 text-lg font-bold">Create a group to start a discussion</div>
-        <div class="mt-1 text-sm max-w-md" style="color:var(--text2);">
-          Pick which agents join the room. Ask questions, get news updates, let agents debate each other,
-          @mention someone specific, or type <code class="font-mono text-xs">/task @agent your goal</code> to hand out real work.
-        </div>
-        <button onclick="openCreateModal()" class="mt-5 flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-bold text-white" style="background:#8c491a;">
-          <span class="material-symbols-outlined text-[18px]">group_add</span> New group chat
-        </button>
-      </div>
-
-      <!-- Active group -->
-      <div id="chatPane" class="hidden flex-1 flex flex-col min-h-0">
-        <!-- Member strip -->
-        <div class="flex items-center gap-2 flex-wrap px-5 py-2.5 border-b shrink-0" style="border-color:var(--border); background:var(--surface);">
-          <span id="grpName" class="font-bold text-sm"></span>
-          <button onclick="renameGroup()" title="Rename group" class="w-6 h-6 flex items-center justify-center rounded-full mr-1" style="background:transparent; color:var(--text3);">
-            <span class="material-symbols-outlined text-[14px]">edit</span>
-          </button>
-          <div id="memberChips" class="flex items-center gap-1.5 flex-wrap"></div>
-          <button onclick="openAddAgent()" title="Add agent" class="w-7 h-7 flex items-center justify-center rounded-full" style="background:var(--surface2); border:1px dashed var(--border);">
-            <span class="material-symbols-outlined text-[15px]">add</span>
-          </button>
-          <div class="flex-1"></div>
-          <button onclick="openTaskModal()" title="Assign a task to an agent" class="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e;">
-            <span class="material-symbols-outlined text-[14px]">assignment</span> Assign task
-          </button>
-          <button onclick="deleteGroup()" title="Delete group" class="w-7 h-7 flex items-center justify-center rounded-full" style="background:var(--surface2); border:1px solid var(--border); color:#dc2626;">
-            <span class="material-symbols-outlined text-[15px]">delete</span>
-          </button>
-        </div>
-
-        <!-- Messages -->
-        <div id="grpMessages" class="flex-1 overflow-y-auto px-5 py-4 space-y-3"></div>
-
-        <!-- Typing indicator -->
-        <div id="grpTyping" class="hidden px-6 pb-1 text-[11px] flex items-center gap-2" style="color:var(--text3);">
-          <span id="grpTypingWho" class="font-semibold"></span>
-          <span>is thinking</span>
-          <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
-        </div>
-
-        <!-- Composer -->
-        <div class="px-5 pb-5 pt-2 shrink-0">
-          <div class="flex items-end gap-2 rounded-3xl px-4 py-2.5" style="background:var(--surface); border:1px solid var(--border);">
-            <textarea id="grpInput" rows="1" placeholder="Message the group — @mention an agent, or /task @agent goal…"
-              class="flex-1 bg-transparent border-0 outline-none resize-none text-sm py-1.5" style="max-height:120px;"></textarea>
-            <button id="grpSendBtn" onclick="sendGroupMessage()" class="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0" style="background:#8c491a;">
-              <span class="material-symbols-outlined text-[18px]">send</span>
-            </button>
-          </div>
-          <div class="mt-1.5 px-2 text-[10px] font-mono" style="color:var(--text3);">
-            Tip: "/task @aurelius check BTC price and news" gives Aurelius real background work — the result posts back here.
-          </div>
-        </div>
-      </div>
-    </main>
+    <div id="notifList"></div>
+   </div>
   </div>
+ </header>
+
+ <div class="flex-1 flex min-h-0">
+
+  <!-- Group list -->
+  <aside id="groupListCol" class="w-72 border-r flex flex-col shrink-0" style="background:var(--surface2); border-color:var(--border);">
+   <div class="px-4 py-3 text-[10px] uppercase tracking-widest font-mono font-bold" style="color:var(--text3);">Your groups</div>
+   <div id="groupList" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+    <div class="px-3 py-2 text-xs" style="color:var(--text3);">Loading…</div>
+   </div>
+  </aside>
+
+  <!-- Chat area -->
+  <main class="flex-1 flex flex-col min-w-0" style="background:var(--bg);">
+
+   <!-- Empty state -->
+   <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center px-6">
+    <span class="material-symbols-outlined" style="font-size:56px; color:#c9c0b0;">forum</span>
+    <div class="mt-3 text-lg font-bold">Create a group to start a discussion</div>
+    <div class="mt-1 text-sm max-w-md" style="color:var(--text2);">
+     Pick which agents join the room. Ask questions, get news updates, let agents debate each other,
+     @mention someone specific, or type <code class="font-mono text-xs">/task @agent your goal</code> to hand out real work.
+    </div>
+    <button onclick="openCreateModal()" class="mt-5 flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-bold text-white" style="background:#8c491a;">
+     <span class="material-symbols-outlined text-[18px]">group_add</span> New group chat
+    </button>
+   </div>
+
+   <!-- Active group -->
+   <div id="chatPane" class="hidden flex-1 flex flex-col min-h-0">
+    <!-- Member strip -->
+    <div class="flex items-center gap-2 flex-wrap px-5 py-2.5 border-b shrink-0" style="border-color:var(--border); background:var(--surface);">
+     <span id="grpName" class="font-bold text-sm"></span>
+     <button onclick="renameGroup()" title="Rename group" class="w-6 h-6 flex items-center justify-center rounded-full mr-1" style="background:transparent; color:var(--text3);">
+      <span class="material-symbols-outlined text-[14px]">edit</span>
+     </button>
+     <div id="memberChips" class="flex items-center gap-1.5 flex-wrap"></div>
+     <button onclick="openAddAgent()" title="Add agent" class="w-7 h-7 flex items-center justify-center rounded-full" style="background:var(--surface2); border:1px dashed var(--border);">
+      <span class="material-symbols-outlined text-[15px]">add</span>
+     </button>
+     <div class="flex-1"></div>
+     <button onclick="openTaskModal()" title="Assign a task to an agent" class="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e;">
+      <span class="material-symbols-outlined text-[14px]">assignment</span> Assign task
+     </button>
+     <button onclick="deleteGroup()" title="Delete group" class="w-7 h-7 flex items-center justify-center rounded-full" style="background:var(--surface2); border:1px solid var(--border); color:#dc2626;">
+      <span class="material-symbols-outlined text-[15px]">delete</span>
+     </button>
+    </div>
+
+    <!-- Messages -->
+    <div id="grpMessages" class="flex-1 overflow-y-auto px-5 py-4 space-y-3"></div>
+
+    <!-- Typing indicator -->
+    <div id="grpTyping" class="hidden px-6 pb-1 text-[11px] flex items-center gap-2" style="color:var(--text3);">
+     <span id="grpTypingWho" class="font-semibold"></span>
+     <span>is thinking</span>
+     <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+    </div>
+
+    <!-- Composer -->
+    <div class="px-5 pb-5 pt-2 shrink-0">
+     <div class="flex items-end gap-2 rounded-3xl px-4 py-2.5" style="background:var(--surface); border:1px solid var(--border);">
+      <textarea id="grpInput" rows="1" placeholder="Message the group — @mention an agent, or /task @agent goal…"
+       class="flex-1 bg-transparent border-0 outline-none resize-none text-sm py-1.5" style="max-height:120px;"></textarea>
+      <button id="grpSendBtn" onclick="sendGroupMessage()" class="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0" style="background:#8c491a;">
+       <span class="material-symbols-outlined text-[18px]">send</span>
+      </button>
+     </div>
+     <div class="mt-1.5 px-2 text-[10px] font-mono" style="color:var(--text3);">
+      Tip: "/task @aurelius check BTC price and news" gives Aurelius real background work — the result posts back here.
+     </div>
+    </div>
+   </div>
+  </main>
+ </div>
 </div>
 
 <!-- Create group modal -->
 <div id="createModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4" style="background:rgba(30,22,15,.55);">
-  <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">New group chat</h2>
-      <button onclick="closeCreateModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
-    </div>
-    <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Group name</label>
-    <input id="newGrpName" placeholder="e.g. Morning market huddle" class="w-full mt-1 mb-4 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none" style="background:var(--surface2); border:1px solid var(--border) !important;" />
-    <div class="flex items-center justify-between">
-      <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agents in this group</label>
-      <span id="agentCount" class="text-[11px] font-mono" style="color:var(--text3);">0 selected</span>
-    </div>
-    <div id="agentPicker" class="mt-2 space-y-2 max-h-56 overflow-y-auto pr-1">
-      <div class="text-xs" style="color:var(--text3);">Loading agents…</div>
-    </div>
-    <button id="createGrpBtn" onclick="createGroup()" class="mt-5 w-full py-3 rounded-full text-sm font-bold text-white" style="background:#8c491a;">Create group</button>
+ <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
+  <div class="flex items-center justify-between mb-4">
+   <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">New group chat</h2>
+   <button onclick="closeCreateModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
   </div>
+  <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Group name</label>
+  <input id="newGrpName" placeholder="e.g. Morning market huddle" class="w-full mt-1 mb-4 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none" style="background:var(--surface2); border:1px solid var(--border) !important;" />
+  <div class="flex items-center justify-between">
+   <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agents in this group</label>
+   <span id="agentCount" class="text-[11px] font-mono" style="color:var(--text3);">0 selected</span>
+  </div>
+  <div id="agentPicker" class="mt-2 space-y-2 max-h-56 overflow-y-auto pr-1">
+   <div class="text-xs" style="color:var(--text3);">Loading agents…</div>
+  </div>
+  <button id="createGrpBtn" onclick="createGroup()" class="mt-5 w-full py-3 rounded-full text-sm font-bold text-white" style="background:#8c491a;">Create group</button>
+ </div>
 </div>
 
 <!-- Assign task modal -->
 <div id="taskModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4" style="background:rgba(30,22,15,.55);">
-  <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">Assign a task</h2>
-      <button onclick="closeTaskModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
-    </div>
-    <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agent</label>
-    <select id="taskAgent" class="w-full mt-1 mb-4 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none" style="background:var(--surface2);"></select>
-    <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Goal</label>
-    <textarea id="taskGoal" rows="3" placeholder="e.g. Summarize today's crypto news and how it affects my watchlist"
-      class="w-full mt-1 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none resize-none" style="background:var(--surface2);"></textarea>
-    <button onclick="submitTask()" class="mt-5 w-full py-3 rounded-full text-sm font-bold text-white" style="background:#8c491a;">Assign task</button>
+ <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
+  <div class="flex items-center justify-between mb-4">
+   <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">Assign a task</h2>
+   <button onclick="closeTaskModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
   </div>
+  <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agent</label>
+  <select id="taskAgent" class="w-full mt-1 mb-4 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none" style="background:var(--surface2);"></select>
+  <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Goal</label>
+  <textarea id="taskGoal" rows="3" placeholder="e.g. Summarize today's crypto news and how it affects my watchlist"
+   class="w-full mt-1 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none resize-none" style="background:var(--surface2);"></textarea>
+  <button onclick="submitTask()" class="mt-5 w-full py-3 rounded-full text-sm font-bold text-white" style="background:#8c491a;">Assign task</button>
+ </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  // ── Auth ──
-  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
-  if (!_session) window.location.href = 'finchat_login.html';
-  else if (!sessionStorage.getItem('finchat_user')) sessionStorage.setItem('finchat_user', JSON.stringify(_session));
-  const SESSION_USER = _session || { name: 'User', id: 'system' };
-  const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (SESSION_USER && SESSION_USER.token) || '';
-  const AUTH = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
-  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
+ // ── Auth ──
+ const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+ if (!_session) window.location.href = 'finchat_login.html';
+ else if (!sessionStorage.getItem('finchat_user')) sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+ const SESSION_USER = _session || { name: 'User', id: 'system' };
+ const token = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (SESSION_USER && SESSION_USER.token) || '';
+ const AUTH = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+ const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
 
-  const AGENT_AVATARS = { plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png' };
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 3500); }
+ const AGENT_AVATARS = { plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png' };
+ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 3500); }
 
-  let groups = [], activeGroup = null, members = [], allAgents = [];
-  let socket = null;
+ let groups = [], activeGroup = null, members = [], allAgents = [];
+ let socket = null;
 
-  // ── Socket ──
+ // ── Socket ──
+ try {
+  socket = io(API, { auth: { token } });
+  window.socket = socket;
+  socket.on('group:message', (m) => {
+   if (activeGroup && m.group_id === activeGroup.group_id) {
+    hideTyping();
+    appendMessage(m);
+    scrollBottom();
+   }
+   loadGroups(); // refresh last-message preview
+  });
+  socket.on('group:typing', (info) => {
+   if (activeGroup && info.group_id === activeGroup.group_id) showTyping(info.agent_id);
+  });
+ } catch (e) { console.log('Socket unavailable', e); }
+
+ // ── Groups list ──
+ async function loadGroups() {
   try {
-    socket = io(API, { auth: { token } });
-    window.socket = socket;
-    socket.on('group:message', (m) => {
-      if (activeGroup && m.group_id === activeGroup.group_id) {
-        hideTyping();
-        appendMessage(m);
-        scrollBottom();
-      }
-      loadGroups(); // refresh last-message preview
-    });
-    socket.on('group:typing', (info) => {
-      if (activeGroup && info.group_id === activeGroup.group_id) showTyping(info.agent_id);
-    });
-  } catch (e) { console.log('Socket unavailable', e); }
+   const r = await fetch(API + '/api/group-chat', { headers: AUTH });
+   if (!r.ok) return;
+   groups = (await r.json()).groups || [];
+   const list = document.getElementById('groupList');
+   if (!groups.length) {
+    list.innerHTML = '<div class="px-3 py-2 text-xs" style="color:var(--text3);">No groups yet — create one!</div>';
+    return;
+   }
+   list.innerHTML = groups.map(g => `
+    <div onclick="openGroup('${g.group_id}')" class="px-3 py-2.5 rounded-2xl cursor-pointer transition-colors"
+     style="${activeGroup && activeGroup.group_id === g.group_id ? 'background:#3a2e23; color:#efe8de;' : 'background:transparent;'}"
+     onmouseover="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='rgba(0,0,0,.05)'"
+     onmouseout="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='transparent'">
+     <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">forum</span>
+      <span class="font-bold text-[13px] truncate flex-1">${esc(g.name)}</span>
+      <span class="text-[10px] font-mono opacity-70">${g.agent_count}🤖</span>
+     </div>
+     <div class="text-[11px] truncate mt-0.5 opacity-70">${esc(g.last_message || 'No messages yet')}</div>
+    </div>`).join('');
+  } catch (e) { console.log('loadGroups failed', e); }
+ }
 
-  // ── Groups list ──
-  async function loadGroups() {
-    try {
-      const r = await fetch(API + '/api/group-chat', { headers: AUTH });
-      if (!r.ok) return;
-      groups = (await r.json()).groups || [];
-      const list = document.getElementById('groupList');
-      if (!groups.length) {
-        list.innerHTML = '<div class="px-3 py-2 text-xs" style="color:var(--text3);">No groups yet — create one!</div>';
-        return;
-      }
-      list.innerHTML = groups.map(g => `
-        <div onclick="openGroup('${g.group_id}')" class="px-3 py-2.5 rounded-2xl cursor-pointer transition-colors"
-          style="${activeGroup && activeGroup.group_id === g.group_id ? 'background:#3a2e23; color:#efe8de;' : 'background:transparent;'}"
-          onmouseover="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='rgba(0,0,0,.05)'"
-          onmouseout="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='transparent'">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px]">forum</span>
-            <span class="font-bold text-[13px] truncate flex-1">${esc(g.name)}</span>
-            <span class="text-[10px] font-mono opacity-70">${g.agent_count}🤖</span>
-          </div>
-          <div class="text-[11px] truncate mt-0.5 opacity-70">${esc(g.last_message || 'No messages yet')}</div>
-        </div>`).join('');
-    } catch (e) { console.log('loadGroups failed', e); }
+ // ── Open a group ──
+ async function openGroup(groupId) {
+  try {
+   const r = await fetch(API + '/api/group-chat/' + groupId, { headers: AUTH });
+   if (!r.ok) { showToast('Could not open group'); return; }
+   const data = await r.json();
+   if (activeGroup && socket) socket.emit('leave_group', activeGroup.group_id);
+   activeGroup = data.group;
+   members = data.members;
+   if (socket) socket.emit('join_group', groupId);
+
+   document.getElementById('emptyState').classList.add('hidden');
+   document.getElementById('chatPane').classList.remove('hidden');
+   document.getElementById('grpName').textContent = activeGroup.name;
+   renderMembers();
+   loadGroups();
+
+   const mr = await fetch(API + '/api/group-chat/' + groupId + '/messages?limit=150', { headers: AUTH });
+   const msgs = mr.ok ? (await mr.json()).messages : [];
+   const box = document.getElementById('grpMessages');
+   box.innerHTML = '';
+   msgs.forEach(appendMessage);
+   scrollBottom();
+   const url = new URL(location); url.searchParams.set('group', groupId); history.replaceState(null, '', url);
+  } catch (e) { showToast('Failed to open group: ' + e.message); }
+ }
+
+ function renderMembers() {
+  const chips = document.getElementById('memberChips');
+  const agents = members.filter(m => m.member_type === 'agent');
+  chips.innerHTML = agents.map(m => `
+   <span class="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full text-[11px] font-semibold" style="background:var(--surface2); border:1px solid var(--border);">
+    ${AGENT_AVATARS[m.member_id]
+     ? `<img src="${AGENT_AVATARS[m.member_id]}" class="w-5 h-5 rounded-full object-cover">`
+     : '<span class="material-symbols-outlined text-[14px]">smart_toy</span>'}
+    ${esc(m.name)}
+    <button onclick="removeAgent('${m.member_id}')" title="Remove ${esc(m.name)}" class="ml-0.5 opacity-50 hover:opacity-100"><span class="material-symbols-outlined text-[13px]">close</span></button>
+   </span>`).join('');
+  // task modal agent options
+  document.getElementById('taskAgent').innerHTML =
+   agents.map(a => `<option value="${a.member_id}">${esc(a.name)}</option>`).join('');
+ }
+
+ // ── Messages ──
+ function appendMessage(m) {
+  const box = document.getElementById('grpMessages');
+  const meta = typeof m.meta === 'string' ? JSON.parse(m.meta || '{}') : (m.meta || {});
+  const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const div = document.createElement('div');
+
+  if (m.sender_type === 'system') {
+   div.className = 'flex justify-center';
+   div.innerHTML = `<div class="text-[11px] px-4 py-1.5 rounded-full text-center max-w-lg" style="background:var(--surface2); color:var(--text3); border:1px dashed var(--border);">${esc(m.content)}</div>`;
+   box.appendChild(div); return;
   }
 
-  // ── Open a group ──
-  async function openGroup(groupId) {
-    try {
-      const r = await fetch(API + '/api/group-chat/' + groupId, { headers: AUTH });
-      if (!r.ok) { showToast('Could not open group'); return; }
-      const data = await r.json();
-      if (activeGroup && socket) socket.emit('leave_group', activeGroup.group_id);
-      activeGroup = data.group;
-      members = data.members;
-      if (socket) socket.emit('join_group', groupId);
+  const isUser = m.sender_type === 'user';
+  const agentMember = members.find(x => x.member_id === m.sender_id);
+  const name = isUser ? 'You' : (agentMember ? agentMember.name : m.sender_id.toUpperCase());
+  const avatar = isUser
+   ? `<div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style="background:linear-gradient(135deg,#d67f48,#8c491a);">${esc((SESSION_USER.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>`
+   : (AGENT_AVATARS[m.sender_id]
+    ? `<img src="${AGENT_AVATARS[m.sender_id]}" class="w-8 h-8 rounded-full object-cover shrink-0" style="border:1px solid var(--border);">`
+    : `<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--surface2);"><span class="material-symbols-outlined text-[16px]">smart_toy</span></div>`);
+  const fallbackBadge = meta.fallback
+   ? `<span title="Groq cloud was unreachable — this reply came from the local ${esc(meta.model || 'qwen')} model" class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold align-middle" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e;">⚠ local fallback · ${esc(meta.model || 'qwen')}</span>`
+   : '';
+  const taskBadge = meta.kind === 'task_result' ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#dcfce7; border:1px solid #16a34a; color:#166534;">TASK RESULT</span>' : '';
+  const body = DOMPurify.sanitize(marked.parse(m.content || ''), { ADD_ATTR: ['target'] });
 
-      document.getElementById('emptyState').classList.add('hidden');
-      document.getElementById('chatPane').classList.remove('hidden');
-      document.getElementById('grpName').textContent = activeGroup.name;
-      renderMembers();
-      loadGroups();
+  div.className = 'flex gap-2.5 ' + (isUser ? 'flex-row-reverse' : '');
+  div.innerHTML = `
+   ${avatar}
+   <div class="max-w-[75%] min-w-0">
+    <div class="text-[11px] font-bold mb-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text2);">${esc(name)}${fallbackBadge}${taskBadge}</div>
+    <div class="px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed markdown-body" style="${isUser ? 'background:#3a2e23; color:#efe8de;' : 'background:var(--surface); border:1px solid var(--border);'}">${body}</div>
+    <div class="text-[10px] font-mono mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
+     <button class="ml-1 opacity-60 hover:opacity-100" title="Copy message" onclick="navigator.clipboard.writeText(this.closest('div').parentNode.querySelector('.markdown-body').innerText).then(()=>showToast('Message copied'))"><span class="material-symbols-outlined text-[12px] align-middle">content_copy</span></button>
+    </div>
+   </div>`;
+  box.appendChild(div);
+ }
 
-      const mr = await fetch(API + '/api/group-chat/' + groupId + '/messages?limit=150', { headers: AUTH });
-      const msgs = mr.ok ? (await mr.json()).messages : [];
-      const box = document.getElementById('grpMessages');
-      box.innerHTML = '';
-      msgs.forEach(appendMessage);
-      scrollBottom();
-      const url = new URL(location); url.searchParams.set('group', groupId); history.replaceState(null, '', url);
-    } catch (e) { showToast('Failed to open group: ' + e.message); }
-  }
+ function scrollBottom() { const b = document.getElementById('grpMessages'); b.scrollTop = b.scrollHeight; }
 
-  function renderMembers() {
-    const chips = document.getElementById('memberChips');
-    const agents = members.filter(m => m.member_type === 'agent');
-    chips.innerHTML = agents.map(m => `
-      <span class="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full text-[11px] font-semibold" style="background:var(--surface2); border:1px solid var(--border);">
-        ${AGENT_AVATARS[m.member_id]
-          ? `<img src="${AGENT_AVATARS[m.member_id]}" class="w-5 h-5 rounded-full object-cover">`
-          : '<span class="material-symbols-outlined text-[14px]">smart_toy</span>'}
-        ${esc(m.name)}
-        <button onclick="removeAgent('${m.member_id}')" title="Remove ${esc(m.name)}" class="ml-0.5 opacity-50 hover:opacity-100"><span class="material-symbols-outlined text-[13px]">close</span></button>
-      </span>`).join('');
-    // task modal agent options
-    document.getElementById('taskAgent').innerHTML =
-      agents.map(a => `<option value="${a.member_id}">${esc(a.name)}</option>`).join('');
-  }
+ let typingTimer = null;
+ function showTyping(agentId) {
+  const m = members.find(x => x.member_id === agentId);
+  document.getElementById('grpTypingWho').textContent = m ? m.name : (agentId || 'Agent');
+  const el = document.getElementById('grpTyping');
+  el.classList.remove('hidden'); el.classList.add('flex');
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(hideTyping, 90000); // safety
+ }
+ function hideTyping() {
+  const el = document.getElementById('grpTyping');
+  el.classList.add('hidden'); el.classList.remove('flex');
+ }
 
-  // ── Messages ──
-  function appendMessage(m) {
-    const box = document.getElementById('grpMessages');
-    const meta = typeof m.meta === 'string' ? JSON.parse(m.meta || '{}') : (m.meta || {});
-    const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const div = document.createElement('div');
+ async function sendGroupMessage() {
+  if (!activeGroup) return;
+  const input = document.getElementById('grpInput');
+  const content = input.value.trim();
+  if (!content) return;
+  input.value = '';
+  try {
+   const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/messages', {
+    method: 'POST', headers: AUTH, body: JSON.stringify({ content })
+   });
+   if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || 'Send failed'); }
+   // message itself arrives via socket broadcast
+  } catch (e) { showToast('Send failed: ' + e.message); }
+ }
+ document.getElementById('grpInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+ });
 
-    if (m.sender_type === 'system') {
-      div.className = 'flex justify-center';
-      div.innerHTML = `<div class="text-[11px] px-4 py-1.5 rounded-full text-center max-w-lg" style="background:var(--surface2); color:var(--text3); border:1px dashed var(--border);">${esc(m.content)}</div>`;
-      box.appendChild(div); return;
-    }
-
-    const isUser = m.sender_type === 'user';
-    const agentMember = members.find(x => x.member_id === m.sender_id);
-    const name = isUser ? 'You' : (agentMember ? agentMember.name : m.sender_id.toUpperCase());
-    const avatar = isUser
-      ? `<div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style="background:linear-gradient(135deg,#d67f48,#8c491a);">${esc((SESSION_USER.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>`
-      : (AGENT_AVATARS[m.sender_id]
-        ? `<img src="${AGENT_AVATARS[m.sender_id]}" class="w-8 h-8 rounded-full object-cover shrink-0" style="border:1px solid var(--border);">`
-        : `<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--surface2);"><span class="material-symbols-outlined text-[16px]">smart_toy</span></div>`);
-    const fallbackBadge = meta.fallback
-      ? `<span title="Groq cloud was unreachable — this reply came from the local ${esc(meta.model || 'qwen')} model" class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold align-middle" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e;">⚠ local fallback · ${esc(meta.model || 'qwen')}</span>`
-      : '';
-    const taskBadge = meta.kind === 'task_result' ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#dcfce7; border:1px solid #16a34a; color:#166534;">TASK RESULT</span>' : '';
-    const body = DOMPurify.sanitize(marked.parse(m.content || ''), { ADD_ATTR: ['target'] });
-
-    div.className = 'flex gap-2.5 ' + (isUser ? 'flex-row-reverse' : '');
-    div.innerHTML = `
-      ${avatar}
-      <div class="max-w-[75%] min-w-0">
-        <div class="text-[11px] font-bold mb-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text2);">${esc(name)}${fallbackBadge}${taskBadge}</div>
-        <div class="px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed markdown-body" style="${isUser ? 'background:#3a2e23; color:#efe8de;' : 'background:var(--surface); border:1px solid var(--border);'}">${body}</div>
-        <div class="text-[10px] font-mono mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
-          <button class="ml-1 opacity-60 hover:opacity-100" title="Copy message" onclick="navigator.clipboard.writeText(this.closest('div').parentNode.querySelector('.markdown-body').innerText).then(()=>showToast('Message copied'))"><span class="material-symbols-outlined text-[12px] align-middle">content_copy</span></button>
-        </div>
-      </div>`;
-    box.appendChild(div);
-  }
-
-  function scrollBottom() { const b = document.getElementById('grpMessages'); b.scrollTop = b.scrollHeight; }
-
-  let typingTimer = null;
-  function showTyping(agentId) {
-    const m = members.find(x => x.member_id === agentId);
-    document.getElementById('grpTypingWho').textContent = m ? m.name : (agentId || 'Agent');
-    const el = document.getElementById('grpTyping');
-    el.classList.remove('hidden'); el.classList.add('flex');
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(hideTyping, 90000); // safety
-  }
-  function hideTyping() {
-    const el = document.getElementById('grpTyping');
-    el.classList.add('hidden'); el.classList.remove('flex');
-  }
-
-  async function sendGroupMessage() {
-    if (!activeGroup) return;
-    const input = document.getElementById('grpInput');
-    const content = input.value.trim();
-    if (!content) return;
-    input.value = '';
-    try {
-      const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/messages', {
-        method: 'POST', headers: AUTH, body: JSON.stringify({ content })
-      });
-      if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || 'Send failed'); }
-      // message itself arrives via socket broadcast
-    } catch (e) { showToast('Send failed: ' + e.message); }
-  }
-  document.getElementById('grpInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+ // ── Members ──
+ async function openAddAgent() {
+  await ensureAgents();
+  const current = members.filter(m => m.member_type === 'agent').map(m => m.member_id);
+  const candidates = allAgents.filter(a => !current.includes(a.agentId));
+  if (!candidates.length) { showToast('All available agents are already in this group'); return; }
+  const pick = prompt('Add which agent?\nAvailable: ' + candidates.map(a => a.agentId).join(', '));
+  if (!pick) return;
+  const agentId = pick.trim().toLowerCase().replace(/^@/, '');
+  const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members', {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ agentId })
   });
+  if (r.ok) { members = (await r.json()).members; renderMembers(); }
+  else showToast((await r.json().catch(() => ({}))).error || 'Could not add agent');
+ }
 
-  // ── Members ──
-  async function openAddAgent() {
-    await ensureAgents();
-    const current = members.filter(m => m.member_type === 'agent').map(m => m.member_id);
-    const candidates = allAgents.filter(a => !current.includes(a.agentId));
-    if (!candidates.length) { showToast('All available agents are already in this group'); return; }
-    const pick = prompt('Add which agent?\nAvailable: ' + candidates.map(a => a.agentId).join(', '));
-    if (!pick) return;
-    const agentId = pick.trim().toLowerCase().replace(/^@/, '');
-    const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members', {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ agentId })
-    });
-    if (r.ok) { members = (await r.json()).members; renderMembers(); }
-    else showToast((await r.json().catch(() => ({}))).error || 'Could not add agent');
-  }
-
-  async function removeAgent(agentId) {
-    if (!confirm('Remove ' + agentId + ' from this group?')) return;
-    const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members/' + agentId, {
-      method: 'DELETE', headers: AUTH
-    });
-    if (r.ok) { members = (await r.json()).members; renderMembers(); }
-    else showToast('Could not remove agent');
-  }
-
-  async function renameGroup() {
-    if (!activeGroup) return;
-    const name = prompt('Rename group:', activeGroup.name);
-    if (!name || !name.trim() || name.trim() === activeGroup.name) return;
-    const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, {
-      method: 'PATCH', headers: AUTH, body: JSON.stringify({ name: name.trim() })
-    });
-    if (r.ok) {
-      activeGroup.name = (await r.json()).name;
-      document.getElementById('grpName').textContent = activeGroup.name;
-      loadGroups();
-      showToast('Group renamed');
-    } else showToast('Rename failed');
-  }
-
-  async function deleteGroup() {
-    if (!activeGroup || !confirm('Delete this group and all its messages?')) return;
-    const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, { method: 'DELETE', headers: AUTH });
-    if (r.ok) {
-      if (socket) socket.emit('leave_group', activeGroup.group_id);
-      activeGroup = null;
-      document.getElementById('chatPane').classList.add('hidden');
-      document.getElementById('emptyState').classList.remove('hidden');
-      history.replaceState(null, '', location.pathname);
-      loadGroups();
-      showToast('Group deleted');
-    } else showToast('Delete failed');
-  }
-
-  // ── Create group ──
-  async function ensureAgents() {
-    if (allAgents.length) return;
-    const r = await fetch(API + '/api/group-chat/agents', { headers: AUTH });
-    if (r.ok) allAgents = (await r.json()).agents || [];
-  }
-
-  async function openCreateModal() {
-    document.getElementById('createModal').classList.remove('hidden');
-    await ensureAgents();
-    const picker = document.getElementById('agentPicker');
-    picker.innerHTML = allAgents.map(a => `
-      <label class="flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer" style="background:var(--surface2); border:1px solid var(--border);">
-        <input type="checkbox" class="agent-check rounded" value="${a.agentId}" onchange="updateAgentCount()">
-        ${AGENT_AVATARS[a.agentId]
-          ? `<img src="${AGENT_AVATARS[a.agentId]}" class="w-7 h-7 rounded-full object-cover">`
-          : '<span class="material-symbols-outlined text-[18px]">smart_toy</span>'}
-        <span class="flex-1">
-          <span class="block text-[13px] font-bold">${esc(a.name)}</span>
-          <span class="block text-[10px] truncate" style="color:var(--text3); max-width:230px;">${esc((a.capabilities || []).slice(0, 4).join(', ') || a.type)}</span>
-        </span>
-      </label>`).join('') || '<div class="text-xs" style="color:var(--text3);">No agents available</div>';
-    updateAgentCount();
-  }
-  function closeCreateModal() { document.getElementById('createModal').classList.add('hidden'); }
-  function updateAgentCount() {
-    const n = document.querySelectorAll('.agent-check:checked').length;
-    document.getElementById('agentCount').textContent = n + ' selected';
-  }
-
-  async function createGroup() {
-    const name = document.getElementById('newGrpName').value.trim();
-    const agents = [...document.querySelectorAll('.agent-check:checked')].map(c => c.value);
-    if (!name) { showToast('Give the group a name'); return; }
-    if (!agents.length) { showToast('Pick at least one agent'); return; }
-    const btn = document.getElementById('createGrpBtn');
-    btn.disabled = true; btn.textContent = 'Creating…';
-    try {
-      const r = await fetch(API + '/api/group-chat', { method: 'POST', headers: AUTH, body: JSON.stringify({ name, agents }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Create failed');
-      closeCreateModal();
-      document.getElementById('newGrpName').value = '';
-      await loadGroups();
-      openGroup(d.groupId);
-      showToast('Group created — say hello!');
-    } catch (e) { showToast(e.message); }
-    finally { btn.disabled = false; btn.textContent = 'Create group'; }
-  }
-
-  // ── Task modal ──
-  function openTaskModal() { if (activeGroup) document.getElementById('taskModal').classList.remove('hidden'); }
-  function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
-  async function submitTask() {
-    const agentId = document.getElementById('taskAgent').value;
-    const goal = document.getElementById('taskGoal').value.trim();
-    if (!goal) { showToast('Describe the task'); return; }
-    closeTaskModal();
-    document.getElementById('taskGoal').value = '';
-    const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/tasks', {
-      method: 'POST', headers: AUTH, body: JSON.stringify({ agentId, goal })
-    });
-    if (r.ok) showToast('Task assigned — the result will post in the chat');
-    else showToast((await r.json().catch(() => ({}))).error || 'Task failed');
-  }
-
-  // ── Drawer toggle ──
-  const navToggle = document.getElementById('navToggle');
-  if (navToggle) navToggle.onclick = () => {
-    document.getElementById('sideNav').classList.toggle('open');
-    document.getElementById('navBackdrop').classList.toggle('hidden');
-  };
-  document.getElementById('navBackdrop').onclick = () => {
-    document.getElementById('sideNav').classList.remove('open');
-    document.getElementById('navBackdrop').classList.add('hidden');
-  };
-
-  // ── Init ──
-  loadGroups().then(() => {
-    const wanted = new URLSearchParams(location.search).get('group');
-    if (wanted) openGroup(wanted);
+ async function removeAgent(agentId) {
+  if (!confirm('Remove ' + agentId + ' from this group?')) return;
+  const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members/' + agentId, {
+   method: 'DELETE', headers: AUTH
   });
+  if (r.ok) { members = (await r.json()).members; renderMembers(); }
+  else showToast('Could not remove agent');
+ }
+
+ async function renameGroup() {
+  if (!activeGroup) return;
+  const name = prompt('Rename group:', activeGroup.name);
+  if (!name || !name.trim() || name.trim() === activeGroup.name) return;
+  const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, {
+   method: 'PATCH', headers: AUTH, body: JSON.stringify({ name: name.trim() })
+  });
+  if (r.ok) {
+   activeGroup.name = (await r.json()).name;
+   document.getElementById('grpName').textContent = activeGroup.name;
+   loadGroups();
+   showToast('Group renamed');
+  } else showToast('Rename failed');
+ }
+
+ async function deleteGroup() {
+  if (!activeGroup || !confirm('Delete this group and all its messages?')) return;
+  const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, { method: 'DELETE', headers: AUTH });
+  if (r.ok) {
+   if (socket) socket.emit('leave_group', activeGroup.group_id);
+   activeGroup = null;
+   document.getElementById('chatPane').classList.add('hidden');
+   document.getElementById('emptyState').classList.remove('hidden');
+   history.replaceState(null, '', location.pathname);
+   loadGroups();
+   showToast('Group deleted');
+  } else showToast('Delete failed');
+ }
+
+ // ── Create group ──
+ async function ensureAgents() {
+  if (allAgents.length) return;
+  const r = await fetch(API + '/api/group-chat/agents', { headers: AUTH });
+  if (r.ok) allAgents = (await r.json()).agents || [];
+ }
+
+ async function openCreateModal() {
+  document.getElementById('createModal').classList.remove('hidden');
+  await ensureAgents();
+  const picker = document.getElementById('agentPicker');
+  picker.innerHTML = allAgents.map(a => `
+   <label class="flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer" style="background:var(--surface2); border:1px solid var(--border);">
+    <input type="checkbox" class="agent-check rounded" value="${a.agentId}" onchange="updateAgentCount()">
+    ${AGENT_AVATARS[a.agentId]
+     ? `<img src="${AGENT_AVATARS[a.agentId]}" class="w-7 h-7 rounded-full object-cover">`
+     : '<span class="material-symbols-outlined text-[18px]">smart_toy</span>'}
+    <span class="flex-1">
+     <span class="block text-[13px] font-bold">${esc(a.name)}</span>
+     <span class="block text-[10px] truncate" style="color:var(--text3); max-width:230px;">${esc((a.capabilities || []).slice(0, 4).join(', ') || a.type)}</span>
+    </span>
+   </label>`).join('') || '<div class="text-xs" style="color:var(--text3);">No agents available</div>';
+  updateAgentCount();
+ }
+ function closeCreateModal() { document.getElementById('createModal').classList.add('hidden'); }
+ function updateAgentCount() {
+  const n = document.querySelectorAll('.agent-check:checked').length;
+  document.getElementById('agentCount').textContent = n + ' selected';
+ }
+
+ async function createGroup() {
+  const name = document.getElementById('newGrpName').value.trim();
+  const agents = [...document.querySelectorAll('.agent-check:checked')].map(c => c.value);
+  if (!name) { showToast('Give the group a name'); return; }
+  if (!agents.length) { showToast('Pick at least one agent'); return; }
+  const btn = document.getElementById('createGrpBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+   const r = await fetch(API + '/api/group-chat', { method: 'POST', headers: AUTH, body: JSON.stringify({ name, agents }) });
+   const d = await r.json();
+   if (!r.ok) throw new Error(d.error || 'Create failed');
+   closeCreateModal();
+   document.getElementById('newGrpName').value = '';
+   await loadGroups();
+   openGroup(d.groupId);
+   showToast('Group created — say hello!');
+  } catch (e) { showToast(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Create group'; }
+ }
+
+ // ── Task modal ──
+ function openTaskModal() { if (activeGroup) document.getElementById('taskModal').classList.remove('hidden'); }
+ function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
+ async function submitTask() {
+  const agentId = document.getElementById('taskAgent').value;
+  const goal = document.getElementById('taskGoal').value.trim();
+  if (!goal) { showToast('Describe the task'); return; }
+  closeTaskModal();
+  document.getElementById('taskGoal').value = '';
+  const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/tasks', {
+   method: 'POST', headers: AUTH, body: JSON.stringify({ agentId, goal })
+  });
+  if (r.ok) showToast('Task assigned — the result will post in the chat');
+  else showToast((await r.json().catch(() => ({}))).error || 'Task failed');
+ }
+
+ // ── Drawer toggle ──
+ const navToggle = document.getElementById('navToggle');
+ if (navToggle) navToggle.onclick = () => {
+  document.getElementById('sideNav').classList.toggle('open');
+  document.getElementById('navBackdrop').classList.toggle('hidden');
+ };
+ document.getElementById('navBackdrop').onclick = () => {
+  document.getElementById('sideNav').classList.remove('open');
+  document.getElementById('navBackdrop').classList.add('hidden');
+ };
+
+ // ── Init ──
+ loadGroups().then(() => {
+  const wanted = new URLSearchParams(location.search).get('group');
+  if (wanted) openGroup(wanted);
+ });
 </script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>
 </body>
 </html>
+
