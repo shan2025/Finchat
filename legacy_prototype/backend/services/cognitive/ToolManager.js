@@ -19,7 +19,12 @@ const TOOL_IMPLEMENTATIONS = {
   reddit: require('../../tools/RedditTool'),
   quora: require('../../tools/QuoraTool'),
   watchlist: require('../../tools/WatchlistTool'),
-  apply_draft: require('../../tools/ApplyDraftTool')
+  apply_draft: require('../../tools/ApplyDraftTool'),
+  bash: require('../../tools/BashTool'),
+  file_read: require('../../tools/FileReadTool'),
+  file_write: require('../../tools/FileWriteTool'),
+  file_edit: require('../../tools/FileEditTool'),
+  glob: require('../../tools/GlobTool')
 };
 
 /**
@@ -44,12 +49,19 @@ function genId(prefix = 'tc') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
+const ADVANCED_SYSTEM_TOOLS = new Set(['bash', 'file_read', 'file_write', 'file_edit', 'glob']);
+
 /**
  * Check if an agent has permission to use a given tool.
  * For Sprint 1: if no explicit permission row exists, allow by default (permissive mode).
  */
 async function checkPermission(agentId, toolName) {
   if (!agentId) return true; // System-level calls are always allowed
+
+  // Hardcode restriction: Only plato can use advanced system tools for now
+  if (ADVANCED_SYSTEM_TOOLS.has(toolName) && agentId !== 'plato') {
+    return false;
+  }
 
   try {
     const res = await query(

@@ -319,6 +319,87 @@ const TOOLS = {
     },
     cacheTTLSeconds: 90, // 1.5 minutes — crypto moves fast but not microsecond-level
     rateLimitPerMinute: 12
+  },
+
+  bash: {
+    name: 'bash',
+    description: 'Execute a shell command inside the Node backend environment (sandboxed to the Docker container). Use this to run scripts, interact with the system, or run builds. Input: {"command":"..."}',
+    requires_approval: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'The shell command to execute' },
+        timeout: { type: 'number', description: 'Optional timeout in ms (default 30000)' }
+      },
+      required: ['command']
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 20
+  },
+
+  file_read: {
+    name: 'file_read',
+    description: 'Read file contents from the local filesystem with line pagination. Use this to inspect code or data files. Input: {"file_path":"..."}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Absolute or relative file path' },
+        offset: { type: 'number', description: 'Line number to start reading from (0-indexed, default 0)' },
+        limit: { type: 'number', description: 'Number of lines to read (default 500, max 1000)' }
+      },
+      required: ['file_path']
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 60
+  },
+
+  file_write: {
+    name: 'file_write',
+    description: 'Write or overwrite a file entirely on the filesystem. Input: {"file_path":"...", "content":"..."}',
+    requires_approval: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Absolute or relative file path' },
+        content: { type: 'string', description: 'Full content to write to the file' }
+      },
+      required: ['file_path', 'content']
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 20
+  },
+
+  file_edit: {
+    name: 'file_edit',
+    description: 'Make targeted search-and-replace edits to existing files. Input: {"file_path":"...", "old_string":"...", "new_string":"..."}',
+    requires_approval: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Absolute or relative file path' },
+        old_string: { type: 'string', description: 'Exact string block to replace (must match perfectly)' },
+        new_string: { type: 'string', description: 'New string block to replace it with' },
+        replace_all: { type: 'boolean', description: 'If true, replaces all occurrences' }
+      },
+      required: ['file_path', 'old_string', 'new_string']
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 20
+  },
+
+  glob: {
+    name: 'glob',
+    description: 'Find files matching a glob pattern in a directory (default cwd). Use to explore the workspace. Input: {"pattern":"**/*.js"}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Glob pattern (e.g. "**/*.js")' },
+        dir: { type: 'string', description: 'Directory to search in (default is current working directory)' }
+      },
+      required: ['pattern']
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 60
   }
 };
 
