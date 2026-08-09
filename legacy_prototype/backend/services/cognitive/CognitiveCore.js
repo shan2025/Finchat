@@ -55,6 +55,35 @@ function extractSources(toolResults = []) {
 }
 
 /**
+ * Sprint Z · Study Mode — fold an action's `blocks` array into its response text.
+ *
+ * The model emits blocks as real JSON objects SIBLING to `response`, so it never
+ * has to escape JSON inside a JSON string (the 8B fallback cannot do that
+ * reliably — verified with a control run). We serialise them into the
+ * `studyblock` fences the frontend already renders, so the stored message, the
+ * chat history replay, and study_blocks.js all keep the same contract.
+ *
+ * Anything unserialisable is skipped rather than thrown: the prose answer must
+ * survive even when a block does not.
+ */
+function withStudyBlocks(action) {
+  const response = typeof action?.response === 'string' ? action.response : '';
+  const blocks = Array.isArray(action?.blocks) ? action.blocks : [];
+  if (blocks.length === 0) return response;
+
+  const fences = [];
+  for (const block of blocks) {
+    try {
+      fences.push('```studyblock\n' + JSON.stringify(block) + '\n```');
+    } catch (err) {
+      // circular or otherwise unserialisable — drop this block only
+    }
+  }
+  if (fences.length === 0) return response;
+  return [response.trim(), fences.join('\n\n')].filter(Boolean).join('\n\n');
+}
+
+/**
  * Log a cognitive phase (thinking, planning, using_tool, reflecting) to execution_logs.
  */
 async function logPhase(executionId, phase, stepNumber, content, startedAt) {
@@ -206,7 +235,7 @@ async function run({
 
       // 3f. Handle action
       if (budget.breached) {
-        finalResponse = result.action.response || 'Budget exceeded. Here is my best response given the constraints.';
+        finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
         completionReason = 'budget_exceeded';
         break;
       }
@@ -239,7 +268,7 @@ async function run({
       }
 
       if (result.action.action === 'respond') {
-        finalResponse = result.action.response;
+        finalResponse = withStudyBlocks(result.action);
         completionReason = result.fallback ? 'error' : 'natural';
         break;
       }
@@ -560,4 +589,4 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
   return result;
 }
 
-module.exports = { run, logPhase, resumeExecution };
+module.exports = { run, logPhase, resumeExecution, withStudyBlocks };

@@ -113,19 +113,75 @@
     return !!v && typeof v === 'object' && !Array.isArray(v);
   }
 
+  function isKnownBlock(o) {
+    return isPlainObject(o) && BLOCK_TYPES.indexOf(str(o.type).toLowerCase().trim()) !== -1;
+  }
+
+  // Models drop the fence. Observed live: a model produced a flawless card
+  // object but emitted it bare, which would have shown the user raw JSON.
+  // So any top-level {...} whose "type" is one of the nine is promoted to a
+  // block wherever it appears. The `type` check is what keeps this from
+  // hijacking unrelated JSON the user was actually asking about.
+  function rescueProse(text, out) {
+    var src = str(text);
+    var depth = 0, start = -1, inStr = false, escNext = false, cursor = 0;
+    for (var i = 0; i < src.length; i++) {
+      var c = src[i];
+      if (inStr) {
+        if (escNext) escNext = false;
+        else if (c === '\\') escNext = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') { inStr = true; continue; }
+      if (c === '{') { if (depth === 0) start = i; depth++; continue; }
+      if (c !== '}') continue;
+      depth--;
+      if (depth > 0) continue;
+      if (depth < 0) { depth = 0; continue; }
+      if (start < 0) continue;
+      var obj = null;
+      try { obj = JSON.parse(src.slice(start, i + 1)); } catch (e) { obj = null; }
+      if (isKnownBlock(obj)) {
+        if (start > cursor) out.push({ kind: 'prose', text: src.slice(cursor, start) });
+        out.push({ kind: 'block', block: obj });
+        cursor = i + 1;
+      }
+      start = -1;
+    }
+    if (cursor < src.length) out.push({ kind: 'prose', text: src.slice(cursor) });
+  }
+
+  // A generic fence (```json, or an untagged one) holding nothing but block
+  // objects is treated as if it had been tagged `studyblock`. Without this the
+  // rescue above would promote the objects but leave orphaned backticks behind.
+  var ANY_FENCE_RE = /```[ \t]*([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g;
+
+  function normalizeFences(src) {
+    ANY_FENCE_RE.lastIndex = 0;
+    return src.replace(ANY_FENCE_RE, function (whole, lang, payload) {
+      if (String(lang).toLowerCase() === 'studyblock') return whole;
+      var blocks = parsePayload(payload);
+      if (blocks && blocks.length && blocks.every(isKnownBlock)) {
+        return '```studyblock\n' + payload.replace(/\s+$/, '') + '\n```';
+      }
+      return whole;
+    });
+  }
+
   /**
    * Split a message into ordered segments.
    * @returns {Array<{kind:'prose',text:string}|{kind:'block',block:object}|{kind:'fallback',text:string}>}
    */
   function parse(text) {
-    var src = str(text);
+    var src = normalizeFences(str(text));
     var segments = [];
     var last = 0;
     var m;
     FENCE_RE.lastIndex = 0;
 
     while ((m = FENCE_RE.exec(src)) !== null) {
-      if (m.index > last) segments.push({ kind: 'prose', text: src.slice(last, m.index) });
+      if (m.index > last) rescueProse(src.slice(last, m.index), segments);
       var blocks = parsePayload(m[1]);
       if (blocks && blocks.length) {
         for (var i = 0; i < blocks.length; i++) segments.push({ kind: 'block', block: blocks[i] });
@@ -134,13 +190,20 @@
       }
       last = m.index + m[0].length;
     }
-    if (last < src.length) segments.push({ kind: 'prose', text: src.slice(last) });
+    if (last < src.length) rescueProse(src.slice(last), segments);
     return segments;
   }
 
+  // True when the message should be rendered as study cards. A `studyblock`
+  // fence is the fast path; otherwise fall back to a full parse, which also
+  // catches the unfenced/mis-fenced output the rescue above handles. The cheap
+  // brace test keeps ordinary prose from paying for a parse.
   function has(text) {
+    var src = str(text);
     FENCE_RE.lastIndex = 0;
-    return FENCE_RE.test(str(text));
+    if (FENCE_RE.test(src)) return true;
+    if (src.indexOf('{') === -1 || src.indexOf('"type"') === -1) return false;
+    return parse(src).some(function (s) { return s.kind === 'block'; });
   }
 
   // ── block renderers ──────────────────────────────────────────────

@@ -92,6 +92,19 @@ function parseActionResponse(rawContent) {
     if (!parsed.response.trim()) {
       return { parsed, valid: false, error: '"response" cannot be empty' };
     }
+    // Sprint Z · Study Mode: an optional sibling array of typed study blocks.
+    // Kept as real objects (never a string) so the model never has to escape
+    // JSON inside JSON — CognitiveCore serialises them on the way out. A
+    // malformed value is dropped rather than failing the whole turn: losing
+    // the cards is recoverable, losing the answer is not.
+    if ('blocks' in parsed) {
+      const blocks = Array.isArray(parsed.blocks) ? parsed.blocks : null;
+      const clean = (blocks || []).filter(
+        b => b && typeof b === 'object' && !Array.isArray(b) && typeof b.type === 'string'
+      );
+      if (clean.length) parsed.blocks = clean;
+      else delete parsed.blocks;
+    }
   }
   if (parsed.action === 'tool') {
     if (typeof parsed.tool !== 'string' || !parsed.tool) {

@@ -25,13 +25,19 @@ function buildToolDescriptions(allowWeb = true) {
 /**
  * The unified action schema per Phase 3 spec, now with tool descriptions from ToolRegistry.
  */
-function getActionSchema(allowWeb = true) {
+function getActionSchema(allowWeb = true, studyMode = false) {
   const toolBlock = buildToolDescriptions(allowWeb);
+
+  // Study Mode adds one optional sibling field. It has to be advertised here
+  // as well as in the directive — the model follows the shape it is shown.
+  const studyField = studyMode
+    ? `, "blocks": [ <study blocks — see STUDY MODE below> ]`
+    : '';
 
   return `You MUST respond with valid JSON matching ONE of these three shapes:
 
 1. To respond to the user:
-   {"thought": "<your internal reasoning>", "action": "respond", "response": "<your response to the user>"}
+   {"thought": "<your internal reasoning>", "action": "respond", "response": "<your response to the user>"${studyField}}
 
 2. To use a tool:
    {"thought": "<your internal reasoning>", "action": "tool", "tool": "<tool_name>", "input": "<tool input>"}
@@ -114,7 +120,7 @@ function buildContext({
     ? persona.systemPrompt
     : 'You are Plato, the Chief AI Officer of FinChat. Answer the user\'s questions thoughtfully and precisely.';
 
-  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb);
+  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb, studyMode);
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
   // Study Mode still applies under a breached budget — the answer is shorter,
   // but it should still come back as cards rather than switching format midway.

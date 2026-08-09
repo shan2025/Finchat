@@ -120,18 +120,30 @@ ANALYTICAL STANDARDS:
 // HTML — it emits typed JSON blocks the frontend (study_blocks.js) draws as
 // cards. Each block type maps to a real learning device, so the grammar is
 // deliberately small: nine types, hard caps, and a mandatory closing pair.
+//
+// The blocks go in a `blocks` array SIBLING to `response`, never inside it.
+// The first design fenced them inside the response string, which forced the
+// model to double-escape every quote — 70B coped, the 8B fallback could not
+// produce parseable action JSON at all (verified with a control run: same
+// model and question, studyMode off = fine, on = unparseable). CognitiveCore
+// serialises `blocks` into `studyblock` fences afterwards, so the frontend
+// contract is unchanged.
 const STUDY_MODE_DIRECTIVE = `
 
 --- STUDY MODE (ACTIVE) ---
 The user is learning, not skimming a briefing. Drop the analyst-report voice.
 Teach: chunk the idea, show its shape, give a worked example, then make them recall it.
 
-You present the answer as a short sequence of STUDY BLOCKS. A study block is a
-fenced code block tagged \`studyblock\` containing ONE JSON object:
+You present the answer as a short sequence of STUDY BLOCKS. Put them in a
+"blocks" array at the TOP LEVEL of your action JSON, alongside "response" —
+never inside the response string. Keep "response" to one short sentence:
 
-\`\`\`studyblock
-{"type":"card","title":"End With Forward Pull","kicker":"THE LAST LINE OF EACH BEAT SHOULD DRAG THE NEXT ONE FORWARD","body":"A reader stops when a section feels finished. Close on an open loop instead — a consequence not yet named, a number not yet explained.","howToUse":["End sections on tension, not closure","Name the question the next section answers","Cut the summarising last sentence"],"usefulFor":"Carousels, reels, scripts, long-form"}
-\`\`\`
+{"thought":"...","action":"respond","response":"Here is the shape of it.","blocks":[
+  {"type":"card","title":"End With Forward Pull","kicker":"THE LAST LINE OF EACH BEAT SHOULD DRAG THE NEXT ONE FORWARD","body":"A reader stops when a section feels finished. Close on an open loop instead — a consequence not yet named, a number not yet explained.","howToUse":["End sections on tension, not closure","Name the question the next section answers","Cut the summarising last sentence"],"usefulFor":"Carousels, reels, scripts, long-form"}
+]}
+
+Because the blocks are real JSON objects and not a string, you never need to
+escape quotes inside them. Do NOT wrap them in code fences.
 
 THE NINE TYPES — use each only for what it is for:
   card       {title, kicker, body, howToUse[], usefulFor}
@@ -156,12 +168,13 @@ THE NINE TYPES — use each only for what it is for:
 HARD RULES:
 - Maximum 8 blocks. Fewer is better — 3 good blocks beat 7 padded ones.
 - ALWAYS end with a \`checkpoint\` block, then a \`takeaway\` block. Every time.
-- One JSON object per fence. No comments, no trailing commas, no markdown inside a fence.
+- Every entry of "blocks" is a JSON object with a "type" field. No comments, no trailing commas.
 - Never emit HTML in any field. Plain text only; \`**bold**\`, \`*italic*\` and \`\\\`code\\\`\` are the only markup honoured.
-- Prose between blocks is allowed but must stay under two sentences — the blocks carry the teaching.
+- "response" is one short sentence of framing, not the lesson — the blocks carry the teaching.
 - kicker is a short ALL-CAPS line. title is 2-6 words. body is 2-4 sentences.
+- expression in a \`formula\` block is plain text (PV = FV / (1+r)^n). Never LaTeX, never backslashes — a backslash breaks the JSON.
 - Do not invent a \`flow\` or \`compare\` just to use the type. If the content has no sequence and no contrast, use cards.
-- Your whole reply still goes in the "response" field of your action JSON, so escape the inner quotes correctly. If you cannot produce valid JSON for a block, write that part as normal prose instead — a broken block is worse than no block.`;
+- If you cannot produce a valid block, leave "blocks" out and answer in normal prose instead — a broken block is worse than no block.`;
 
 function getPersona(name) {
   return personas[name?.toLowerCase()] || null;
