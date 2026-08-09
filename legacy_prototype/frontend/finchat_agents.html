@@ -650,7 +650,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
     });
     refreshBadge();
-    setInterval(refreshBadge, 12000);
+    setInterval(() => { if (!document.hidden) refreshBadge(); }, 30000); // egress guard + 30s
   })();
 
   // Load the initially-selected agent's live config + audit trail from the backend

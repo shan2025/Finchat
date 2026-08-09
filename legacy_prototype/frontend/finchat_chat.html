@@ -2768,7 +2768,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     }
 
     checkSolanaStatus();
-    setInterval(checkSolanaStatus, 30000);
+    setInterval(() => { if (!document.hidden) checkSolanaStatus(); }, 30000); // egress guard
 
     // ─────────────────────────────────
     // SETTINGS PANEL + PHANTOM WALLET

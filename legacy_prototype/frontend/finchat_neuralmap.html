@@ -1741,7 +1741,7 @@ async function pollActivity() {
   }
  } catch (e) { /* map still works without the pulse feed */ }
 }
-setInterval(pollActivity, 6000);
+setInterval(pollActivity, 15000); // 15s; pollActivity already no-ops when the tab is hidden
 
 const KIND_META = {
  gap: { icon: 'extension', label: 'Knowledge gap', color: 'var(--cat-tool)' },

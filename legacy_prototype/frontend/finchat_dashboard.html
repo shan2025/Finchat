@@ -778,18 +778,12 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
     if (icon) icon.classList.add('animate-spin');
     showToast('⚡ Refreshing live agent pulse & integrity checks...');
 
-    // Reset polling timers to prevent race conditions
-    if (statusInterval) clearInterval(statusInterval);
-    if (integrityInterval) clearInterval(integrityInterval);
-
+    // Manual refresh only fetches once here; the background pollers set up at
+    // page load keep running (no re-registration — that previously leaked timers).
     await Promise.all([fetchStatus(), loadIntegrity(), loadMemoryGraph()]);
 
     if (icon) icon.classList.remove('animate-spin');
     showToast('✅ Pulse synced successfully!');
-
-    statusInterval = setInterval(fetchStatus, 5000);
-    integrityInterval = setInterval(loadIntegrity, 20000);
-    memGraphInterval = setInterval(loadMemoryGraph, 20000);
   }
 
   // ── Knowledge Memory tile (Sprint 5C: Graph-RAG + skill recipes) ──
@@ -818,9 +812,11 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
   fetchStatus();
   loadIntegrity();
   loadMemoryGraph();
-  statusInterval = setInterval(fetchStatus, 5000);
-  integrityInterval = setInterval(loadIntegrity, 20000);
-  memGraphInterval = setInterval(loadMemoryGraph, 20000);
+  // Egress guard: poll only while the tab is visible; a backgrounded dashboard
+  // tab makes zero requests. Intervals raised from 5s/20s to 30s/60s.
+  statusInterval = setInterval(() => { if (!document.hidden) fetchStatus(); }, 30000);
+  integrityInterval = setInterval(() => { if (!document.hidden) loadIntegrity(); }, 60000);
+  memGraphInterval = setInterval(() => { if (!document.hidden) loadMemoryGraph(); }, 60000);
 </script>
 <script>
   // Drawer nav on narrow screens.

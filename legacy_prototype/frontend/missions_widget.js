@@ -219,7 +219,8 @@
       window.selectAgent = wrapped;
     }
     refresh();
-    setInterval(refresh, 60000); // keep approvals + next-run times fresh
+    // Egress guard: only refresh while the tab is visible.
+    setInterval(() => { if (!document.hidden) refresh(); }, 60000); // keep approvals + next-run times fresh
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

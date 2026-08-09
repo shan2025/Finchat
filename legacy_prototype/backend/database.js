@@ -39,11 +39,10 @@ function getPool() {
     if (!connectionString) {
       throw new Error('DATABASE_URL is not configured in .env');
     }
+    const isLocalDb = /localhost|127\.0\.0\.1/.test(connectionString);
     pool = new Pool({
       connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      },
+      ssl: isLocalDb ? false : { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000 // bumped from 10s — Supabase can be slow

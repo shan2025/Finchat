@@ -215,8 +215,11 @@ async function handleUserMessage({ groupId, userId, content }) {
         for (const other of others.slice(0, 3)) {
           await maybeFollowUpDirect(groupId, other, content);
         }
-      } else if (MAX_FOLLOWUPS > 0) {
-        // Otherwise, one member may voluntarily chime in
+      } else if (!hasMentions && MAX_FOLLOWUPS > 0) {
+        // Un-addressed message (no @mention) — one member may voluntarily
+        // chime in. When the user explicitly @mentions a single agent we
+        // respect that and don't invite others (that's why "Memory Agent"
+        // used to butt in on a message addressed only to Aurelius).
         await maybeFollowUp(groupId, primary, userId);
       }
 

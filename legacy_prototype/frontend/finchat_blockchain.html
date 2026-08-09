@@ -264,7 +264,7 @@
  };
 
  refreshAll(false);
- setInterval(() => refreshAll(false), 30000);
+ setInterval(() => { if (!document.hidden) refreshAll(false); }, 30000); // egress guard
 </script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>

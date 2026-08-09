@@ -133,6 +133,32 @@ const TOOLS = {
     rateLimitPerMinute: 15
   },
 
+  forex: {
+    name: 'forex',
+    description: 'Look up the current foreign-exchange rate between two currencies (e.g. USD→INR, EUR→USD, GBP→JPY). Use this WHENEVER the user asks about a currency, exchange rate, or "dollar price in rupees" style question — do NOT just tell them to visit a website. Input: {"from":"USD","to":"INR"} or a phrase like "USD to INR".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Base currency — ISO code or name, e.g. "USD", "dollar"' },
+        to: { type: 'string', description: 'Quote currency — ISO code or name, e.g. "INR", "rupee"' }
+      },
+      required: ['from', 'to']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        pair: { type: 'string' },
+        rate: { type: 'number' },
+        change: { type: 'number' },
+        changePercent: { type: 'number' },
+        description: { type: 'string' },
+        source: { type: 'string' }
+      }
+    },
+    cacheTTLSeconds: 60, // FX moves continuously — keep it fresh
+    rateLimitPerMinute: 15
+  },
+
   fetch: {
     name: 'fetch',
     web: true,
@@ -219,6 +245,51 @@ const TOOLS = {
       }
     },
     cacheTTLSeconds: 0, // stateful — never cache
+    rateLimitPerMinute: 20
+  },
+
+  notifications: {
+    name: 'notifications',
+    description: 'Read the signed-in user\'s own notification feed (alerts, mission results, system messages). Use this whenever the user asks about their notifications — e.g. "where are my notifications", "do I have anything new", "any unread alerts". Input: {"action":"list"} for recent items or {"action":"unread"} for just the unread count. Read-only — it cannot mark items read or delete them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | unread (default list)' },
+        limit: { type: 'number', description: 'Max items to return for list (default 20, max 50)' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        unreadCount: { type: 'number' },
+        notifications: { type: 'array', description: 'Recent notifications (type, title, content, read, link, createdAt)' }
+      }
+    },
+    cacheTTLSeconds: 0, // per-user, changes anytime — never cache
+    rateLimitPerMinute: 20
+  },
+
+  neural_map: {
+    name: 'neural_map',
+    description: 'Read the signed-in user\'s own neural maps — the concept maps and network diagrams they build on the Neural Map page. Use this to understand how the user thinks or organises a topic, or when they say things like "read my map", "what\'s on my <name> map", or "use my maps to understand me". Input: {"action":"list"} to see all their maps, or {"action":"read","map":"<map name or id>"} to read one map\'s nodes, connections and notes. Read-only — it cannot create or change maps.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | read (default list)' },
+        map: { type: 'string', description: 'For read: the map name or id (omit or "system" for the built-in System Map)' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        maps: { type: 'array', description: 'For list: the user\'s maps (mapId, name, kind, nodeCount)' },
+        nodes: { type: 'array', description: 'For read: the map\'s nodes (label, type, note)' },
+        edges: { type: 'array', description: 'For read: connections between nodes (from, to, note)' }
+      }
+    },
+    cacheTTLSeconds: 0, // per-user, editable anytime — never cache
     rateLimitPerMinute: 20
   },
 

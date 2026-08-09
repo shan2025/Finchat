@@ -49,12 +49,52 @@
     };
     let notifCache = {}; // notification_id → item, so the click handler can route
 
+    // Types whose whole payload IS the report text — the notification content
+    // already carries the FULL body (same thing sent to email/Telegram). For
+    // these, when there's no better destination (see the !n.link guard in the
+    // click handler), we show the report in a modal instead of dumping the user
+    // on a page where only a truncated teaser is visible. Briefings are excluded
+    // because they carry an explicit link to the chat session that holds them.
+    const REPORT_TYPES = { mission: 1 };
+
     function targetFor(n) {
       if (n.link) return n.link;
       // Older approval notifications embed [execution:<id>] in the content.
       const exec = /\[execution:([^\]]+)\]/.exec(n.content || '');
       if (exec) return 'finchat_dashboard.html?execution=' + encodeURIComponent(exec[1]);
       return TYPE_LINKS[n.type] || null;
+    }
+
+    // Full-report modal. Renders markdown when marked+DOMPurify are present
+    // (as on the Agents page), else falls back to escaped text with <br>.
+    function escHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function showReport(n) {
+      let ov = $('notifReportModal');
+      if (ov) ov.remove();
+      const body = (window.marked && window.DOMPurify)
+        ? DOMPurify.sanitize(marked.parse(n.content || ''))
+        : escHtml(n.content || '').replace(/\n/g, '<br>');
+      ov = document.createElement('div');
+      ov.id = 'notifReportModal';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:24px;';
+      ov.innerHTML =
+        '<div style="background:#fffaf0;max-width:760px;width:100%;max-height:85vh;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.3);display:flex;flex-direction:column;overflow:hidden;">' +
+          '<div style="display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid #e6dcc8;">' +
+            '<div style="flex:1;min-width:0;font-size:15px;font-weight:800;color:#3a2e23;">' + escHtml(n.title || 'Report') + '</div>' +
+            '<button id="notifReportClose" style="border:none;background:transparent;font-size:22px;line-height:1;color:#8c7a6b;cursor:pointer;">&times;</button>' +
+          '</div>' +
+          '<div class="markdown-body" style="padding:20px 24px;overflow-y:auto;font-size:14px;line-height:1.55;color:#3a2e23;">' + body + '</div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      const close = () => ov.remove();
+      ov.addEventListener('click', e => { if (e.target === ov) close(); });
+      $('notifReportClose').onclick = close;
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+      });
     }
 
     async function loadList() {
@@ -83,11 +123,22 @@
     window.__notifClick = async function (id) {
       const n = notifCache[id];
       try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+      // Report/briefing notifications carry the full body — show it in place
+      // instead of navigating to a page where only a teaser is visible.
+      if (n && REPORT_TYPES[n.type] && !n.link && (n.content || '').trim()) {
+        const dd = $('notifDropdown'); if (dd) { dd.classList.add('hidden'); open = false; }
+        showReport(n);
+        await loadList(); refreshBadge();
+        return;
+      }
       const dest = n ? targetFor(n) : null;
       if (dest) {
-        // Same page? just refresh the list instead of a pointless reload.
-        const here = location.pathname.split('/').pop();
-        if (dest.split('?')[0] !== here) { location.href = dest; return; }
+        // Same page AND same query (e.g. same ?session=)? just refresh the
+        // list instead of a pointless reload. If only the page matches but
+        // the query differs (e.g. a different ?session=<id>), we still need
+        // to navigate so the page picks up the new deep-link param.
+        const here = location.pathname.split('/').pop() + location.search;
+        if (dest !== here) { location.href = dest; return; }
       }
       await loadList(); refreshBadge();
     };
@@ -110,7 +161,9 @@
       if (s && !window.__notifSockBound) { s.on('notification:new', () => { refreshBadge(); if (open) loadList(); }); window.__notifSockBound = true; }
     }
     refreshBadge();
-    setInterval(() => { refreshBadge(); bindSocket(); }, 12000);
+    // Egress guard: skip the network poll while the tab is hidden; socket push
+    // still delivers new notifications instantly when the tab is open.
+    setInterval(() => { if (!document.hidden) refreshBadge(); bindSocket(); }, 30000);
     setTimeout(bindSocket, 2000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
