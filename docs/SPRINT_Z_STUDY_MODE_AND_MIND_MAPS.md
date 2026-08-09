@@ -1,8 +1,28 @@
 # Sprint Z — Study Mode & Mind Map Studio
 
-**Status:** proposed (2026-08-07)
+**Status:** Track B shipped (2026-08-09) · Track A not started
+**Next migration number:** `023` — Track B took `022` (`ai_session_meta.study_mode`), so the mind-map migration moves from 022 to 023.
+
+### Shipped in Track B (2026-08-09)
+
+| Piece | File |
+|---|---|
+| Block parser + renderer, 9 types, XSS-safe, degrades on bad JSON | `frontend/study_blocks.js` |
+| Card system in the warm palette + dark mirror + print stylesheet | `frontend/study_blocks.css` (self-installed by the JS) |
+| Static design harness for all nine types | `frontend/study_blocks_demo.html` |
+| `STUDY_MODE_DIRECTIVE` (block grammar + worked example + hard rules) | `backend/services/personas.js` |
+| `studyMode` threaded route → service → orchestrator → agent → core → context | `routes/aiChat.js`, `services/aiChat.js`, `PlatoOrchestrator.js`, `BaseAgent.js`, `CognitiveCore.js`, `ContextBuilder.js` |
+| Per-session persistence + restore on reopen | migration `022`, `GET /history` returns `studyMode` |
+| Composer STUDY toggle, card rendering in both bubble renderers, Save-to-Knowledge + Export actions, prose-not-JSON copy | `frontend/finchat_chat.html` |
+| Reports inherit the renderer | `frontend/finchat_reports.html` |
+| 38 offline assertions (parser, degradation, injection, directive plumbing) | `backend/scripts/test_study_blocks.js` |
+
+Deviation from the plan below: the plan claimed the reports page rendered markdown — it did not, it escaped `summary` as plaintext. B3 therefore also added `marked`/`DOMPurify` there.
+
+---
+
+**Original status:** proposed (2026-08-07)
 **Supersedes as active roadmap:** `SPRINT_X_COGNITIVE_MEMORY_ENGINE.md` (Stages 1–4 done), `SPRINT_Y_KNOWLEDGE_AND_REPORTS.md` (done)
-**Next migration number:** `022`
 
 ---
 
@@ -125,7 +145,7 @@ Point `finchat_reports.html` at the same renderer so generated reports inherit t
 
 **Goal:** a real mind map page — AI-generated from a topic, a chat, a document or a slice of the memory graph; radial and collapsible; every node clickable into a scoped conversation; editable and persistent.
 
-### A1 — Data model (migration `022_mind-maps`)
+### A1 — Data model (migration `023_mind-maps`)
 
 Deliberately **separate tables from `neural_maps`**. The neural map answers *"what does the system know and do"*; a mind map answers *"how should I understand this topic"*. Different shape (tree, not mesh), different lifecycle. Sharing tables would force one to lie about the other — the same principle behind derived nodes being hideable but not deletable on the neural map.
 
@@ -199,7 +219,7 @@ Not design-tool-managed, so it is safe from regeneration — same as the neural 
 | **0** | Commit the working tree; confirm DB (Supabase vs local PG) and re-run a smoke suite | XS |
 | **B0–B2** | Study Mode: block contract, renderer, persona directive, composer toggle | M |
 | **B3** | Reports reuse the renderer | XS |
-| **A1–A2** | Migration 022 + MindMapEngine (topic + chat sources) | M |
+| **A1–A2** | Migration 023 + MindMapEngine (topic + chat sources) | M |
 | **A3** | `/api/mind-maps` routes | S |
 | **A4** | Mind Map Studio page | L |
 | **A5** | Document + graph sources, MindMapTool, gap nodes, `to-mission` | M |

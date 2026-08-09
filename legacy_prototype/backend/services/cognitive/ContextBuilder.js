@@ -1,5 +1,5 @@
 // services/cognitive/ContextBuilder.js — Builds LLM context for the Cognitive Core reasoning loop
-const { getPersona } = require('../personas');
+const { getPersona, STUDY_MODE_DIRECTIVE } = require('../personas');
 const { listTools } = require('./ToolRegistry');
 
 /**
@@ -90,6 +90,7 @@ function buildTraitDirective(traits) {
  * @param {Array} [options.memories] - Retrieved memories (Phase 6 wiring)
  * @param {boolean} [options.budgetExceeded] - If true, use restricted respond-only schema
  * @param {object} [options.traits] - Agent runtime settings {risk, formal, brief, serious}
+ * @param {boolean} [options.studyMode] - Composer STUDY toggle: answer as study blocks
  * @returns {Array} messages - Array of {role, content} for the LLM
  */
 function buildContext({
@@ -102,7 +103,8 @@ function buildContext({
   recipeHints = [],
   budgetExceeded = false,
   traits = null,
-  allowWeb = true
+  allowWeb = true,
+  studyMode = false
 }) {
   const messages = [];
 
@@ -114,10 +116,13 @@ function buildContext({
 
   const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb);
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
+  // Study Mode still applies under a breached budget — the answer is shorter,
+  // but it should still come back as cards rather than switching format midway.
+  const studyDirective = studyMode ? STUDY_MODE_DIRECTIVE : '';
 
   messages.push({
     role: 'system',
-    content: `${personaPrompt}${traitDirective}\n\n--- RESPONSE FORMAT ---\n${actionSchema}`
+    content: `${personaPrompt}${traitDirective}${studyDirective}\n\n--- RESPONSE FORMAT ---\n${actionSchema}`
   });
 
   // 2. Memory context (Phase 6 — now live via MemoryService)

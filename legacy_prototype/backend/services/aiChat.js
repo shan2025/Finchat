@@ -68,6 +68,8 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       conversationHistory: history,
       targetAgentId,
       allowWeb: options.webAccess !== false,
+      studyMode: options.studyMode === true, // composer STUDY toggle → card-format answers
+
       ...(dynamicBudget ? { budget: dynamicBudget } : {})
     });
 

@@ -49,7 +49,7 @@ router.get('/personas', requireAuth, (req, res) => {
 // ── POST /api/ai-chat/send ─────────────────────────────────────
 router.post('/send', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const { persona: personaId, sessionId, web, attachments } = req.body;
+  const { persona: personaId, sessionId, web, study, attachments } = req.body;
   let { message } = req.body;
 
   const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
@@ -90,7 +90,8 @@ router.post('/send', requireAuth, async (req, res) => {
     const result = await chatWithPersona(personaId, goalForAgent, history, {
       userId,
       sessionId: activeSession,
-      webAccess: web !== false // composer WEB toggle; default on for API callers that don't send it
+      webAccess: web !== false, // composer WEB toggle; default on for API callers that don't send it
+      studyMode: study === true  // composer STUDY toggle; off unless explicitly asked for
     });
     lastCleanResponse = result.cleanResponse;
 
@@ -123,6 +124,14 @@ router.post('/send', requireAuth, async (req, res) => {
       INSERT INTO ai_conversations (conversation_id, session_id, user_id, persona, role, content, message_id)
       VALUES ($1, $2, $3, $4, 'assistant', $5, $6)
     `, [uuidv4(), activeSession, userId, personaId, result.cleanResponse, botMsgId]);
+
+    // Study Mode is a property of the conversation, not the browser — remember it
+    // so reopening this session anywhere comes back in card format.
+    await query(`
+      INSERT INTO ai_session_meta (session_id, user_id, study_mode, deleted, updated_at)
+      VALUES ($1, $2, $3, false, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET study_mode = $3, updated_at = NOW()
+    `, [activeSession, userId, study === true]);
 
     let newBalance = user.token_balance - 5;
     await query('UPDATE users SET token_balance = $1 WHERE user_id = $2', [newBalance, userId]);
@@ -312,9 +321,15 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
 
     const persona = messages.length > 0 ? getPersona(messages[0].persona) : null;
 
+    const resMeta = await query(
+      'SELECT study_mode FROM ai_session_meta WHERE session_id = $1 AND user_id = $2',
+      [req.params.sessionId, req.user.id]);
+
     res.json({
       sessionId: req.params.sessionId,
       persona: persona ? { id: messages[0].persona, name: persona.name, avatar: persona.avatar } : null,
+      // Sprint Z: restores the composer STUDY toggle when a study chat is reopened
+      studyMode: resMeta.rows[0] ? resMeta.rows[0].study_mode === true : false,
       messages
     });
   } catch (err) {

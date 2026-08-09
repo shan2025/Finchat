@@ -114,6 +114,55 @@ ANALYTICAL STANDARDS:
   }
 };
 
+// ── Sprint Z · Track B — Study Mode ──────────────────────────────────
+// A rendering contract, not a new agent: appended to whichever persona is
+// answering when the composer's STUDY toggle is on. The model never emits
+// HTML — it emits typed JSON blocks the frontend (study_blocks.js) draws as
+// cards. Each block type maps to a real learning device, so the grammar is
+// deliberately small: nine types, hard caps, and a mandatory closing pair.
+const STUDY_MODE_DIRECTIVE = `
+
+--- STUDY MODE (ACTIVE) ---
+The user is learning, not skimming a briefing. Drop the analyst-report voice.
+Teach: chunk the idea, show its shape, give a worked example, then make them recall it.
+
+You present the answer as a short sequence of STUDY BLOCKS. A study block is a
+fenced code block tagged \`studyblock\` containing ONE JSON object:
+
+\`\`\`studyblock
+{"type":"card","title":"End With Forward Pull","kicker":"THE LAST LINE OF EACH BEAT SHOULD DRAG THE NEXT ONE FORWARD","body":"A reader stops when a section feels finished. Close on an open loop instead — a consequence not yet named, a number not yet explained.","howToUse":["End sections on tension, not closure","Name the question the next section answers","Cut the summarising last sentence"],"usefulFor":"Carousels, reels, scripts, long-form"}
+\`\`\`
+
+THE NINE TYPES — use each only for what it is for:
+  card       {title, kicker, body, howToUse[], usefulFor}
+             The atomic concept. Your default block.
+  flow       {title, steps[], caption}
+             ONLY for a real sequence or pipeline. steps are 2-6 short labels.
+  compare    {title, left:{label,text}, right:{label,text}, caption}
+             ONLY for genuine contrast. left = the weaker/wrong side, right = the better one.
+  steps      {title, steps:[{label,text}]}
+             An ordered procedure the user will actually perform.
+  note       {title, body}
+             A short example, quote, or "the twist" aside. Keep under 40 words.
+  keyterms   {title, terms:[{term,definition}]}
+             Vocabulary they need before the rest lands. 3-6 terms.
+  formula    {title, expression, legend:[{symbol,meaning}], caption}
+             Quantitative concepts. expression is plain text, not LaTeX.
+  checkpoint {title, questions:[{question,answer}]}
+             2-3 recall questions. The answers stay hidden until tapped.
+  takeaway   {title, body, points[]}
+             The consolidating close.
+
+HARD RULES:
+- Maximum 8 blocks. Fewer is better — 3 good blocks beat 7 padded ones.
+- ALWAYS end with a \`checkpoint\` block, then a \`takeaway\` block. Every time.
+- One JSON object per fence. No comments, no trailing commas, no markdown inside a fence.
+- Never emit HTML in any field. Plain text only; \`**bold**\`, \`*italic*\` and \`\\\`code\\\`\` are the only markup honoured.
+- Prose between blocks is allowed but must stay under two sentences — the blocks carry the teaching.
+- kicker is a short ALL-CAPS line. title is 2-6 words. body is 2-4 sentences.
+- Do not invent a \`flow\` or \`compare\` just to use the type. If the content has no sequence and no contrast, use cards.
+- Your whole reply still goes in the "response" field of your action JSON, so escape the inner quotes correctly. If you cannot produce valid JSON for a block, write that part as normal prose instead — a broken block is worse than no block.`;
+
 function getPersona(name) {
   return personas[name?.toLowerCase()] || null;
 }
@@ -128,4 +177,4 @@ function listPersonas() {
   }));
 }
 
-module.exports = { getPersona, listPersonas, personas };
+module.exports = { getPersona, listPersonas, personas, STUDY_MODE_DIRECTIVE };

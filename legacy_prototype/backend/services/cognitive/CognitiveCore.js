@@ -88,6 +88,7 @@ async function run({
   agentName = 'plato',
   conversationHistory = [],
   allowWeb = true,
+  studyMode = false,
   approvedTools = [],
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
@@ -177,7 +178,8 @@ async function run({
         recipeHints: enriched.recipeHints,
         budgetExceeded: budget.breached,
         traits: agentTraits,
-        allowWeb
+        allowWeb,
+        studyMode
       });
 
       // 3c. Run reasoning turn (temperature comes from the agent's risk setting;

@@ -59,7 +59,7 @@ class BaseAgent {
    * @param {string} [options.conversationId=null]
    * @param {Array} [options.conversationHistory=[]]
    */
-  async execute({ goal, userId = 'system', conversationId = null, conversationHistory = [], allowWeb = true, budget = {}, approvedTools = [] }) {
+  async execute({ goal, userId = 'system', conversationId = null, conversationHistory = [], allowWeb = true, studyMode = false, budget = {}, approvedTools = [] }) {
     return await run({
       goal,
       userId,
@@ -67,6 +67,7 @@ class BaseAgent {
       agentName: this.agentId,
       conversationHistory,
       allowWeb,
+      studyMode,
       budget,
       approvedTools
     });

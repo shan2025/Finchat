@@ -8,6 +8,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script>tailwind.config = {darkMode:"class", theme:{extend:{colors:{"primary-brown":"#3a2e23","cream-bg":"#efe8de"}}}};</script>
+<!-- Sprint Z · B3: reports render through the same study-card system as chat.
+     A report narrative that contains `studyblock` fences becomes cards; plain
+     narratives just get proper markdown instead of escaped plaintext. -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<script src="study_blocks.js"></script>
 <style>
  :root { --bg:#f7f4ed; --card:#fffdf8; --border:#e2d9c9; --txt:#3a2e23; --sub:#8c7a6b; --accent:#c67139; --accent-soft:#e9d6c2; --muted:#b3a693; }
  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--txt); }
@@ -91,9 +97,23 @@ function reportCard(r){
     <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">${KIND_ICON[r.kind]||'description'}</span> ${esc(r.title||r.kind)}</div>
    <div class="text-xs" style="color:var(--sub)">${when(r.created_at)}</div>
   </div>
-  <p class="text-sm mt-3" style="color:var(--txt);line-height:1.6">${esc(r.summary||'')}</p>
+  <div class="text-sm mt-3" style="color:var(--txt);line-height:1.6" data-report-body="${esc(r.report_id)}"></div>
   <div class="text-[11px] mt-3" style="color:var(--sub)">${r.period_start?('Period: '+when(r.period_start)+' → '+when(r.period_end)):''}</div>
  </div>`;
+}
+
+// Narratives are written by an LLM, so they go through the same renderer the
+// chat bubbles use — study cards when the report emitted blocks, sanitised
+// markdown otherwise. Never innerHTML the raw narrative.
+function paintReportBodies(reports){
+ for(const r of reports){
+  const el=document.querySelector(`[data-report-body="${CSS.escape(r.report_id)}"]`);
+  if(!el) continue;
+  const text=r.summary||'';
+  if(window.StudyBlocks && window.StudyBlocks.has(text)) window.StudyBlocks.render(el,text);
+  else if(window.marked && window.DOMPurify) el.innerHTML=DOMPurify.sanitize(marked.parse(text),{ADD_ATTR:['target']});
+  else el.textContent=text;
+ }
 }
 
 async function loadList(){
@@ -102,6 +122,7 @@ async function loadList(){
   const rs=d.reports||[];
   document.getElementById('list').innerHTML = rs.length ? rs.map(reportCard).join('')
    : `<div class="card p-6 text-sm text-center" style="color:var(--sub)">No reports yet — generate your first one above.</div>`;
+  paintReportBodies(rs);
  }catch(e){ document.getElementById('list').innerHTML=`<div class="card p-6 text-sm text-center" style="color:var(--sub)">Reports unavailable (run migration 020 &amp; restart the server).</div>`; }
 }
 
