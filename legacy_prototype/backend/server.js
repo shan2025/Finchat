@@ -69,6 +69,7 @@ app.use('/api/group-chat', require('./routes/groupChat'));
 app.use('/api/blockchain', require('./routes/blockchain'));
 app.use('/api/knowledge', require('./routes/knowledge'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/mind-maps', require('./routes/mindMaps'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');
