@@ -15,9 +15,17 @@
 | Per-session persistence + restore on reopen | migration `022`, `GET /history` returns `studyMode` |
 | Composer STUDY toggle, card rendering in both bubble renderers, Save-to-Knowledge + Export actions, prose-not-JSON copy | `frontend/finchat_chat.html` |
 | Reports inherit the renderer | `frontend/finchat_reports.html` |
-| 38 offline assertions (parser, degradation, injection, directive plumbing) | `backend/scripts/test_study_blocks.js` |
+| Sibling-array block transport + server-side fence serialisation | `ReasoningEngine.parseActionResponse`, `CognitiveCore.withStudyBlocks` |
+| 62 offline assertions + 9/9 live types | `backend/scripts/test_study_blocks.js` |
 
-Deviation from the plan below: the plan claimed the reports page rendered markdown — it did not, it escaped `summary` as plaintext. B3 therefore also added `marked`/`DOMPurify` there.
+**Verification.** 62/62 offline (parser, fence rescue, degradation, injection, directive plumbing, `blocks[]` serialisation). Live: **9/9 block types on `llama-3.1-8b-instant`**, 71 assertions, 0 failures — driven through the real production path (`buildContext` → `reason` → `withStudyBlocks`), not a hand-rolled prompt. Browser-verified in `study_blocks_demo.html`: all nine render, reveal/key-term toggles work, hostile input yields 0 injected nodes and 0 `alert()` calls, mobile stacks without page-level horizontal scroll, dark mirror keys off `data-nm-theme`.
+
+**Still open:** 70B (`llama-3.3-70b-versatile`) is unverified under the revised contract — its Groq tokens-per-day budget was exhausted during this session. It passed `compare` and `checkpoint` under the *older, harder* nested contract, so this is a formality. Re-run when the daily quota resets: `node scripts/test_study_blocks.js --pace=8000`.
+
+**Deviations from the plan as written:**
+- The plan claimed the reports page rendered markdown — it did not, it escaped `summary` as plaintext. B3 therefore also added `marked`/`DOMPurify` there.
+- The B0 fenced-inside-`response` contract did not survive contact with the 8B fallback; see the revision note in B0.
+- Study Mode is wired into 1:1 chat only. `GroupChatOrchestrator` and `MissionScheduler` call the same cognitive core but never pass `studyMode`, so the toggle is inert there. Deliberate scope line, not a bug.
 
 ---
 
@@ -89,16 +97,26 @@ Two tracks. **Track B ships first** — it is smaller, touches the surface the u
 
 ### B0 — Design contract (do this first, it de-risks everything)
 
-The model must **never emit HTML**. It emits typed JSON blocks inside a fenced code block; the frontend renders them. Malformed JSON degrades to a normal markdown code block instead of breaking the message.
+The model must **never emit HTML**. It emits typed JSON blocks; the frontend renders them. Malformed JSON degrades to a visible raw block instead of breaking the message.
 
-````
-```studyblock
-{"type":"card","title":"End With Forward Pull",
- "kicker":"THE LAST LINE OF EACH BEAT SHOULD DRAG THE NEXT ONE FORWARD",
- "body":"...", "howToUse":["End sections on tension, not closure","..."],
- "usefulFor":"Carousels, reels, scripts, long-form"}
+**Revised during implementation (2026-08-09).** The original design fenced the block JSON *inside* the action JSON's `response` string. That forces the model to double-escape every quote, and a control run settled it: same model, same question, `studyMode` off produced a valid action JSON, `studyMode` on produced nothing parseable. 70B coped; `llama-3.1-8b-instant` could not — and the 8B model is what answers whenever the primary is rate-limited, which on the free tier is often. Study Mode was therefore broken on the entire fallback path.
+
+Blocks now travel as a **sibling array** to `response`, so there is nothing to escape:
+
+```json
+{"thought":"...","action":"respond","response":"Here is the shape of it.","blocks":[
+  {"type":"card","title":"End With Forward Pull",
+   "kicker":"THE LAST LINE OF EACH BEAT SHOULD DRAG THE NEXT ONE FORWARD",
+   "body":"...","howToUse":["End sections on tension, not closure"],
+   "usefulFor":"Carousels, reels, scripts, long-form"}
+]}
 ```
-````
+
+`CognitiveCore.withStudyBlocks()` folds the array into ` ```studyblock ` fences server-side, so the **frontend contract is unchanged** — `study_blocks.js`, the stored message, and history replay all still see fences. The schema advertises `blocks` only when Study Mode is on, so normal chat is untouched.
+
+Two robustness properties this path guarantees, both pinned by tests: a malformed `blocks` value (or a junk entry inside a good array) is **dropped, never fatal** — you lose the cards, never the answer; and quotes/newlines inside block fields survive the round trip, which is exactly what the nested design broke.
+
+The parser additionally **rescues unfenced blocks**: 70B was observed emitting a flawless `card` object with no fence at all, which would have shown the user raw JSON. Any top-level JSON whose `type` is one of the nine is promoted to a block wherever it appears; the `type` check is what stops unrelated JSON (`{"ticker":"TSLA","type":"equity"}`) being hijacked into a card.
 
 **Block types (v1 — nine, deliberately small):**
 
@@ -230,6 +248,6 @@ Not design-tool-managed, so it is safe from regeneration — same as the neural 
 ## Part 5 — Risks
 
 - **Design-tool regeneration** clobbers `finchat_chat.html` and shared JS includes. Mitigation: keep every new capability in standalone files (`study_blocks.js`, `finchat_mindmap.html`); after any regen, re-add `<script>` includes and diff shared JS.
-- **LLM emitting invalid block JSON.** Mitigation: strict grammar in the directive, one worked example, a lenient parser, and graceful degradation to a code block. Test with the 8B fallback model, not just 70B — Ollama `qwen2.5:3b` will be the worst case.
+- ~~**LLM emitting invalid block JSON.**~~ **This one fired.** Nesting JSON in JSON broke the 8B fallback completely — see the B0 revision. Resolved by moving blocks to a sibling array; 9/9 types now pass live on 8B. The lesson generalises: never make a small model escape structured data inside a string field. Ollama `qwen2.5:3b` remains untested and is still the true worst case.
 - **Mind maps that are just prettier bullet lists.** Mitigation: enforce breadth/depth bounds in the generator, and make `expandNode` + gap detection the primary interaction rather than one-shot generation.
 - **Local `jsonb` vector fallback** degrades entity matching for `generateFromGraph`. Build it against Supabase, or accept reduced linking locally and say so.
