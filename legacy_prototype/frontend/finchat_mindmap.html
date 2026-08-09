@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinChat | Mind Map Studio</title>
+<!--
+  Sprint Z · Track A · A4 — Mind Map Studio.
+
+  Hand-written, NOT design-tool managed (same as finchat_neuralmap.html and
+  finchat_neuralnetwork.html), so a regeneration cannot clobber it.
+
+  Theme follows the neural map's convention: data-nm-theme on <html>, persisted
+  under localStorage['finchat_mm_theme'].
+
+  Rendering is inline SVG, no chart or graph library and no CDN beyond the
+  fonts already used across the app.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&family=Caprasimo&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<style>
+:root, [data-nm-theme="warm"] {
+  --mm-bg:#f5ead8; --mm-surface:#fffaf0; --mm-surface2:#f4eede;
+  --mm-line:#e7d9be; --mm-line2:#d9c7a6;
+  --mm-fg:#2b2118; --mm-fg2:#5b4a3a; --mm-muted:#8a7d6a;
+  --mm-accent:#c67139; --mm-gold:#d4af37;
+  --mm-shadow:0 8px 28px rgba(46,43,37,.14);
+  --mm-canvas:#f0e4cf;
+}
+[data-nm-theme="dark"] {
+  --mm-bg:#12100c; --mm-surface:#1d1913; --mm-surface2:#26211a;
+  --mm-line:#352c21; --mm-line2:#4a3d2d;
+  --mm-fg:#f0e7d7; --mm-fg2:#cbbca4; --mm-muted:#9b8d78;
+  --mm-accent:#e08a4e; --mm-gold:#e0c25c;
+  --mm-shadow:0 10px 34px rgba(0,0,0,.5);
+  --mm-canvas:#171310;
+}
+* { box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  margin:0; font-family:'Figtree',system-ui,sans-serif;
+  background:var(--mm-bg); color:var(--mm-fg); overflow:hidden;
+}
+.mm-serif { font-family:'Caprasimo',Georgia,serif; font-weight:400; }
+
+/* layout ---------------------------------------------------------- */
+#mmShell { display:flex; height:100vh; }
+#mmMain { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+.mm-topbar {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 18px; border-bottom:1px solid var(--mm-line);
+  background:var(--mm-surface); flex-shrink:0;
+}
+.mm-title { font-size:18px; margin:0; margin-right:auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mm-sub { font-size:11.5px; color:var(--mm-muted); font-weight:600; }
+
+.mm-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 13px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--mm-line2); background:var(--mm-surface2);
+  color:var(--mm-fg2); font-family:inherit; font-size:12.5px; font-weight:700;
+  transition:background .14s, color .14s, border-color .14s;
+}
+.mm-btn:hover { color:var(--mm-accent); border-color:var(--mm-accent); }
+.mm-btn:disabled { opacity:.5; cursor:default; }
+.mm-btn-primary { background:var(--mm-accent); border-color:var(--mm-accent); color:#fff; }
+.mm-btn-primary:hover { filter:brightness(1.07); color:#fff; }
+.mm-btn .material-symbols-outlined { font-size:16px; }
+
+/* canvas ---------------------------------------------------------- */
+#mmCanvasWrap { flex:1; position:relative; overflow:hidden; background:var(--mm-canvas); }
+#mmSvg { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
+#mmSvg.panning { cursor:grabbing; }
+
+.mm-link { fill:none; stroke:var(--mm-line2); stroke-width:1.6; }
+.mm-xlink { fill:none; stroke:var(--mm-accent); stroke-width:1.3; stroke-dasharray:5 4; opacity:.75; }
+.mm-node { cursor:pointer; }
+.mm-node-box {
+  fill:var(--mm-surface); stroke:var(--mm-line2); stroke-width:1.4;
+  transition:stroke .14s, filter .14s;
+}
+.mm-node.root .mm-node-box { fill:var(--mm-accent); stroke:var(--mm-accent); }
+.mm-node.selected .mm-node-box { stroke:var(--mm-gold); stroke-width:3; }
+.mm-node:hover .mm-node-box { stroke:var(--mm-accent); }
+.mm-node-label {
+  font-size:12.5px; font-weight:700; fill:var(--mm-fg);
+  pointer-events:none; dominant-baseline:middle;
+}
+.mm-node.root .mm-node-label { fill:#fff; font-size:14px; }
+.mm-node.question .mm-node-box { stroke-dasharray:4 3; }
+.mm-toggle-circle { fill:var(--mm-surface2); stroke:var(--mm-line2); stroke-width:1.2; }
+.mm-toggle-sign { font-size:12px; font-weight:800; fill:var(--mm-fg2);
+  text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+
+/* panel ----------------------------------------------------------- */
+#mmPanel {
+  position:absolute; top:0; right:0; bottom:0; width:min(400px, 92vw);
+  background:var(--mm-surface); border-left:1px solid var(--mm-line);
+  box-shadow:var(--mm-shadow); transform:translateX(102%);
+  transition:transform .2s ease; display:flex; flex-direction:column; z-index:20;
+}
+#mmPanel.open { transform:translateX(0); }
+.mm-panel-head { padding:16px 18px 12px; border-bottom:1px solid var(--mm-line); }
+.mm-panel-path { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--mm-muted); font-weight:800; margin-bottom:7px; line-height:1.5; }
+.mm-panel-body { flex:1; overflow-y:auto; padding:16px 18px; }
+.mm-panel-actions { padding:12px 18px; border-top:1px solid var(--mm-line);
+  display:flex; flex-wrap:wrap; gap:8px; }
+.mm-field { width:100%; padding:9px 12px; border-radius:11px; font-family:inherit;
+  font-size:13.5px; border:1px solid var(--mm-line2); background:var(--mm-bg);
+  color:var(--mm-fg); outline:none; }
+.mm-field:focus { border-color:var(--mm-accent); }
+.mm-label { font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--mm-muted); font-weight:800; margin:14px 0 6px; }
+.mm-detail { font-size:13.5px; line-height:1.6; color:var(--mm-fg2); white-space:pre-wrap; }
+
+/* map list -------------------------------------------------------- */
+#mmList { width:250px; border-right:1px solid var(--mm-line); background:var(--mm-surface);
+  display:flex; flex-direction:column; flex-shrink:0; }
+.mm-list-head { padding:14px 14px 10px; border-bottom:1px solid var(--mm-line); }
+.mm-list-body { flex:1; overflow-y:auto; padding:8px; }
+.mm-card { padding:10px 12px; border-radius:12px; cursor:pointer; border:1px solid transparent; }
+.mm-card:hover { background:var(--mm-surface2); }
+.mm-card.active { background:var(--mm-surface2); border-color:var(--mm-accent); }
+.mm-card-title { font-size:13px; font-weight:700; color:var(--mm-fg);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mm-card-meta { font-size:11px; color:var(--mm-muted); margin-top:2px; }
+
+/* modal ----------------------------------------------------------- */
+.mm-modal { position:fixed; inset:0; background:rgba(20,16,12,.55);
+  display:none; align-items:center; justify-content:center; z-index:60; padding:20px; }
+.mm-modal.open { display:flex; }
+.mm-modal-box { background:var(--mm-surface); border:1px solid var(--mm-line);
+  border-radius:20px; padding:22px; width:min(460px,100%); box-shadow:var(--mm-shadow); }
+.mm-src { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
+.mm-src button { flex:1; min-width:100px; padding:9px; border-radius:12px;
+  border:1px solid var(--mm-line2); background:var(--mm-bg); color:var(--mm-fg2);
+  font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+.mm-src button.on { background:var(--mm-accent); border-color:var(--mm-accent); color:#fff; }
+
+#mmEmpty { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; text-align:center; padding:30px;
+  color:var(--mm-muted); }
+
+.mm-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--mm-accent); color:#fff; padding:11px 20px; border-radius:12px;
+  font-size:13px; font-weight:700; opacity:0; transition:.25s; z-index:99; pointer-events:none; }
+.mm-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+.mm-spin { width:15px; height:15px; border:2px solid rgba(255,255,255,.4);
+  border-top-color:#fff; border-radius:50%; animation:mmspin .7s linear infinite; }
+@keyframes mmspin { to { transform:rotate(360deg); } }
+
+@media (max-width:860px) {
+  #mmList { display:none; }
+  #mmList.mobile-open { display:flex; position:absolute; z-index:30; height:100%; }
+}
+/* The shared nav is a fixed 250px column. Left in flow on a phone it starves
+   the canvas (measured: 125px of usable width). sidebar_nav.js already ships
+   the drawer rules (#sideNav.sbn / .sbn.open) — this only takes it out of the
+   flex flow and supplies the #navToggle button that component expects. */
+@media (max-width:767px) {
+  #sideNav { position:fixed; height:100%; }
+  #navToggle { display:inline-flex !important; }
+  .mm-topbar { padding:10px 12px; gap:7px; }
+  .mm-title { font-size:16px; }
+  .mm-btn { padding:7px 10px; }
+}
+#navToggle { display:none; }
+</style>
+</head>
+<body>
+
+<div id="mmShell">
+  <nav id="sideNav" style="width:250px;flex-shrink:0;"></nav>
+
+  <aside id="mmList">
+    <div class="mm-list-head">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <span class="mm-sub">My mind maps</span>
+        <button class="mm-btn" style="padding:5px 9px;" onclick="openGenerate()" title="New mind map">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
+    </div>
+    <div class="mm-list-body" id="mmListBody">
+      <div style="padding:10px 12px; font-size:12px; color:var(--mm-muted);">Loading…</div>
+    </div>
+  </aside>
+
+  <main id="mmMain">
+    <div class="mm-topbar">
+      <button class="mm-btn" id="navToggle" onclick="toggleNav()" title="Menu" style="padding:7px 9px;">
+        <span class="material-symbols-outlined">menu</span></button>
+      <h1 class="mm-title mm-serif" id="mmTitle">Mind Map Studio</h1>
+      <span class="mm-sub" id="mmMeta"></span>
+      <button class="mm-btn" onclick="fitToScreen()" title="Fit to screen">
+        <span class="material-symbols-outlined">fit_screen</span></button>
+      <button class="mm-btn" onclick="presentStep(1)" id="mmPresentBtn" title="Present mode — walk the branches">
+        <span class="material-symbols-outlined">slideshow</span></button>
+      <button class="mm-btn" onclick="exportMap('markdown')" title="Export">
+        <span class="material-symbols-outlined">download</span></button>
+      <button class="mm-btn" onclick="toggleTheme()" id="mmThemeBtn" title="Theme">
+        <span class="material-symbols-outlined">dark_mode</span></button>
+      <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
+        <span class="material-symbols-outlined">auto_awesome</span> Generate</button>
+    </div>
+
+    <div id="mmCanvasWrap">
+      <svg id="mmSvg"><g id="mmViewport"></g></svg>
+
+      <div id="mmEmpty">
+        <span class="material-symbols-outlined" style="font-size:52px; opacity:.4;">schema</span>
+        <div class="mm-serif" style="font-size:22px; color:var(--mm-fg);">No map open</div>
+        <div style="font-size:13.5px; max-width:330px; line-height:1.6;">
+          Generate one from a topic or from a conversation you have already had.
+          Nodes that match something in your knowledge graph link straight to it.
+        </div>
+        <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
+          <span class="material-symbols-outlined">auto_awesome</span> Generate a mind map</button>
+      </div>
+
+      <aside id="mmPanel">
+        <div class="mm-panel-head">
+          <div class="mm-panel-path" id="mmPanelPath"></div>
+          <input class="mm-field mm-serif" id="mmPanelLabel" style="font-size:17px;"
+                 onchange="renameNode(this.value)" aria-label="Node label">
+        </div>
+        <div class="mm-panel-body">
+          <div class="mm-label">Summary</div>
+          <textarea class="mm-field" id="mmPanelSummary" rows="2"
+                    onchange="saveNodeField('summary', this.value)"></textarea>
+          <div class="mm-label">Detail</div>
+          <div class="mm-detail" id="mmPanelDetail">—</div>
+          <div id="mmPanelEntity"></div>
+          <div class="mm-label">Answers</div>
+          <div id="mmPanelAnswer" style="font-size:13px; color:var(--mm-muted);">
+            Ask about this node to get a scoped explanation.
+          </div>
+        </div>
+        <div class="mm-panel-actions">
+          <button class="mm-btn mm-btn-primary" onclick="askAboutNode()" id="mmAskBtn">
+            <span class="material-symbols-outlined">forum</span> Ask about this</button>
+          <button class="mm-btn" onclick="expandCurrent()" id="mmExpandBtn">
+            <span class="material-symbols-outlined">expand_content</span> Expand</button>
+          <button class="mm-btn" onclick="addChild()">
+            <span class="material-symbols-outlined">add</span> Add child</button>
+          <button class="mm-btn" onclick="deleteCurrent()" style="margin-left:auto;">
+            <span class="material-symbols-outlined">delete</span></button>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<!-- generate modal -->
+<div class="mm-modal" id="mmGenModal" onclick="if(event.target===this) closeGenerate()">
+  <div class="mm-modal-box">
+    <div class="mm-serif" style="font-size:21px; margin-bottom:4px;">New mind map</div>
+    <div style="font-size:12.5px; color:var(--mm-muted);">
+      Generated from your memory graph, so it already knows what you have studied.
+    </div>
+    <div class="mm-src">
+      <button data-src="topic" class="on" onclick="pickSource('topic')">A topic</button>
+      <button data-src="chat" onclick="pickSource('chat')">A conversation</button>
+    </div>
+    <div id="mmGenTopic">
+      <div class="mm-label">Topic</div>
+      <input class="mm-field" id="mmTopicInput" placeholder="e.g. Transformer attention mechanisms">
+    </div>
+    <div id="mmGenChat" style="display:none;">
+      <div class="mm-label">Conversation</div>
+      <select class="mm-field" id="mmSessionSelect"></select>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
+      <button class="mm-btn" onclick="closeGenerate()">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmGenBtn" onclick="doGenerate()">
+        <span class="material-symbols-outlined">auto_awesome</span> Generate</button>
+    </div>
+  </div>
+</div>
+
+<div class="mm-toast" id="mmToast"></div>
+
+<script src="sidebar_nav.js"></script>
+<script src="study_blocks.js"></script>
+<script>
+// ── session ──────────────────────────────────────────────────────
+const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+if (!_session) window.location.href = 'finchat_login.html';
+const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (_session && _session.token) || '';
+const API = (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000');
+
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+function toast(msg) {
+  const t = document.getElementById('mmToast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN, ...(opts.headers || {}) }
+  });
+  const isJson = (res.headers.get('content-type') || '').includes('json');
+  const body = isJson ? await res.json().catch(() => ({})) : await res.text();
+  if (!res.ok) throw new Error((body && body.error) || ('HTTP ' + res.status));
+  return body;
+}
+
+// ── theme ────────────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-nm-theme', t);
+  const icon = document.querySelector('#mmThemeBtn .material-symbols-outlined');
+  if (icon) icon.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+}
+function toggleNav() {
+  document.getElementById('sideNav').classList.toggle('open');
+  // On a phone the map list and the nav compete for the same edge; opening one
+  // closes the other rather than stacking two panels over the canvas.
+  document.getElementById('mmList').classList.remove('mobile-open');
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-nm-theme') === 'dark' ? 'warm' : 'dark';
+  localStorage.setItem('finchat_mm_theme', next);
+  applyTheme(next);
+}
+applyTheme(localStorage.getItem('finchat_mm_theme') || 'warm');
+
+// ── state ────────────────────────────────────────────────────────
+let MAP = null;            // {map, nodes, edges}
+let NODES = new Map();     // node_id -> node (with .children)
+let ROOT = null;
+let SELECTED = null;
+let view = { x: 0, y: 0, k: 1 };
+let genSource = 'topic';
+let presentIndex = -1;
+
+// ── tree building ────────────────────────────────────────────────
+function buildTree(nodes) {
+  NODES = new Map();
+  for (const n of nodes) NODES.set(n.node_id, { ...n, children: [] });
+  ROOT = null;
+  for (const n of NODES.values()) {
+    if (n.parent_id && NODES.has(n.parent_id)) NODES.get(n.parent_id).children.push(n);
+    else if (!n.parent_id) ROOT = n;
+  }
+  for (const n of NODES.values()) n.children.sort((a, b) => a.order_index - b.order_index);
+}
+
+/**
+ * Radial layout. Each branch owns an angular wedge sized by how many leaves it
+ * carries, so a fat branch does not crowd a thin one — the naive "equal slice
+ * per child" version overlaps badly as soon as one branch is deeper.
+ * Collapsed nodes contribute no descendants.
+ */
+function layout() {
+  if (!ROOT) return;
+  const RING = 190;
+
+  const leafCount = n => (n.collapsed || !n.children.length)
+    ? 1 : n.children.reduce((s, c) => s + leafCount(c), 0);
+
+  ROOT.x = 0; ROOT.y = 0; ROOT.depth = 0;
+
+  const place = (node, a0, a1, depth) => {
+    if (node.collapsed || !node.children.length) return;
+    const total = node.children.reduce((s, c) => s + leafCount(c), 0) || 1;
+    let a = a0;
+    for (const child of node.children) {
+      const span = (a1 - a0) * (leafCount(child) / total);
+      const mid = a + span / 2;
+      const r = RING * depth;
+      child.x = Math.cos(mid) * r;
+      child.y = Math.sin(mid) * r;
+      child.depth = depth;
+      place(child, a + span * 0.06, a + span * 0.94, depth + 1);
+      a += span;
+    }
+  };
+  place(ROOT, -Math.PI, Math.PI, 1);
+
+  // A node the user dragged keeps its saved position — the layout is a
+  // starting point, not a cage.
+  for (const n of NODES.values()) {
+    if (Number.isFinite(n.x_saved)) { n.x = n.x_saved; n.y = n.y_saved; }
+  }
+}
+
+function visibleNodes() {
+  const out = [];
+  const walk = (n) => {
+    out.push(n);
+    if (!n.collapsed) n.children.forEach(walk);
+  };
+  if (ROOT) walk(ROOT);
+  return out;
+}
+
+// ── rendering ────────────────────────────────────────────────────
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs = {}) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v);
+  return e;
+};
+
+function nodeWidth(n) {
+  return Math.max(74, Math.min(190, 13 + n.label.length * 7.4));
+}
+
+function render() {
+  const vp = document.getElementById('mmViewport');
+  vp.innerHTML = '';
+  if (!ROOT) return;
+
+  const vis = visibleNodes();
+  const shown = new Set(vis.map(n => n.node_id));
+
+  // hierarchy links
+  for (const n of vis) {
+    if (!n.parent_id || !shown.has(n.parent_id)) continue;
+    const p = NODES.get(n.parent_id);
+    const mx = (p.x + n.x) / 2;
+    vp.appendChild(el('path', {
+      class: 'mm-link',
+      d: `M ${p.x} ${p.y} C ${mx} ${p.y}, ${mx} ${n.y}, ${n.x} ${n.y}`
+    }));
+  }
+
+  // cross-links
+  for (const e of (MAP.edges || [])) {
+    if (!shown.has(e.from_node) || !shown.has(e.to_node)) continue;
+    const a = NODES.get(e.from_node), b = NODES.get(e.to_node);
+    vp.appendChild(el('path', {
+      class: 'mm-xlink',
+      d: `M ${a.x} ${a.y} Q ${(a.x + b.x) / 2} ${(a.y + b.y) / 2 - 60}, ${b.x} ${b.y}`
+    }));
+  }
+
+  // nodes
+  for (const n of vis) {
+    const w = nodeWidth(n), h = n.node_type === 'root' ? 42 : 32;
+    const g = el('g', {
+      class: 'mm-node ' + n.node_type + (SELECTED === n.node_id ? ' selected' : ''),
+      transform: `translate(${n.x - w / 2}, ${n.y - h / 2})`
+    });
+    g.dataset.id = n.node_id;
+
+    const box = el('rect', { class: 'mm-node-box', width: w, height: h, rx: h / 2 });
+    if (n.color) { box.setAttribute('fill', n.color); box.setAttribute('stroke', n.color); }
+    g.appendChild(box);
+
+    const label = el('text', { class: 'mm-node-label', x: w / 2, y: h / 2, 'text-anchor': 'middle' });
+    label.textContent = n.label.length > 24 ? n.label.slice(0, 23) + '…' : n.label;
+    g.appendChild(label);
+
+    if (n.children.length) {
+      const tg = el('g', { class: 'mm-toggle', transform: `translate(${w + 9}, ${h / 2})` });
+      tg.appendChild(el('circle', { class: 'mm-toggle-circle', r: 8 }));
+      const sign = el('text', { class: 'mm-toggle-sign', y: 0 });
+      sign.textContent = n.collapsed ? '+' : '−';
+      tg.appendChild(sign);
+      tg.addEventListener('click', ev => { ev.stopPropagation(); toggleCollapse(n.node_id); });
+      g.appendChild(tg);
+    }
+
+    g.addEventListener('click', () => selectNode(n.node_id));
+    vp.appendChild(g);
+  }
+
+  applyView();
+}
+
+function applyView() {
+  document.getElementById('mmViewport')
+    .setAttribute('transform', `translate(${view.x}, ${view.y}) scale(${view.k})`);
+}
+
+function fitToScreen() {
+  if (!ROOT) return;
+  const vis = visibleNodes();
+  const xs = vis.map(n => n.x), ys = vis.map(n => n.y);
+  const pad = 130;
+  const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+  const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+  const wrap = document.getElementById('mmCanvasWrap').getBoundingClientRect();
+  const k = Math.min(wrap.width / (maxX - minX), wrap.height / (maxY - minY), 1.5);
+  view.k = Math.max(0.15, k);
+  view.x = wrap.width / 2 - ((minX + maxX) / 2) * view.k;
+  view.y = wrap.height / 2 - ((minY + maxY) / 2) * view.k;
+  applyView();
+}
+
+// ── pan & zoom ───────────────────────────────────────────────────
+(function () {
+  const svg = document.getElementById('mmSvg');
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+
+  svg.addEventListener('pointerdown', e => {
+    if (e.target.closest('.mm-node')) return;
+    dragging = true; sx = e.clientX; sy = e.clientY; ox = view.x; oy = view.y;
+    svg.classList.add('panning'); svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    view.x = ox + (e.clientX - sx); view.y = oy + (e.clientY - sy); applyView();
+  });
+  const stop = e => { dragging = false; svg.classList.remove('panning'); };
+  svg.addEventListener('pointerup', stop);
+  svg.addEventListener('pointercancel', stop);
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const k2 = Math.max(0.15, Math.min(3, view.k * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    // Zoom toward the cursor rather than the origin.
+    view.x = mx - (mx - view.x) * (k2 / view.k);
+    view.y = my - (my - view.y) * (k2 / view.k);
+    view.k = k2; applyView();
+  }, { passive: false });
+})();
+
+// ── interactions ─────────────────────────────────────────────────
+async function toggleCollapse(nodeId) {
+  const n = NODES.get(nodeId);
+  n.collapsed = !n.collapsed;
+  layout(); render();
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${nodeId}`, {
+      method: 'PATCH', body: JSON.stringify({ collapsed: n.collapsed })
+    });
+  } catch (e) { /* a lost collapse state is not worth interrupting the user */ }
+}
+
+function selectNode(nodeId) {
+  SELECTED = nodeId;
+  const n = NODES.get(nodeId);
+  render();
+
+  const path = [];
+  let cur = n;
+  while (cur) { path.unshift(cur.label); cur = cur.parent_id ? NODES.get(cur.parent_id) : null; }
+
+  document.getElementById('mmPanelPath').textContent = path.join('  ›  ');
+  document.getElementById('mmPanelLabel').value = n.label;
+  document.getElementById('mmPanelSummary').value = n.summary || '';
+  document.getElementById('mmPanelDetail').textContent = n.detail || '—';
+  document.getElementById('mmPanelAnswer').innerHTML =
+    '<span style="color:var(--mm-muted)">Ask about this node to get a scoped explanation.</span>';
+
+  const ent = document.getElementById('mmPanelEntity');
+  ent.innerHTML = n.entity_id
+    ? '<div class="mm-label">Knowledge graph</div>' +
+      '<a class="mm-btn" style="text-decoration:none;" href="finchat_neuralmap.html">' +
+      '<span class="material-symbols-outlined">hub</span> Open in Neural Map</a>'
+    : '';
+
+  document.getElementById('mmPanel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('mmPanel').classList.remove('open');
+  SELECTED = null; render();
+}
+
+async function saveNodeField(field, value) {
+  if (!SELECTED) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${SELECTED}`, {
+      method: 'PATCH', body: JSON.stringify({ [field]: value })
+    });
+    NODES.get(SELECTED)[field] = value;
+    toast('Saved');
+  } catch (e) { toast('Save failed: ' + e.message); }
+}
+
+async function renameNode(value) {
+  const v = String(value || '').trim();
+  if (!v || !SELECTED) return;
+  await saveNodeField('label', v);
+  NODES.get(SELECTED).label = v;
+  render();
+}
+
+async function expandCurrent() {
+  if (!SELECTED) return;
+  const btn = document.getElementById('mmExpandBtn');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="mm-spin"></span> Growing…';
+  try {
+    const out = await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${SELECTED}/expand`, { method: 'POST' });
+    if (out.added > 0) { toast(`Added ${out.added} node${out.added > 1 ? 's' : ''}`); await openMap(MAP.map.map_id, SELECTED); }
+    else toast(out.reason || 'Nothing new to add');
+  } catch (e) { toast('Expand failed: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = original;
+}
+
+async function addChild() {
+  if (!SELECTED) return;
+  const label = prompt('New child node');
+  if (!label || !label.trim()) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes`, {
+      method: 'POST', body: JSON.stringify({ parentId: SELECTED, label: label.trim() })
+    });
+    await openMap(MAP.map.map_id, SELECTED);
+    toast('Node added');
+  } catch (e) { toast('Could not add node: ' + e.message); }
+}
+
+async function deleteCurrent() {
+  if (!SELECTED) return;
+  const n = NODES.get(SELECTED);
+  const kids = n.children.length;
+  if (!confirm(`Delete "${n.label}"${kids ? ` and its ${kids} child node${kids > 1 ? 'ren' : ''}` : ''}?`)) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${SELECTED}`, { method: 'DELETE' });
+    closePanel();
+    await openMap(MAP.map.map_id);
+    toast('Deleted');
+  } catch (e) { toast('Delete failed: ' + e.message); }
+}
+
+/**
+ * Ask about this node. The route hands back a session bound to the node plus a
+ * seeded prompt; the answer comes from the ordinary chat endpoint so tokens,
+ * the proof chain and memory ingest all behave exactly as they do in Chat.
+ * Study Mode is requested, so the answer renders through study_blocks.js —
+ * one design language across both surfaces.
+ */
+async function askAboutNode() {
+  if (!SELECTED) return;
+  const btn = document.getElementById('mmAskBtn');
+  const out = document.getElementById('mmPanelAnswer');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="mm-spin"></span> Thinking…';
+  out.innerHTML = '<span style="color:var(--mm-muted)">Working…</span>';
+  try {
+    const bind = await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${SELECTED}/chat`, { method: 'POST' });
+    const reply = await api('/api/ai-chat/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        persona: 'plato', sessionId: bind.sessionId,
+        message: bind.seedPrompt, web: false, study: true
+      })
+    });
+    const text = reply.response || '';
+    if (window.StudyBlocks && window.StudyBlocks.has(text)) window.StudyBlocks.render(out, text);
+    else out.innerHTML = DOMPurify.sanitize(marked.parse(text), { ADD_ATTR: ['target'] });
+  } catch (e) {
+    out.innerHTML = '<span style="color:var(--mm-muted)">Could not answer: ' + esc(e.message) + '</span>';
+  }
+  btn.disabled = false; btn.innerHTML = original;
+}
+
+// ── present mode ─────────────────────────────────────────────────
+// Walks the branches one at a time — a review flow rather than a slideshow.
+function presentStep(dir) {
+  if (!ROOT) return;
+  const order = [];
+  (function walk(n) { order.push(n); n.children.forEach(walk); })(ROOT);
+  presentIndex = (presentIndex + dir + order.length) % order.length;
+  const target = order[presentIndex];
+  let cur = target.parent_id ? NODES.get(target.parent_id) : null;
+  while (cur) { cur.collapsed = false; cur = cur.parent_id ? NODES.get(cur.parent_id) : null; }
+  layout();
+  selectNode(target.node_id);
+  const wrap = document.getElementById('mmCanvasWrap').getBoundingClientRect();
+  view.k = 1;
+  view.x = wrap.width / 2 - target.x - 200;
+  view.y = wrap.height / 2 - target.y;
+  applyView();
+}
+
+// ── maps ─────────────────────────────────────────────────────────
+async function loadList() {
+  try {
+    const d = await api('/api/mind-maps');
+    const body = document.getElementById('mmListBody');
+    if (!d.maps.length) {
+      body.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--mm-muted);">No maps yet</div>';
+      return;
+    }
+    body.innerHTML = d.maps.map(m => `
+      <div class="mm-card ${MAP && MAP.map.map_id === m.map_id ? 'active' : ''}" data-map="${esc(m.map_id)}">
+        <div class="mm-card-title">${esc(m.title || m.topic || 'Untitled')}</div>
+        <div class="mm-card-meta">${m.node_count} nodes · ${esc(m.source_type)}</div>
+      </div>`).join('');
+    body.querySelectorAll('[data-map]').forEach(c =>
+      c.addEventListener('click', () => openMap(c.dataset.map)));
+  } catch (e) {
+    document.getElementById('mmListBody').innerHTML =
+      '<div style="padding:10px 12px; font-size:12px; color:var(--mm-muted);">Could not load maps</div>';
+  }
+}
+
+async function openMap(mapId, keepSelected) {
+  try {
+    MAP = await api('/api/mind-maps/' + mapId);
+    buildTree(MAP.nodes);
+    for (const n of NODES.values()) {
+      if (Number.isFinite(n.x) && n.x !== null) { n.x_saved = n.x; n.y_saved = n.y; }
+    }
+    layout();
+    document.getElementById('mmEmpty').style.display = 'none';
+    document.getElementById('mmTitle').textContent = MAP.map.title || 'Untitled map';
+    document.getElementById('mmMeta').textContent = `${MAP.nodes.length} nodes`;
+    SELECTED = keepSelected && NODES.has(keepSelected) ? keepSelected : null;
+    render();
+    if (!keepSelected) { fitToScreen(); closePanel(); }
+    else selectNode(keepSelected);
+    loadList();
+    history.replaceState(null, '', `?map=${encodeURIComponent(mapId)}`);
+  } catch (e) { toast('Could not open map: ' + e.message); }
+}
+
+async function exportMap(format) {
+  if (!MAP) { toast('Open a map first'); return; }
+  try {
+    const text = await api(`/api/mind-maps/${MAP.map.map_id}/export?format=${format}`);
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (MAP.map.title || 'mindmap').replace(/[^\w-]+/g, '_') + '.md';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { toast('Export failed: ' + e.message); }
+}
+
+// ── generate ─────────────────────────────────────────────────────
+function openGenerate() {
+  document.getElementById('mmGenModal').classList.add('open');
+  document.getElementById('mmTopicInput').focus();
+  loadSessions();
+}
+function closeGenerate() { document.getElementById('mmGenModal').classList.remove('open'); }
+function pickSource(src) {
+  genSource = src;
+  document.querySelectorAll('.mm-src button').forEach(b => b.classList.toggle('on', b.dataset.src === src));
+  document.getElementById('mmGenTopic').style.display = src === 'topic' ? '' : 'none';
+  document.getElementById('mmGenChat').style.display = src === 'chat' ? '' : 'none';
+}
+
+async function loadSessions() {
+  const sel = document.getElementById('mmSessionSelect');
+  if (sel.dataset.loaded) return;
+  try {
+    const d = await api('/api/ai-chat/sessions');
+    sel.innerHTML = (d.sessions || []).map(s =>
+      `<option value="${esc(s.session_id)}">${esc(s.title)}</option>`).join('')
+      || '<option value="">No conversations yet</option>';
+    sel.dataset.loaded = '1';
+  } catch (e) { sel.innerHTML = '<option value="">Could not load conversations</option>'; }
+}
+
+async function doGenerate() {
+  const btn = document.getElementById('mmGenBtn');
+  const payload = genSource === 'topic'
+    ? { sourceType: 'topic', topic: document.getElementById('mmTopicInput').value }
+    : { sourceType: 'chat', sessionId: document.getElementById('mmSessionSelect').value };
+
+  if (genSource === 'topic' && !payload.topic.trim()) { toast('Enter a topic'); return; }
+  if (genSource === 'chat' && !payload.sessionId) { toast('Pick a conversation'); return; }
+
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="mm-spin"></span> Generating…';
+  try {
+    const out = await api('/api/mind-maps/generate', { method: 'POST', body: JSON.stringify(payload) });
+    closeGenerate();
+    await openMap(out.mapId);
+    toast(`Built "${out.title}" — ${out.nodeCount} nodes` +
+      (out.linkedEntities ? `, ${out.linkedEntities} linked to your graph` : ''));
+  } catch (e) { toast('Generation failed: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = original;
+}
+
+// ── keyboard ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === 'Escape') { closePanel(); closeGenerate(); }
+  if (e.key === 'f') fitToScreen();
+  if (e.key === 'ArrowRight') presentStep(1);
+  if (e.key === 'ArrowLeft') presentStep(-1);
+});
+
+window.addEventListener('resize', () => { if (ROOT) applyView(); });
+
+// ── boot ─────────────────────────────────────────────────────────
+(async () => {
+  await loadList();
+  const wanted = new URLSearchParams(location.search).get('map');
+  if (wanted) openMap(wanted);
+})();
+</script>
+</body>
+</html>

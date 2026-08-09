@@ -33,6 +33,7 @@
     ['finchat_groupchat', 'groupchat'],
     ['finchat_neuralmap', 'neuralmap'],
     ['finchat_neuralnetwork', 'neuralmap'], // Model Lab lives under Neural Map
+    ['finchat_mindmap', 'mindmap'],
     ['finchat_knowledge', 'knowledge'],
     ['finchat_reports', 'reports'],
     ['finchat_blockchain', 'blockchain'],
@@ -170,6 +171,7 @@
           navItem('chat', 'finchat_chat.html', 'chat', 'Chat') +
           navItem('groupchat', 'finchat_groupchat.html', 'forum', 'Group Chat') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
+          navItem('mindmap', 'finchat_mindmap.html', 'schema', 'Mind Maps') +
           navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
           navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +
           soonItem('account_balance', 'Governance') +
