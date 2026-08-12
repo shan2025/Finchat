@@ -1,0 +1,81 @@
+# Render blueprint for the FinChat backend (service "Finchat-6").
+#
+# NOTE: this file does NOT retroactively take over a service that was created
+# through the Render dashboard. The existing Finchat-6 service keeps using its
+# dashboard settings until you either point a Blueprint at this repo
+# (Render -> New -> Blueprint) or recreate the service from it. Until then treat
+# this as documentation of the intended configuration — and if you change the
+# service in the dashboard, change it here too.
+#
+# Secrets are declared with `sync: false`, meaning Render prompts for them
+# rather than reading them from source control. Nothing secret belongs in here:
+# `.env` is listed in both .gitignore and .dockerignore, so the image ships with
+# no credentials and every value below must exist in the service Environment.
+
+services:
+  - type: web
+    name: Finchat-6
+    runtime: docker
+    plan: free
+    branch: main
+
+    # The Dockerfile lives under backend/ but COPYs both `backend/` and
+    # `frontend/`, so the build context has to be the directory above it.
+    dockerfilePath: ./legacy_prototype/backend/Dockerfile
+    dockerContext: ./legacy_prototype
+
+    # Safe now that /health degrades to 503 instead of throwing. Previously an
+    # unhandled rejection in this handler killed the process, so probing it
+    # turned a database outage into a permanent restart loop.
+    healthCheckPath: /health
+
+    envVars:
+      # PORT is injected by Render; server.js already honours it.
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+
+      # Supabase session pooler. Must be URL-encoded — the password contains
+      # characters that are otherwise parsed as URL delimiters. Re-check this
+      # whenever the Supabase project changes: a stale value here fails with
+      # "(ENOTFOUND) tenant/user <ref> not found", which is a dead tenant
+      # rather than a DNS problem.
+      - key: DATABASE_URL
+        sync: false
+
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      - key: PINATA_API_KEY
+        sync: false
+      - key: PINATA_SECRET_KEY
+        sync: false
+
+      # JSON array of the 64 secret-key bytes. Without it the devnet wallet is
+      # regenerated on every boot, because the container filesystem is
+      # ephemeral and .solana-keypair.json does not survive a restart.
+      - key: SOLANA_SECRET_KEY
+        sync: false
+
+      - key: FRONTEND_URL
+        value: https://finchat-6.onrender.com
+
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
