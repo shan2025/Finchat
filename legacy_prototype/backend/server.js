@@ -70,6 +70,9 @@ app.use('/api/blockchain', require('./routes/blockchain'));
 app.use('/api/knowledge', require('./routes/knowledge'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/mind-maps', require('./routes/mindMaps'));
+// External-scheduler triggers (shared-secret auth, not user JWT) — lets missions
+// and briefings fire on a host that sleeps when idle. See routes/cron.js.
+app.use('/api/cron', require('./routes/cron'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');
