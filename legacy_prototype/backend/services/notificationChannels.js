@@ -105,7 +105,14 @@ function getVapidKeys() {
 }
 
 // ── Adapters ─────────────────────────────────────────────────
-async function sendEmail(to, subject, text) {
+/**
+ * @param {string} to
+ * @param {string} subject
+ * @param {string} text  - plain-text body (markdown already flattened)
+ * @param {string} [html] - optional rich alternative; clients that can render
+ *                          it show headings and bold instead of "#" and "**".
+ */
+async function sendEmail(to, subject, text, html) {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return { status: 'unconfigured', detail: 'SMTP_HOST / SMTP_USER not set in .env' };
   if (!process.env.SMTP_PASS) return { status: 'unconfigured', detail: 'SMTP_PASS not set — generate a Gmail App Password and paste it into .env' };
   const nodemailer = require('nodemailer');
@@ -117,7 +124,7 @@ async function sendEmail(to, subject, text) {
   });
   await transporter.sendMail({
     from: process.env.SMTP_FROM || `FinChat <${process.env.SMTP_USER}>`,
-    to, subject, text
+    to, subject, text, ...(html ? { html } : {})
   });
   return { status: 'sent' };
 }
@@ -158,6 +165,11 @@ function splitForTelegram(text, max = 4000) {
   return out;
 }
 
+// Sent WITHOUT parse_mode on purpose. Telegram's Markdown/MarkdownV2 modes
+// reject the whole message with a 400 if a single character is unescaped, and
+// agent output is full of unescaped _ * [ ] ( ) — the user would get nothing
+// instead of a slightly plainer report. Callers pass text already flattened by
+// services/markdown.js, so the "#" and "**" are gone before we get here.
 async function sendTelegram(chatId, text) {
   if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
   for (const chunk of splitForTelegram(text)) {
@@ -231,24 +243,30 @@ async function dispatchToChannels(n) {
     : (typeof prefs.muted_types === 'string' ? JSON.parse(prefs.muted_types || '[]') : []);
   if (muted.includes(n.type)) return;
 
-  const text = `${n.title}\n${n.content || ''}`.trim();
+  // Agents write markdown. Every channel below is plain text, so flatten it —
+  // otherwise reports arrive with literal "#" headings and "**bold**" markers.
+  // Email additionally gets a rendered HTML alternative.
+  const { toPlainText, toEmailHtml, toSnippet } = require('./markdown');
+  const body = toPlainText(n.content || '');
+  const text = `${n.title}\n\n${body}`.trim();
   const attempts = [];
 
   if (prefs.channel_email && prefs.email_to) {
-    attempts.push(['email', prefs.email_to, () => sendEmail(prefs.email_to, `FinChat: ${n.title}`, text)]);
+    attempts.push(['email', prefs.email_to, () => sendEmail(
+      prefs.email_to, `FinChat: ${n.title}`, text, toEmailHtml(n.title, n.content || ''))]);
   }
   if (prefs.channel_whatsapp && prefs.whatsapp_to) {
     attempts.push(['whatsapp', prefs.whatsapp_to, () => sendWhatsApp(prefs.whatsapp_to, text)]);
   }
   if (prefs.channel_sms && prefs.sms_to) {
-    attempts.push(['sms', prefs.sms_to, () => sendSMS(prefs.sms_to, text.slice(0, 300))]);
+    attempts.push(['sms', prefs.sms_to, () => sendSMS(prefs.sms_to, `${n.title}\n${toSnippet(n.content, 260)}`)]);
   }
   if (prefs.channel_telegram && prefs.telegram_chat_id) {
     attempts.push(['telegram', prefs.telegram_chat_id, () => sendTelegram(prefs.telegram_chat_id, text)]);
   }
   if (prefs.channel_push) {
     attempts.push(['push', 'browser', () => sendPush(prefs.push_subscription, {
-      title: n.title, body: n.content || '', link: n.link || 'finchat_dashboard.html'
+      title: n.title, body: toSnippet(n.content, 180), link: n.link || 'finchat_dashboard.html'
     })]);
   }
 

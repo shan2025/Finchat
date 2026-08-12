@@ -71,6 +71,27 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+
+    // One-line teaser for the dropdown. Notification bodies are markdown (the
+    // same text sent to email/Telegram), so slicing the raw source showed
+    // literal "# 🧠 Frontier Research…" and "**bold**" in the list.
+    function mdSnippet(md, max) {
+      const t = String(md == null ? '' : md)
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+        .replace(/^\s*>\s?/gm, '')
+        .replace(/^\s*[-*+]\s+/gm, '• ')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (m, txt, url) => txt.trim() || url)
+        .replace(/(\*\*\*|\*\*|__|~~)(.+?)\1/g, '$2')
+        .replace(/(^|[\s(])[*_]([^*_\n]+)[*_]/g, '$1$2')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/^\s*(?:[-*_]\s*){3,}\s*$/gm, ' ')
+        .replace(/\s*\n+\s*/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      return escHtml(t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t);
+    }
     function showReport(n) {
       let ov = $('notifReportModal');
       if (ov) ov.remove();
@@ -111,8 +132,8 @@
         list.innerHTML = items.map(n => `
           <div onclick="__notifClick('${n.notification_id}')" style="padding:12px 16px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${n.is_read ? 'opacity:0.55' : 'background:rgba(212,175,55,0.08)'}">
             <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:700;color:#3a2e23">${n.title}</div>
-              <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${(n.content || '').slice(0, 120)}</div>
+              <div style="font-size:12px;font-weight:700;color:#3a2e23">${escHtml(n.title)}</div>
+              <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${mdSnippet(n.content, 120)}</div>
               <div style="font-size:10px;color:#8c7a6b;font-family:ui-monospace,monospace;margin-top:3px">${timeAgo(n.created_at)}</div>
             </div>
             ${n.is_read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:4px"></span>'}
