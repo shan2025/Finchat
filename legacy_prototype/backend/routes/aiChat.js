@@ -70,7 +70,9 @@ router.post('/send', requireAuth, async (req, res) => {
 
   const activeSession = sessionId || uuidv4();
 
-  let userProof, botProof, lastCleanResponse;
+  // userMsgId/botMsgId/channelId are needed by the post-response anchoring and
+  // IPFS pinning below, which runs outside this try block.
+  let userProof, botProof, lastCleanResponse, userMsgId, botMsgId, channelId;
   try {
     const resHistory = await query(`
       SELECT role, content FROM ai_conversations
@@ -96,9 +98,9 @@ router.post('/send', requireAuth, async (req, res) => {
     lastCleanResponse = result.cleanResponse;
 
     const resChan = await query("SELECT channel_id as id FROM channels LIMIT 1");
-    const channelId = resChan.rows[0] ? resChan.rows[0].id : 'general';
+    channelId = resChan.rows[0] ? resChan.rows[0].id : 'general';
 
-    const userMsgId = uuidv4();
+    userMsgId = uuidv4();
     await query(`
       INSERT INTO messages (message_id, channel_id, sender_id, content, message_type)
       VALUES ($1, $2, $3, $4, 'text')
@@ -111,7 +113,7 @@ router.post('/send', requireAuth, async (req, res) => {
       VALUES ($1, $2, $3, $4, 'user', $5, $6)
     `, [uuidv4(), activeSession, userId, personaId, storedMessage, userMsgId]);
 
-    const botMsgId = uuidv4();
+    botMsgId = uuidv4();
     const botContent = `[${persona.name}] ${result.cleanResponse}`;
     await query(`
       INSERT INTO messages (message_id, channel_id, sender_id, content, message_type)
@@ -288,23 +290,46 @@ router.post('/send', requireAuth, async (req, res) => {
 
   setImmediate(async () => {
     if (!userProof || !botProof) return;
-    try {
-      if (isCheckpoint(userProof.chain_height)) {
-        const solanaResult = await anchorHash(userProof.hash, userProof.chain_height);
-        if (solanaResult.tx) {
-          await updateProofSolana(userProof.id, solanaResult.tx,
-            solanaResult.solana_slot || solanaResult.slot, !solanaResult.simulated);
-        }
+
+    // Pin the proof document to IPFS at the same checkpoints we anchor on-chain.
+    // The Solana memo only carries a hash; without the document behind it there
+    // is nothing for an auditor to verify that hash against. Pinning every
+    // message would exhaust the free Pinata allowance for no extra assurance,
+    // so the two run on the same cadence.
+    const pinProof = async (proof, msgId, sender) => {
+      const doc = buildProofDocument(
+        proof,
+        { id: msgId, message_type: 'ai_chat', channel_id: channelId },
+        sender,
+        null // fraud assessment belongs to the channel-message path, not AI chat
+      );
+      const pin = await pinJSON(doc, `finchat-proof-${proof.chain_height}`);
+      if (pin.cid) await updateProofIPFS(proof.id, pin.cid, pin.url);
+      return pin;
+    };
+
+    const anchor = async (proof) => {
+      const result = await anchorHash(proof.hash, proof.chain_height);
+      if (result.tx) {
+        await updateProofSolana(proof.id, result.tx,
+          result.solana_slot || result.slot, !result.simulated);
       }
-      if (isCheckpoint(botProof.chain_height)) {
-        const solanaResult = await anchorHash(botProof.hash, botProof.chain_height);
-        if (solanaResult.tx) {
-          await updateProofSolana(botProof.id, solanaResult.tx,
-            solanaResult.solana_slot || solanaResult.slot, !solanaResult.simulated);
-        }
-      }
-    } catch (asyncErr) {
-      console.error('Async AI Anchor Error:', asyncErr.message);
+      return result;
+    };
+
+    // IPFS and Solana are attempted independently: a Pinata outage must not
+    // cost the on-chain anchor, and vice versa.
+    const checkpoints = [
+      { proof: userProof, msgId: userMsgId, sender: { id: user.id, name: user.name, role: user.role, wallet_address: user.wallet_address || null } },
+      { proof: botProof, msgId: botMsgId, sender: { id: personaId.toUpperCase(), name: persona.name, role: 'agent', wallet_address: null } }
+    ];
+
+    for (const { proof, msgId, sender } of checkpoints) {
+      if (!isCheckpoint(proof.chain_height)) continue;
+      try { await pinProof(proof, msgId, sender); }
+      catch (e) { console.error(`IPFS pin failed for proof #${proof.chain_height}:`, e.message); }
+      try { await anchor(proof); }
+      catch (e) { console.error(`Solana anchor failed for proof #${proof.chain_height}:`, e.message); }
     }
   });
 });

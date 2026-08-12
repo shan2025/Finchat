@@ -52,6 +52,15 @@ services:
       - key: GROQ_API_KEY
         sync: false
 
+      # Groq's free allowance is per-model per-day, so an exhausted primary is
+      # recovered by switching model, not by waiting. Listed in try-order and
+      # spanning three families so one spent quota cannot stall inference.
+      # This matters more here than locally: the Ollama fallback in
+      # services/inference.js points at localhost, which does not exist on
+      # Render, so without these a spent Groq quota means no inference at all.
+      - key: GROQ_FALLBACK_MODELS
+        value: openai/gpt-oss-120b,llama-3.1-8b-instant
+
       - key: PINATA_API_KEY
         sync: false
       - key: PINATA_SECRET_KEY

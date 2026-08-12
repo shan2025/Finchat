@@ -7,6 +7,18 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
+// Groq enforces its free-tier token allowance PER MODEL PER DAY, so when the
+// primary model is exhausted the answer is a different model, not a longer
+// wait. These are tried in order before giving up on Groq entirely. That last
+// part matters in production: the Ollama fallback further down points at
+// localhost, which does not exist on a cloud host, so Groq running out used to
+// mean no inference at all. Deliberately spans three model families, since a
+// spent quota is scoped to one model.
+const GROQ_PRIMARY_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
+  'openai/gpt-oss-120b,llama-3.1-8b-instant')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
 // ── Token-bucket rate limiter ────────────────────────────────────
 // Groq free tier ≈ 30 RPM. We cap at 28 to leave headroom.
 const GROQ_RPM = Number(process.env.GROQ_RPM) || 28;
@@ -102,19 +114,29 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
 
   if (provider === 'groq' && hasValidGroqKey) {
     const apiKey = byokKey || GROQ_API_KEY;
-    const gModel = model || 'llama-3.3-70b-versatile';
+    // An explicit `model` argument still wins, but it is only the first thing
+    // tried — the rest of the chain covers it running out of daily allowance.
+    const candidates = [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS]
+      .filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-    // Rate-limit: wait for a token before calling Groq
-    const hasToken = await _acquireToken();
-    if (!hasToken) {
-      console.warn(`⚠️ Groq rate limit: bucket empty after waiting ${MAX_WAIT_MS}ms, falling back to Ollama [${feature}]`);
-      // Fall through to Ollama below
-    } else {
-      // Attempt Groq with 429-retries
+    for (let mi = 0; mi < candidates.length; mi++) {
+      const gModel = candidates[mi];
+
+      // Rate-limit: wait for a token before calling Groq
+      const hasToken = await _acquireToken();
+      if (!hasToken) {
+        // An empty bucket is our own throttle, not this model's quota, so
+        // switching models would not help — leave Groq entirely.
+        console.warn(`⚠️ Groq rate limit: bucket empty after waiting ${MAX_WAIT_MS}ms, falling back to Ollama [${feature}]`);
+        break;
+      }
+
+      // Attempt this model with 429-retries
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
           const response = await _callGroq({ apiKey, model: gModel, messages, temperature, jsonMode });
-          console.log(`⚡ Groq Cloud Inference Successful [Model: ${gModel}]`);
+          console.log(`⚡ Groq Cloud Inference Successful [Model: ${gModel}]` +
+            (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
           const gUsage = response.data.usage || {};
           recordInferenceMetric({
             provider: 'groq', model: gModel, feature,
@@ -131,18 +153,24 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
           };
         } catch (err) {
           const status = err.response?.status;
-          if (status === 429 && attempt < 3) {
-            // Read Retry-After header (seconds) or default to 2s * (attempt + 1)
-            const retryAfter = Number(err.response?.headers?.['retry-after']) || (2 * (attempt + 1));
-            const delayMs = Math.min(retryAfter * 1000, 15_000);
-            console.warn(`⚠️ Groq 429 rate-limited (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
+          // A 429 carrying a retry-after under a minute is ordinary per-minute
+          // throttling, worth waiting out. A spent DAILY allowance also returns
+          // 429 but with a retry-after measured in hours — waiting is useless
+          // there, so stop retrying and let the next model take over.
+          const retryAfterSec = Number(err.response?.headers?.['retry-after']) || 0;
+          const dailyQuotaSpent = status === 429 && retryAfterSec > 120;
+          if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
+            const delayMs = Math.min((retryAfterSec || (2 * (attempt + 1))) * 1000, 15_000);
+            console.warn(`⚠️ Groq 429 rate-limited on "${gModel}" (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
             _bucket.tokens = 0; // Drain bucket so other concurrent calls also wait
             await _sleep(delayMs);
-            continue; // retry
+            continue; // retry same model
           }
-          // Non-429 error or exhausted 429 retries — fall to Ollama
-          console.warn(`⚠️ Groq API call failed (${status || 'network'}), falling back to Ollama: ${err.message}`);
-          break;
+          const nextModel = candidates[mi + 1];
+          const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');
+          console.warn(`⚠️ Groq model "${gModel}" unavailable (${why}): ${err.message}` +
+            (nextModel ? ` — trying "${nextModel}"` : ' — no Groq models left, falling back to Ollama'));
+          break; // move to the next candidate model
         }
       }
     }
