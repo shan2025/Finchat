@@ -88,7 +88,9 @@ const H = t => ({ headers: { Authorization: `Bearer ${t}` }, validateStatus: () 
   ok(badLayout.status === 400, `an unknown layout is rejected (${badLayout.status})`);
   const badSource = await axios.post(`${BASE}/generate`, { sourceType: 'telepathy' }, H(t1));
   ok(badSource.status === 400, `an unknown sourceType is rejected (${badSource.status})`);
-  const notYet = await axios.post(`${BASE}/generate`, { sourceType: 'document' }, H(t1));
+  const noDocs = await axios.post(`${BASE}/generate`, { sourceType: 'document' }, H(t1));
+  ok(noDocs.status === 400, `generating from documents without any is rejected (${noDocs.status})`);
+  const notYet = await axios.post(`${BASE}/generate`, { sourceType: 'graph' }, H(t1));
   ok(notYet.status === 501, `an unimplemented sourceType says 501, not a wrong map (${notYet.status})`);
 
   // Cycles
@@ -161,6 +163,82 @@ const H = t => ({ headers: { Authorization: `Bearer ${t}` }, validateStatus: () 
   ok(chat2.data.sessionId === chat1.data.sessionId && chat2.data.resumed === true,
     'reopening the same node resumes its conversation rather than starting a new one');
 
+  // Documents
+  console.log('\n=== 9b. Documents ===');
+  const FormData = require(B + '/node_modules/form-data');
+  const postDocs = async (token, fields, files) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    for (const f of files) fd.append('files', Buffer.from(f.body), { filename: f.name, contentType: 'text/plain' });
+    return axios.post(`${BASE}/docs`, fd, {
+      headers: { ...fd.getHeaders(), Authorization: `Bearer ${token}` },
+      validateStatus: () => true
+    });
+  };
+
+  const noFiles = await axios.post(`${BASE}/docs`, {}, H(t1));
+  ok(noFiles.status === 400, `an upload with no files is rejected (${noFiles.status})`);
+
+  const nodeUp = await postDocs(t1, { mapId, nodeId: alphaId },
+    [{ name: 'alpha-notes.txt', body: 'Alpha is measured in basis points and rebalanced quarterly.' }]);
+  ok(nodeUp.status === 201 && nodeUp.data.docs.length === 1, `a document uploads to a node (${nodeUp.status})`);
+  const docId = nodeUp.data?.docs?.[0]?.docId;
+  ok(nodeUp.data?.docs?.[0]?.chars > 20, `the text is extracted at upload time (${nodeUp.data?.docs?.[0]?.chars} chars)`);
+  ok(!!nodeUp.data?.docs?.[0]?.url, 'the original file is addressable');
+
+  const orphanNode = await postDocs(t1, { nodeId: alphaId }, [{ name: 'x.txt', body: 'hello there' }]);
+  ok(orphanNode.status === 400, `a nodeId without a mapId is rejected (${orphanNode.status})`);
+  const foreignUp = await postDocs(t2, { mapId, nodeId: alphaId }, [{ name: 'x.txt', body: 'hello there' }]);
+  ok(foreignUp.status === 404, `uploading into another user's map is refused (${foreignUp.status})`);
+
+  const withDocs = await axios.get(`${BASE}/${mapId}`, H(t1));
+  ok(withDocs.data.docs.length === 1, 'the map read carries its documents');
+  ok(withDocs.data.sources.some(s => s.type === 'document' && s.label === 'alpha-notes.txt'),
+    'the document shows up in the map source list');
+
+  const readDoc = await axios.get(`${BASE}/docs/${docId}`, H(t1));
+  ok(readDoc.status === 200 && readDoc.data.doc.text.includes('basis points'),
+    'a document reads back with its extracted text');
+  const foreignDoc = await axios.get(`${BASE}/docs/${docId}`, H(t2));
+  ok(foreignDoc.status === 404, `another user cannot read the document (${foreignDoc.status})`);
+
+  // Documents are inherited down the branch: alpha1 sits under beta now, so it
+  // must NOT see alpha's document, while alpha itself must.
+  const alphaChat = await axios.post(`${BASE}/${mapId}/nodes/${alphaId}/chat`, {}, H(t1));
+  ok(alphaChat.data.docs.length === 1 && alphaChat.data.docs[0].scope === 'node',
+    'the node chat is handed the document attached to that node');
+  const rootChat = await axios.post(`${BASE}/${mapId}/nodes/${rootId}/chat`, {}, H(t1));
+  ok(rootChat.data.docs.length === 0, 'a document on a child does not leak up to the root');
+
+  const mapUp = await postDocs(t1, { mapId }, [{
+    name: 'map-level.txt',
+    body: 'A map-wide reference document that every node in this map may draw on when answering.'
+  }]);
+  ok(mapUp.status === 201, `a map-level document uploads (${mapUp.status})`);
+  const rootChat2 = await axios.post(`${BASE}/${mapId}/nodes/${rootId}/chat`, {}, H(t1));
+  ok(rootChat2.data.docs.length === 1, 'a map-level document is in scope for every node');
+  ok(rootChat2.data.docs[0].scope === 'map', 'a map-level document is labelled as such');
+  const alphaChat2 = await axios.post(`${BASE}/${mapId}/nodes/${alphaId}/chat`, {}, H(t1));
+  ok(alphaChat2.data.docs.length === 2 && alphaChat2.data.docs[0].scope === 'node',
+    'a node sees its own document first, then the map-level one');
+
+  // Too short to be a source. Silently feeding "hi" to the model as evidence is
+  // worse than leaving it out, so the floor is deliberate.
+  const trivial = await postDocs(t1, { mapId, nodeId: alphaId }, [{ name: 'note.txt', body: 'hi' }]);
+  const alphaChat3 = await axios.post(`${BASE}/${mapId}/nodes/${alphaId}/chat`, {}, H(t1));
+  ok(alphaChat3.data.docs.length === 2, 'a document with almost no text is not offered as a source');
+  await axios.delete(`${BASE}/docs/${trivial.data.docs[0].docId}`, H(t1));
+
+  const moved2 = await axios.patch(`${BASE}/docs/${docId}`, { nodeId: betaId }, H(t1));
+  ok(moved2.status === 200 && moved2.data.doc.nodeId === betaId, `a document can be moved to another node (${moved2.status})`);
+  const badMove = await axios.patch(`${BASE}/docs/${docId}`, { nodeId: otherRows[0].node_id }, H(t1));
+  ok(badMove.status === 400, `a move onto a node outside the map is rejected (${badMove.status})`);
+
+  const listed2 = await axios.get(`${BASE}/docs`, H(t1));
+  ok(listed2.status === 200 && listed2.data.docs.length >= 2, 'the document library lists the caller\'s uploads');
+  const foreignDel = await axios.delete(`${BASE}/docs/${docId}`, H(t2));
+  ok(foreignDel.status === 404, `another user cannot delete the document (${foreignDel.status})`);
+
   // Delete semantics
   console.log('\n=== 10. Delete ===');
   const delRoot = await axios.delete(`${BASE}/${mapId}/nodes/${rootId}`, H(t1));
@@ -170,6 +248,9 @@ const H = t => ({ headers: { Authorization: `Bearer ${t}` }, validateStatus: () 
   const afterDel = await axios.get(`${BASE}/${mapId}`, H(t1));
   ok(!afterDel.data.nodes.some(n => n.node_id === alpha1Id), 'the moved child went with its new parent');
   ok(afterDel.data.edges.length === 0, 'cross-links touching a deleted node are cleaned up');
+  ok(!afterDel.data.docs.some(d => d.doc_id === docId),
+    'a document attached to a deleted node goes with it');
+  ok(afterDel.data.docs.length === 1, 'the map-level document survives a node delete');
 
   // Generation (optional)
   console.log('\n=== 11. Generation ===');
@@ -185,6 +266,34 @@ const H = t => ({ headers: { Authorization: `Bearer ${t}` }, validateStatus: () 
     }
     const empty = await axios.post(`${BASE}/generate`, { sourceType: 'topic', topic: '' }, H(t1));
     ok(empty.status === 400, `an empty topic is rejected (${empty.status})`);
+
+    // Generate from documents: the staged upload must end up owned by the map
+    // it produced, so the root can name what it was built from.
+    const staged = await postDocs(t1, {}, [{
+      name: 'convexity.txt',
+      body: 'Bond convexity measures the curvature of the price-yield relationship. ' +
+            'Duration is a first-order approximation; convexity is the second-order correction. ' +
+            'Positive convexity means the price rises more than duration predicts when yields fall, ' +
+            'and falls less than predicted when yields rise. Callable bonds can exhibit negative ' +
+            'convexity because the issuer will refinance as yields drop. Portfolio managers buy ' +
+            'convexity as insurance against large rate moves, and pay for it in yield.'
+    }]);
+    ok(staged.status === 201 && !staged.data.docs[0].mapId, 'a staged document starts with no map');
+    const genDoc = await axios.post(`${BASE}/generate`,
+      { sourceType: 'document', docIds: [staged.data.docs[0].docId] }, H(t1));
+    ok(genDoc.status === 201 && genDoc.data.nodeCount > 5,
+      `POST /generate builds a map from documents (${genDoc.data?.nodeCount} nodes)`);
+    if (genDoc.data?.mapId) {
+      const built = await axios.get(`${BASE}/${genDoc.data.mapId}`, H(t1));
+      ok(built.data.docs.length === 1, 'the map adopted the document it was built from');
+      ok(built.data.sources.some(s => s.label === 'convexity.txt'), 'the source is named on the map');
+      await axios.delete(`${BASE}/${genDoc.data.mapId}`, H(t1));
+    }
+    const unreadable = await postDocs(t1, {}, [{ name: 'tiny.txt', body: 'hi' }]);
+    const genBad = await axios.post(`${BASE}/generate`,
+      { sourceType: 'document', docIds: [unreadable.data.docs[0].docId] }, H(t1));
+    ok(genBad.status === 422, `a document with no usable text is refused, not turned into a stub (${genBad.status})`);
+    await axios.delete(`${BASE}/docs/${unreadable.data.docs[0].docId}`, H(t1));
   }
 
   // Cleanup

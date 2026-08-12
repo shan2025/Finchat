@@ -27,6 +27,12 @@ const MAX_BRANCHES = 7;
 const MAX_CHILDREN = 6;
 const MAX_NODES = 60;
 
+// How much source text a document-backed generation may spend. Split evenly
+// across the chosen documents so one 400-page PDF cannot crowd out the other
+// four sources the learner deliberately picked.
+const DOC_BUDGET = 12000;
+const EXPAND_DOC_BUDGET = 5000;
+
 const NODE_TYPES = new Set(['root', 'branch', 'leaf', 'question', 'task']);
 
 const GEN_PROMPT = `You build STUDY MIND MAPS: a hierarchy that shows how a topic is organised.
@@ -224,11 +230,11 @@ async function createMap({ userId, title, topic, sourceType, sourceRef, meta = {
 // Generation
 // ═══════════════════════════════════════════════════════════
 
-async function generateHierarchy(userContent, { model = null } = {}) {
+async function generateHierarchy(userContent, { model = null, maxChars = 8000 } = {}) {
   const res = await runInference({
     messages: [
       { role: 'system', content: GEN_PROMPT },
-      { role: 'user', content: userContent.slice(0, 8000) }
+      { role: 'user', content: userContent.slice(0, maxChars) }
     ],
     temperature: 0.4,
     jsonMode: true,
@@ -329,6 +335,65 @@ async function generateFromChat(userId, sessionId, opts = {}) {
 }
 
 /**
+ * Build a map from documents the user uploaded.
+ *
+ * The map is grounded: the model is told to organise what the sources actually
+ * say. Documents are then adopted by the map (map_id set), so the root's
+ * overview can name every source the map was built from.
+ */
+async function generateFromDocuments(userId, docIds, opts = {}) {
+  const docs = await docsByIds(userId, docIds);
+  if (!docs.length) throw new Error('no documents found for that selection');
+
+  // A scanned PDF with no text layer extracts to nothing. Building a map from
+  // the filename alone would look like it worked and be worthless.
+  const usable = docs.filter(d => String(d.extracted || '').trim().length > 40);
+  if (!usable.length) throw new Error('none of those documents had extractable text');
+
+  const focus = clean(opts.topic, 300);
+  const topic = focus || clean(usable.map(d => d.filename).join(', '), 400);
+
+  const prompt =
+    `Build a study mind map of the ${usable.length} source document(s) below.` +
+    (focus ? ` Focus it on: ${focus}.` : '') +
+    `\nOrganise it by what the sources actually say. Do not add facts they do not contain.\n\n` +
+    sourceBlock(usable, DOC_BUDGET);
+
+  const { raw, provider, model } = await generateHierarchy(prompt, { ...opts, maxChars: DOC_BUDGET + 2000 });
+  const tree = normalizeTree(raw, topic);
+  if (tree.children.length < MIN_BRANCHES) {
+    throw new Error(`generator produced only ${tree.children.length} branch(es) — refusing to save a stub map`);
+  }
+
+  const title = clean(raw?.title || topic, 160);
+  const mapId = await createMap({
+    userId, title, topic, sourceType: 'document', sourceRef: usable[0].doc_id,
+    meta: {
+      provider, model, generatedAt: new Date().toISOString(),
+      sources: usable.map(d => ({ docId: d.doc_id, filename: d.filename }))
+    }
+  });
+
+  const rows = flatten(tree, mapId);
+  const linked = await linkEntities(rows);
+  await insertNodes(rows);
+
+  await adoptDocs(mapId, userId, usable);
+
+  if (linked.length) {
+    await recordActivation({
+      entityIds: linked, userId, source: 'mindmap', sourceId: mapId,
+      detail: `Studied via mind map "${title}".`
+    });
+  }
+
+  return {
+    mapId, title, nodeCount: rows.length, linkedEntities: linked.length,
+    sourceCount: usable.length, skipped: docs.length - usable.length
+  };
+}
+
+/**
  * Grow one branch on demand. The ancestor chain is the context, so an expanded
  * node goes one level deeper rather than drifting back to the top-level topic —
  * this is the primary interaction, not one-shot generation.
@@ -349,11 +414,20 @@ async function expandNode(mapId, nodeId, opts = {}) {
   const existing = await query(
     'SELECT label FROM mind_map_nodes WHERE parent_id = $1 ORDER BY order_index', [nodeId]);
 
+  // Documents on this node or anywhere above it are the source of truth for
+  // this branch. With them present the expansion stops being general knowledge
+  // and starts being "what do MY sources say about this".
+  const docs = (await inheritedDocs(nodeId)).filter(d => String(d.extracted || '').trim().length > 40);
+
   const prompt =
     `PATH: ${ancestors.join(' → ')}\n` +
     `NODE TO EXPAND: ${node.label}${node.summary ? ` — ${node.summary}` : ''}\n` +
     (existing.rows.length
       ? `ALREADY PRESENT (do not repeat): ${existing.rows.map(r => r.label).join(', ')}\n`
+      : '') +
+    (docs.length
+      ? `\nGround every child in the source material below — it is what this branch is about. ` +
+        `Do not add anything the sources do not support.\n\n${sourceBlock(docs.slice(0, 4), EXPAND_DOC_BUDGET)}\n`
       : '');
 
   const res = await runInference({
@@ -407,6 +481,118 @@ async function expandNode(mapId, nodeId, opts = {}) {
 // ═══════════════════════════════════════════════════════════
 // Reads / helpers
 // ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// Documents
+// ═══════════════════════════════════════════════════════════
+
+/** The caller's own documents, by id. Ownership is part of the query, not a check after it. */
+async function docsByIds(userId, docIds) {
+  const ids = (Array.isArray(docIds) ? docIds : []).filter(d => typeof d === 'string' && d);
+  if (!ids.length) return [];
+  const res = await query(
+    'SELECT * FROM mind_map_docs WHERE user_id = $1 AND doc_id = ANY($2::text[]) ORDER BY created_at ASC',
+    [userId, ids]);
+  return res.rows;
+}
+
+/**
+ * Documents in scope for a node: its own first, then each ancestor's, then the
+ * map-level sources. A leaf inherits the paper its branch was built from, which
+ * is what "ask about this" has to mean for the answer to be grounded.
+ */
+async function inheritedDocs(nodeId) {
+  const res = await query(`
+    WITH RECURSIVE up AS (
+      SELECT node_id, parent_id, map_id, 0 AS d FROM mind_map_nodes WHERE node_id = $1
+      UNION ALL
+      SELECT n.node_id, n.parent_id, n.map_id, up.d + 1
+        FROM mind_map_nodes n JOIN up ON up.parent_id = n.node_id
+    )
+    SELECT d.*, up.d AS distance FROM mind_map_docs d JOIN up ON d.node_id = up.node_id
+    UNION ALL
+    SELECT d.*, 999 AS distance FROM mind_map_docs d
+     WHERE d.node_id IS NULL
+       AND d.map_id = (SELECT map_id FROM mind_map_nodes WHERE node_id = $1)
+    ORDER BY distance ASC, created_at ASC
+  `, [nodeId]);
+  return res.rows;
+}
+
+/**
+ * Bind the documents a generation used to the map it produced.
+ *
+ * A document still sitting in the library is moved. One that already belongs to
+ * another map is COPIED instead — building a second map from a paper must not
+ * silently strip that paper off the first map's node, which is exactly what a
+ * bare UPDATE would do. The text is already extracted, so a copy is cheap.
+ */
+async function adoptDocs(mapId, userId, docs) {
+  if (!docs.length) return;
+  const free = docs.filter(d => !d.map_id);
+  const bound = docs.filter(d => d.map_id && d.map_id !== mapId);
+
+  if (free.length) {
+    await query(
+      `UPDATE mind_map_docs SET map_id = $1
+        WHERE user_id = $2 AND doc_id = ANY($3::text[]) AND map_id IS NULL`,
+      [mapId, userId, free.map(d => d.doc_id)]);
+  }
+
+  for (const d of bound) {
+    await query(`
+      INSERT INTO mind_map_docs
+        (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
+         stored_name, kind, extracted, char_count)
+      VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,$10)
+    `, ['mmd_' + uuidv4(), userId, mapId, d.filename, d.mimetype, d.size_bytes,
+        d.stored_name, d.kind, d.extracted, d.char_count]);
+  }
+}
+
+/** Every document belonging to a map, node-scoped and map-scoped alike. */
+async function mapDocs(mapId) {
+  const res = await query(`
+    SELECT doc_id, map_id, node_id, filename, mimetype, size_bytes, stored_name,
+           kind, char_count, created_at
+      FROM mind_map_docs WHERE map_id = $1 ORDER BY created_at ASC
+  `, [mapId]);
+  return res.rows;
+}
+
+/**
+ * Fold documents into one prompt block, spending the budget evenly. Even split
+ * rather than first-come: the fifth source the learner chose deserves the same
+ * room as the first.
+ */
+function sourceBlock(docs, budget) {
+  if (!docs.length) return '';
+  const share = Math.max(700, Math.floor(budget / docs.length));
+  return docs.map((d, i) => {
+    const body = String(d.extracted || '').trim();
+    const cut = body.length > share ? body.slice(0, share) + '\n…[source truncated]' : body;
+    return `--- SOURCE ${i + 1}: ${d.filename} ---\n${cut}`;
+  }).join('\n\n');
+}
+
+/** What the map was built from, in the order a reader would want to see it. */
+function buildSources(map, docs) {
+  const out = [];
+  if (map.source_type === 'chat' && map.source_ref) {
+    out.push({ type: 'chat', label: 'Conversation transcript', ref: map.source_ref });
+  } else if (map.source_type === 'topic') {
+    out.push({ type: 'topic', label: map.topic || map.title || 'Topic', ref: null });
+  } else if (map.source_type === 'graph') {
+    out.push({ type: 'graph', label: 'Knowledge graph slice', ref: map.source_ref });
+  }
+  for (const d of docs) {
+    out.push({
+      type: 'document', label: d.filename, ref: d.doc_id,
+      nodeId: d.node_id, kind: d.kind, chars: d.char_count
+    });
+  }
+  return out;
+}
 
 /** Concepts the user already has in the living graph, as prompt context. */
 async function relatedContext(topic) {
@@ -470,12 +656,15 @@ async function getMap(mapId, userId) {
   `, [mapId]);
 
   const edges = await query('SELECT * FROM mind_map_edges WHERE map_id = $1', [mapId]);
-  return { map, nodes: nodes.rows, edges: edges.rows };
+  const docs = await mapDocs(mapId);
+  return { map, nodes: nodes.rows, edges: edges.rows, docs, sources: buildSources(map, docs) };
 }
 
 async function listMaps(userId) {
   const res = await query(`
-    SELECT m.*, (SELECT COUNT(*) FROM mind_map_nodes n WHERE n.map_id = m.map_id) AS node_count
+    SELECT m.*,
+           (SELECT COUNT(*) FROM mind_map_nodes n WHERE n.map_id = m.map_id) AS node_count,
+           (SELECT COUNT(*) FROM mind_map_docs d WHERE d.map_id = m.map_id)  AS doc_count
     FROM mind_maps m WHERE m.user_id = $1 ORDER BY m.updated_at DESC LIMIT 50
   `, [userId]);
   return res.rows;
@@ -484,12 +673,19 @@ async function listMaps(userId) {
 module.exports = {
   generateFromTopic,
   generateFromChat,
+  generateFromDocuments,
   expandNode,
   getMap,
   listMaps,
   createMap,
   insertNodes,
   touchMap,
+  // documents
+  docsByIds,
+  inheritedDocs,
+  mapDocs,
+  sourceBlock,
+  buildSources,
   // exported for tests
   normalizeTree,
   normalizeNode,
