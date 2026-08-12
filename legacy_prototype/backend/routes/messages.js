@@ -216,7 +216,8 @@ router.post('/:channelId', requireAuth, upload.array('files', 5), async (req, re
         if (isCheckpoint(proof.chain_height)) {
           const solanaResult = await anchorHash(proof.hash, proof.chain_height);
           if (solanaResult.tx) {
-            await updateProofSolana(proof.id, solanaResult.tx, solanaResult.solana_slot || solanaResult.slot);
+            await updateProofSolana(proof.id, solanaResult.tx,
+              solanaResult.solana_slot || solanaResult.slot, !solanaResult.simulated);
           }
           console.log(`✅ Async complete: msg ${messageId.substring(0, 8)} | IPFS: ${ipfsResult.cid || 'skipped'} | Solana: ${solanaResult.tx || 'skipped'} (Checkpoint #${proof.chain_height})`);
         } else {

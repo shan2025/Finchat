@@ -292,13 +292,15 @@ router.post('/send', requireAuth, async (req, res) => {
       if (isCheckpoint(userProof.chain_height)) {
         const solanaResult = await anchorHash(userProof.hash, userProof.chain_height);
         if (solanaResult.tx) {
-          await updateProofSolana(userProof.id, solanaResult.tx, solanaResult.solana_slot || solanaResult.slot);
+          await updateProofSolana(userProof.id, solanaResult.tx,
+            solanaResult.solana_slot || solanaResult.slot, !solanaResult.simulated);
         }
       }
       if (isCheckpoint(botProof.chain_height)) {
         const solanaResult = await anchorHash(botProof.hash, botProof.chain_height);
         if (solanaResult.tx) {
-          await updateProofSolana(botProof.id, solanaResult.tx, solanaResult.solana_slot || solanaResult.slot);
+          await updateProofSolana(botProof.id, solanaResult.tx,
+            solanaResult.solana_slot || solanaResult.slot, !solanaResult.simulated);
         }
       }
     } catch (asyncErr) {

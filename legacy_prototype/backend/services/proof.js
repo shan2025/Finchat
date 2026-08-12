@@ -145,10 +145,15 @@ async function updateProofIPFS(proofId, cid, url) {
   `, [cid, url, proofId]);
 }
 
-async function updateProofSolana(proofId, txSignature, slot) {
+// `confirmed` must reflect whether the transaction really landed on-chain.
+// anchorHash() falls back to a fake "sim_" signature when devnet is unreachable
+// or the wallet cannot be funded, and recording those as confirmed made the
+// audit trail claim on-chain proof that does not exist. Simulated anchors are
+// still stored (they show the checkpoint was reached) but marked unconfirmed.
+async function updateProofSolana(proofId, txSignature, slot, confirmed = true) {
   await query(`
-    UPDATE proof_chain SET solana_tx = $1, solana_slot = $2, solana_confirmed = 1 WHERE proof_id = $3
-  `, [txSignature, slot, proofId]);
+    UPDATE proof_chain SET solana_tx = $1, solana_slot = $2, solana_confirmed = $3 WHERE proof_id = $4
+  `, [txSignature, slot, confirmed ? 1 : 0, proofId]);
 }
 
 module.exports = { createProof, verifyChain, updateProofIPFS, updateProofSolana, sha256, isCheckpoint };
