@@ -89,6 +89,15 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
 
+      # Web Push signing pair. Optional, but without it the keys are generated
+      # at boot and lost with the container, which silently invalidates every
+      # browser subscription made against the previous pair. Generate once with
+      # `npx web-push generate-vapid-keys` and keep them stable.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+
       # Shared secret for the external scheduler that drives /api/cron/*.
       # Required for missions and briefings to fire on the free plan, where the
       # instance sleeps when idle and the in-process scheduler stops with it.

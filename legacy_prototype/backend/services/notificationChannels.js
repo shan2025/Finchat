@@ -60,7 +60,10 @@ function channelConfigStatus() {
     whatsapp: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
     sms: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_SMS_FROM),
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    push: true // VAPID keys are self-generated, always available
+    // Reflect reality rather than assuming: getVapidKeys() returns null when the
+    // web-push package is missing, and reporting push as configured there made
+    // the Settings page offer a channel that could never deliver.
+    push: Boolean(getVapidKeys())
   };
 }
 
@@ -70,11 +73,27 @@ function getVapidKeys() {
   if (_vapid) return _vapid;
   try {
     const webpush = require('web-push');
-    if (fs.existsSync(VAPID_PATH)) {
+    // A browser's push subscription is bound to the public key it was created
+    // with, so regenerating the pair silently invalidates every existing
+    // subscription. VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY are read first because
+    // the on-disk fallback does not survive a restart on a host with an
+    // ephemeral filesystem — there, every boot would issue a new pair and
+    // quietly break push for everyone already subscribed.
+    if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      _vapid = {
+        publicKey: process.env.VAPID_PUBLIC_KEY.trim(),
+        privateKey: process.env.VAPID_PRIVATE_KEY.trim()
+      };
+    } else if (fs.existsSync(VAPID_PATH)) {
       _vapid = JSON.parse(fs.readFileSync(VAPID_PATH, 'utf8'));
     } else {
       _vapid = webpush.generateVAPIDKeys();
-      fs.writeFileSync(VAPID_PATH, JSON.stringify(_vapid));
+      try {
+        fs.writeFileSync(VAPID_PATH, JSON.stringify(_vapid));
+      } catch (writeErr) {
+        console.warn(`⚠️ Could not persist VAPID keys (${writeErr.message}). ` +
+          'Set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY so subscriptions survive a restart.');
+      }
       console.log('🔔 Generated new VAPID keypair for Web Push');
     }
     webpush.setVapidDetails('mailto:admin@finchat.local', _vapid.publicKey, _vapid.privateKey);
