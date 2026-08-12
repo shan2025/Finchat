@@ -27,9 +27,23 @@ function getConnection() {
   return _connection;
 }
 
-// Get or generate a devnet keypair (saved to disk for reuse)
+// Get or generate a devnet keypair.
+// Prefers SOLANA_SECRET_KEY (JSON array of 64 bytes) so the wallet survives
+// restarts on hosts with an ephemeral filesystem — writing to KEYPAIR_PATH
+// there yields a brand-new unfunded wallet on every boot.
 function getOrCreateKeypair() {
   if (_payer) return _payer;
+
+  if (process.env.SOLANA_SECRET_KEY) {
+    try {
+      const raw = JSON.parse(process.env.SOLANA_SECRET_KEY);
+      _payer = Keypair.fromSecretKey(Uint8Array.from(raw));
+      console.log(`🔑 Loaded Keypair from SOLANA_SECRET_KEY: ${_payer.publicKey.toBase58()}`);
+      return _payer;
+    } catch (err) {
+      console.error('SOLANA_SECRET_KEY is set but unusable, falling back to disk:', err.message);
+    }
+  }
 
   if (fs.existsSync(KEYPAIR_PATH)) {
     try {
@@ -42,9 +56,16 @@ function getOrCreateKeypair() {
     }
   }
 
-  // Generate a new keypair and save it
+  // Generate a new keypair and try to save it. The write is best-effort: on a
+  // read-only or ephemeral filesystem it fails (or silently won't persist), so
+  // set SOLANA_SECRET_KEY there instead of relying on this path.
   _payer = Keypair.generate();
-  fs.writeFileSync(KEYPAIR_PATH, JSON.stringify(Array.from(_payer.secretKey)));
+  try {
+    fs.writeFileSync(KEYPAIR_PATH, JSON.stringify(Array.from(_payer.secretKey)));
+  } catch (err) {
+    console.error(`Could not persist keypair to ${KEYPAIR_PATH} (${err.message}). ` +
+      'Set SOLANA_SECRET_KEY to keep a stable wallet across restarts.');
+  }
   console.log(`🔑 New Solana devnet keypair generated: ${_payer.publicKey.toBase58()}`);
   console.log(`💰 Run: solana airdrop 2 ${_payer.publicKey.toBase58()} --url devnet`);
   return _payer;

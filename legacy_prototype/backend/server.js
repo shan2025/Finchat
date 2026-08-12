@@ -142,23 +142,46 @@ eventBus.on('group:typing', (info) => {
   io.to(`group:${info.group_id}`).emit('group:typing', info);
 });
 
-// Health check
+// Health check.
+// Must never throw: an unhandled rejection here takes down the whole process,
+// which turns a transient DB blip into a permanent crash-loop (the platform
+// health probe restarts the container, probes again, and kills it again).
+// Degrade to 503 with a diagnosis instead.
 app.get('/health', async (req, res) => {
-  const { isReachable } = require('./services/solana');
-  const solanaConnected = await isReachable();
-  const resUsers = await query('SELECT COUNT(*) as c FROM users');
-  const resMsgs = await query('SELECT COUNT(*) as c FROM messages');
-  const userCount = resUsers.rows[0].c;
-  const msgCount = resMsgs.rows[0].c;
-  res.json({
-    status: 'ok',
+  const base = {
     service: 'FinChat Backend',
     version: '0.2.0',
-    users: userCount,
-    messages: msgCount,
-    uptime: process.uptime().toFixed(1) + 's',
-    solana_connected: solanaConnected
-  });
+    uptime: process.uptime().toFixed(1) + 's'
+  };
+
+  let solanaConnected = false;
+  try {
+    const { isReachable } = require('./services/solana');
+    solanaConnected = await isReachable();
+  } catch (err) {
+    solanaConnected = false;
+  }
+
+  try {
+    const resUsers = await query('SELECT COUNT(*) as c FROM users');
+    const resMsgs = await query('SELECT COUNT(*) as c FROM messages');
+    res.json({
+      ...base,
+      status: 'ok',
+      users: resUsers.rows[0].c,
+      messages: resMsgs.rows[0].c,
+      solana_connected: solanaConnected
+    });
+  } catch (err) {
+    console.error('❌ Health check: database unreachable:', err.message);
+    res.status(503).json({
+      ...base,
+      status: 'degraded',
+      database: 'unreachable',
+      error: err.message,
+      solana_connected: solanaConnected
+    });
+  }
 });
 
 // 404 handler
