@@ -155,6 +155,19 @@ async function run({
     console.warn(`⚠️ CognitiveCore: could not load runtime settings for ${agentName}: ${cfgErr.message}`);
   }
 
+  // Standing user preferences ("explain it like I'm a child", "keep it short").
+  // Loaded ONCE per execution rather than inside the retrieval bundle: unlike
+  // memories and graph hops these are not goal-scoped, they cannot change
+  // mid-run, and the reasoning loop below runs up to 8 times — which would
+  // otherwise mean 8 identical round-trips to Supabase per chat turn.
+  let userPreferences = [];
+  try {
+    const { getUserPreferences } = require('./MemoryEngine');
+    userPreferences = await getUserPreferences(userId);
+  } catch (prefErr) {
+    console.warn(`⚠️ CognitiveCore: could not load user preferences: ${prefErr.message}`);
+  }
+
   try {
     // 2. Transition created -> ready -> running
     await updateState(execId, STATES.READY);
@@ -207,6 +220,7 @@ async function run({
         recipeHints: enriched.recipeHints,
         budgetExceeded: budget.breached,
         traits: agentTraits,
+        userPreferences,
         allowWeb,
         studyMode
       });

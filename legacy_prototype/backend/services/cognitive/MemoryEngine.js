@@ -21,6 +21,7 @@ const { eventBus } = require('./EventBus');
 
 const ENTITY_TYPES = ['ticker', 'technology', 'company', 'person', 'topic', 'preference', 'project', 'document'];
 const RELATION_TYPES = ['related_to', 'part_of', 'uses', 'prefers', 'works_on', 'causes', 'instance_of', 'compares_to', 'co_mentioned'];
+const PREFERENCE_KINDS = ['style', 'format', 'depth', 'topic', 'tool', 'constraint'];
 
 const INGEST_PROMPT = `You maintain the long-term knowledge graph memory of an AI assistant.
 Given one conversation exchange (user message + assistant reply), extract what is worth remembering.
@@ -43,11 +44,31 @@ Respond ONLY with JSON:
     {"statement": "<claim made in this exchange>",
      "conflicts_with": "<the earlier/known fact it contradicts>",
      "explanation": "<one sentence>"}
+  ],
+  "preferences": [
+    {"label": "<3-6 word name for the preference, e.g. 'Child-level explanations'>",
+     "instruction": "<how the assistant should behave from now on, as one imperative sentence>",
+     "kind": "<style|format|depth|topic|tool|constraint>",
+     "evidence": "<the user's own words that show it>",
+     "confidence": <0-1>}
   ]
 }
 
 Rules: at most 6 entities and 8 relations. Skip greetings, small talk and generic words.
-"contradictions" is usually empty. Return {"entities":[],"relations":[],"contradictions":[]} if nothing significant.`;
+"contradictions" is usually empty.
+
+PREFERENCES — read the USER's words only, never the assistant's:
+- Capture how this user wants to be answered, not what the answer was about.
+- Anything the user asks for about the FORM of a reply is a preference worth keeping:
+  "explain it like I'm a child", "in a way a child can understand", "keep it short",
+  "no jargon", "give me bullet points", "always cite sources", "answer in Arabic",
+  "stop using emojis", "show the numbers first".
+- Also capture standing interests and constraints: "I only care about crypto, not stocks",
+  "I'm a beginner", "I invest long-term", "never recommend penny stocks".
+- Treat these as durable even when phrased about the current message — the user is
+  telling you how they like to be taught.
+- Do NOT invent preferences. If the user only asked a factual question, return [].
+Return {"entities":[],"relations":[],"contradictions":[],"preferences":[]} if nothing significant.`;
 
 function parseJsonLoose(text) {
   let cleaned = (text || '').trim();
@@ -66,7 +87,7 @@ const clamp = (v, lo, hi, fallback) => {
 
 /** LLM pass over one exchange. Returns {entities, relations, contradictions}; empty on failure. */
 async function extractFromExchange(userText, aiText) {
-  const empty = { entities: [], relations: [], contradictions: [] };
+  const empty = { entities: [], relations: [], contradictions: [], preferences: [] };
   const text = `USER: ${(userText || '').slice(0, 2500)}\n\nASSISTANT: ${(aiText || '').slice(0, 2500)}`;
   if (text.length < 30) return empty;
   try {
@@ -102,7 +123,17 @@ async function extractFromExchange(userText, aiText) {
     const contradictions = (Array.isArray(parsed.contradictions) ? parsed.contradictions : [])
       .filter(c => c && typeof c.statement === 'string' && c.statement.trim())
       .slice(0, 3);
-    return { entities, relations, contradictions };
+    const preferences = (Array.isArray(parsed.preferences) ? parsed.preferences : [])
+      .filter(p => p && typeof p.instruction === 'string' && p.instruction.trim().length > 3)
+      .slice(0, 4)
+      .map(p => ({
+        label: (typeof p.label === 'string' && p.label.trim() ? p.label : p.instruction).trim().slice(0, 60),
+        instruction: p.instruction.trim().slice(0, 240),
+        kind: PREFERENCE_KINDS.includes(String(p.kind || '').toLowerCase()) ? String(p.kind).toLowerCase() : 'style',
+        evidence: typeof p.evidence === 'string' ? p.evidence.trim().slice(0, 200) : '',
+        confidence: clamp(p.confidence, 0, 1, 0.7)
+      }));
+    return { entities, relations, contradictions, preferences };
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.extractFromExchange failed: ${err.message}`);
     return empty;
@@ -234,6 +265,110 @@ async function upsertLivingEdge({ fromId, toId, edgeType, reason = '', strength 
 }
 
 // ═══════════════════════════════════════════════════════════
+// User preferences
+// ═══════════════════════════════════════════════════════════
+//
+// A preference is a `preference` node hanging off the user's own node by a
+// `prefers` edge that carries user_id — the shape /api/knowledge/patterns and
+// ReportEngine already query. Nothing wrote them reliably before: the generic
+// relation extractor had to invent both endpoints, so "explain it like I'm a
+// child" was learned as a topic, if at all.
+
+/**
+ * The node standing for this user in the graph — the `from` side of every
+ * `prefers` edge. Deterministic id, so it is created once and then found.
+ */
+async function userNode(userId) {
+  if (!userId || userId === 'system') return null;
+  const entityId = `ent_user_${String(userId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)}`;
+  const found = await query(`SELECT entity_id FROM entities WHERE entity_id = $1`, [entityId]);
+  if (found.rows.length) return entityId;
+
+  let name = 'You';
+  try {
+    const u = await query(`SELECT name FROM users WHERE user_id = $1`, [userId]);
+    if (u.rows[0]?.name) name = u.rows[0].name;
+  } catch (e) { /* users table shape is not this module's business */ }
+
+  try {
+    await query(`
+      INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at,
+                            summary, importance, confidence)
+      VALUES ($1, $2, 'person', 1, now(), $3, 9, 1.0)
+      ON CONFLICT (canonical_name, entity_type) DO NOTHING
+    `, [entityId, name, 'The person this assistant works for.']);
+  } catch (err) {
+    console.warn(`⚠️ MemoryEngine.userNode insert failed: ${err.message}`);
+  }
+  // A name collision (same display name already in the graph) means that node
+  // IS this person — reuse it rather than forking.
+  const r = await query(
+    `SELECT entity_id FROM entities WHERE entity_id = $1 OR (canonical_name = $2 AND entity_type = 'person') LIMIT 1`,
+    [entityId, name]);
+  return r.rows[0]?.entity_id || null;
+}
+
+/**
+ * Persist one learned preference: a `preference` node plus a user-scoped
+ * `prefers` edge. Repeating a preference strengthens the edge instead of
+ * duplicating it (upsertLivingEdge handles that).
+ */
+async function recordPreference(pref, ctx = {}) {
+  const fromId = await userNode(ctx.userId);
+  if (!fromId) return null;
+  const { entityId } = await upsertLivingEntity({
+    name: pref.label,
+    type: 'preference',
+    summary: pref.instruction,
+    importance: 8,
+    confidence: pref.confidence
+  }, ctx);
+  if (!entityId) return null;
+
+  await upsertLivingEdge({
+    fromId, toId: entityId, edgeType: 'prefers',
+    // The reason column is what the Knowledge page shows under each pattern,
+    // so it carries the actionable instruction, not a description of it.
+    reason: pref.instruction,
+    strength: Math.max(0.6, pref.confidence),
+    source: ctx.sourceType || 'chat',
+    agentId: ctx.agentId || null,
+    userId: ctx.userId
+  });
+  await recordEvent(entityId, 'mentioned',
+    pref.evidence ? `Preference stated: "${pref.evidence}"` : pref.instruction, ctx);
+  return entityId;
+}
+
+/**
+ * Standing preferences for a user, strongest first — injected into the system
+ * prompt so agents actually honour them.
+ * @returns {Promise<Array<{label: string, instruction: string, strength: number}>>}
+ */
+async function getUserPreferences(userId, limit = 8) {
+  if (!userId || userId === 'system') return [];
+  try {
+    const r = await query(`
+      SELECT t.canonical_name AS label, COALESCE(NULLIF(e.reason, ''), t.summary) AS instruction,
+             e.strength, e.weight
+      FROM entity_edges e
+      JOIN entities t ON t.entity_id = e.to_entity_id
+      WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND t.status = 'active'
+      ORDER BY e.strength DESC, e.weight DESC, e.updated_at DESC
+      LIMIT $2
+    `, [userId, limit]);
+    return r.rows.map(x => ({
+      label: x.label,
+      instruction: x.instruction || x.label,
+      strength: Number(x.strength) || 0
+    }));
+  } catch (err) {
+    console.warn(`⚠️ MemoryEngine.getUserPreferences failed: ${err.message}`);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // The pipeline
 // ═══════════════════════════════════════════════════════════
 
@@ -241,12 +376,17 @@ async function upsertLivingEdge({ fromId, toId, edgeType, reason = '', strength 
  * Learn from one chat exchange. Fire-and-forget from the chat route.
  * Returns a report { learned, linked, contradictions } for tests/logging.
  */
-async function ingestChat({ userId, sessionId, agentId, userText, aiText, sourceLabel = '' }) {
-  const report = { learned: [], linked: [], contradictions: [] };
+async function ingestChat({ userId, sessionId, agentId, userText, aiText, sourceLabel = '',
+                           sourceType = 'chat', learnPreferences = true }) {
+  const report = { learned: [], linked: [], contradictions: [], preferences: [] };
   const extracted = await extractFromExchange(userText, aiText);
-  if (extracted.entities.length === 0 && extracted.contradictions.length === 0) return report;
+  // Document ingestion reuses this path with the file's text in the user slot;
+  // a sentence inside a PDF is not the user telling us how they want answers.
+  if (!learnPreferences) extracted.preferences = [];
+  if (extracted.entities.length === 0 && extracted.contradictions.length === 0
+      && extracted.preferences.length === 0) return report;
 
-  const ctx = { sourceType: 'chat', sourceId: sessionId || null, agentId: agentId || null, userId: userId || null };
+  const ctx = { sourceType, sourceId: sessionId || null, agentId: agentId || null, userId: userId || null };
 
   // entities → nodes (dedup happens inside upsertLivingEntity)
   const idByName = new Map();
@@ -275,6 +415,19 @@ async function ingestChat({ userId, sessionId, agentId, userText, aiText, source
     report.linked.push({ from: r.from, to: r.to, type: r.type });
   }
 
+  // preferences → the user's own node, by a user-scoped `prefers` edge.
+  // These drive the "Your patterns" panel AND get replayed into every future
+  // system prompt, so learning one is what makes the assistant change how it
+  // answers next time.
+  for (const p of extracted.preferences) {
+    try {
+      const entityId = await recordPreference(p, ctx);
+      if (entityId) report.preferences.push({ label: p.label, instruction: p.instruction, entityId });
+    } catch (err) {
+      console.warn(`⚠️ MemoryEngine preference record failed: ${err.message}`);
+    }
+  }
+
   // contradictions → insights for the user to resolve
   for (const c of extracted.contradictions) {
     try {
@@ -291,7 +444,12 @@ async function ingestChat({ userId, sessionId, agentId, userText, aiText, source
     }
   }
 
-  eventBus.emit('memory:ingested', { userId, sessionId, learned: report.learned.length, linked: report.linked.length });
+  eventBus.emit('memory:ingested', {
+    userId, sessionId,
+    learned: report.learned.length,
+    linked: report.linked.length,
+    preferences: report.preferences.length
+  });
   return report;
 }
 
@@ -329,7 +487,9 @@ async function ingestDocument({ text, title, userId = null, agentId = null, docI
         sessionId: stableDocId,
         userText: `[Document: ${title || 'Untitled'}, chunk ${ci + 1}/${chunks.length}]\n\n${chunks[ci]}`,
         aiText: '',
-        sourceLabel: title || 'Document'
+        sourceLabel: title || 'Document',
+        sourceType: 'document',
+        learnPreferences: false
       });
       totalLearned += r.learned.length;
       totalLinked  += r.linked.length;
@@ -567,5 +727,8 @@ module.exports = {
   dream,
   findExisting,
   upsertLivingEntity,
-  upsertLivingEdge
+  upsertLivingEdge,
+  userNode,
+  recordPreference,
+  getUserPreferences
 };

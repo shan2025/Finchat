@@ -82,6 +82,46 @@ function transcriptFor(messages) {
   }).join('\n');
 }
 
+// ── Learned user preferences ─────────────────────────────────
+// The primary responder answers through route() → CognitiveCore, which loads
+// these itself. The chime-in replies below are direct runInference calls that
+// bypass that path, so they have to ask for them explicitly — otherwise the
+// room answers in two different voices, one honouring "explain it simply" and
+// one ignoring it.
+async function preferenceBlockFor(userId) {
+  try {
+    const { getUserPreferences } = require('../cognitive/MemoryEngine');
+    const { buildPreferenceDirective } = require('../cognitive/ContextBuilder');
+    return buildPreferenceDirective(await getUserPreferences(userId));
+  } catch (e) { return ''; }
+}
+
+/**
+ * Teach the graph from a group exchange. Group chat used to be the one surface
+ * that never fed the MemoryEngine, so a preference stated in a group ("explain
+ * like I'm a child") was forgotten the moment the room scrolled.
+ */
+function learnFromGroupExchange({ groupId, userId, agentId, userText, aiText }) {
+  setImmediate(async () => {
+    try {
+      const { ingestChat } = require('../cognitive/MemoryEngine');
+      const report = await ingestChat({
+        userId, agentId,
+        sessionId: `group_${groupId}`,
+        userText, aiText,
+        sourceType: 'group_chat',
+        sourceLabel: 'Group chat'
+      });
+      if (report.preferences.length || report.learned.length) {
+        console.log(`🧠 MemoryEngine (group ${groupId.slice(0, 12)}): ` +
+          `${report.learned.length} node(s), ${report.preferences.length} preference(s)`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Group MemoryEngine ingest failed: ${err.message}`);
+    }
+  });
+}
+
 // ── Responder selection ──────────────────────────────────────
 async function pickResponders(groupId, content) {
   const agentIds = await getAgentMembers(groupId);
@@ -123,7 +163,8 @@ async function maybeFollowUp(groupId, primaryId, userId) {
       role: 'system',
       content: `You are ${cfg.name}, a specialist agent (${(cfg.capabilities || []).join(', ')}) in a FinChat group discussion with the user and other agents. ` +
         `Read the transcript. If you have a genuinely useful, DIFFERENT angle to add to the last agent's answer, reply in 1-3 short sentences addressed to the room. ` +
-        `If you have nothing new to add, reply with exactly: PASS`
+        `If you have nothing new to add, reply with exactly: PASS` +
+        await preferenceBlockFor(userId)
     },
     { role: 'user', content: transcriptFor(history) }
   ];
@@ -204,16 +245,19 @@ async function handleUserMessage({ groupId, userId, content }) {
         fallback: result.provider === 'ollama'
       });
 
+      // Every group exchange teaches the graph, same as one-to-one chat.
+      learnFromGroupExchange({ groupId, userId, agentId: primary, userText: content, aiText: reply });
+
       if (isBroadcast) {
         // Room-wide question ("hi everyone, how are your tasks going?") —
         // every member agent answers, one after another.
         for (const other of allAgents.filter(id => id !== primary)) {
-          await maybeFollowUpDirect(groupId, other, content);
+          await maybeFollowUpDirect(groupId, other, content, userId);
         }
       } else if (others.length) {
         // Explicitly mentioned co-responders answer too (lightweight)
         for (const other of others.slice(0, 3)) {
-          await maybeFollowUpDirect(groupId, other, content);
+          await maybeFollowUpDirect(groupId, other, content, userId);
         }
       } else if (!hasMentions && MAX_FOLLOWUPS > 0) {
         // Un-addressed message (no @mention) — one member may voluntarily
@@ -236,7 +280,8 @@ async function handleUserMessage({ groupId, userId, content }) {
           if (allAgents.includes(id) && !answered.has(id)) {
             answered.add(id);
             await maybeFollowUpDirect(groupId, id,
-              `${msg.sender_id.toUpperCase()} addressed you in the group: "${msg.content.slice(0, 300)}" — respond to them.`);
+              `${msg.sender_id.toUpperCase()} addressed you in the group: "${msg.content.slice(0, 300)}" — respond to them.`,
+              userId);
           }
         }
       }
@@ -251,7 +296,7 @@ async function handleUserMessage({ groupId, userId, content }) {
 
 // An addressed agent must answer (not optional like maybeFollowUp) — used for
 // @mentioned co-responders, broadcast questions, and agent-to-agent mentions.
-async function maybeFollowUpDirect(groupId, agentId, userContent) {
+async function maybeFollowUpDirect(groupId, agentId, userContent, userId = null) {
   const cfg = await getAgentConfig(agentId);
   if (!cfg) return;
   const history = await getRecentMessages(groupId);
@@ -260,7 +305,8 @@ async function maybeFollowUpDirect(groupId, agentId, userContent) {
       role: 'system',
       content: `You are ${cfg.name}, a specialist agent (${(cfg.capabilities || []).join(', ')}) in a FinChat group discussion with the user and other agents. ` +
         `You were addressed directly. Answer from YOUR specialty's perspective in a short, direct reply (max 5 sentences). ` +
-        `Don't repeat what other agents already said in the transcript — add your own angle.`
+        `Don't repeat what other agents already said in the transcript — add your own angle.` +
+        await preferenceBlockFor(userId)
     },
     { role: 'user', content: `${transcriptFor(history)}\n\nRespond to: "${userContent}"` }
   ];
@@ -310,6 +356,7 @@ async function assignTask({ groupId, userId, agentId, goal }) {
       model: result.model || null,
       fallback: result.provider === 'ollama'
     });
+    learnFromGroupExchange({ groupId, userId, agentId, userText: goal, aiText: reply });
     await createNotification({
       userId,
       type: 'group_chat',

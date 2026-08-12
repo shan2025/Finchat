@@ -86,6 +86,30 @@ function buildTraitDirective(traits) {
 }
 
 /**
+ * Standing preferences the MemoryEngine learned from earlier conversations
+ * ("explain it like I'm a child", "keep it short", "always cite sources").
+ *
+ * These are the user's own words about HOW they want to be answered, so they
+ * outrank the persona's default voice and the operator's trait sliders — but
+ * not an explicit instruction in the message currently being answered.
+ *
+ * @param {Array<{label: string, instruction: string}>} prefs
+ * @returns {string} system-prompt fragment ('' when nothing has been learned)
+ */
+function buildPreferenceDirective(prefs) {
+  if (!Array.isArray(prefs) || prefs.length === 0) return '';
+  const lines = prefs
+    .map(p => (p && (p.instruction || p.label) ? `- ${p.instruction || p.label}` : null))
+    .filter(Boolean)
+    .slice(0, 8);
+  if (!lines.length) return '';
+  return `\n\n--- HOW THIS USER WANTS ANSWERS (learned from earlier conversations) ---\n` +
+    `${lines.join('\n')}\n` +
+    `Follow these in every reply without being asked again, and without mentioning that you remembered them. ` +
+    `If the user's current message contradicts one, the current message wins.`;
+}
+
+/**
  * Build the full message array for the LLM inference call.
  *
  * @param {object} options
@@ -109,6 +133,7 @@ function buildContext({
   recipeHints = [],
   budgetExceeded = false,
   traits = null,
+  userPreferences = [],
   allowWeb = true,
   studyMode = false
 }) {
@@ -122,13 +147,17 @@ function buildContext({
 
   const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb, studyMode);
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
+  // Preferences survive a breached budget: "keep it short" matters MORE when
+  // the answer is being cut off, and dropping "explain it simply" mid-session
+  // is exactly the inconsistency the user notices.
+  const prefDirective = buildPreferenceDirective(userPreferences);
   // Study Mode still applies under a breached budget — the answer is shorter,
   // but it should still come back as cards rather than switching format midway.
   const studyDirective = studyMode ? STUDY_MODE_DIRECTIVE : '';
 
   messages.push({
     role: 'system',
-    content: `${personaPrompt}${traitDirective}${studyDirective}\n\n--- RESPONSE FORMAT ---\n${actionSchema}`
+    content: `${personaPrompt}${traitDirective}${prefDirective}${studyDirective}\n\n--- RESPONSE FORMAT ---\n${actionSchema}`
   });
 
   // 2. Memory context (Phase 6 — now live via MemoryService)
@@ -208,6 +237,7 @@ function buildContext({
 module.exports = {
   buildContext,
   buildTraitDirective,
+  buildPreferenceDirective,
   getActionSchema,
   BUDGET_EXCEEDED_SCHEMA
 };
