@@ -80,6 +80,19 @@ body {
 #mmCanvasWrap { flex:1; position:relative; overflow:hidden; background:var(--mm-canvas); }
 #mmSvg { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
 #mmSvg.panning { cursor:grabbing; }
+/* Dot grid, the way schema visualisers draw one: it belongs to the canvas, not
+   the screen, so it translates and scales with the map and gives the eye a
+   fixed reference while panning. Drawn as a pattern-filled backdrop rect that
+   is re-sized on every view change (see applyView). */
+#mmGrid { pointer-events:none; }
+.mm-grid-dot { fill:var(--mm-line2); opacity:.55; }
+[data-nm-theme="dark"] .mm-grid-dot { opacity:.4; }
+.mm-node.dragging .mm-node-box { stroke:var(--mm-gold); stroke-width:3; }
+.mm-node.dragging { cursor:grabbing; }
+.mm-node.pinned .mm-node-box { stroke-dasharray:none; }
+/* A node the user placed by hand carries a small anchor so it is obvious why
+   it did not move when the branch re-laid itself out. */
+.mm-pin-dot { fill:var(--mm-gold); opacity:.9; }
 
 .mm-link { fill:none; stroke:var(--mm-line2); stroke-width:1.6; }
 .mm-xlink { fill:none; stroke:var(--mm-accent); stroke-width:1.3; stroke-dasharray:5 4; opacity:.75; }
@@ -332,7 +345,15 @@ body {
     </div>
 
     <div id="mmCanvasWrap">
-      <svg id="mmSvg"><g id="mmViewport"></g></svg>
+      <svg id="mmSvg">
+        <defs>
+          <pattern id="mmDots" width="26" height="26" patternUnits="userSpaceOnUse">
+            <circle class="mm-grid-dot" cx="1.4" cy="1.4" r="1.4"></circle>
+          </pattern>
+        </defs>
+        <rect id="mmGrid" x="0" y="0" width="100%" height="100%" fill="url(#mmDots)"></rect>
+        <g id="mmViewport"></g>
+      </svg>
 
       <div id="mmEmpty">
         <span class="material-symbols-outlined" style="font-size:52px; opacity:.4;">schema</span>
@@ -515,6 +536,9 @@ body {
   <button onclick="ctxAction('child')"><span class="material-symbols-outlined">add</span> Add child node</button>
   <button onclick="ctxAction('docs')"><span class="material-symbols-outlined">upload_file</span> Attach a document</button>
   <hr>
+  <button onclick="ctxAction('unpin')"><span class="material-symbols-outlined">restart_alt</span> Reset position</button>
+  <button onclick="ctxAction('tidy')"><span class="material-symbols-outlined">auto_awesome_mosaic</span> Re-arrange whole map</button>
+  <hr>
   <button onclick="ctxAction('delete')"><span class="material-symbols-outlined">delete</span> Delete node</button>
 </div>
 
@@ -597,6 +621,7 @@ let SELECTED = null;
 let DOCS_BY_NODE = new Map();   // node_id -> [doc]
 let MAP_DOCS = [];              // map-level sources (node_id === null)
 let view = { x: 0, y: 0, k: 1 };
+const GRID_GAP = 26;       // canvas-space spacing of the backdrop dot grid
 let genSource = 'topic';
 let genStaged = [];        // documents uploaded in the generate modal
 let presentIndex = -1;
@@ -677,6 +702,24 @@ function layout() {
 
   ROOT.x = 0; ROOT.y = 0; ROOT.depth = 0;
 
+  // How many leaves a whole ring carries. A ring with 30 labels on it needs
+  // more circumference than one with 4, so the radius grows with the crowd
+  // instead of staying at RING × depth and letting long labels collide.
+  const ringLoad = [];
+  const measure = (node, depth) => {
+    if (node.collapsed || !node.children.length) return;
+    ringLoad[depth] = (ringLoad[depth] || 0) + node.children.length;
+    for (const c of node.children) measure(c, depth + 1);
+  };
+  measure(ROOT, 1);
+  const radii = [0];
+  for (let d = 1; d < ringLoad.length + 1; d++) {
+    const count = ringLoad[d] || 1;
+    // ~132px of arc per node keeps typical labels clear of their neighbours.
+    const needed = (count * 132) / (2 * Math.PI);
+    radii[d] = Math.max(radii[d - 1] + RING * 0.85, Math.max(RING * d, needed));
+  }
+
   const place = (node, a0, a1, depth) => {
     if (node.collapsed || !node.children.length) return;
     const total = node.children.reduce((s, c) => s + leafCount(c), 0) || 1;
@@ -684,7 +727,7 @@ function layout() {
     for (const child of node.children) {
       const span = (a1 - a0) * (leafCount(child) / total);
       const mid = a + span / 2;
-      const r = RING * depth;
+      const r = radii[depth] != null ? radii[depth] : RING * depth;
       child.x = Math.cos(mid) * r;
       child.y = Math.sin(mid) * r;
       child.depth = depth;
@@ -698,6 +741,59 @@ function layout() {
   // starting point, not a cage.
   for (const n of NODES.values()) {
     if (Number.isFinite(n.x_saved)) { n.x = n.x_saved; n.y = n.y_saved; }
+  }
+
+  separate(visibleNodes());
+}
+
+/**
+ * Push overlapping node boxes apart. The radial pass gets the shape right but
+ * not the packing: a wide label on a deep ring can still sit on top of its
+ * neighbour, which is what makes a node "hide" another one.
+ *
+ * Straightforward pairwise relaxation over the visible set — a few passes is
+ * plenty because the layout starts nearly correct, and maps here are tens of
+ * nodes, not thousands. Hand-placed nodes are pinned: the user put them there.
+ */
+function separate(vis, passes = 22) {
+  if (vis.length < 2) return;
+  // O(passes · n²). Fine for the tens-of-nodes maps this studio produces;
+  // trimmed on the rare huge one so a re-layout never blocks a frame.
+  if (vis.length > 160) passes = 8;
+  const GAP_X = 22, GAP_Y = 14;
+  const box = new Map();
+  for (const n of vis) box.set(n.node_id, { w: nodeWidth(n) + GAP_X, h: nodeHeight(n) + GAP_Y });
+
+  for (let pass = 0; pass < passes; pass++) {
+    let moved = false;
+    for (let i = 0; i < vis.length; i++) {
+      for (let j = i + 1; j < vis.length; j++) {
+        const a = vis[i], b = vis[j];
+        const ba = box.get(a.node_id), bb = box.get(b.node_id);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const minX = (ba.w + bb.w) / 2, minY = (ba.h + bb.h) / 2;
+        const ox = minX - Math.abs(dx), oy = minY - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) continue;   // boxes clear of each other
+
+        // Resolve along the shallower axis — moving 8px vertically beats
+        // moving 90px horizontally and tearing the branch off its ring.
+        const aFixed = a.node_type === 'root' || Number.isFinite(a.x_saved);
+        const bFixed = b.node_type === 'root' || Number.isFinite(b.x_saved);
+        if (aFixed && bFixed) continue;
+        const shareA = aFixed ? 0 : (bFixed ? 1 : 0.5);
+        const shareB = bFixed ? 0 : (aFixed ? 1 : 0.5);
+
+        if (oy < ox) {
+          const push = (oy + 0.5) * (dy >= 0 ? 1 : -1);
+          a.y -= push * shareA; b.y += push * shareB;
+        } else {
+          const push = (ox + 0.5) * (dx >= 0 ? 1 : -1);
+          a.x -= push * shareA; b.x += push * shareB;
+        }
+        moved = true;
+      }
+    }
+    if (!moved) break;
   }
 }
 
@@ -738,10 +834,140 @@ function buildNodeEl(n) {
   g.appendChild(el('rect', { class: 'mm-node-box', rx: 0 }));
   g.appendChild(el('text', { class: 'mm-node-label', 'text-anchor': 'middle' }));
 
-  g.addEventListener('click', ev => { ev.stopPropagation(); selectNode(n.node_id); });
+  g.addEventListener('click', ev => {
+    ev.stopPropagation();
+    // The click a browser synthesises at the end of a drag must not also
+    // select. Timestamped rather than a sticky flag: a drag released away
+    // from the node produces no click at all, and a flag left standing would
+    // then eat the user's next real one.
+    if (Date.now() - DRAG.endedAt < 250) return;
+    selectNode(n.node_id);
+  });
   g.addEventListener('dblclick', ev => { ev.stopPropagation(); pushNodeToChat(n.node_id); });
   g.addEventListener('contextmenu', ev => { ev.preventDefault(); openCtxMenu(ev, n.node_id); });
+  // setPointerCapture in startNodeDrag routes the rest of the gesture here,
+  // so the node keeps following the cursor even past the canvas edge.
+  g.addEventListener('pointerdown', ev => startNodeDrag(ev, n.node_id));
+  g.addEventListener('pointermove', moveNodeDrag);
+  g.addEventListener('pointerup', endNodeDrag);
+  g.addEventListener('pointercancel', endNodeDrag);
   return g;
+}
+
+// ── node dragging ────────────────────────────────────────────────
+// The layout decides where a node starts; the user decides where it stays.
+// A dragged node is pinned (x/y persisted, and separate() stops moving it), so
+// the fix for "this node is hiding that one" is always available by hand even
+// when the automatic packing gets it wrong.
+const DRAG = { id: null, moved: false, endedAt: 0 };
+
+function canvasPoint(ev) {
+  const r = document.getElementById('mmSvg').getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left - view.x) / view.k,
+    y: (ev.clientY - r.top - view.y) / view.k
+  };
+}
+
+function startNodeDrag(ev, nodeId) {
+  if (ev.button !== 0) return;                       // right-click opens the menu
+  if (ev.target.closest('.mm-toggle, .mm-doc-badge')) return; // those have their own jobs
+  const n = NODES.get(nodeId);
+  if (!n) return;
+
+  // A drag has to win over any layout animation still gliding this node.
+  stopAnim();
+  for (const m of visibleNodes()) { m.rx = m.x; m.ry = m.y; m.ra = 1; }
+  dropGhosts();
+  paint();
+
+  const p = canvasPoint(ev);
+  DRAG.id = nodeId;
+  DRAG.moved = false;
+  DRAG.offX = n.x - p.x;
+  DRAG.offY = n.y - p.y;
+  DRAG.startX = ev.clientX;
+  DRAG.startY = ev.clientY;
+  ev.stopPropagation();                              // don't start a canvas pan
+  // Capture is an optimisation, not a requirement: without it the gesture
+  // still works while the cursor is over the node, and the window-level
+  // pointerup below finishes it. Refusing to throw here matters because an
+  // exception mid-gesture would strand DRAG.id and freeze the canvas.
+  try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* not fatal */ }
+  ev.currentTarget.classList.add('dragging');
+}
+
+function moveNodeDrag(ev) {
+  if (!DRAG.id) return;
+  const n = NODES.get(DRAG.id);
+  if (!n) return;
+  if (!DRAG.moved &&
+      Math.abs(ev.clientX - DRAG.startX) < 3 && Math.abs(ev.clientY - DRAG.startY) < 3) return;
+  DRAG.moved = true;
+  const p = canvasPoint(ev);
+  n.x = p.x + DRAG.offX; n.y = p.y + DRAG.offY;
+  n.rx = n.x; n.ry = n.y; n.ra = 1;
+  paint();
+}
+
+async function endNodeDrag(ev) {
+  const nodeId = DRAG.id;
+  if (!nodeId) return;
+  const g = DOM.nodes.get(nodeId);
+  if (g) g.classList.remove('dragging');
+  DRAG.id = null;
+  if (!DRAG.moved) return;                           // a plain click: let it select
+  DRAG.endedAt = Date.now();
+  const n = NODES.get(nodeId);
+  if (!n) return;
+
+  n.x_saved = n.x; n.y_saved = n.y;                  // pinned from here on
+  refreshDecor();
+  if (!MAP) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${nodeId}`, {
+      method: 'PATCH', body: JSON.stringify({ x: Math.round(n.x), y: Math.round(n.y) })
+    });
+  } catch (e) { toast('Could not save that position'); }
+}
+
+// Safety net: if the pointer is released somewhere that never reaches the
+// node (capture refused, pointer lost, window blurred), finish the drag anyway
+// rather than leaving the node stuck to the cursor.
+window.addEventListener('pointerup', ev => { if (DRAG.id) endNodeDrag(ev); });
+window.addEventListener('blur', () => { if (DRAG.id) endNodeDrag({}); });
+
+/** Drop every hand-placed position and re-run the layout for the whole map. */
+async function tidyMap() {
+  if (!MAP) return;
+  const pinned = [...NODES.values()].filter(n => Number.isFinite(n.x_saved));
+  if (!pinned.length) { relayout(); fitToScreen(); toast('Already auto-arranged'); return; }
+  for (const n of pinned) { delete n.x_saved; delete n.y_saved; n.x = null; n.y = null; }
+  relayout();
+  fitToScreen();
+  toast(`Re-arranged ${pinned.length} node${pinned.length > 1 ? 's' : ''}`);
+  for (const n of pinned) {
+    try {
+      await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${n.node_id}`, {
+        method: 'PATCH', body: JSON.stringify({ x: null, y: null })
+      });
+    } catch (e) { /* the canvas is already tidy; a stale saved x/y is harmless */ }
+  }
+}
+
+/** Hand a node back to the automatic layout. */
+async function unpinNode(nodeId) {
+  const n = NODES.get(nodeId);
+  if (!n) return;
+  delete n.x_saved; delete n.y_saved;
+  n.x = null; n.y = null;
+  relayout();
+  if (!MAP) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${nodeId}`, {
+      method: 'PATCH', body: JSON.stringify({ x: null, y: null })
+    });
+  } catch (e) { /* the layout already moved it; a stale saved x/y is harmless */ }
 }
 
 /** Bring the DOM in line with what should be visible, without touching positions. */
@@ -801,10 +1027,27 @@ function decorateNode(g, n) {
   const w = nodeWidth(n), h = nodeHeight(n);
   const docs = docsOn(n.node_id).length;
 
+  const pinned = Number.isFinite(n.x_saved);
+
   g.setAttribute('class', 'mm-node ' + n.node_type
     + (SELECTED === n.node_id ? ' selected' : '')
     + (CTX_CHIPS.some(c => c.nodeId === n.node_id) ? ' ctx' : '')
-    + (FRESH.has(n.node_id) ? ' fresh' : ''));
+    + (FRESH.has(n.node_id) ? ' fresh' : '')
+    + (pinned ? ' pinned' : ''));
+
+  // Marker for a hand-placed node, so it's clear why the automatic layout
+  // left it where it is. Right-click → Reset position hands it back.
+  let pin = g.querySelector('.mm-pin');
+  if (pinned) {
+    if (!pin) {
+      pin = el('g', { class: 'mm-pin' });
+      pin.appendChild(el('circle', { class: 'mm-pin-dot', r: 3 }));
+      pin.appendChild(el('title'));
+      pin.querySelector('title').textContent = 'Placed by hand — right-click to reset';
+      g.appendChild(pin);
+    }
+    pin.setAttribute('transform', `translate(7, 7)`);
+  } else if (pin) { pin.remove(); }
 
   const box = g.querySelector('.mm-node-box');
   box.setAttribute('width', w); box.setAttribute('height', h); box.setAttribute('rx', h / 2);
@@ -997,6 +1240,27 @@ function refreshDecor() {
 function applyView() {
   document.getElementById('mmViewport')
     .setAttribute('transform', `translate(${view.x}, ${view.y}) scale(${view.k})`);
+  // The grid rect stays pinned to the screen; the PATTERN moves under it. One
+  // viewport-sized rect then covers any pan distance — a grid drawn inside the
+  // viewport group would need a canvas-sized rect and would still run out at
+  // the edges once you panned far enough.
+  //
+  // Spacing follows the zoom (so the dots ride with the map) but the dot RADIUS
+  // does not, or they'd swell into blobs at 3× and vanish at 0.15×.
+  //
+  // Density is held in a readable band by HALVING or DOUBLING the spacing
+  // rather than clamping it: every step is still a whole multiple of the
+  // canvas grid, so the dots stay locked to map coordinates at any zoom —
+  // a clamp would let them drift out of step with the nodes.
+  const p = document.getElementById('mmDots');
+  if (p) {
+    let gap = GRID_GAP * view.k;
+    while (gap < 17) gap *= 2;
+    while (gap > 68) gap /= 2;
+    p.setAttribute('width', gap);
+    p.setAttribute('height', gap);
+    p.setAttribute('patternTransform', `translate(${view.x}, ${view.y})`);
+  }
 }
 
 /** Glide the camera. Abrupt jumps lose the reader; 380ms keeps orientation. */
@@ -1676,6 +1940,8 @@ function ctxAction(what) {
   if (!id) return;
   if (what === 'delete') { deleteCurrent(id); return; }
   if (what === 'child') { openChildForm(id); return; }
+  if (what === 'unpin') { unpinNode(id); return; }
+  if (what === 'tidy') { tidyMap(); return; }
   selectNode(id, { tab: what === 'docs' ? 'docs' : what === 'ask' ? 'chat' : 'details' });
   if (what === 'expand') expandCurrent();
 }

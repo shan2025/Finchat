@@ -411,6 +411,11 @@ router.patch('/:mapId/nodes/:nodeId', requireAuth, async (req, res) => {
       }
     }
 
+    // Hand-placed nodes pin themselves by storing x/y. Sending an explicit
+    // null clears the pin and hands the node back to the automatic layout —
+    // COALESCE alone can't express that, since it reads null as "unchanged".
+    const clearPos = ('x' in (req.body || {})) && req.body.x === null;
+
     await query(`
       UPDATE mind_map_nodes SET
         label     = COALESCE($2, label),
@@ -420,8 +425,8 @@ router.patch('/:mapId/nodes/:nodeId', requireAuth, async (req, res) => {
         color     = CASE WHEN $6::text IS NULL THEN color WHEN $6 = '' THEN NULL ELSE $6 END,
         icon      = COALESCE($7, icon),
         collapsed = COALESCE($8, collapsed),
-        x         = COALESCE($9, x),
-        y         = COALESCE($10, y),
+        x         = CASE WHEN $12 THEN NULL ELSE COALESCE($9, x) END,
+        y         = CASE WHEN $12 THEN NULL ELSE COALESCE($10, y) END,
         parent_id = CASE WHEN $11::text IS NULL THEN parent_id
                          WHEN $11 = '' THEN NULL ELSE $11 END
       WHERE node_id = $1
@@ -435,7 +440,8 @@ router.patch('/:mapId/nodes/:nodeId', requireAuth, async (req, res) => {
         typeof collapsed === 'boolean' ? collapsed : null,
         Number.isFinite(x) ? x : null,
         Number.isFinite(y) ? y : null,
-        parentId !== undefined ? (parentId === null ? '' : parentId) : null]);
+        parentId !== undefined ? (parentId === null ? '' : parentId) : null,
+        clearPos]);
 
     await Engine.touchMap(map.map_id);
     res.json({ ok: true });
