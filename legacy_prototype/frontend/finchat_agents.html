@@ -424,8 +424,14 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   if (!personaBalances || !personaBalances.plato) {
     personaBalances = { plato: 1000, aurelius: 1000, rasha: 1000, nova: 1000 };
   }
-  document.getElementById('sidebarToken').textContent = personaBalances.plato || 1000;
-  document.getElementById('topbarTokenDisplay').textContent = personaBalances.plato || 1000;
+  // Guarded: this page has no #sidebarToken (the shared sidebar markup differs
+  // per page, and sidebar_nav.js loads AFTER this script). An unguarded lookup
+  // threw here and aborted the rest of the block — which is why the audit trail
+  // sat on "Loading…" and the sliders kept their hardcoded HTML defaults
+  // instead of the agent's saved config.
+  const setText = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  setText('sidebarToken', personaBalances.plato || 1000);
+  setText('topbarTokenDisplay', personaBalances.plato || 1000);
 
   const AUTH_HDR = () => ({ 'Authorization': 'Bearer ' + (SESSION_USER.token || _session?.token || localStorage.getItem('finchat_token') || '') });
   const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
@@ -588,70 +594,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     setTimeout(() => { t.className = 'toast'; }, 3000);
   }
 
-  // ── Notification bell (backend-wired) ──────────────────────
-  (function () {
-    const tok = () => localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
-      (JSON.parse(sessionStorage.getItem('finchat_user') || 'null') || {}).token || '';
-    const $ = (id) => document.getElementById(id);
-    let open = false;
-
-    function timeAgo(ts) {
-      const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
-      if (s < 60) return 'just now';
-      if (s < 3600) return Math.floor(s / 60) + 'm ago';
-      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-      return Math.floor(s / 86400) + 'd ago';
-    }
-    async function refreshBadge() {
-      try {
-        const r = await fetch('/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + tok() } });
-        if (!r.ok) return;
-        const d = await r.json();
-        const badge = $('notifBadge'); if (!badge) return;
-        if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.classList.remove('hidden'); }
-        else badge.classList.add('hidden');
-      } catch (e) { }
-    }
-    async function loadList() {
-      const list = $('notifList'); if (!list) return;
-      list.innerHTML = '<div style="padding:16px;text-align:center;color:#8c7a6b;font-size:12px">Loading…</div>';
-      try {
-        const r = await fetch('/api/notifications?limit=20', { headers: { Authorization: 'Bearer ' + tok() } });
-        const d = await r.json();
-        const items = d.notifications || [];
-        if (!items.length) { list.innerHTML = '<div style="padding:24px;text-align:center;color:#8c7a6b;font-size:12px">No notifications yet</div>'; return; }
-        list.innerHTML = items.map(n => `
-          <div onclick="__notifClick('${n.notification_id}')" style="padding:12px 16px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;${n.is_read ? 'opacity:0.55' : 'background:rgba(212,175,55,0.08)'}">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:700;color:#3a2e23">${n.title}</div>
-              <div style="font-size:11px;color:#5c4a38;margin-top:2px;line-height:1.4">${(n.content || '').slice(0, 120)}</div>
-              <div style="font-size:10px;color:#8c7a6b;font-family:ui-monospace,monospace;margin-top:3px">${timeAgo(n.created_at)}</div>
-            </div>
-            ${n.is_read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:4px"></span>'}
-          </div>`).join('');
-      } catch (e) { list.innerHTML = '<div style="padding:16px;text-align:center;color:#dc2626;font-size:12px">Failed to load</div>'; }
-    }
-    window.__notifClick = async function (id) {
-      try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
-      await loadList(); refreshBadge();
-    };
-    window.markAllNotifsRead = async function () {
-      try { await fetch('/api/notifications/read-all', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
-      await loadList(); refreshBadge();
-    };
-    window.toggleNotifications = function (e) {
-      if (e) e.stopPropagation();
-      const dd = $('notifDropdown'); if (!dd) return;
-      open = !open; dd.classList.toggle('hidden', !open);
-      if (open) loadList();
-    };
-    document.addEventListener('click', (e) => {
-      const dd = $('notifDropdown'), bell = $('notifBell');
-      if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
-    });
-    refreshBadge();
-    setInterval(() => { if (!document.hidden) refreshBadge(); }, 30000); // egress guard + 30s
-  })();
+  // The notification bell is driven by the shared notifications_widget.js
+  // included at the bottom of this page. An older inline copy used to live
+  // here: it was fully overwritten by the shared widget (same window.*
+  // handlers, loaded later), but still ran its own 30s poll and rendered
+  // notification bodies as raw markdown. Removed rather than kept in sync.
 
   // Load the initially-selected agent's live config + audit trail from the backend
   selectAgent('plato', true);
