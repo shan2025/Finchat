@@ -76,6 +76,34 @@ function recordInferenceMetric({ provider, model, feature, promptTokens, complet
   } catch (err) { /* metrics are best-effort */ }
 }
 
+/** Rough size of a message list, for logging and trim decisions. */
+function _payloadChars(messages) {
+  return messages.reduce((n, m) => n + String(m.content || '').length, 0);
+}
+
+/**
+ * Shrink an oversized message list. Groq answers 413 when the request body
+ * exceeds a model's accepted size, which the research path hits easily once web
+ * and arXiv results are appended — the primary model tolerates payloads the
+ * smaller fallbacks reject, so a spent primary quota turned into a hard failure.
+ *
+ * Every oversized message is truncated, including the newest one: on the
+ * research path the bulk of the payload is exactly there, because the retrieved
+ * pages are appended after the question. Truncation keeps the head of each
+ * message, which is where the question and the most relevant retrieved text sit,
+ * and discards the tail. Exempting the last message (or system messages) would
+ * defeat the whole exercise — a single 180k-character message is the common
+ * case, and skipping it leaves the payload unchanged.
+ */
+function _trimMessages(messages, maxCharsPerMessage) {
+  const marker = '\n…[truncated to fit the model\'s request limit]';
+  return messages.map((m) => {
+    const content = String(m.content || '');
+    if (content.length <= maxCharsPerMessage) return m;
+    return { ...m, content: content.slice(0, maxCharsPerMessage) + marker };
+  });
+}
+
 /**
  * Make one Groq API call. Separated so the retry logic can call it cleanly.
  */
@@ -119,6 +147,13 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
     const candidates = [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS]
       .filter((m, i, arr) => m && arr.indexOf(m) === i);
 
+    // Trimming persists across models: once a payload proves too large for one
+    // fallback the next is unlikely to accept it either, so the smaller version
+    // carries forward rather than re-failing at full size on every candidate.
+    let payload = messages;
+    const TRIM_STEPS = [12000, 4000];
+    let trimStep = 0;
+
     for (let mi = 0; mi < candidates.length; mi++) {
       const gModel = candidates[mi];
 
@@ -134,7 +169,7 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
       // Attempt this model with 429-retries
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
-          const response = await _callGroq({ apiKey, model: gModel, messages, temperature, jsonMode });
+          const response = await _callGroq({ apiKey, model: gModel, messages: payload, temperature, jsonMode });
           console.log(`⚡ Groq Cloud Inference Successful [Model: ${gModel}]` +
             (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
           const gUsage = response.data.usage || {};
@@ -159,6 +194,18 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
           // there, so stop retrying and let the next model take over.
           const retryAfterSec = Number(err.response?.headers?.['retry-after']) || 0;
           const dailyQuotaSpent = status === 429 && retryAfterSec > 120;
+          // 413 is the request body being too large for this model, not a
+          // transient fault — retrying unchanged always fails. Shrink and retry
+          // before writing the model off, otherwise a long research answer can
+          // never fall back to a smaller model.
+          if (status === 413 && trimStep < TRIM_STEPS.length) {
+            const before = _payloadChars(payload);
+            payload = _trimMessages(payload, TRIM_STEPS[trimStep]);
+            const after = _payloadChars(payload);
+            trimStep++;
+            console.warn(`⚠️ Groq 413 on "${gModel}" — payload ${before} → ${after} chars (cap ${TRIM_STEPS[trimStep - 1]}/msg), retrying [${feature}]`);
+            if (after < before) continue; // retry same model with the smaller payload
+          }
           if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
             const delayMs = Math.min((retryAfterSec || (2 * (attempt + 1))) * 1000, 15_000);
             console.warn(`⚠️ Groq 429 rate-limited on "${gModel}" (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
