@@ -234,6 +234,33 @@ body {
   border-radius:20px; padding:22px; width:min(520px,100%); box-shadow:var(--mm-shadow);
   max-height:88vh; overflow-y:auto; }
 .mm-modal-box.wide { width:min(760px,100%); }
+.mm-modal-title { font-size:20px; margin-bottom:8px; color:var(--mm-fg); }
+.mm-modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+/* The destructive action is the only red thing in the app, so it reads as a
+   warning without needing a warning icon. */
+.mm-btn-danger { background:#b0472e; border-color:#b0472e; color:#fff; }
+.mm-btn-danger:hover { background:#9a3d27; border-color:#9a3d27; color:#fff; }
+
+/* gap cards ------------------------------------------------------- */
+.mm-gap { border:1px solid var(--mm-line); border-radius:14px; padding:12px 14px;
+  background:var(--mm-bg); display:flex; gap:11px; align-items:flex-start; }
+.mm-gap-kind { font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+  padding:3px 8px; border-radius:999px; white-space:nowrap; margin-top:2px; }
+.mm-gap-kind.missing { background:#e8d9c4; color:#7a5a30; }
+.mm-gap-kind.thin { background:#dde5d4; color:#4a6135; }
+.mm-gap-kind.question { background:#d9dfe8; color:#3b506e; }
+.mm-gap-kind.unsupported { background:#f0d4cc; color:#8f3a22; }
+.mm-gap-main { flex:1; min-width:0; }
+.mm-gap-label { font-weight:700; font-size:13.5px; color:var(--mm-fg); }
+.mm-gap-why { font-size:12px; color:var(--mm-fg2); line-height:1.55; margin-top:3px; }
+.mm-gap-under { font-size:11px; color:var(--mm-muted); margin-top:4px; }
+.mm-gap.added { opacity:.5; }
+
+/* unsaved-changes bar --------------------------------------------- */
+#mmSaveBar { display:none; gap:8px; align-items:center; padding:9px 14px;
+  border-top:1px solid var(--mm-line); background:var(--mm-surface2); flex-shrink:0; }
+#mmSaveBar.on { display:flex; }
+#mmSaveBar .mm-dirty { flex:1; font-size:12px; font-weight:700; color:var(--mm-accent); }
 .mm-src { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
 .mm-src button { flex:1; min-width:96px; padding:9px; border-radius:12px;
   border:1px solid var(--mm-line2); background:var(--mm-bg); color:var(--mm-fg2);
@@ -340,6 +367,8 @@ body {
       </div>
       <button class="mm-btn" onclick="toggleTheme()" id="mmThemeBtn" title="Theme">
         <span class="material-symbols-outlined">dark_mode</span></button>
+      <button class="mm-btn" onclick="findGaps()" id="mmGapsBtn" title="Ask the AI what this map is missing">
+        <span class="material-symbols-outlined">troubleshoot</span> Find gaps</button>
       <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
         <span class="material-symbols-outlined">auto_awesome</span> Generate</button>
     </div>
@@ -375,7 +404,8 @@ body {
               <span class="material-symbols-outlined">close</span></button>
           </div>
           <input class="mm-field mm-serif" id="mmPanelLabel" style="font-size:17px;"
-                 onchange="renameNode(this.value)" aria-label="Node label">
+                 oninput="markDirty()" onkeydown="if(event.key==='Enter'){event.preventDefault();saveNodeEdits();}"
+                 aria-label="Node label">
         </div>
 
         <div class="mm-tabs">
@@ -394,7 +424,7 @@ body {
             <div id="mmMapOverview"></div>
             <div class="mm-label">Summary</div>
             <textarea class="mm-field" id="mmPanelSummary" rows="2"
-                      onchange="saveNodeField('summary', this.value)"></textarea>
+                      oninput="markDirty()"></textarea>
             <div class="mm-label">Detail</div>
             <div class="mm-detail" id="mmPanelDetail">—</div>
             <div id="mmPanelEntity"></div>
@@ -434,6 +464,16 @@ body {
             <button class="mm-btn mm-btn-sm" id="mmBuildFromDocsBtn" onclick="buildMapFromNodeDocs()" style="display:none;">
               <span class="material-symbols-outlined">schema</span> New map from these sources</button>
           </div>
+        </div>
+
+        <!-- Appears only while the label or summary differs from what is saved.
+             Editing used to persist silently on blur, which meant no way to
+             tell whether a change had landed and no way to back one out. -->
+        <div id="mmSaveBar">
+          <span class="mm-dirty">Unsaved changes</span>
+          <button class="mm-btn mm-btn-sm" onclick="revertNodeEdits()">Revert</button>
+          <button class="mm-btn mm-btn-sm mm-btn-primary" id="mmSaveBtn" onclick="saveNodeEdits()">
+            <span class="material-symbols-outlined">check</span> Save</button>
         </div>
 
         <div class="mm-panel-actions">
@@ -526,6 +566,33 @@ body {
       <button class="mm-icon-btn" onclick="closeDoc()"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div id="mmDocText">Loading…</div>
+  </div>
+</div>
+
+<!-- confirm dialog — replaces window.confirm(), which rendered as a bare
+     "finchat-6.onrender.com says" browser chrome box outside the app's design -->
+<div class="mm-modal" id="mmConfirmModal" onclick="if(event.target===this) closeConfirm(false)">
+  <div class="mm-modal-box" style="max-width:430px;">
+    <div class="mm-modal-title mm-serif" id="mmConfirmTitle">Are you sure?</div>
+    <div id="mmConfirmBody" style="font-size:13.5px; line-height:1.6; color:var(--mm-fg2); margin-bottom:6px;"></div>
+    <div id="mmConfirmDetail" style="font-size:12px; line-height:1.55; color:var(--mm-muted);"></div>
+    <div class="mm-modal-actions">
+      <button class="mm-btn" onclick="closeConfirm(false)">Cancel</button>
+      <button class="mm-btn" id="mmConfirmOk" onclick="closeConfirm(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- gap analysis -->
+<div class="mm-modal" id="mmGapsModal" onclick="if(event.target===this) closeGaps()">
+  <div class="mm-modal-box" style="max-width:640px;">
+    <div class="mm-modal-title mm-serif">What this map is missing</div>
+    <div id="mmGapsMeta" style="font-size:12px; color:var(--mm-muted); margin-bottom:12px;"></div>
+    <div id="mmGapsList" style="max-height:56vh; overflow-y:auto; display:flex; flex-direction:column; gap:9px;"></div>
+    <div class="mm-modal-actions">
+      <button class="mm-btn" onclick="closeGaps()">Close</button>
+      <button class="mm-btn mm-btn-primary" id="mmGapsAddAll" onclick="addAllGaps()">Add all</button>
+    </div>
   </div>
 </div>
 
@@ -1385,12 +1452,17 @@ function selectNode(nodeId, opts = {}) {
   const n = NODES.get(nodeId);
   if (!n) return;
   const changed = SELECTED !== nodeId;
+  // Moving to another node with an edit in flight commits it rather than
+  // dropping it. The Save button is how you commit deliberately; this is only
+  // the safety net, and it toasts so the write is never silent.
+  if (changed && isDirty()) saveNodeEdits();
   SELECTED = nodeId;
   refreshDecor();
 
   document.getElementById('mmPanelPath').textContent = pathOf(nodeId).join('  ›  ');
   document.getElementById('mmPanelLabel').value = n.label;
   document.getElementById('mmPanelSummary').value = n.summary || '';
+  markDirty();
   document.getElementById('mmPanelDetail').textContent = n.detail || '—';
 
   renderMapOverview(n);
@@ -1419,10 +1491,19 @@ function selectNode(nodeId, opts = {}) {
 }
 
 function closePanel() {
+  if (isDirty()) saveNodeEdits();          // same safety net as switching nodes
   document.getElementById('mmPanel').classList.remove('open');
+  document.getElementById('mmSaveBar').classList.remove('on');
   SELECTED = null;
   refreshDecor();
 }
+
+// A reload is the one exit we cannot save through, so warn instead.
+window.addEventListener('beforeunload', (e) => {
+  if (!isDirty()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
 
 function showTab(tab) {
   activeTab = tab;
@@ -1470,24 +1551,59 @@ function renderMapOverview(n) {
     <div style="height:6px;"></div>`;
 }
 
-async function saveNodeField(field, value) {
-  if (!SELECTED) return;
-  try {
-    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${SELECTED}`, {
-      method: 'PATCH', body: JSON.stringify({ [field]: value })
-    });
-    NODES.get(SELECTED)[field] = value;
-    toast('Saved');
-  } catch (e) { toast('Save failed: ' + e.message); }
+// ── explicit save for the label / summary fields ─────────────────
+// These used to persist on `change` (i.e. on blur). That gave no signal that
+// an edit was pending, no way to abandon one, and no obvious way to commit it
+// — you had to click elsewhere and hope. The fields are now plainly dirty or
+// clean, with Enter and a Save button as the commit.
+function isDirty() {
+  if (!SELECTED) return false;
+  const n = NODES.get(SELECTED);
+  if (!n) return false;
+  const label = document.getElementById('mmPanelLabel').value.trim();
+  const summary = document.getElementById('mmPanelSummary').value.trim();
+  return label !== String(n.label || '').trim() || summary !== String(n.summary || '').trim();
 }
 
-async function renameNode(value) {
-  const v = String(value || '').trim();
-  if (!v || !SELECTED) return;
-  await saveNodeField('label', v);
-  NODES.get(SELECTED).label = v;
-  document.getElementById('mmPanelPath').textContent = pathOf(SELECTED).join('  ›  ');
-  relayout();
+function markDirty() {
+  document.getElementById('mmSaveBar').classList.toggle('on', isDirty());
+}
+
+function revertNodeEdits() {
+  if (!SELECTED) return;
+  const n = NODES.get(SELECTED);
+  document.getElementById('mmPanelLabel').value = n.label;
+  document.getElementById('mmPanelSummary').value = n.summary || '';
+  markDirty();
+}
+
+async function saveNodeEdits() {
+  if (!SELECTED || !isDirty()) return;
+  const id = SELECTED;                       // captured: the panel may move on
+  const n = NODES.get(id);
+  const label = document.getElementById('mmPanelLabel').value.trim();
+  const summary = document.getElementById('mmPanelSummary').value.trim();
+  if (!label) { toast('A node needs a label'); return; }
+
+  const btn = document.getElementById('mmSaveBtn');
+  btn.disabled = true;
+  const labelChanged = label !== String(n.label || '').trim();
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ label, summary })
+    });
+    n.label = label; n.summary = summary;
+    if (SELECTED === id) {
+      document.getElementById('mmPanelPath').textContent = pathOf(id).join('  ›  ');
+      markDirty();
+    }
+    // The label sets the node's width, so the layout has to be redone — but
+    // only when it actually changed; a summary edit is invisible on canvas.
+    if (labelChanged) relayout();
+    loadList();
+    toast('Saved');
+  } catch (e) { toast('Save failed: ' + e.message); }
+  btn.disabled = false;
 }
 
 async function expandCurrent() {
@@ -1558,20 +1674,57 @@ async function submitChild() {
   btn.disabled = false;
 }
 
+// ── in-app confirm ───────────────────────────────────────────────
+// window.confirm() drew a bare "finchat-6.onrender.com says" browser box —
+// outside the app's design, unstyleable, and it blocks the whole tab.
+let _confirmResolve = null;
+function askConfirm({ title, body, detail = '', okLabel = 'Delete', danger = true }) {
+  const box = document.getElementById('mmConfirmModal');
+  document.getElementById('mmConfirmTitle').textContent = title;
+  document.getElementById('mmConfirmBody').textContent = body;
+  document.getElementById('mmConfirmDetail').textContent = detail;
+  const ok = document.getElementById('mmConfirmOk');
+  ok.textContent = okLabel;
+  ok.className = 'mm-btn ' + (danger ? 'mm-btn-danger' : 'mm-btn-primary');
+  box.classList.add('open');
+  setTimeout(() => ok.focus(), 60);
+  return new Promise(res => { _confirmResolve = res; });
+}
+function closeConfirm(result) {
+  document.getElementById('mmConfirmModal').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
 async function deleteCurrent(nodeId) {
   const id = nodeId || SELECTED;
   if (!id) return;
   const n = NODES.get(id);
-  const kids = n.children.length;
+  const kids = countDescendants(n);
   const docs = docsOn(id).length;
-  if (!confirm(`Delete "${n.label}"${kids ? ` and its ${kids} child node${kids > 1 ? 'ren' : ''}` : ''}` +
-               `${docs ? ` (${docs} attached document${docs > 1 ? 's' : ''} will be detached)` : ''}?`)) return;
+  const okay = await askConfirm({
+    title: 'Delete this node?',
+    body: `“${n.label}” will be removed from the map.`,
+    detail: [
+      kids ? `${kids} node${kids > 1 ? 's' : ''} beneath it will go too.` : '',
+      docs ? `${docs} attached document${docs > 1 ? 's' : ''} will be detached but kept in your library.` : '',
+      'This cannot be undone.'
+    ].filter(Boolean).join(' '),
+    okLabel: 'Delete node'
+  });
+  if (!okay) return;
   try {
     await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${id}`, { method: 'DELETE' });
     if (SELECTED === id) closePanel();
     await openMap(MAP.map.map_id);
     toast('Deleted');
   } catch (e) { toast('Delete failed: ' + e.message); }
+}
+
+/** Whole subtree, not just direct children — deleting cascades. */
+function countDescendants(n) {
+  let c = 0;
+  (function walk(x) { for (const k of x.children) { c++; walk(k); } })(n);
+  return c;
 }
 
 // ── documents ────────────────────────────────────────────────────
@@ -1672,7 +1825,14 @@ async function reloadDocs() {
 }
 
 async function removeDoc(docId) {
-  if (!confirm('Remove this document from the map?')) return;
+  const d = [...DOCS_BY_NODE.values()].flat().concat(MAP_DOCS).find(x => x.docId === docId);
+  const okay = await askConfirm({
+    title: 'Remove this source?',
+    body: d ? `“${d.filename}” will be detached from this map.` : 'This document will be detached from this map.',
+    detail: 'Nodes built from it stay as they are, but the AI will no longer read it when expanding or answering here.',
+    okLabel: 'Remove'
+  });
+  if (!okay) return;
   try {
     await api('/api/mind-maps/docs/' + docId, { method: 'DELETE' });
     await reloadDocs();
@@ -1917,6 +2077,120 @@ async function buildMapFromNodeDocs() {
     toast(`Built "${out.title}" from ${out.sourceCount} source${out.sourceCount > 1 ? 's' : ''}`);
   } catch (e) { toast('Could not build: ' + e.message); }
   btn.disabled = false; btn.innerHTML = original;
+}
+
+// ── gap analysis ─────────────────────────────────────────────────
+// "What is this map missing?" The backend only PROPOSES — nothing is written
+// until the user accepts a suggestion here, so a wrong call from the model
+// can't quietly end up in a map they trust.
+let GAPS = [];
+
+async function findGaps() {
+  if (!MAP) { toast('Open a map first'); return; }
+  const btn = document.getElementById('mmGapsBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="mm-spin"></span> Looking…';
+  try {
+    const out = await api(`/api/mind-maps/${MAP.map.map_id}/gaps`, { method: 'POST' });
+    GAPS = out.gaps || [];
+    document.getElementById('mmGapsMeta').textContent = out.grounded
+      ? `Checked ${out.nodeCount} nodes against ${out.sources} attached source${out.sources > 1 ? 's' : ''}.`
+      : `Checked ${out.nodeCount} nodes. No sources attached, so this is judged on general knowledge of the topic.`;
+    renderGaps();
+    document.getElementById('mmGapsModal').classList.add('open');
+  } catch (e) {
+    toast('Gap check failed: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.innerHTML = original;
+}
+
+const GAP_BLURB = {
+  missing: 'Not covered anywhere',
+  thin: 'Too shallow to be useful',
+  question: 'Raised but never answered',
+  unsupported: 'Your sources do not back this'
+};
+
+function renderGaps() {
+  const host = document.getElementById('mmGapsList');
+  const addAll = document.getElementById('mmGapsAddAll');
+  if (!GAPS.length) {
+    host.innerHTML = `<div style="font-size:13px; color:var(--mm-fg2); line-height:1.6; padding:6px 2px;">
+      Nothing obvious is missing — the map covers its subject. Worth re-running after you expand a branch or attach a new source.</div>`;
+    addAll.style.display = 'none';
+    return;
+  }
+  addAll.style.display = GAPS.some(g => !g.added && g.kind !== 'unsupported') ? '' : 'none';
+  host.innerHTML = GAPS.map((g, i) => `
+    <div class="mm-gap${g.added ? ' added' : ''}">
+      <span class="mm-gap-kind ${esc(g.kind)}" title="${esc(GAP_BLURB[g.kind] || '')}">${esc(g.kind)}</span>
+      <div class="mm-gap-main">
+        <div class="mm-gap-label">${esc(g.label)}</div>
+        <div class="mm-gap-why">${esc(g.why)}</div>
+        <div class="mm-gap-under">would go under “${esc(g.under.label)}”</div>
+      </div>
+      ${g.kind === 'unsupported'
+        // Nothing to add for these — the point is that something already in the
+        // map is not backed by the sources, so the fix is to review it, not
+        // to grow the map further.
+        ? `<button class="mm-btn mm-btn-sm" onclick="revealGapNode(${i})">Show me</button>`
+        : g.added
+          ? '<span style="font-size:11.5px; color:var(--mm-muted); white-space:nowrap;">added ✓</span>'
+          : `<button class="mm-btn mm-btn-sm mm-btn-primary" onclick="addGap(${i})">Add</button>`}
+    </div>`).join('');
+}
+
+/** Jump to the node a gap is about, so an "unsupported" claim can be judged. */
+function revealGapNode(i) {
+  const g = GAPS[i];
+  if (!g || !NODES.has(g.under.nodeId)) { toast('That node is no longer in the map'); return; }
+  closeGaps();
+  let cur = NODES.get(g.under.nodeId);
+  while (cur) { cur.collapsed = false; cur = cur.parent_id ? NODES.get(cur.parent_id) : null; }
+  relayout();
+  selectNode(g.under.nodeId);
+  const n = NODES.get(g.under.nodeId);
+  flyTo(n.x + 200, n.y, 1);
+}
+
+async function addGap(i) {
+  const g = GAPS[i];
+  if (!g || g.added) return;
+  try {
+    await api(`/api/mind-maps/${MAP.map.map_id}/nodes`, {
+      method: 'POST',
+      body: JSON.stringify({
+        parentId: g.under.nodeId,
+        label: g.label,
+        summary: g.why,
+        // A gap the map never answers enters as a question, not as a fact —
+        // it is a prompt to go and find out, and the node style says so.
+        nodeType: g.kind === 'question' ? 'question' : 'leaf'
+      })
+    });
+    g.added = true;
+    renderGaps();
+    toast(`Added “${g.label}”`);
+  } catch (e) { toast('Could not add: ' + e.message); }
+}
+
+async function addAllGaps() {
+  const pending = GAPS.map((g, i) => i).filter(i => !GAPS[i].added && GAPS[i].kind !== 'unsupported');
+  if (!pending.length) return;
+  const btn = document.getElementById('mmGapsAddAll');
+  btn.disabled = true;
+  for (const i of pending) await addGap(i);
+  btn.disabled = false;
+}
+
+// The map is only reloaded on close, once, rather than after each Add — every
+// reload re-lays-out and re-fits the canvas, which is jarring mid-review.
+async function closeGaps() {
+  document.getElementById('mmGapsModal').classList.remove('open');
+  if (GAPS.some(g => g.added)) await openMap(MAP.map.map_id, SELECTED);
+  GAPS = [];
 }
 
 // ── context menu ─────────────────────────────────────────────────
