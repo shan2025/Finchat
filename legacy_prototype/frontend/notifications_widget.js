@@ -92,12 +92,137 @@
         .trim();
       return escHtml(t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t);
     }
+    // Minimal markdown → HTML, self-contained on purpose. Only 5 of the 13
+    // pages that ship this widget load marked+DOMPurify, so on the rest the
+    // modal used to dump raw "## …" / "**…**" source. Input is HTML-escaped
+    // FIRST and no raw HTML is ever passed through, so the output is safe
+    // without a sanitizer.
+    const MD_HREF_OK = /^(https?:|mailto:|\/|#)/i;
+    function mdInline(s) {
+      const codes = [];
+      let t = escHtml(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+      t = t
+        // URL body allows one level of nested parens, so Wikipedia-style
+        // "…/Foo_(bar)" links don't leave a stray ")" in the text.
+        .replace(/!\[[^\]]*\]\(\s*(?:[^()\s]|\([^()\s]*\))*(?:\s+&quot;[^&]*&quot;)?\s*\)/g, '')
+        .replace(/\[([^\]]+)\]\(\s*((?:[^()\s]|\([^()\s]*\))+)(?:\s+&quot;[^&]*&quot;)?\s*\)/g, (m, txt, url) =>
+          MD_HREF_OK.test(url) ? '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + txt + '</a>' : txt)
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
+        .replace(/~~(.+?)~~/g, '<del>$1</del>')
+        .replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s.,;:!?)])/g, '$1<em>$2</em>')
+        .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s.,;:!?)])/g, '$1<em>$2</em>');
+      return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + codes[i] + '</code>');
+    }
+    function mdToHtml(src) {
+      const lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
+      const isSep = (s) => s != null && /\|/.test(s) && /-/.test(s) && /^[\s|:-]+$/.test(s);
+      const cells = (s) => s.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const out = [];
+      let para = [], list = null, quote = null, code = null;
+      const softJoin = (arr) => mdInline(arr.join('\n')).replace(/\n/g, '<br>');
+      const flushPara = () => { if (para.length) { out.push('<p>' + softJoin(para) + '</p>'); para = []; } };
+      const flushList = () => {
+        if (!list) return;
+        out.push('<' + list.tag + '>' + list.items.map(i => '<li>' + mdInline(i) + '</li>').join('') + '</' + list.tag + '>');
+        list = null;
+      };
+      const flushQuote = () => { if (quote) { out.push('<blockquote>' + softJoin(quote) + '</blockquote>'); quote = null; } };
+      const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i], line = raw.trim();
+        if (/^```/.test(line)) {
+          if (code) { out.push('<pre><code>' + escHtml(code.join('\n')) + '</code></pre>'); code = null; }
+          else { flushAll(); code = []; }
+          continue;
+        }
+        if (code) { code.push(raw); continue; }
+        if (!line) { flushAll(); continue; }
+
+        const h = /^(#{1,6})\s+(.*)$/.exec(line);
+        if (h) { flushAll(); const l = h[1].length; out.push('<h' + l + '>' + mdInline(h[2].replace(/\s+#+\s*$/, '')) + '</h' + l + '>'); continue; }
+        if (/^([-*_])\s*(?:\1\s*){2,}$/.test(line)) { flushAll(); out.push('<hr>'); continue; }
+
+        if (line.indexOf('|') !== -1 && isSep(lines[i + 1])) {
+          flushAll();
+          const head = cells(line);
+          const rows = [];
+          i += 2;
+          while (i < lines.length && lines[i].trim() && lines[i].indexOf('|') !== -1) { rows.push(cells(lines[i])); i++; }
+          i--;
+          out.push('<table><thead><tr>' + head.map(c => '<th>' + mdInline(c) + '</th>').join('') + '</tr></thead><tbody>' +
+            rows.map(r => '<tr>' + r.map(c => '<td>' + mdInline(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table>');
+          continue;
+        }
+
+        const ul = /^[-*+]\s+(.*)$/.exec(line);
+        const ol = /^\d+[.)]\s+(.*)$/.exec(line);
+        if (ul || ol) {
+          flushPara(); flushQuote();
+          const tag = ul ? 'ul' : 'ol';
+          if (!list || list.tag !== tag) { flushList(); list = { tag: tag, items: [] }; }
+          list.items.push((ul || ol)[1]);
+          continue;
+        }
+        // Wrapped continuation of the previous list item (indented, not a new bullet).
+        if (list && /^\s{2,}\S/.test(raw)) { list.items[list.items.length - 1] += ' ' + line; continue; }
+
+        const bq = /^>\s?(.*)$/.exec(line);
+        if (bq) { flushPara(); flushList(); if (!quote) quote = []; quote.push(bq[1]); continue; }
+
+        flushList(); flushQuote();
+        para.push(line);
+      }
+      if (code) out.push('<pre><code>' + escHtml(code.join('\n')) + '</code></pre>');
+      flushAll();
+      return out.join('');
+    }
+
+    // Report styles live with the widget too: `.markdown-body` is only defined
+    // on a few pages, and Tailwind's preflight resets heading sizes and list
+    // bullets everywhere else. Scoped by #id so it wins on the pages that do.
+    function ensureReportStyles() {
+      if (document.getElementById('notifReportStyles')) return;
+      const st = document.createElement('style');
+      st.id = 'notifReportStyles';
+      st.textContent = [
+        '#notifReportModal .markdown-body{word-wrap:break-word}',
+        '#notifReportModal .markdown-body>*:first-child{margin-top:0}',
+        '#notifReportModal .markdown-body>*:last-child{margin-bottom:0}',
+        '#notifReportModal .markdown-body h1,#notifReportModal .markdown-body h2,#notifReportModal .markdown-body h3,',
+        '#notifReportModal .markdown-body h4,#notifReportModal .markdown-body h5,#notifReportModal .markdown-body h6',
+        '{font-weight:800;color:#3a2e23;line-height:1.3;margin:1.15em 0 .45em}',
+        '#notifReportModal .markdown-body h1{font-size:1.3em}',
+        '#notifReportModal .markdown-body h2{font-size:1.15em}',
+        '#notifReportModal .markdown-body h3{font-size:1.05em}',
+        '#notifReportModal .markdown-body h4,#notifReportModal .markdown-body h5,#notifReportModal .markdown-body h6{font-size:1em}',
+        '#notifReportModal .markdown-body p{margin:0 0 .6em}',
+        '#notifReportModal .markdown-body ul{list-style:disc;padding-left:1.4em;margin:0 0 .6em}',
+        '#notifReportModal .markdown-body ol{list-style:decimal;padding-left:1.6em;margin:0 0 .6em}',
+        '#notifReportModal .markdown-body li{margin:.2em 0}',
+        '#notifReportModal .markdown-body strong{font-weight:700;color:#2f261d}',
+        '#notifReportModal .markdown-body em{font-style:italic}',
+        '#notifReportModal .markdown-body a{color:#8c491a;text-decoration:underline;text-underline-offset:2px}',
+        '#notifReportModal .markdown-body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;background:rgba(74,56,40,.08);padding:1px 5px;border-radius:4px}',
+        '#notifReportModal .markdown-body pre{background:rgba(74,56,40,.08);padding:10px 12px;border-radius:8px;overflow-x:auto;margin:0 0 .7em}',
+        '#notifReportModal .markdown-body pre code{background:transparent;padding:0}',
+        '#notifReportModal .markdown-body blockquote{border-left:3px solid #d9cbb2;padding-left:12px;margin:0 0 .7em;color:#5c4a38}',
+        '#notifReportModal .markdown-body hr{border:none;border-top:1px solid #e6dcc8;margin:1.1em 0}',
+        '#notifReportModal .markdown-body table{width:100%;border-collapse:collapse;margin:0 0 .8em;font-size:.95em;display:block;overflow-x:auto}',
+        '#notifReportModal .markdown-body th,#notifReportModal .markdown-body td{border:1px solid #e6dcc8;padding:6px 9px;text-align:left;vertical-align:top}',
+        '#notifReportModal .markdown-body th{background:rgba(74,56,40,.06);font-weight:700}'
+      ].join('');
+      document.head.appendChild(st);
+    }
+
     function showReport(n) {
       let ov = $('notifReportModal');
       if (ov) ov.remove();
+      ensureReportStyles();
       const body = (window.marked && window.DOMPurify)
-        ? DOMPurify.sanitize(marked.parse(n.content || ''))
-        : escHtml(n.content || '').replace(/\n/g, '<br>');
+        ? DOMPurify.sanitize(marked.parse(n.content || ''), { ADD_ATTR: ['target'] })
+        : mdToHtml(n.content || '');
       ov = document.createElement('div');
       ov.id = 'notifReportModal';
       ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:24px;';
