@@ -486,6 +486,22 @@ router.post('/:mapId/nodes/:nodeId/expand', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /:mapId/gaps ──────────────────────────────────────────
+// "What is this map missing?" Read-only by design: it returns suggestions and
+// writes nothing. The user accepts one by adding it through the normal node
+// endpoint, so a wrong suggestion can never quietly pollute a trusted map.
+router.post('/:mapId/gaps', requireAuth, async (req, res) => {
+  try {
+    const map = await requireOwnedMap(req, res);
+    if (!map) return;
+    const out = await Engine.analyseGaps(map.map_id, { model: req.body?.model || null });
+    res.json({ ok: true, ...out });
+  } catch (err) {
+    console.error('Mind map gap analysis error:', err);
+    res.status(500).json({ error: 'Failed to analyse gaps', details: err.message });
+  }
+});
+
 // ── POST /:mapId/nodes/:nodeId/chat ────────────────────────────
 // Binds a chat session to a node and hands back the session id plus a seeded
 // opening prompt carrying the node's ancestor path.

@@ -53,6 +53,46 @@ Rules:
 - Organise by how the subject actually decomposes, not by "introduction / history / conclusion".
 - No markdown, no HTML, no backslashes anywhere.`;
 
+const GAPS_PROMPT = `You review a study mind map and find what is MISSING from it.
+
+You are given the full hierarchy, and sometimes the source documents it was
+built from. Judge the map as a learner would: what would leave someone with a
+false sense of having covered the topic?
+
+Respond ONLY with JSON:
+{"gaps":[
+  {"kind":"<missing|thin|unsupported|question>",
+   "label":"<2-5 word node label for the concept that is missing>",
+   "why":"<one sentence: why its absence matters, in plain language>",
+   "under":"<the EXACT label of the existing node this belongs beneath>"}
+]}
+
+The four kinds, use each only for what it is:
+  missing    — a whole facet of the subject that no branch covers.
+  thin       — a branch that exists but is too shallow to be useful yet.
+  unsupported— a claim in the map the provided sources do not actually back,
+               or that they directly contradict. Only ever use this when
+               sources were supplied.
+  question   — an open question the map raises but never answers.
+
+WHEN SOURCES ARE SUPPLIED, do this before anything else: walk the map node by
+node and check each one against the sources. Any node stating something the
+sources contradict, or asserting something they never say, is an "unsupported"
+gap — report it with "label" set to that node's EXISTING label and "under" set
+to its parent. A map that confidently contradicts its own source is worse than
+one with a hole in it, so these outrank every "missing" you might also list.
+
+Rules:
+- At most 6 gaps. Three real ones beat six padded ones.
+- "under" MUST be copied exactly from the labels listed in the map. If a gap
+  belongs at the top level, use the root's label.
+- Do not suggest something the map already contains under a different name.
+- Do not suggest generic filler ("Introduction", "Conclusion", "Future work",
+  "Best practices") unless the subject genuinely turns on it.
+- If the map is genuinely well covered, return {"gaps":[]}. That is a valid
+  and useful answer — do not invent work.
+- No markdown, no HTML, no backslashes.`;
+
 const EXPAND_PROMPT = `You grow ONE branch of an existing study mind map.
 
 Respond ONLY with JSON:
@@ -478,6 +518,135 @@ async function expandNode(mapId, nodeId, opts = {}) {
   return { added: rows.length, linkedEntities: linked.length, nodes: rows };
 }
 
+/**
+ * Find what a map is missing. Read-only: it proposes, the user disposes —
+ * nothing is written until they accept a gap, which keeps a wrong suggestion
+ * from quietly polluting a map they trust.
+ *
+ * Grounded in the map's own documents where it has them, so on a
+ * document-backed map "missing" means missing FROM THE SOURCES rather than
+ * missing from the model's general knowledge — which is the difference between
+ * a useful review and a generic topic checklist.
+ *
+ * @returns {Promise<{gaps: Array, nodeCount: number, grounded: boolean}>}
+ */
+async function analyseGaps(mapId, opts = {}) {
+  const nodesRes = await query(
+    `SELECT node_id, parent_id, label, summary, node_type, order_index
+     FROM mind_map_nodes WHERE map_id = $1 ORDER BY order_index ASC`, [mapId]);
+  const nodes = nodesRes.rows;
+  if (nodes.length === 0) return { gaps: [], nodeCount: 0, grounded: false };
+
+  const mapRes = await query('SELECT title, topic FROM mind_maps WHERE map_id = $1', [mapId]);
+  const map = mapRes.rows[0] || {};
+
+  // Render the tree as an indented outline — the model reads structure far more
+  // reliably from indentation than from a flat list of parent ids.
+  const byParent = new Map();
+  for (const n of nodes) {
+    const k = n.parent_id || '__root__';
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k).push(n);
+  }
+  const lines = [];
+  const walk = (parentKey, depth) => {
+    for (const n of (byParent.get(parentKey) || [])) {
+      lines.push(`${'  '.repeat(depth)}- ${n.label}${n.summary ? ` — ${n.summary}` : ''}`);
+      if (depth < 8) walk(n.node_id, depth + 1);
+    }
+  };
+  walk('__root__', 0);
+
+  // NOT mapDocs(): that is the UI listing query and deliberately omits the
+  // `extracted` column so listing a map never ships whole documents over the
+  // wire. Filtering its rows on `extracted` silently discards every source.
+  const docsRes = await query(
+    `SELECT doc_id, filename, kind, extracted
+       FROM mind_map_docs
+      WHERE map_id = $1 AND extracted IS NOT NULL AND length(trim(extracted)) > 40
+      ORDER BY created_at ASC`, [mapId]);
+  const docs = docsRes.rows;
+
+  const prompt =
+    `MAP TITLE: ${map.title || 'Untitled'}\n` +
+    (map.topic ? `TOPIC: ${map.topic}\n` : '') +
+    `\nCURRENT MAP (${nodes.length} nodes):\n${lines.join('\n')}\n` +
+    (docs.length
+      ? `\nSOURCE DOCUMENTS this map was built from — judge coverage against THESE, ` +
+        `and use kind "unsupported" for anything in the map they do not back:\n\n` +
+        `${sourceBlock(docs.slice(0, 4), EXPAND_DOC_BUDGET)}\n`
+      : '');
+
+  const res = await runInference({
+    messages: [
+      { role: 'system', content: GAPS_PROMPT },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.4,
+    jsonMode: true,
+    feature: 'mindmap',
+    model: opts.model || null
+  });
+
+  const raw = parseJsonLoose(res.content);
+  const KINDS = new Set(['missing', 'thin', 'unsupported', 'question']);
+  // "under" is matched back to a real node here rather than trusted: the model
+  // paraphrases labels often enough that accepting its string verbatim would
+  // strand gaps with no valid parent.
+  const byLabel = new Map();
+  for (const n of nodes) byLabel.set(n.label.trim().toLowerCase(), n);
+  const root = nodes.find(n => !n.parent_id) || nodes[0];
+  const seen = new Set();
+
+  let gaps = (Array.isArray(raw?.gaps) ? raw.gaps : [])
+    .filter(g => g && typeof g.label === 'string' && g.label.trim())
+    .slice(0, 6)
+    .map(g => {
+      const label = g.label.trim().slice(0, 120);
+      const key = label.toLowerCase();
+      if (seen.has(key)) return null;
+      seen.add(key);
+
+      let kind = String(g.kind || '').toLowerCase();
+      if (!KINDS.has(kind)) kind = 'missing';
+      // Only a document-backed map can have an unsupported claim.
+      if (kind === 'unsupported' && !docs.length) kind = 'missing';
+
+      const why = typeof g.why === 'string' ? g.why.trim().slice(0, 300) : '';
+      const existing = byLabel.get(key);
+
+      if (kind === 'unsupported') {
+        // These deliberately name a node that IS in the map — that is the whole
+        // point, the claim is already there and the sources do not back it. If
+        // the label matches nothing, the model paraphrased and we cannot point
+        // the user at a real node, so the finding is not actionable: drop it.
+        if (!existing) return null;
+        const parent = existing.parent_id
+          ? nodes.find(n => n.node_id === existing.parent_id) || root
+          : root;
+        return {
+          kind, label, why,
+          // `under` is what the UI focuses on "Show me" — for an unsupported
+          // claim that is the offending node itself, not its parent.
+          under: { nodeId: existing.node_id, label: existing.label },
+          parentLabel: parent.label
+        };
+      }
+
+      // For every other kind, a label already in the map means it is not a gap.
+      if (existing) return null;
+      const parent = byLabel.get(String(g.under || '').trim().toLowerCase()) || root;
+      return { kind, label, why, under: { nodeId: parent.node_id, label: parent.label } };
+    })
+    .filter(Boolean);
+
+  // A contradicted claim matters more than an absent one, so it sorts first.
+  const RANK = { unsupported: 0, missing: 1, thin: 2, question: 3 };
+  gaps.sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+
+  return { gaps, nodeCount: nodes.length, grounded: docs.length > 0, sources: docs.length };
+}
+
 // ═══════════════════════════════════════════════════════════
 // Reads / helpers
 // ═══════════════════════════════════════════════════════════
@@ -675,6 +844,7 @@ module.exports = {
   generateFromChat,
   generateFromDocuments,
   expandNode,
+  analyseGaps,
   getMap,
   listMaps,
   createMap,
@@ -697,3 +867,4 @@ module.exports = {
   MAX_CHILDREN,
   MAX_NODES
 };
+
