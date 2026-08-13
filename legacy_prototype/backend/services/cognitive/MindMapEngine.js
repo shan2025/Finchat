@@ -27,6 +27,17 @@ const MAX_BRANCHES = 7;
 const MAX_CHILDREN = 6;
 const MAX_NODES = 60;
 
+// Enrichment is deliberately allowed deeper than one-shot generation. MAX_DEPTH
+// exists to stop a generator padding a topic into a four-level bullet list
+// nobody asked for; enrichment is the opposite situation — the user is handing
+// over specific material and asking for it to be broken down, and "more detail
+// means more children, and children of those children" is the whole point.
+const MAX_ENRICH_DEPTH = 8;
+
+// A pasted note is source material, not a document: generous, but not so large
+// that one paste blows the generation budget on its own.
+const TEXT_NOTE_MAX = 20000;
+
 // How much source text a document-backed generation may spend. Split evenly
 // across the chosen documents so one 400-page PDF cannot crowd out the other
 // four sources the learner deliberately picked.
@@ -93,6 +104,24 @@ Rules:
   and useful answer — do not invent work.
 - No markdown, no HTML, no backslashes.`;
 
+const ENRICH_PROMPT = `You fold NEW DETAIL a learner has supplied into ONE node of their study mind map.
+
+Respond ONLY with JSON:
+{"summary":"<one line for the node — repeat the current one unchanged if it still fits>",
+ "detail":"<the node's panel body, rewritten so it carries the new material>",
+ "children":[
+   {"label":"<2-4 words>","summary":"<one sentence>","detail":"<2-3 sentences>",
+    "children":[{"label":"<2-4 words>","summary":"<one sentence>","detail":"<2-3 sentences>"}]}
+ ]}
+
+Rules:
+- Every word you write must come from the NEW DETAIL or from what the node already says. Never add outside facts, and never contradict the new detail.
+- "children" are the sub-topics the new detail introduces. 0 to 5 of them, and never a restatement of an existing child.
+- A child carries its own "children" when the new detail genuinely splits it further. Nest as deep as the material honestly goes and no deeper — that nesting is how the map gains depth.
+- Return "children":[] when the detail only sharpens the node itself. That is a valid answer; do not invent sub-topics to fill the array.
+- Where the new detail CORRECTS the node, the rewritten summary and detail must reflect the correction rather than keeping both versions.
+- labels are SHORT noun phrases. No markdown, no HTML, no backslashes.`;
+
 const EXPAND_PROMPT = `You grow ONE branch of an existing study mind map.
 
 Respond ONLY with JSON:
@@ -116,6 +145,18 @@ function parseJsonLoose(text) {
 }
 
 const clean = (v, max = 400) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+
+/**
+ * Same idea as `clean`, but keeps line structure. Pasted notes arrive as prose
+ * with paragraphs and bullets; collapsing every newline into a space throws away
+ * the outline the user typed, which is exactly the signal the model needs.
+ */
+const cleanLong = (v, max = TEXT_NOTE_MAX) => String(v == null ? '' : v)
+  .replace(/\r\n?/g, '\n')
+  .replace(/[ \t]+/g, ' ')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim()
+  .slice(0, max);
 
 // ═══════════════════════════════════════════════════════════
 // Tree normalisation
@@ -407,7 +448,11 @@ async function generateFromDocuments(userId, docIds, opts = {}) {
 
   const title = clean(raw?.title || topic, 160);
   const mapId = await createMap({
-    userId, title, topic, sourceType: 'document', sourceRef: usable[0].doc_id,
+    userId, title, topic,
+    // A map built from pasted notes says so on its provenance panel rather than
+    // claiming a document it never had.
+    sourceType: opts.sourceType === 'text' ? 'text' : 'document',
+    sourceRef: usable[0].doc_id,
     meta: {
       provider, model, generatedAt: new Date().toISOString(),
       sources: usable.map(d => ({ docId: d.doc_id, filename: d.filename }))
@@ -430,6 +475,164 @@ async function generateFromDocuments(userId, docIds, opts = {}) {
   return {
     mapId, title, nodeCount: rows.length, linkedEntities: linked.length,
     sourceCount: usable.length, skipped: docs.length - usable.length
+  };
+}
+
+/**
+ * Build a map from text the user typed or pasted.
+ *
+ * The text is stored as a note first and the map generated from that note, so
+ * the passage the map was built from survives as a source you can reopen,
+ * inherit down a branch, and ask questions against — the same as an upload.
+ * Losing it would make a text-built map the only kind that cannot say where it
+ * came from.
+ */
+async function generateFromText(userId, text, opts = {}) {
+  const body = cleanLong(text);
+  if (body.length < 40) throw new Error('that text is too short to build a map from');
+
+  const note = await addTextNote({ userId, title: opts.title, text: body });
+  try {
+    return await generateFromDocuments(userId, [note.doc_id], {
+      ...opts, topic: opts.topic, sourceType: 'text'
+    });
+  } catch (err) {
+    // A refused stub map must not leave an unreachable note behind: nothing in
+    // the UI lists an orphaned one, so it would only ever be invisible clutter.
+    // The user still has their text in the box they typed it into.
+    await query('DELETE FROM mind_map_docs WHERE doc_id = $1 AND map_id IS NULL', [note.doc_id])
+      .catch(() => {});
+    throw err;
+  }
+}
+
+/**
+ * Fold new detail into one node: rewrite what it says, and grow the sub-topics
+ * that detail introduces.
+ *
+ * This is the difference between a map you generated and a map you are keeping.
+ * `expandNode` asks the model what it knows; this hands the model what YOU know
+ * and asks it to place that in the tree — so the same call both corrects the
+ * node and gives it children (and children of those), which is what "add more
+ * detail" has to mean for a hierarchy.
+ *
+ * Nothing outside the supplied text is invented: the prompt is grounded on it,
+ * and the node's own text is the only other permitted source.
+ */
+async function enrichNode(mapId, nodeId, text, opts = {}) {
+  const note = cleanLong(text, 12000);
+  if (note.length < 3) throw new Error('nothing to add — write the detail first');
+
+  const nodeRes = await query(
+    'SELECT node_id, map_id, parent_id, label, summary, detail, node_type FROM mind_map_nodes WHERE node_id = $1 AND map_id = $2',
+    [nodeId, mapId]);
+  const node = nodeRes.rows[0];
+  if (!node) throw new Error('node not found');
+
+  const mapRes = await query('SELECT title, topic FROM mind_maps WHERE map_id = $1', [mapId]);
+  const map = mapRes.rows[0] || {};
+
+  const depth = await depthOf(nodeId);
+  const ancestors = await ancestorChain(nodeId);
+  const existing = await query(
+    'SELECT label FROM mind_map_nodes WHERE parent_id = $1 ORDER BY order_index', [nodeId]);
+
+  // How much room is left beneath this node. At the ceiling the node still gets
+  // its text rewritten — refusing the whole call because the tree is deep would
+  // throw away the part that always works.
+  const room = Math.max(0, MAX_ENRICH_DEPTH - depth);
+
+  const prompt =
+    `MAP: ${map.title || 'Untitled'}${map.topic ? ` (${map.topic})` : ''}\n` +
+    `PATH: ${ancestors.join(' → ')}\n` +
+    `NODE: ${node.label}\n` +
+    `CURRENT SUMMARY: ${node.summary || '(none)'}\n` +
+    `CURRENT DETAIL: ${node.detail || '(none)'}\n` +
+    (existing.rows.length
+      ? `EXISTING CHILDREN (do not repeat these): ${existing.rows.map(r => r.label).join(', ')}\n`
+      : '') +
+    (room === 0
+      ? `\nThis node is at the maximum depth of the map — return "children":[] and put everything into summary and detail.\n`
+      : room === 1
+        ? `\nOnly ONE more level fits beneath this node — children must not carry their own "children".\n`
+        : `\nUp to ${room} more levels fit beneath this node.\n`) +
+    `\nNEW DETAIL FROM THE LEARNER:\n${note}`;
+
+  const res = await runInference({
+    messages: [
+      { role: 'system', content: ENRICH_PROMPT },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.3,
+    jsonMode: true,
+    feature: 'mindmap',
+    model: opts.model || null
+  });
+
+  const raw = parseJsonLoose(res.content);
+
+  // Both fields are optional in practice — a model that returns only children
+  // should still be useful, so each is applied only when it came back non-empty.
+  const summary = clean(raw?.summary, 400);
+  const detail = clean(raw?.detail, 1500);
+  if (summary || detail) {
+    await query(`
+      UPDATE mind_map_nodes SET
+        summary = CASE WHEN $2 = '' THEN summary ELSE $2 END,
+        detail  = CASE WHEN $3 = '' THEN detail  ELSE $3 END
+      WHERE node_id = $1
+    `, [nodeId, summary, detail]);
+  }
+
+  const taken = new Set(existing.rows.map(r => r.label.toLowerCase()));
+  taken.add(node.label.toLowerCase());
+
+  const rows = [];
+  if (room > 0) {
+    // normalizeNode caps its own recursion at MAX_DEPTH, which is the wrong
+    // ceiling here — pass a depth rebased so the remaining room is what limits
+    // nesting rather than the generator's flatter shape.
+    const startDepth = MAX_DEPTH - Math.min(room, MAX_DEPTH - 1);
+    const kids = (Array.isArray(raw?.children) ? raw.children : [])
+      .slice(0, MAX_CHILDREN)
+      .map(k => normalizeNode(k, startDepth, taken))
+      .filter(Boolean);
+
+    let order = existing.rows.length;
+    const walk = (kid, parentId, index, level) => {
+      const id = 'mmn_' + uuidv4();
+      rows.push({
+        node_id: id, map_id: mapId, parent_id: parentId,
+        label: kid.label, summary: kid.summary, detail: kid.detail,
+        node_type: kid.nodeType, order_index: index, entity_id: null
+      });
+      if (level < room) kid.children.forEach((g, gi) => walk(g, id, gi, level + 1));
+    };
+    for (const kid of kids) walk(kid, nodeId, order++, 1);
+  }
+
+  let linked = [];
+  if (rows.length) {
+    linked = await linkEntities(rows);
+    await insertNodes(rows);
+  }
+  await touchMap(mapId);
+
+  if (linked.length && opts.userId) {
+    await recordActivation({
+      entityIds: linked, userId: opts.userId, source: 'mindmap', sourceId: mapId,
+      detail: `Detail added under "${node.label}" in mind map "${map.title || 'Untitled'}".`
+    }).catch(() => {});
+  }
+
+  return {
+    added: rows.length,
+    linkedEntities: linked.length,
+    summary: summary || node.summary || '',
+    detail: detail || node.detail || '',
+    rewritten: Boolean(summary || detail),
+    atMaxDepth: room === 0,
+    nodes: rows
   };
 }
 
@@ -666,6 +869,51 @@ async function docsByIds(userId, docIds) {
 }
 
 /**
+ * Store typed or pasted text as a source, in the same table as uploads.
+ *
+ * kind = 'text' with no stored_name: there is no blob to serve, the note itself
+ * is the extracted text. Everything that reads sources reads `extracted`, so a
+ * note is inherited, quoted in prompts and answered from exactly like a PDF —
+ * without a parallel table and a second version of all of that.
+ */
+async function addTextNote({ userId, mapId = null, nodeId = null, title, text }) {
+  const body = cleanLong(text);
+  if (!body) throw new Error('the note is empty');
+  const docId = 'mmd_' + uuidv4();
+  // Title is a convenience: a note the user did not name is identified by its
+  // own opening words, which reads far better in a source list than "Note 3".
+  const name = clean(title, 200) || (clean(body, 60) + (body.length > 60 ? '…' : '')) || 'Note';
+  const res = await query(`
+    INSERT INTO mind_map_docs
+      (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
+       stored_name, kind, extracted, char_count)
+    VALUES ($1,$2,$3,$4,$5,'text/plain',$6,NULL,'text',$7,$8)
+    RETURNING *
+  `, [docId, userId, mapId, nodeId, name, Buffer.byteLength(body, 'utf8'), body, body.length]);
+  return res.rows[0];
+}
+
+/** Rewrite a note in place. Uploads are immutable; a note is meant to be edited. */
+async function updateTextNote(docId, { title, text }) {
+  const body = text === undefined ? null : cleanLong(text);
+  if (body !== null && !body) throw new Error('the note is empty');
+  const res = await query(`
+    UPDATE mind_map_docs SET
+      filename   = COALESCE($2, filename),
+      extracted  = COALESCE($3, extracted),
+      char_count = COALESCE($4, char_count),
+      size_bytes = COALESCE($5, size_bytes)
+    WHERE doc_id = $1 AND kind = 'text'
+    RETURNING *
+  `, [docId,
+      title === undefined ? null : (clean(title, 200) || null),
+      body,
+      body === null ? null : body.length,
+      body === null ? null : Buffer.byteLength(body, 'utf8')]);
+  return res.rows[0] || null;
+}
+
+/**
  * Documents in scope for a node: its own first, then each ancestor's, then the
  * map-level sources. A leaf inherits the paper its branch was built from, which
  * is what "ask about this" has to mean for the answer to be grounded.
@@ -843,7 +1091,9 @@ module.exports = {
   generateFromTopic,
   generateFromChat,
   generateFromDocuments,
+  generateFromText,
   expandNode,
+  enrichNode,
   analyseGaps,
   getMap,
   listMaps,
@@ -852,6 +1102,8 @@ module.exports = {
   touchMap,
   // documents
   docsByIds,
+  addTextNote,
+  updateTextNote,
   inheritedDocs,
   mapDocs,
   sourceBlock,
@@ -863,8 +1115,10 @@ module.exports = {
   depthOf,
   ancestorChain,
   MAX_DEPTH,
+  MAX_ENRICH_DEPTH,
   MAX_BRANCHES,
   MAX_CHILDREN,
-  MAX_NODES
+  MAX_NODES,
+  TEXT_NOTE_MAX
 };
 

@@ -1,7 +1,7 @@
 // routes/mindMaps.js — Sprint Z · Track A · /api/mind-maps
 //
 //   GET    /                              list the caller's maps
-//   POST   /generate                      {sourceType, topic|sessionId}
+//   POST   /generate                      {sourceType, topic|sessionId|docIds|text}
 //   GET    /:mapId                        full tree + cross-links
 //   PATCH  /:mapId                        rename / layout / theme
 //   DELETE /:mapId                        delete a map
@@ -9,6 +9,7 @@
 //   PATCH  /:mapId/nodes/:nodeId          rename / recolor / collapse / retype / move
 //   DELETE /:mapId/nodes/:nodeId          delete a node and its subtree
 //   POST   /:mapId/nodes/:nodeId/expand   AI-grow this branch
+//   POST   /:mapId/nodes/:nodeId/enrich   fold supplied detail into this branch
 //   POST   /:mapId/nodes/:nodeId/chat     bind a scoped conversation to this node
 //   GET    /:mapId/nodes/:nodeId/messages the node conversation so far
 //   POST   /:mapId/edges                  add a cross-link
@@ -17,9 +18,11 @@
 //   GET    /:mapId/export?format=         markdown | opml
 //
 //   POST   /docs                          upload documents (multipart, "files")
+//   POST   /docs/text                     save typed / pasted text as a source
 //   GET    /docs                          the caller's document library
 //   GET    /docs/:docId                   one document + its extracted text
 //   PATCH  /docs/:docId                   attach / move to a map or node
+//   PATCH  /docs/:docId/text              rewrite a text note in place
 //   DELETE /docs/:docId                   forget a document
 //
 // Ownership mirrors neuralMap.js: someone else's map is 404, never 401 — a 401
@@ -53,6 +56,30 @@ const CHAT_DOC_LIMIT = 4;
 
 const clean = (v, max = 400) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
 
+/**
+ * Turn a generator refusal into something the user can act on.
+ *
+ * The engine refuses to save a map with fewer than three branches, which is the
+ * right call — a two-branch map is a bullet list wearing a costume. But the
+ * fix depends entirely on what you fed it, and "Failed to generate mind map"
+ * tells you none of that.
+ */
+function thinSourceMessage(raw, sourceType) {
+  if (!/refusing to save a stub/i.test(raw)) return raw;
+  switch (sourceType) {
+    case 'text':
+      return 'That text was too thin to organise into a map — paste more of it, ' +
+             'or keep it as a note on a node in an existing map instead.';
+    case 'chat':
+      return 'That conversation was too short to map — it needs to cover more ground first.';
+    case 'document':
+      return 'Those sources were too thin to organise into a map — add another, ' +
+             'or drop the focus so more of them counts.';
+    default:
+      return 'That topic came back too thin to map — try a more specific one.';
+  }
+}
+
 /** Public shape of a document row. `text` is opt-in — it is the expensive field. */
 function docView(row, withText = false) {
   const view = {
@@ -80,6 +107,26 @@ async function requireOwnedDoc(req, res) {
   const doc = r.rows[0];
   if (!doc) { res.status(404).json({ error: 'Document not found' }); return null; }
   return doc;
+}
+
+/**
+ * Validate where a source is being filed. A node id without its map, or either
+ * one belonging to someone else, must not silently degrade into a library
+ * upload — the user would never find the source where they put it.
+ *
+ * @returns {Promise<null|{status:number, error:string}>} null when the scope is fine.
+ */
+async function checkDocScope(userId, mapId, nodeId) {
+  if (nodeId && !mapId) return { status: 400, error: 'nodeId requires mapId' };
+  if (mapId) {
+    const own = await query('SELECT 1 FROM mind_maps WHERE map_id = $1 AND user_id = $2', [mapId, userId]);
+    if (!own.rows.length) return { status: 404, error: 'Map not found' };
+  }
+  if (nodeId) {
+    const inMap = await query('SELECT 1 FROM mind_map_nodes WHERE node_id = $1 AND map_id = $2', [nodeId, mapId]);
+    if (!inMap.rows.length) return { status: 400, error: 'nodeId is not a node in this map' };
+  }
+  return null;
 }
 
 /** Resolve a map the caller owns, or answer 404 and return null. */
@@ -112,7 +159,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // ── POST /generate ─────────────────────────────────────────────
 router.post('/generate', requireAuth, async (req, res) => {
-  const { sourceType = 'topic', topic, sessionId, docIds } = req.body || {};
+  const { sourceType = 'topic', topic, sessionId, docIds, text, title } = req.body || {};
   try {
     let out;
     if (sourceType === 'topic') {
@@ -121,6 +168,9 @@ router.post('/generate', requireAuth, async (req, res) => {
     } else if (sourceType === 'chat') {
       if (!clean(sessionId)) return res.status(400).json({ error: 'sessionId is required' });
       out = await Engine.generateFromChat(req.user.id, sessionId);
+    } else if (sourceType === 'text') {
+      if (!String(text || '').trim()) return res.status(400).json({ error: 'text is required' });
+      out = await Engine.generateFromText(req.user.id, text, { topic, title });
     } else if (sourceType === 'document') {
       if (!Array.isArray(docIds) || !docIds.length) {
         return res.status(400).json({ error: 'docIds is required — upload documents first' });
@@ -136,10 +186,16 @@ router.post('/generate', requireAuth, async (req, res) => {
     res.status(201).json({ ok: true, ...out });
   } catch (err) {
     console.error('Mind map generate error:', err);
-    // A refused stub map is the user's problem to retry, not a server fault.
-    const isShape = /refusing to save a stub|topic is required|no conversation found|no documents found|extractable text/i
+    // A refused stub map is the user's problem to retry, not a server fault —
+    // and the client only ever shows `error`, so the reason has to go there.
+    // "Failed to generate mind map" with the cause hidden in `details` left the
+    // most common case (a paste too thin to decompose) looking like a crash.
+    const isShape = /refusing to save a stub|topic is required|no conversation found|no documents found|extractable text|too short to build/i
       .test(err.message);
-    res.status(isShape ? 422 : 500).json({ error: 'Failed to generate mind map', details: err.message });
+    if (isShape) {
+      return res.status(422).json({ error: thinSourceMessage(err.message, sourceType), details: err.message });
+    }
+    res.status(500).json({ error: 'Failed to generate mind map', details: err.message });
   }
 });
 
@@ -164,18 +220,8 @@ router.post('/docs', requireAuth, upload.array('files', 6), async (req, res) => 
     const mapId = clean(req.body?.mapId, 80) || null;
     const nodeId = clean(req.body?.nodeId, 80) || null;
 
-    // A node id without its map, or either one belonging to someone else, must
-    // not silently degrade into a library upload — the user would never find
-    // the file where they put it.
-    if (nodeId && !mapId) return res.status(400).json({ error: 'nodeId requires mapId' });
-    if (mapId) {
-      const own = await query('SELECT 1 FROM mind_maps WHERE map_id = $1 AND user_id = $2', [mapId, req.user.id]);
-      if (!own.rows.length) return res.status(404).json({ error: 'Map not found' });
-    }
-    if (nodeId) {
-      const inMap = await query('SELECT 1 FROM mind_map_nodes WHERE node_id = $1 AND map_id = $2', [nodeId, mapId]);
-      if (!inMap.rows.length) return res.status(400).json({ error: 'nodeId is not a node in this map' });
-    }
+    const scopeError = await checkDocScope(req.user.id, mapId, nodeId);
+    if (scopeError) return res.status(scopeError.status).json({ error: scopeError.error });
 
     const saved = [];
     for (const f of req.files) {
@@ -199,6 +245,54 @@ router.post('/docs', requireAuth, upload.array('files', 6), async (req, res) => 
   } catch (err) {
     console.error('Mind map doc upload error:', err);
     res.status(500).json({ error: 'Failed to process documents', details: err.message });
+  }
+});
+
+// ── POST /docs/text ────────────────────────────────────────────
+// A typed or pasted note, stored as a source alongside the uploads.
+//
+// Registered ahead of GET /docs/:docId for the same reason the whole docs block
+// sits ahead of /:mapId — "text" would otherwise be read as a document id.
+router.post('/docs/text', requireAuth, async (req, res) => {
+  try {
+    const mapId = clean(req.body?.mapId, 80) || null;
+    const nodeId = clean(req.body?.nodeId, 80) || null;
+    const scopeError = await checkDocScope(req.user.id, mapId, nodeId);
+    if (scopeError) return res.status(scopeError.status).json({ error: scopeError.error });
+
+    const row = await Engine.addTextNote({
+      userId: req.user.id, mapId, nodeId,
+      title: req.body?.title, text: req.body?.text
+    });
+    if (mapId) await Engine.touchMap(mapId);
+    res.status(201).json({ ok: true, doc: docView(row) });
+  } catch (err) {
+    console.error('Mind map text note error:', err);
+    const isShape = /empty/i.test(err.message);
+    res.status(isShape ? 400 : 500).json({ error: 'Failed to save the note', details: err.message });
+  }
+});
+
+// ── PATCH /docs/:docId/text ────────────────────────────────────
+// Notes are editable in place — that is the whole difference between a note and
+// an upload. Re-titling alone is allowed, so `text` is optional.
+router.patch('/docs/:docId/text', requireAuth, async (req, res) => {
+  try {
+    const doc = await requireOwnedDoc(req, res);
+    if (!doc) return;
+    if (doc.kind !== 'text') {
+      return res.status(400).json({ error: 'only text notes can be edited — re-upload the file instead' });
+    }
+    const row = await Engine.updateTextNote(doc.doc_id, {
+      title: req.body?.title, text: req.body?.text
+    });
+    if (!row) return res.status(404).json({ error: 'Note not found' });
+    if (row.map_id) await Engine.touchMap(row.map_id);
+    res.json({ ok: true, doc: docView(row, true) });
+  } catch (err) {
+    console.error('Mind map note update error:', err);
+    const isShape = /empty/i.test(err.message);
+    res.status(isShape ? 400 : 500).json({ error: 'Failed to update the note', details: err.message });
   }
 });
 
@@ -483,6 +577,43 @@ router.post('/:mapId/nodes/:nodeId/expand', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Mind map expand error:', err);
     res.status(500).json({ error: 'Failed to expand node', details: err.message });
+  }
+});
+
+// ── POST /:mapId/nodes/:nodeId/enrich ──────────────────────────
+// Fold detail the user supplies into a node: rewrite what it says, and grow the
+// sub-topics that detail introduces.
+//
+// Distinct from /expand, which asks the model what IT knows. This one is given
+// the user's own material — typed into the panel, or an answer from the node's
+// Ask AI thread they want kept — and places it in the tree. `saveNote` files the
+// same text as a source on the node, so the map can show what a branch grew from.
+router.post('/:mapId/nodes/:nodeId/enrich', requireAuth, async (req, res) => {
+  try {
+    const map = await requireOwnedMap(req, res);
+    if (!map) return;
+    const node = await requireOwnedNode(req, res, map.map_id);
+    if (!node) return;
+
+    const text = String(req.body?.text || '');
+    if (!text.trim()) return res.status(400).json({ error: 'text is required' });
+
+    let note = null;
+    if (req.body?.saveNote) {
+      note = await Engine.addTextNote({
+        userId: req.user.id, mapId: map.map_id, nodeId: node.node_id,
+        title: req.body?.title, text
+      });
+    }
+
+    const out = await Engine.enrichNode(map.map_id, node.node_id, text, {
+      userId: req.user.id, model: req.body?.model || null
+    });
+    res.json({ ok: true, ...out, note: note ? docView(note) : null });
+  } catch (err) {
+    console.error('Mind map enrich error:', err);
+    const isShape = /nothing to add|node not found|the note is empty/i.test(err.message);
+    res.status(isShape ? 400 : 500).json({ error: 'Failed to add that detail', details: err.message });
   }
 });
 

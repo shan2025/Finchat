@@ -388,9 +388,9 @@ body {
         <span class="material-symbols-outlined" style="font-size:52px; opacity:.4;">schema</span>
         <div class="mm-serif" style="font-size:22px; color:var(--mm-fg);">No map open</div>
         <div style="font-size:13.5px; max-width:360px; line-height:1.6;">
-          Generate one from a topic, from a conversation you have already had, or from
-          documents you upload. Nodes that match something in your knowledge graph link
-          straight to it.
+          Generate one from a topic, from a conversation you have already had, from text
+          you paste, or from documents you upload. Nodes that match something in your
+          knowledge graph link straight to it.
         </div>
         <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
           <span class="material-symbols-outlined">auto_awesome</span> Generate a mind map</button>
@@ -439,6 +439,14 @@ body {
               <div style="margin-top:4px; font-weight:700;">Add documents to this node</div>
               <div style="font-size:11px; margin-top:2px;">PDF, DOCX, TXT, MD, CSV or an image · drop or click</div>
             </div>
+            <!-- Typed text is a source in its own right, not a file you have to
+                 make first. It lands in the same place an upload does. -->
+            <div style="display:flex; gap:6px; margin-top:8px;">
+              <button class="mm-btn mm-btn-sm" onclick="openNoteForm()">
+                <span class="material-symbols-outlined">edit_note</span> Write a note</button>
+              <button class="mm-btn mm-btn-sm" onclick="openEnrich()">
+                <span class="material-symbols-outlined">auto_awesome</span> Add detail with AI</button>
+            </div>
             <div id="mmInheritedDocs"></div>
           </div>
 
@@ -461,6 +469,9 @@ body {
           <div style="margin-top:7px; display:flex; gap:6px; flex-wrap:wrap;">
             <button class="mm-btn mm-btn-sm" onclick="seedAsk()">
               <span class="material-symbols-outlined">bolt</span> Explain this node</button>
+            <button class="mm-btn mm-btn-sm" onclick="composerToMap()"
+                    title="Put what you typed onto the map instead of asking about it">
+              <span class="material-symbols-outlined">note_add</span> Add to map</button>
             <button class="mm-btn mm-btn-sm" id="mmBuildFromDocsBtn" onclick="buildMapFromNodeDocs()" style="display:none;">
               <span class="material-symbols-outlined">schema</span> New map from these sources</button>
           </div>
@@ -479,6 +490,9 @@ body {
         <div class="mm-panel-actions">
           <button class="mm-btn mm-btn-primary" onclick="expandCurrent()" id="mmExpandBtn">
             <span class="material-symbols-outlined">expand_content</span> Expand</button>
+          <button class="mm-btn" onclick="openEnrich()" id="mmEnrichBtn"
+                  title="Give this branch your own detail — the node is rewritten and the sub-topics it introduces are added">
+            <span class="material-symbols-outlined">note_add</span> Add detail</button>
           <button class="mm-btn" onclick="openChildForm()">
             <span class="material-symbols-outlined">add</span> Add child</button>
           <button class="mm-btn" onclick="deleteCurrent()" style="margin-left:auto;" title="Delete node">
@@ -499,6 +513,7 @@ body {
     <div class="mm-src">
       <button data-src="topic" class="on" onclick="pickSource('topic')">A topic</button>
       <button data-src="chat" onclick="pickSource('chat')">A conversation</button>
+      <button data-src="text" onclick="pickSource('text')">Text</button>
       <button data-src="document" onclick="pickSource('document')">Documents</button>
     </div>
     <div id="mmGenTopic">
@@ -508,6 +523,19 @@ body {
     <div id="mmGenChat" style="display:none;">
       <div class="mm-label">Conversation</div>
       <select class="mm-field" id="mmSessionSelect"></select>
+    </div>
+    <!-- Text: the same standing as an upload. Notes you paste here are kept as
+         a source on the map, so the map can still say what it was built from. -->
+    <div id="mmGenText" style="display:none;">
+      <div class="mm-label">Title <span style="text-transform:none; letter-spacing:0;">(optional)</span></div>
+      <input class="mm-field" id="mmGenTextTitle" placeholder="e.g. Lecture 4 notes" maxlength="200">
+      <div class="mm-label">Your text</div>
+      <textarea class="mm-field" id="mmGenTextBody" rows="9"
+                placeholder="Paste or write the material to build the map from — notes, a passage, an outline…"
+                style="resize:vertical; line-height:1.6;"></textarea>
+      <div class="mm-doc-meta" id="mmGenTextCount" style="margin-top:5px;">0 characters</div>
+      <div class="mm-label">Focus <span style="text-transform:none; letter-spacing:0;">(optional)</span></div>
+      <input class="mm-field" id="mmGenTextFocus" placeholder="e.g. only the parts about consensus">
     </div>
     <div id="mmGenDocs" style="display:none;">
       <div class="mm-label">Sources</div>
@@ -548,6 +576,52 @@ body {
       <button class="mm-btn" onclick="closeChildForm()">Cancel</button>
       <button class="mm-btn mm-btn-primary" id="mmChildAddBtn" onclick="submitChild()">
         <span class="material-symbols-outlined">add</span> Add node</button>
+    </div>
+  </div>
+</div>
+
+<!-- text note: write one, or rewrite one already attached -->
+<div class="mm-modal" id="mmNoteModal" onclick="if(event.target===this) closeNoteForm()">
+  <div class="mm-modal-box">
+    <div class="mm-serif" style="font-size:20px; margin-bottom:2px;" id="mmNoteTitleText">Write a note</div>
+    <div style="font-size:12.5px; color:var(--mm-muted);" id="mmNoteUnder"></div>
+    <div class="mm-label">Title <span style="text-transform:none; letter-spacing:0;">(optional)</span></div>
+    <input class="mm-field" id="mmNoteName" placeholder="Named after its first words if you leave this blank" maxlength="200">
+    <div class="mm-label">Note</div>
+    <textarea class="mm-field" id="mmNoteBody" rows="10"
+              placeholder="Anything this branch should be answered from — your own notes, a passage, a definition…"
+              style="resize:vertical; line-height:1.6;"></textarea>
+    <div class="mm-doc-meta" style="margin-top:6px;">
+      Kept as a source on this node. Expanding or asking about this branch reads it, and so does anything below it.
+    </div>
+    <div class="mm-modal-actions">
+      <button class="mm-btn" onclick="closeNoteForm()">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmNoteSaveBtn" onclick="submitNote()">
+        <span class="material-symbols-outlined">check</span> Save note</button>
+    </div>
+  </div>
+</div>
+
+<!-- add detail: the user's material, folded into the node and grown into children -->
+<div class="mm-modal" id="mmEnrichModal" onclick="if(event.target===this) closeEnrich()">
+  <div class="mm-modal-box">
+    <div class="mm-serif" style="font-size:21px; margin-bottom:2px;">Add detail to this node</div>
+    <div style="font-size:12.5px; color:var(--mm-muted);" id="mmEnrichUnder"></div>
+    <div class="mm-label">What should this node say?</div>
+    <textarea class="mm-field" id="mmEnrichBody" rows="9"
+              placeholder="Write or paste the detail. The node's summary is rewritten to carry it, and whatever new sub-topics it introduces become children — with their own children where the material goes that deep."
+              style="resize:vertical; line-height:1.6;"></textarea>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px; color:var(--mm-fg2); cursor:pointer;">
+      <input type="checkbox" id="mmEnrichKeep" checked style="width:15px; height:15px; accent-color:var(--mm-accent);">
+      Also keep this as a source note on the node
+    </label>
+    <div class="mm-doc-meta" style="margin-top:8px;">
+      Nothing outside what you write here is invented — the model is only allowed to organise it against what the node already says.
+    </div>
+    <div class="mm-modal-actions">
+      <button class="mm-btn" onclick="closeEnrich()">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmEnrichBtn2" onclick="submitEnrich()">
+        <span class="material-symbols-outlined">auto_awesome</span> Add to map</button>
     </div>
   </div>
 </div>
@@ -600,7 +674,9 @@ body {
 <div id="mmCtxMenu">
   <button onclick="ctxAction('ask')"><span class="material-symbols-outlined">forum</span> Ask AI about this</button>
   <button onclick="ctxAction('expand')"><span class="material-symbols-outlined">expand_content</span> Expand with AI</button>
+  <button onclick="ctxAction('enrich')"><span class="material-symbols-outlined">note_add</span> Add detail with AI</button>
   <button onclick="ctxAction('child')"><span class="material-symbols-outlined">add</span> Add child node</button>
+  <button onclick="ctxAction('note')"><span class="material-symbols-outlined">edit_note</span> Write a note</button>
   <button onclick="ctxAction('docs')"><span class="material-symbols-outlined">upload_file</span> Attach a document</button>
   <hr>
   <button onclick="ctxAction('unpin')"><span class="material-symbols-outlined">restart_alt</span> Reset position</button>
@@ -1535,11 +1611,12 @@ function renderMapOverview(n) {
     ${sources.map(s => `
       <div class="mm-doc">
         <div class="mm-doc-ico"><span class="material-symbols-outlined">${
-          s.type === 'document' ? (s.kind === 'image' ? 'image' : 'description')
+          s.type === 'document' ? docIcon(s)
           : s.type === 'chat' ? 'forum' : s.type === 'graph' ? 'hub' : 'lightbulb'}</span></div>
         <div class="mm-doc-main">
           <div class="mm-doc-name">${esc(s.label)}</div>
-          <div class="mm-doc-meta">${esc(s.type)}${s.chars ? ' · ' + s.chars.toLocaleString() + ' chars' : ''}</div>
+          <div class="mm-doc-meta">${esc(s.kind === 'text' ? 'note' : s.type)}${
+            s.chars ? ' · ' + s.chars.toLocaleString() + ' chars' : ''}</div>
         </div>
         ${s.type === 'document'
           ? `<div class="mm-doc-acts"><button class="mm-icon-btn" onclick="viewDoc('${esc(s.ref)}')" title="View">
@@ -1728,15 +1805,21 @@ function countDescendants(n) {
 }
 
 // ── documents ────────────────────────────────────────────────────
+const docIcon = d => d.kind === 'image' ? 'image' : d.kind === 'text' ? 'edit_note' : 'description';
+
 function docRow(d, actions) {
+  // A note has no file behind it, so size and "chars read" would be lying about
+  // an extraction that never happened — it reports its own length instead.
+  const meta = d.kind === 'text'
+    ? `note · ${(d.chars || 0).toLocaleString()} characters`
+    : `${fmtSize(d.size)}${d.chars ? ' · ' + d.chars.toLocaleString() + ' chars read' : ' · no text extracted'}`;
   return `
     <div class="mm-doc">
-      <div class="mm-doc-ico"><span class="material-symbols-outlined">${
-        d.kind === 'image' ? 'image' : 'description'}</span></div>
+      <div class="mm-doc-ico"><span class="material-symbols-outlined">${docIcon(d)}</span></div>
       <div class="mm-doc-main">
         <div class="mm-doc-name">${esc(d.filename)}</div>
         <div class="mm-doc-meta">
-          ${fmtSize(d.size)}${d.chars ? ' · ' + d.chars.toLocaleString() + ' chars read' : ' · no text extracted'}
+          ${meta}
           ${d.scope && d.scope !== 'node' ? ` · <span class="mm-scope">${esc(d.scope)}</span>` : ''}
         </div>
       </div>
@@ -1749,14 +1832,18 @@ function renderNodeDocs(n) {
   const host = document.getElementById('mmNodeDocs');
   host.innerHTML = mine.length
     ? mine.map(d => docRow(d, `
-        <button class="mm-icon-btn" onclick="viewDoc('${esc(d.docId)}')" title="View extracted text">
-          <span class="material-symbols-outlined">visibility</span></button>
+        ${d.kind === 'text'
+          // A note is meant to be revised — an upload can only be replaced.
+          ? `<button class="mm-icon-btn" onclick="editNote('${esc(d.docId)}')" title="Edit this note">
+               <span class="material-symbols-outlined">edit</span></button>`
+          : `<button class="mm-icon-btn" onclick="viewDoc('${esc(d.docId)}')" title="View extracted text">
+               <span class="material-symbols-outlined">visibility</span></button>`}
         ${d.url ? `<a class="mm-icon-btn" href="${esc(d.url)}"
             target="_blank" rel="noopener" title="Open the original file">
           <span class="material-symbols-outlined">open_in_new</span></a>` : ''}
         <button class="mm-icon-btn" onclick="removeDoc('${esc(d.docId)}')" title="Remove">
           <span class="material-symbols-outlined">close</span></button>`)).join('')
-    : '<div class="mm-empty-note">Nothing attached yet. Anything you add here becomes the source the AI answers this node from.</div>';
+    : '<div class="mm-empty-note">Nothing attached yet. A document you upload or a note you write here becomes the source the AI answers this node from.</div>';
 
   // What this node inherits from above — read-only here, managed on its owner.
   const inherited = inheritedDocsFor(n.node_id).filter(d => d.nodeId !== n.node_id);
@@ -1878,6 +1965,123 @@ function closeDoc() { document.getElementById('mmDocModal').classList.remove('op
   });
 })();
 
+// ── text notes ───────────────────────────────────────────────────
+// A note is a source the user types instead of uploads. Same table, same
+// inheritance, same grounding — the only difference is that it can be rewritten
+// afterwards, which is the whole reason to type one rather than attach a file.
+let noteEditingId = null;   // doc id being rewritten, or null for a new note
+
+function openNoteForm(docId) {
+  if (!SELECTED) { toast('Select a node first'); return; }
+  noteEditingId = docId || null;
+  const n = NODES.get(SELECTED);
+  document.getElementById('mmNoteTitleText').textContent = noteEditingId ? 'Edit note' : 'Write a note';
+  document.getElementById('mmNoteUnder').textContent = 'On “' + (n ? n.label : 'this node') + '”';
+  if (!noteEditingId) {
+    document.getElementById('mmNoteName').value = '';
+    document.getElementById('mmNoteBody').value = '';
+  }
+  document.getElementById('mmNoteModal').classList.add('open');
+  setTimeout(() => document.getElementById('mmNoteBody').focus(), 60);
+}
+function closeNoteForm() {
+  document.getElementById('mmNoteModal').classList.remove('open');
+  noteEditingId = null;
+}
+
+/** Load an existing note into the form. Its text lives on the server, not in the list. */
+async function editNote(docId) {
+  try {
+    const { doc } = await api('/api/mind-maps/docs/' + docId);
+    openNoteForm(docId);
+    document.getElementById('mmNoteName').value = doc.filename || '';
+    document.getElementById('mmNoteBody').value = doc.text || '';
+  } catch (e) { toast('Could not open that note: ' + e.message); }
+}
+
+async function submitNote() {
+  const body = document.getElementById('mmNoteBody').value.trim();
+  if (!body) { toast('Write something first'); return; }
+  if (!SELECTED || !MAP) return;
+
+  const btn = document.getElementById('mmNoteSaveBtn');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="mm-spin"></span> Saving…';
+  const title = document.getElementById('mmNoteName').value.trim();
+  try {
+    if (noteEditingId) {
+      await api('/api/mind-maps/docs/' + noteEditingId + '/text', {
+        method: 'PATCH', body: JSON.stringify({ title: title || undefined, text: body })
+      });
+    } else {
+      await api('/api/mind-maps/docs/text', {
+        method: 'POST',
+        body: JSON.stringify({ mapId: MAP.map.map_id, nodeId: SELECTED, title: title || undefined, text: body })
+      });
+    }
+    closeNoteForm();
+    await reloadDocs();
+    // The node answers from its sources, so a changed note makes the bound
+    // context stale exactly the way a new upload does.
+    if (CHAT.nodeId) { CHAT.loaded = false; CHAT.loading = null; await ensureNodeChat(); }
+    toast(noteEditingId ? 'Note updated' : 'Note saved to this node');
+  } catch (e) { toast('Could not save the note: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = original;
+}
+
+// ── add detail (enrich) ──────────────────────────────────────────
+// The other half of "add text": this one does not just file the text, it folds
+// it into the node — rewriting what the node says and growing the sub-topics
+// the text introduces, nested as deep as the material actually goes.
+function openEnrich(prefill) {
+  if (!SELECTED) { toast('Select a node first'); return; }
+  const n = NODES.get(SELECTED);
+  document.getElementById('mmEnrichUnder').textContent =
+    'Into “' + (n ? n.label : 'this node') + '” · ' + pathOf(SELECTED).join('  ›  ');
+  if (prefill !== undefined) document.getElementById('mmEnrichBody').value = prefill;
+  document.getElementById('mmEnrichModal').classList.add('open');
+  setTimeout(() => document.getElementById('mmEnrichBody').focus(), 60);
+}
+function closeEnrich() { document.getElementById('mmEnrichModal').classList.remove('open'); }
+
+async function submitEnrich() {
+  const text = document.getElementById('mmEnrichBody').value.trim();
+  if (!text) { toast('Write the detail first'); return; }
+  if (!SELECTED || !MAP) return;
+
+  const target = SELECTED;               // captured: the panel may move on
+  const btn = document.getElementById('mmEnrichBtn2');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.innerHTML = '<span class="mm-spin"></span> Working…';
+  const before = new Set(NODES.keys());
+  try {
+    const out = await api(`/api/mind-maps/${MAP.map.map_id}/nodes/${target}/enrich`, {
+      method: 'POST',
+      body: JSON.stringify({ text, saveNote: document.getElementById('mmEnrichKeep').checked })
+    });
+    closeEnrich();
+    document.getElementById('mmEnrichBody').value = '';
+    await openMap(MAP.map.map_id, target);
+
+    // Same pulse as an expand — the point is to see where the map grew.
+    FRESH = new Set([...NODES.keys()].filter(id => !before.has(id)));
+    refreshDecor();
+    setTimeout(() => { FRESH = new Set(); refreshDecor(); }, 1400);
+    const n = NODES.get(target);
+    if (n) flyTo(n.x, n.y, Math.max(0.6, Math.min(view.k, 1)));
+    if (CHAT.nodeId) { CHAT.loaded = false; CHAT.loading = null; }
+
+    toast(out.added
+      ? `Added ${out.added} node${out.added > 1 ? 's' : ''}${out.rewritten ? ' and rewrote this one' : ''}`
+      : out.atMaxDepth
+        ? 'This node is as deep as the map goes — its detail was updated'
+        : out.rewritten ? 'Detail folded into this node' : 'Nothing new to add');
+  } catch (e) { toast('Could not add that detail: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = original;
+}
+
 // ── node AI chat ─────────────────────────────────────────────────
 /**
  * Bind (or resume) the conversation attached to this node and load its history.
@@ -1942,9 +2146,16 @@ function renderThread(note) {
     const t = String(m.content || '');
     const isStudy = window.StudyBlocks && window.StudyBlocks.has && window.StudyBlocks.has(t);
     if (isStudy) deferred.push({ i, text: t });
+    // An answer worth keeping should not have to be copied out and pasted back
+    // in — this is the "ask the AI, then tell it to put that on the map" path.
     return `<div class="mm-msg ai"><div class="mm-msg-who">Plato</div>
        <div class="mm-ai-body" data-msg="${i}">${
-         isStudy ? '' : DOMPurify.sanitize(marked.parse(t), { ADD_ATTR: ['target'] })}</div></div>`;
+         isStudy ? '' : DOMPurify.sanitize(marked.parse(t), { ADD_ATTR: ['target'] })}</div>
+       <div style="margin-top:7px;">
+         <button class="mm-btn mm-btn-sm" onclick="addAnswerToMap(${i})"
+                 title="Fold this answer into the node and grow the sub-topics it introduces">
+           <span class="material-symbols-outlined">note_add</span> Add to map</button>
+       </div></div>`;
   }).join('');
 
   host.innerHTML = docLine + (body || (note
@@ -1970,6 +2181,33 @@ function seedAsk() {
   const box = document.getElementById('mmChatInput');
   box.value = 'Explain this node in depth, and say what it connects to.';
   sendChat();
+}
+
+/** Take an answer from the thread onto the map, via the same review step. */
+function addAnswerToMap(i) {
+  const m = CHAT.messages[i];
+  const text = String(m && m.content || '').trim();
+  if (!text) { toast('Nothing to add'); return; }
+  // The thread belongs to the node it was bound to, which is not necessarily
+  // the one selected now — enrich the node that was actually asked about.
+  if (CHAT.nodeId && CHAT.nodeId !== SELECTED) selectNode(CHAT.nodeId);
+  openEnrich(text);
+}
+
+/** Same, for text the user typed into the composer but has not sent. */
+function composerToMap() {
+  const box = document.getElementById('mmChatInput');
+  const typed = box.value.trim();
+  if (!typed) {
+    // Falling back to the last answer makes the button useful in the common
+    // case: read the reply, decide to keep it, press one thing.
+    const last = [...CHAT.messages].reverse().find(m => m.role === 'assistant');
+    if (!last) { toast('Type the detail, or ask something first'); return; }
+    openEnrich(String(last.content || '').trim());
+    return;
+  }
+  box.value = ''; growInput(box);
+  openEnrich(typed);
 }
 
 async function sendChat() {
@@ -2216,8 +2454,10 @@ function ctxAction(what) {
   if (what === 'child') { openChildForm(id); return; }
   if (what === 'unpin') { unpinNode(id); return; }
   if (what === 'tidy') { tidyMap(); return; }
-  selectNode(id, { tab: what === 'docs' ? 'docs' : what === 'ask' ? 'chat' : 'details' });
+  selectNode(id, { tab: what === 'docs' || what === 'note' ? 'docs' : what === 'ask' ? 'chat' : 'details' });
   if (what === 'expand') expandCurrent();
+  if (what === 'enrich') openEnrich('');
+  if (what === 'note') openNoteForm();
 }
 
 function toggleExportMenu(ev) {
@@ -2470,8 +2710,18 @@ function pickSource(src) {
   document.querySelectorAll('.mm-src button').forEach(b => b.classList.toggle('on', b.dataset.src === src));
   document.getElementById('mmGenTopic').style.display = src === 'topic' ? '' : 'none';
   document.getElementById('mmGenChat').style.display = src === 'chat' ? '' : 'none';
+  document.getElementById('mmGenText').style.display = src === 'text' ? '' : 'none';
   document.getElementById('mmGenDocs').style.display = src === 'document' ? '' : 'none';
+  if (src === 'text') setTimeout(() => document.getElementById('mmGenTextBody').focus(), 40);
 }
+
+// A map needs real material to organise; the count is there so a paste that
+// silently failed is obvious before the Generate button is pressed.
+document.getElementById('mmGenTextBody').addEventListener('input', e => {
+  const n = e.target.value.trim().length;
+  document.getElementById('mmGenTextCount').textContent =
+    n < 40 ? `${n} characters — a little more and this can be mapped` : `${n.toLocaleString()} characters`;
+});
 
 async function loadSessions() {
   const sel = document.getElementById('mmSessionSelect');
@@ -2554,6 +2804,15 @@ async function doGenerate() {
   } else if (genSource === 'chat') {
     payload = { sourceType: 'chat', sessionId: document.getElementById('mmSessionSelect').value };
     if (!payload.sessionId) { toast('Pick a conversation'); return; }
+  } else if (genSource === 'text') {
+    const body = document.getElementById('mmGenTextBody').value.trim();
+    if (body.length < 40) { toast('Paste a little more text — 40 characters or so'); return; }
+    payload = {
+      sourceType: 'text',
+      text: body,
+      title: document.getElementById('mmGenTextTitle').value.trim() || undefined,
+      topic: document.getElementById('mmGenTextFocus').value.trim() || undefined
+    };
   } else {
     if (!genStaged.length) { toast('Upload at least one document'); return; }
     payload = {
@@ -2570,6 +2829,12 @@ async function doGenerate() {
     const out = await api('/api/mind-maps/generate', { method: 'POST', body: JSON.stringify(payload) });
     closeGenerate();
     genStaged = []; renderGenDocs();
+    // Only cleared once the map exists — a failed generation must leave the
+    // pasted text where the user can fix it and try again.
+    document.getElementById('mmGenTextBody').value = '';
+    document.getElementById('mmGenTextTitle').value = '';
+    document.getElementById('mmGenTextFocus').value = '';
+    document.getElementById('mmGenTextCount').textContent = '0 characters';
     await openMap(out.mapId);
     toast(`Built "${out.title}" — ${out.nodeCount} nodes` +
       (out.linkedEntities ? `, ${out.linkedEntities} linked to your graph` : ''));
@@ -2581,6 +2846,7 @@ async function doGenerate() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeCtxMenu(); closeGenerate(); closeChildForm(); closeDoc();
+    closeNoteForm(); closeEnrich();
     if (!document.querySelector('.mm-modal.open')) closePanel();
     return;
   }

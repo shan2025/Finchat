@@ -535,6 +535,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       <input id="knowledgeSearch" class="w-full" placeholder="Search system knowledge…" type="text" autocomplete="off" style="padding:10px 14px 10px 40px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13.5px; outline:none;">
     </div>
 
+    <!-- Turn the open conversation into a mind map -->
+    <button id="mindMapBtn" onclick="mindMapFromChat()" class="fc-icon shrink-0" title="Build a mind map from this conversation" style="width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+      <span class="material-symbols-outlined text-[20px]">account_tree</span>
+    </button>
+
     <!-- Notifications -->
     <div class="relative shrink-0">
       <button id="notifBell" onclick="toggleNotifications(event)" class="fc-icon" title="Notifications" style="position:relative; width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
@@ -1511,6 +1516,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           return `<a class="fc-nav fc-recent" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:${active ? '#fff' : '#cfc3ad'}; background:${active ? 'rgba(255,255,255,.09)' : 'transparent'}; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
               ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
               <span class="rc-actions">
+                <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
                 <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
                 <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
                 <button data-act="delete" title="Delete conversation"><span class="material-symbols-outlined" style="font-size:14px">delete</span></button>
@@ -1530,6 +1536,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
             if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
             else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
             else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
+            else if (b.dataset.act === 'mindmap') mindMapFromChat(a.dataset.session);
           };
         });
       } catch (e) { console.log('Could not load recent sessions:', e); }
@@ -1619,6 +1626,42 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           loadRecentSessions();
         } else showToast('Delete failed', 'warn');
       } catch (e) { showToast('Delete failed: ' + e.message, 'warn'); }
+    }
+
+    // ── Mind map from a conversation ─────────────────────────────
+    // The chat is where you notice a conversation was worth keeping, so the
+    // option to turn it into a map belongs here rather than only in the Mind Map
+    // Studio's "new map" dialog. Plato reads the transcript and organises what
+    // it covered; the map then grows from there like any other.
+    async function mindMapFromChat(sessionId) {
+      const sid = sessionId || personaSessions[activePersona];
+      if (!sid) { showToast('Nothing to map yet — send a message first', 'warn'); return; }
+      const ok = await fcDialog({
+        title: 'Build a mind map from this conversation?',
+        message: 'The agent reads the transcript and organises what it covered into a map. This can take up to a minute, and the Mind Map Studio opens when it is done.',
+        okLabel: 'Build the map'
+      });
+      if (!ok) return;
+
+      showToast('Reading the conversation and building the map…', 'info');
+      try {
+        const res = await fetch(`${API_URL}/api/mind-maps/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_session?.token}` },
+          body: JSON.stringify({ sourceType: 'chat', sessionId: sid })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // 422 is the generator refusing a stub map — that is about the
+          // conversation being too thin, which the user can act on.
+          showToast(data.details || data.error || 'Could not build the map', 'warn');
+          return;
+        }
+        showToast(`Built “${data.title}” — ${data.nodeCount} nodes. Opening…`, 'info');
+        setTimeout(() => {
+          window.location.href = `finchat_mindmap.html?map=${encodeURIComponent(data.mapId)}`;
+        }, 900);
+      } catch (e) { showToast('Could not build the map: ' + e.message, 'warn'); }
     }
 
     async function copyConversation(sessionId) {
