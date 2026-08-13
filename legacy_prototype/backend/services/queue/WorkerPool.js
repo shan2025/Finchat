@@ -238,6 +238,18 @@ QUALITY RULES:
 - Minimum 800 words, maximum 2000 words. Quality over quantity.`;
 
 /**
+ * Sidebar title for a briefing conversation, e.g. "📰 Daily News — 13 Aug 2026".
+ *
+ * Dated rather than just "Daily News": several briefings sit in the list at
+ * once and the date is the only thing that tells them apart at a glance.
+ * Exported so the sessions endpoint can label briefings that predate this.
+ */
+function briefingSessionTitle(when = new Date()) {
+  const day = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `📰 Daily News — ${day}`;
+}
+
+/**
  * Process a morning executive briefing job.
  * Routes through PlatoOrchestrator which delegates to specialist agents with their tools.
  */
@@ -286,6 +298,22 @@ async function processMorningBriefing(job) {
       `, [`conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`, briefingSessionId, userId, 'plato', briefingText]);
     } catch (msgErr) {
       console.warn(`⚠️ [MorningBriefing] Failed to store briefing message: ${msgErr.message}`);
+    }
+
+    // Name the conversation. /api/ai-chat/sessions titles a session from its
+    // first USER message, and a briefing has none — every one of them showed up
+    // in the sidebar as "New conversation", indistinguishable from each other
+    // and from a chat you actually started. A stored title also survives the
+    // user replying into the session later.
+    try {
+      await dbQuery(`
+        INSERT INTO ai_session_meta (session_id, user_id, title, deleted, updated_at)
+        VALUES ($1, $2, $3, false, NOW())
+        ON CONFLICT (session_id) DO UPDATE SET title = EXCLUDED.title, updated_at = NOW()
+      `, [briefingSessionId, userId, briefingSessionTitle()]);
+    } catch (titleErr) {
+      // A missing title is cosmetic — never lose the briefing over it.
+      console.warn(`⚠️ [MorningBriefing] Could not title briefing session: ${titleErr.message}`);
     }
 
     // Store notification so it shows on the notification bell (live via notification:new)
@@ -433,5 +461,6 @@ module.exports = {
   getRedisConnectionConfig,
   scheduleMorningBriefing,
   cancelMorningBriefings,
+  briefingSessionTitle,
   QUEUE_NAME
 };

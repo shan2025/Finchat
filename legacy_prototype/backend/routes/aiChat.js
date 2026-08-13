@@ -396,12 +396,27 @@ router.get('/sessions', requireAuth, async (req, res) => {
     `, [req.user.id]);
     const sessions = resSessions.rows;
 
+    // Briefings have no user message to take a title from, so without this they
+    // all read "New conversation". New ones are titled at generation time; this
+    // covers the ones already in the database, and keeps a briefing named after
+    // the briefing even when the user has since replied inside it.
+    const { briefingSessionTitle } = require('../services/queue/WorkerPool');
+    const briefingTitle = (sessionId) => {
+      const stamp = Number(String(sessionId).split('_')[1]);
+      return briefingSessionTitle(Number.isFinite(stamp) ? new Date(stamp) : new Date());
+    };
+
     const enriched = sessions.map(s => {
       const p = getPersona(s.persona);
       const rawTitle = (s.title || '').replace(/\s+/g, ' ').trim();
+      const fallback = String(s.session_id).startsWith('briefing_')
+        ? briefingTitle(s.session_id)
+        : 'New conversation';
+      const useFallback = !rawTitle || (!s.renamed && fallback !== 'New conversation');
       return {
         ...s,
-        title: rawTitle ? (rawTitle.length > 60 ? rawTitle.slice(0, 57) + '…' : rawTitle) : 'New conversation',
+        title: useFallback ? fallback
+          : (rawTitle.length > 60 ? rawTitle.slice(0, 57) + '…' : rawTitle),
         personaName: p?.name || s.persona,
         personaAvatar: p?.avatar || '🤖'
       };
