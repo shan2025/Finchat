@@ -21,6 +21,25 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  // Mission goals are written in markdown (they instruct an agent that answers
+  // in markdown), so the one-line preview has to flatten the source or it reads
+  // "Produce a daily **Markets & Macro Intelligence Brief** as Plato".
+  function mdLine(md, max) {
+    var t = String(md == null ? '' : md)
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s*>\s?/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '• ')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, function (m, txt, url) { return txt.trim() || url; })
+      .replace(/(\*\*\*|\*\*|__|~~)([\s\S]+?)\1/g, '$2')
+      .replace(/(^|[\s(])[*_]([^*_\n]+)[*_]/g, '$1$2')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^\s*(?:[-*_]\s*){3,}\s*$/gm, ' ')
+      .replace(/\s*\n+\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    return esc(t.length > max ? t.slice(0, max - 1).replace(/\s+$/, '') + '…' : t);
+  }
+
   function toast(msg) {
     if (typeof window.showToast === 'function') return window.showToast(msg);
     var t = document.getElementById('toast');
@@ -94,9 +113,9 @@
           '<button data-run="' + esc(m.mission_id) + '" style="padding:7px 14px; border-radius:999px; border:1px solid #3a2e23; background:transparent; color:#3a2e23; font-weight:700; font-size:12px; cursor:pointer;">Run now</button>' +
           '<button data-del="' + esc(m.mission_id) + '" title="Delete mission" style="padding:7px 10px; border-radius:999px; border:none; background:transparent; color:#b0472e; font-size:15px; cursor:pointer;">✕</button>' +
         '</div>' +
-        '<div style="font-size:12px; color:#5a4d3c; margin-top:8px; line-height:1.45;">' + esc(m.goal).slice(0, 220) + (m.goal.length > 220 ? '…' : '') + '</div>' +
+        '<div style="font-size:12px; color:#5a4d3c; margin-top:8px; line-height:1.45;">' + mdLine(m.goal, 220) + '</div>' +
         '<div style="font-size:11.5px; color:#8c7a6b; margin-top:8px;">Last run: ' + fmtTime(m.last_run_at) + (m.enabled ? ' · Next ≈ ' + fmtTime(m.next_run_at) : '') + '</div>' +
-        (m.last_result_preview ? '<details style="margin-top:6px;"><summary style="font-size:12px; color:#8c491a; cursor:pointer; font-weight:600;">Last result</summary><div class="markdown-body" style="font-size:12px; color:#5a4d3c; margin-top:6px; max-height:250px; overflow-y:auto; background:#f5ead8; border-radius:10px; padding:12px;">' + (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.last_result_preview)) : esc(m.last_result_preview).replace(/\\n/g, '<br>')) + '</div></details>' : '') +
+        (m.last_result_preview ? '<details style="margin-top:6px;"><summary style="font-size:12px; color:#8c491a; cursor:pointer; font-weight:600;">Last result</summary><div class="markdown-body" style="font-size:12px; color:#5a4d3c; margin-top:6px; max-height:250px; overflow-y:auto; background:#f5ead8; border-radius:10px; padding:12px;">' + (window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(m.last_result_preview)) : esc(m.last_result_preview).replace(/\n/g, '<br>')) + '</div></details>' : '') +
       '</div>';
     }).join('') : '<div style="font-size:13px; color:#8c7a6b; padding:4px 2px;">No missions for this agent yet — create one below. Missions run on a schedule while the server is up; new and seeded missions start <b>paused</b> so nothing spends tokens until you enable it.</div>';
 
