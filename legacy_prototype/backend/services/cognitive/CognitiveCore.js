@@ -6,7 +6,7 @@ const { plan: generatePlan } = require('./PlanningEngine');
 const { retrieveEnrichedContext, appendToScratchpad } = require('./MemoryService');
 const { reflect } = require('./ReflectionEngine');
 const { eventBus } = require('./EventBus');
-const { createExecution, updateState, completeExecution, failExecution, checkBudget, incrementUsage } = require('./ExecutionManager');
+const { createExecution, updateState, completeExecution, failExecution, checkBudget, incrementUsage, evaluateBudget } = require('./ExecutionManager');
 const { STATES, WAIT_REASONS } = require('./StateMachine');
 const { query } = require('../../database');
 
@@ -121,16 +121,20 @@ async function run({
   approvedTools = [],
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
-  // 1. Create execution record
+  // 1. Create execution record.
+  // Overrides are applied on "is it a number", not on truthiness: a caller that
+  // asks for 0 of something means 0, and silently swapping that for the default
+  // is how a deliberately tight budget turns into a generous one.
+  const override = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
   const execution = await createExecution({
     userId,
     conversationId,
     goal,
     assignedAgent: agentName,
-    ...(budget.maxIterations ? { maxIterations: budget.maxIterations } : {}),
-    ...(budget.maxToolCalls ? { maxToolCalls: budget.maxToolCalls } : {}),
-    ...(budget.maxTokens ? { maxTokens: budget.maxTokens } : {}),
-    ...(budget.maxRuntimeSeconds ? { maxRuntimeSeconds: budget.maxRuntimeSeconds } : {})
+    ...(override(budget.maxIterations) ? { maxIterations: Number(budget.maxIterations) } : {}),
+    ...(override(budget.maxToolCalls) ? { maxToolCalls: Number(budget.maxToolCalls) } : {}),
+    ...(override(budget.maxTokens) ? { maxTokens: Number(budget.maxTokens) } : {}),
+    ...(override(budget.maxRuntimeSeconds) ? { maxRuntimeSeconds: Number(budget.maxRuntimeSeconds) } : {})
   });
   const execId = execution.execution_id;
   const toolContext = { userId, agentName, conversationId };
@@ -185,13 +189,54 @@ async function run({
     const traceConcepts = new Map();
     let traceMemories = 0, traceRecipes = 0;
 
-    // 3. Reasoning loop — now supports tool cycling
-    const MAX_LOOP = 8; // Safety net
-    for (let i = 0; i < MAX_LOOP; i++) {
+    // 3. Reasoning loop — now supports tool cycling.
+    //
+    // The bound follows the row's ceiling instead of being a parallel constant.
+    // A hardcoded 8 equalled the default ceiling, which is the only reason the
+    // off-by-one below never showed up in stored rows: the constant clipped the
+    // extra turn before it could be written. Any budget tighter than 8 got the
+    // overshoot for real.
+    //
+    // The 8 survives as an explicit upper safety net rather than the bound
+    // itself. Budgets configured above it — aiChat's 12/15/20, WorkerPool's 14 —
+    // have never actually been reachable, so letting them through here would
+    // raise real LLM spend as a side effect of a containment fix. That is a
+    // deliberate decision to take separately, not to smuggle in.
+    const LOOP_SAFETY_NET = 8;
+    const rowCeiling = Number(execution.max_iterations);
+    const iterationCeiling = Math.min(
+      Number.isFinite(rowCeiling) ? Math.max(0, rowCeiling) : LOOP_SAFETY_NET,
+      LOOP_SAFETY_NET
+    );
+
+    for (let i = 0; i < iterationCeiling; i++) {
+      // 3a. Budget check BEFORE anything is spent on this turn — and, crucially,
+      // the decision to stop is taken here rather than after the LLM call. The
+      // old ordering read the budget, spent a full reasoning turn, incremented,
+      // and only then acted on the by-then-stale verdict: the turn that first
+      // saw the breach was itself charged to the budget it had already broken.
+      // That is the token overshoot visible across the live rows.
+      const verdict = await checkBudget(execId);
+
+      // Iterations are the loop's own currency: once they are gone there is no
+      // turn left to spend, not even a wrap-up one. (The loop bound above
+      // normally gets here first; this is the invariant, stated where it is
+      // enforced, and it also covers a row whose counters moved underneath us.)
+      if (verdict.details.iterations.breached) {
+        finalResponse = 'Iteration budget exhausted before a response could be produced.';
+        completionReason = 'budget_exceeded';
+        break;
+      }
+
       stepNumber++;
 
-      // 3a. Check budget before every reasoning call
-      const budget = await checkBudget(execId);
+      // This is the last turn the budget allows — either a non-iteration ceiling
+      // has already breached, or spending this iteration exhausts the iteration
+      // ceiling. Either way the model gets the restricted respond-only schema
+      // and the loop stops afterwards, so the wrap-up turn now happens INSIDE
+      // the budget instead of one turn past it.
+      const lastTurn = verdict.breached ||
+        verdict.details.iterations.used + 1 >= verdict.details.iterations.max;
 
       // 3b. Retrieve memories + graph-hop entities + skill recipes for context (Phase 6 + Sprint 5C)
       const enriched = await retrieveEnrichedContext({
@@ -218,7 +263,7 @@ async function run({
         memories: enriched.memories,
         graphContext: enriched.graphContext,
         recipeHints: enriched.recipeHints,
-        budgetExceeded: budget.breached,
+        budgetExceeded: lastTurn,
         traits: agentTraits,
         userPreferences,
         allowWeb,
@@ -240,15 +285,22 @@ async function run({
         model: result.model,
         retried: result.retried,
         fallback: result.fallback,
-        budgetBreached: budget.breached
+        budgetBreached: verdict.breached,
+        lastTurn
       }, thinkStart);
       logs.push(logEntry);
 
-      // 3e. Increment iteration usage + real LLM token burn from this reasoning turn
-      await incrementUsage(execId, { iterations: 1, tokens: result.tokens || 0 });
+      // 3e. Increment iteration usage + real LLM token burn from this reasoning
+      // turn. The write returns the updated row, so the post-spend verdict costs
+      // no extra round-trip — and it is the only verdict that reflects what this
+      // turn actually cost. Tokens can only be counted after the call, so a
+      // single turn may still land above the token ceiling; what is enforced is
+      // that no further turn is started once it has.
+      const usage = await incrementUsage(execId, { iterations: 1, tokens: result.tokens || 0 });
+      const spent = evaluateBudget(usage);
 
       // 3f. Handle action
-      if (budget.breached) {
+      if (verdict.breached || spent.breached) {
         finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
         completionReason = 'budget_exceeded';
         break;
@@ -284,6 +336,16 @@ async function run({
       if (result.action.action === 'respond') {
         finalResponse = withStudyBlocks(result.action);
         completionReason = result.fallback ? 'error' : 'natural';
+        break;
+      }
+
+      // Nothing left to start new work with: this was the final permitted
+      // iteration and the model chose to keep going anyway. Take whatever prose
+      // it produced rather than launching a plan or a tool call we cannot pay
+      // for — and rather than falling out of the loop with no response at all.
+      if (lastTurn) {
+        finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
+        completionReason = 'budget_exceeded';
         break;
       }
 
@@ -570,6 +632,37 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
     throw new Error(`Execution ${executionId} is not in WAITING state (current state: ${execution.current_state})`);
   }
 
+  // A resumption must not be handed a brand-new budget. run() mints a fresh
+  // execution row, so without carrying the remainder the ceiling launders across
+  // executions: park at 7/8 iterations, get approved, and the continuation
+  // starts again at 0/8. Neither row ever reads as over budget while the work as
+  // a whole quietly runs to twice its ceiling.
+  //
+  // Runtime is deliberately NOT carried. It is wall-clock from created_at, and
+  // an execution parked on a human approval can sit for hours without spending
+  // any compute; charging that to the resumption would make every approval
+  // impossible to resume. The countable ceilings do carry.
+  const remainingBudget = {
+    maxIterations: execution.max_iterations - execution.iterations_used,
+    maxToolCalls: execution.max_tool_calls - execution.tool_calls_used,
+    maxTokens: execution.max_tokens - execution.tokens_used
+  };
+  const exhausted = Object.entries(remainingBudget)
+    .filter(([, left]) => !(left > 0))
+    .map(([name]) => name);
+
+  if (exhausted.length > 0) {
+    // Checked before the waiting -> running transition so a refused resumption
+    // does not strand the row in 'running' for the stale sweeper to find. Parked
+    // rows terminate as CANCELLED (waiting -> completed is not a legal
+    // transition), the same way POST /api/executions/:id/reject retires one.
+    await updateState(executionId, STATES.CANCELLED, {
+      completionReason: 'budget_exceeded',
+      result: `Cannot resume: budget already exhausted (${exhausted.join(', ')})`
+    });
+    throw new Error(`Execution ${executionId} cannot be resumed: its budget is exhausted (${exhausted.join(', ')})`);
+  }
+
   await updateState(executionId, STATES.RUNNING);
   await appendToScratchpad(executionId, `Resumed from wait state (${execution.wait_reason || 'human_approval'}): ${resumptionMessage}. Modified params: ${JSON.stringify(modifiedParameters)}`);
 
@@ -581,12 +674,14 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
   });
 
   // Re-run cognitive loop with the resumption context (gated tools whitelisted)
+  // under what is left of the original execution's budget.
   const result = await run({
     goal: `${execution.goal} (Resumed: ${resumptionMessage})`,
     userId: execution.user_id || userId,
     conversationId: execution.session_id,
     agentName: execution.assigned_agent || 'plato',
-    approvedTools
+    approvedTools,
+    budget: remainingBudget
   });
 
   // Close out the ORIGINAL execution — it was flipped waiting→running above and
