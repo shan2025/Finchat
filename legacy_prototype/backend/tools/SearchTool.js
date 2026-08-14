@@ -36,13 +36,45 @@ function unwrapDdgUrl(href) {
   return href;
 }
 
+// ---------------------------------------------------------------- recency
+
+// Asked "what happened this week", the providers happily return a two-year-old page
+// and the model presents it as current — it has no idea when anything was published.
+// So detect the recency intent in the query and push it down as a real filter.
+// Longest phrases first: "this month" must not match on the "month" rule.
+const RECENCY_RULES = [
+  { range: 'day', re: /\b(today|todays|today's|tonight|yesterday|right now|as of now|breaking|past 24 ?hours|last 24 ?hours)\b/i },
+  { range: 'week', re: /\b(this week|past week|last week|these days|last few days|past few days|recent days)\b/i },
+  { range: 'month', re: /\b(this month|past month|last month|last 30 days|past 30 days)\b/i },
+  { range: 'year', re: /\b(this year|past year|last year|last 12 months)\b/i },
+  // Bare "latest/current/newest" has no explicit window. A month is wide enough to
+  // still return something for a quiet topic, narrow enough to exclude stale pages.
+  { range: 'month', re: /\b(latest|newest|most recent|currently|current|up ?to ?date|so far)\b/i }
+];
+
+// Map a time range onto each provider's own parameter vocabulary.
+const BRAVE_FRESHNESS = { day: 'pd', week: 'pw', month: 'pm', year: 'py' };
+const DDG_FRESHNESS = { day: 'd', week: 'w', month: 'm', year: 'y' };
+
+/** Infer the recency window a query is implicitly asking for, or null. */
+function detectRecency(query) {
+  for (const rule of RECENCY_RULES) {
+    if (rule.re.test(query)) return rule.range;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- providers
 
 // Brave Search API — $5/1,000 requests with $5 of free credit each month (~1,000 free
 // requests), 50 q/s. Requires a card on file, and bills it past the credit.
-async function braveSearch(query, limit) {
+async function braveSearch(query, limit, { timeRange } = {}) {
   const res = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-    params: { q: query, count: limit },
+    params: {
+      q: query,
+      count: limit,
+      ...(BRAVE_FRESHNESS[timeRange] ? { freshness: BRAVE_FRESHNESS[timeRange] } : {})
+    },
     headers: {
       'X-Subscription-Token': process.env.BRAVE_API_KEY,
       'Accept': 'application/json',
@@ -65,10 +97,15 @@ async function braveSearch(query, limit) {
 //      on a datacenter IP just relocates the blocking that broke the DDG scrape. Host
 //      it on a residential/clean IP or it will not help.
 // Public instances are unusable for this: most disable JSON, and the rest rate-limit.
-async function searxngSearch(query, limit) {
+async function searxngSearch(query, limit, { timeRange } = {}) {
   const base = process.env.SEARXNG_URL.replace(/\/+$/, '');
   const res = await axios.get(`${base}/search`, {
-    params: { q: query, format: 'json', language: 'en' },
+    params: {
+      q: query,
+      format: 'json',
+      language: 'en',
+      ...(timeRange ? { time_range: timeRange } : {})
+    },
     headers: {
       'User-Agent': UA,
       'Accept': 'application/json',
@@ -88,26 +125,36 @@ async function searxngSearch(query, limit) {
 
 // Tavily — search API built for LLM use; returns clean snippets. Free "Researcher"
 // tier is 1,000 credits/month with no card required, and hard-stops at the cap.
-async function tavilySearch(query, limit) {
+async function tavilySearch(query, limit, { timeRange } = {}) {
   const res = await axios.post('https://api.tavily.com/search', {
     api_key: process.env.TAVILY_API_KEY,
     query,
     max_results: limit,
-    search_depth: 'basic'
+    search_depth: 'basic',
+    // NB: Tavily has no `days` parameter — the recency controls are `time_range`
+    // plus `topic`. `news` is the index that actually carries publish dates, so a
+    // day/week question is routed there; wider windows stay on the general index.
+    ...(timeRange ? { time_range: timeRange } : {}),
+    ...(timeRange === 'day' || timeRange === 'week' ? { topic: 'news' } : {})
   }, { timeout: TIMEOUT, headers: { 'Content-Type': 'application/json' } });
   return (res.data?.results || []).slice(0, limit).map(r => ({
     title: textOnly(r.title),
     url: r.url,
-    snippet: textOnly(r.content).slice(0, 300)
+    snippet: textOnly(r.content).slice(0, 300),
+    // Only the news index returns this. Surfacing it lets the model — and the
+    // Sources panel — see how old a "this week" result actually is.
+    ...(r.published_date ? { publishedDate: r.published_date } : {})
   }));
 }
 
 // DuckDuckGo HTML scrape — kept as a fallback because it works from residential
 // IPs (local dev) even when no API key is configured. Expect it to fail on Render.
-async function ddgSearch(query, limit) {
+async function ddgSearch(query, limit, { timeRange } = {}) {
+  const form = { q: query, kl: 'us-en' };
+  if (DDG_FRESHNESS[timeRange]) form.df = DDG_FRESHNESS[timeRange];
   const res = await axios.post(
     'https://html.duckduckgo.com/html/',
-    new URLSearchParams({ q: query, kl: 'us-en' }).toString(),
+    new URLSearchParams(form).toString(),
     {
       headers: {
         // Full browser-style header set — DDG anomaly-blocks minimal clients.
@@ -165,6 +212,40 @@ const PROVIDERS = [
   { name: 'duckduckgo', available: () => process.env.SEARCH_DISABLE_DDG !== 'true', run: ddgSearch }
 ];
 
+/**
+ * Run the provider chain and return the first non-empty result set.
+ *
+ * Exported so the site-scoped tools (reddit, quora) get the same working
+ * providers instead of each scraping DuckDuckGo on their own — that private
+ * scraping is exactly what leaves them dead on a datacenter IP. Deliberately
+ * has NO Wikipedia fallback: a `site:reddit.com` query wants Reddit threads,
+ * and answering it with encyclopedia articles would be worse than nothing.
+ *
+ * @returns {Promise<{results: Array, source: string|null, attempts: string[]}>}
+ */
+async function runProviders(query, limit = 6, { timeRange = null } = {}) {
+  const attempts = [];
+
+  for (const provider of PROVIDERS) {
+    if (!provider.available()) continue;
+    try {
+      const results = await provider.run(query, limit, { timeRange });
+      if (results.length) return { results, source: provider.name, attempts };
+      attempts.push(`${provider.name}: 0 results`);
+    } catch (err) {
+      const detail = err.response?.status ? `HTTP ${err.response.status}` : err.message;
+      console.warn(`⚠️ SearchTool provider ${provider.name} failed: ${detail}`);
+      attempts.push(`${provider.name}: ${detail}`);
+    }
+  }
+
+  // Nothing even ran: every provider is unconfigured (no keys, DDG disabled). Say so,
+  // otherwise the caller reports "every provider failed ()" with an empty reason list.
+  if (!attempts.length) attempts.push('no search provider is configured — set TAVILY_API_KEY, BRAVE_API_KEY or SEARXNG_URL');
+
+  return { results: [], source: null, attempts };
+}
+
 // ---------------------------------------------------------------- entrypoint
 
 /**
@@ -190,19 +271,19 @@ async function execute(input) {
   if (!query) return { query, results: [], source: 'none', error: 'empty query' };
   limit = Math.max(1, Math.min(10, limit || 6));
 
-  const attempts = [];
+  const timeRange = input?.timeRange || detectRecency(query);
+  const { results, source, attempts } = await runProviders(query, limit, { timeRange });
 
-  for (const provider of PROVIDERS) {
-    if (!provider.available()) continue;
-    try {
-      const results = await provider.run(query, limit);
-      if (results.length) return { query, results, source: provider.name };
-      attempts.push(`${provider.name}: 0 results`);
-    } catch (err) {
-      const detail = err.response?.status ? `HTTP ${err.response.status}` : err.message;
-      console.warn(`⚠️ SearchTool provider ${provider.name} failed: ${detail}`);
-      attempts.push(`${provider.name}: ${detail}`);
-    }
+  if (results.length) {
+    return {
+      query,
+      results,
+      source,
+      ...(timeRange ? {
+        recencyFilter: timeRange,
+        recencyNote: `The user asked about a "${timeRange}" window, so results were filtered to that period. Check any publishedDate before calling something recent — if the newest result is older than the window, say so instead of presenting it as current.`
+      } : {})
+    };
   }
 
   // Every web provider is down. Wikipedia's API is not IP-blocked from datacenters,
@@ -240,4 +321,4 @@ async function execute(input) {
   };
 }
 
-module.exports = { execute };
+module.exports = { execute, runProviders, detectRecency };

@@ -4,56 +4,32 @@
 // tells the agent to cross-check specifics against wikipedia/news/search before
 // reporting them as true.
 const axios = require('axios');
+const { runProviders } = require('./SearchTool');
 
 const UA = 'FinChat/1.0 (research agent by u/finchat; +https://finchat.local)';
-const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36';
 
-function textOnly(html) {
-  return String(html || '').replace(/<[^>]+>/g, '')
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, c) => String.fromCodePoint(+c))
-    .replace(/&([a-z]+);/gi, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[e] || ' '))
-    .replace(/\s+/g, ' ').trim();
-}
-
-function unwrapDdgUrl(href) {
-  if (!href) return '';
-  const m = href.match(/[?&]uddg=([^&]+)/);
-  if (m) { try { return decodeURIComponent(m[1]); } catch (e) {} }
-  return href.startsWith('//') ? 'https:' + href : href;
-}
-
-// Fallback when Reddit's JSON API 403s (it bot-blocks datacenter IPs): find
-// Reddit threads via a site-scoped DuckDuckGo search. Fewer fields (no score),
-// but real relevant thread links the agent can open with fetch.
-async function ddgFallback(query, subreddit, limit) {
+// Fallback when Reddit's JSON API 403s (it bot-blocks datacenter IPs): find Reddit
+// threads via a site-scoped search. This used to run its own DuckDuckGo scrape, which
+// meant the fallback was dead in exactly the deployment where it was needed — DDG
+// blackholes datacenter IPs, so a 403 from Reddit was followed by a 12s timeout and
+// no results at all. It now goes through the shared provider chain (SearxNG/Tavily/
+// Brave/DDG), so it works anywhere `search` works. Fewer fields than the JSON API
+// (no score or comment count), but real thread links the agent can open with fetch.
+async function searchFallback(query, subreddit, limit) {
   const scope = subreddit ? `site:reddit.com/r/${subreddit.replace(/^r\//, '')}` : 'site:reddit.com';
-  const res = await axios.post(
-    'https://html.duckduckgo.com/html/',
-    new URLSearchParams({ q: `${scope} ${query}`, kl: 'us-en' }).toString(),
-    {
-      headers: {
-        'User-Agent': BROWSER_UA, 'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Referer': 'https://duckduckgo.com/', 'Origin': 'https://duckduckgo.com'
-      },
-      timeout: 12000, maxRedirects: 3, validateStatus: s => s >= 200 && s < 400
-    }
-  );
-  const html = res.data || '';
-  const out = [];
-  const anchorRe = /<a\s+[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-  let m;
-  while ((m = anchorRe.exec(html)) !== null && out.length < Math.min(limit, 10)) {
-    const url = unwrapDdgUrl(m[1]);
-    const title = textOnly(m[2]);
-    if (!title || !/reddit\.com\/r\//.test(url)) continue;
-    const rest = html.slice(m.index, m.index + 3000);
-    const snip = rest.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-    const subMatch = url.match(/reddit\.com\/(r\/[^/]+)/);
-    out.push({ title, subreddit: subMatch ? subMatch[1] : '', excerpt: snip ? textOnly(snip[1]).slice(0, 300) : '', url });
-  }
-  return out;
+  const { results, source, attempts } = await runProviders(`${scope} ${query}`, Math.min(limit, 10));
+  const mapped = results
+    .filter(r => /reddit\.com\/r\//.test(r.url || ''))
+    .map(r => {
+      const subMatch = r.url.match(/reddit\.com\/(r\/[^/]+)/);
+      return {
+        title: r.title,
+        subreddit: subMatch ? subMatch[1] : '',
+        excerpt: String(r.snippet || '').slice(0, 300),
+        url: r.url
+      };
+    });
+  return { results: mapped, source, attempts };
 }
 
 function parseInput(input) {
@@ -103,14 +79,32 @@ async function execute(input) {
     const res = await axios.get(base, { params, headers: { 'User-Agent': UA, 'Accept': 'application/json' }, timeout: 12000 });
     results = mapPosts(res.data?.data?.children, limit);
   } catch (err) {
-    console.warn(`⚠️ RedditTool JSON API failed (${err.message}) — falling back to DuckDuckGo site search`);
+    console.warn(`⚠️ RedditTool JSON API failed (${err.message}) — falling back to site-scoped search`);
   }
 
-  // API blocked or empty → DuckDuckGo site:reddit.com fallback
+  // API blocked or empty → site:reddit.com search via the shared provider chain
   if (!results.length) {
     try {
-      results = await ddgFallback(query, subreddit, limit);
-      via = 'duckduckgo';
+      const fb = await searchFallback(query, subreddit, limit);
+      results = fb.results;
+      via = fb.source ? `search:${fb.source}` : 'search';
+
+      // Chain exhausted: this is a tool outage, and the model must not read it as
+      // "nobody on Reddit has discussed this" — same failure that had agents
+      // declaring real things non-existent.
+      if (!results.length && !fb.source) {
+        return {
+          query,
+          results: [],
+          source: 'reddit',
+          searchUnavailable: true,
+          error:
+            `REDDIT LOOKUP UNAVAILABLE — the Reddit API blocked this request and every ` +
+            `search provider then failed (${fb.attempts.join('; ')}). This is a tool outage, ` +
+            'NOT evidence. Do NOT tell the user that there is no discussion on this topic; ' +
+            'say that the Reddit lookup is currently unavailable.'
+        };
+      }
     } catch (err) {
       console.warn(`⚠️ RedditTool fallback failed: ${err.message}`);
       return { query, results: [], source: 'reddit', error: `Reddit lookup failed (API blocked and search fallback errored: ${err.message}).` };

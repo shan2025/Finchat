@@ -334,7 +334,7 @@ const TOOLS = {
   reddit: {
     name: 'reddit',
     web: true,
-    description: 'Search Reddit for real community discussion, sentiment, and first-hand experiences on any topic. Results are UNVERIFIED opinion — you MUST cross-check any factual claim with the wikipedia, news, or search tool before reporting it. Input: {"query":"...","subreddit":"optional"}',
+    description: 'Search Reddit for real community discussion, sentiment, and first-hand experiences on any topic. Results are UNVERIFIED opinion — you MUST cross-check any factual claim with the wikipedia, news, or search tool before reporting it. If the result has "searchUnavailable": true, the lookup itself is broken — report that, and never say there is no discussion on the topic. Input: {"query":"...","subreddit":"optional"}',
     inputSchema: {
       type: 'object',
       properties: {
@@ -354,7 +354,7 @@ const TOOLS = {
   quora: {
     name: 'quora',
     web: true,
-    description: 'Find relevant Quora question threads and perspectives on a topic. Answers are anonymous opinion of varying quality — UNVERIFIED. Use for angles/viewpoints only and cross-check every fact with wikipedia/news/search. Use the fetch tool on a result URL to read a full thread. Input: {"query":"..."}',
+    description: 'Find relevant Quora question threads and perspectives on a topic. Answers are anonymous opinion of varying quality — UNVERIFIED. Use for angles/viewpoints only and cross-check every fact with wikipedia/news/search. Use the fetch tool on a result URL to read a full thread. If the result has "searchUnavailable": true, the lookup itself is broken — report that, and never say nothing has been asked about the topic. Input: {"query":"..."}',
     inputSchema: {
       type: 'object',
       properties: { query: { type: 'string', description: 'Question or topic to find on Quora' } },
