@@ -1,19 +1,16 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Agent Operations Dashboard</title>
 <!-- Material Symbols -->
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <!-- Google Fonts: Inter & Georgia -->
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, "fontFamily": {
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, "fontFamily": {
                         "headline-lg": ["Inter"],
                         "code-md": ["JetBrains Mono"],
                         "headline-md": ["Inter"],
@@ -33,13 +30,11 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
     document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
   }
 </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
-  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
-  :root {
-    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
-    --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
-    --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
-  }
+  body { font-family: var(--sans); background-color: var(--bg); color: var(--text); }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
@@ -70,7 +65,6 @@ display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "m
   }
   @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden">

@@ -1,22 +1,18 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Agent Configuration</title>
 <!-- Material Symbols -->
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <!-- Google Fonts: Inter & Georgia -->
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Markdown rendering for mission results -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
                         "headline-lg": ["Inter"],
                         "code-md": ["JetBrains Mono"],
                         "headline-md": ["Inter"],
@@ -36,15 +32,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
   }
 </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 <style>
-  body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
-  :root {
-    --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc; --border2: #c9c0b0;
-    --accent: #4a3828; --accent-blue: #3b82f6; --accent-green: #16a34a; --accent-amber: #d97706; --accent-red: #dc2626;
-    --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
-    --mono: ui-monospace, SFMono-Regular, monospace; --sans: 'Inter', sans-serif;
-    --shadow: 0 1px 3px rgba(58,46,35,0.08); --shadow-md: 0 4px 12px rgba(58,46,35,0.12);
-  }
+  body { font-family: var(--sans); background-color: var(--bg); color: var(--text); }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
@@ -78,7 +71,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   @media (min-width: 768px) { #sideNav { transform: none !important; } }
   
   /* Markdown styling for mission results */
-  .markdown-body { font-family: var(--sans); font-size: 13px; line-height: 1.5; word-wrap: break-word; }
+  .markdown-body { font-family:var(--sans); font-size: 13px; line-height: 1.5; word-wrap: break-word; }
   .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #3a2e23; }
   .markdown-body h1 { font-size: 1.2em; }
   .markdown-body h2 { font-size: 1.1em; }
@@ -92,7 +85,6 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
   .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
 </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
 </head>
 
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden">

@@ -1,46 +1,52 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Neural Map</title>
 <!-- Material Symbols -->
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <!-- Google Fonts -->
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
 </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
  /* ── Two themes. Warm is FinChat's house palette; dark comes from the
-    Neural Map design (#0b1220 field, #5fd0e6 accent). ───────────── */
+    Neural Map design (#12100c field, #c9a97f accent). ───────────── */
+ /* Page-specific graph tokens only. --bg/--txt/--sub/--border/--accent/--danger
+    now come from finchat_theme.css so this page matches the rest of the app.
+    --nm-panel and --nm-accent-hi were called --chrome and --accent-soft, renamed
+    because the shared layer uses those names for the dark nav rail and a pale
+    tint respectively. */
  :root, [data-nm-theme="warm"] {
-  --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
-  --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
-  --danger: #b0472e; --rail: #3a2e23; --rail-txt: #efe8de; --rail-hover: #4a3828;
+  --nm-panel: #efe8de; --field: #f3eee3; --nm-accent-hi: #c67139;
+  --rail: #2a241d; --rail-txt: #efe6d6; --rail-hover: #4a3828;
   --rail-muted: #c9c0b0; --grid: rgba(58,46,35,.06); --edge: #d6ccbc; --edge-hi: #c67139;
-  --label: #3a2e23; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
+  --label: #2b2118; --marquee: rgba(198,113,57,.14); --marquee-line: #c67139;
   --cat-agent: #d2691e; --cat-tool: #4f8a52; --cat-chain: #46536b;
   --cat-entity: #e0a01e; --cat-doc: #6d8ab0; --cat-idea: #c0392b;
  }
+ /* Espresso dark, matching the mind map's dark mode — was navy/cyan, which made
+    this page look like a different product. */
  [data-nm-theme="dark"] {
-  --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
-  --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
-  --danger: #e8867a; --rail: #131c2e; --rail-txt: #e8eef8; --rail-hover: #1c2942;
-  --rail-muted: #7f93b3; --grid: rgba(255,255,255,.04); --edge: #2c3d57; --edge-hi: #5fd0e6;
-  --label: #dbe6f5; --marquee: rgba(95,208,230,.12); --marquee-line: #5fd0e6;
-  --cat-agent: #f2f6fc; --cat-tool: #4fb06a; --cat-chain: #c79a52;
-  --cat-entity: #5fd0e6; --cat-doc: #9a86e0; --cat-idea: #e8867a;
+  --bg: #12100c; --nm-panel: #1d1913; --field: #26211a; --border: #352c21;
+  --txt: #f0e7d7; --sub: #9b8d78; --accent: #c9a97f; --nm-accent-hi: #e08a4e;
+  --danger: #d1705a; --rail: #0d0b08; --rail-txt: #efe6d6; --rail-hover: #26211a;
+  --rail-muted: #8a7d6a; --grid: rgba(240,231,215,.05); --edge: #4a3d2d; --edge-hi: #e08a4e;
+  --label: #f0e7d7; --marquee: rgba(224,138,78,.14); --marquee-line: #e08a4e;
+  --cat-agent: #e08a4e; --cat-tool: #7aa77c; --cat-chain: #8f9ab5;
+  --cat-entity: #e0c25c; --cat-doc: #a99ad8; --cat-idea: #d1705a;
  }
 
  /* Do NOT transition background-color here. Its value is var(--bg), and when
    the theme flips that var on <html>, Chrome refuses to re-resolve a
    background-color that has a transition on it — the page stays stuck on the
    old theme. Transitioning `color` is unaffected, so it stays. */
- body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
+ body { font-family: var(--sans); background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
  ::-webkit-scrollbar { width: 6px; height: 6px; }
  ::-webkit-scrollbar-track { background: transparent; }
  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
@@ -64,8 +70,8 @@
  /* Themed primitives — used instead of hard-coded Tailwind hex so both
    themes flow from the variables above. */
  .nm-rail  { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
- .nm-chrome { background: var(--chrome); border-color: var(--border); }
- .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
+ .nm-chrome { background: var(--nm-panel); border-color: var(--border); }
+ .nm-surface { background: var(--nm-panel); border: 1px solid var(--border); color: var(--txt); }
  .nm-field  { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
  .nm-field:focus { outline: none; border-color: var(--accent); }
  .nm-sub   { color: var(--sub); }
@@ -75,9 +81,9 @@
  .nm-btn-primary { background: var(--accent); border: none; transition: filter .12s ease; }
  .nm-btn-primary:hover { filter: brightness(1.1); }
  [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
- [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
+ [data-nm-theme="dark"] .nm-btn-primary { color: #12100c; }
  .nm-rail-link:hover { background: var(--rail-hover); }
- .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
+ .nm-rail-active { background: var(--nm-panel); color: var(--txt); border: 1px solid var(--border); }
  .toast { position:fixed; bottom:24px; right:24px; background: var(--accent); color: var(--bg); padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.25); transform:translateY(20px); }
  .toast.show { opacity:1; transform:translateY(0); }
 </style>
@@ -178,7 +184,7 @@
   <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
-  <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--accent-soft);">Neural Map</h1>
+  <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--nm-accent-hi);">Neural Map</h1>
   <span class="text-[10px] uppercase tracking-widest font-mono hidden xl:inline-block nm-sub truncate min-w-0" style="max-width:220px" id="mapStats">loading…</span>
 
   <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
@@ -191,8 +197,8 @@
 
   <!-- Recognize -->
   <div class="relative flex-1 min-w-[130px] max-w-[210px] hidden lg:block">
-   <span class="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--accent-soft);">smart_toy</span>
-   <input id="recognizeInput" list="nm-known" placeholder="Jump to a node…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" style="border-style: dashed; border-color: var(--accent-soft);" />
+   <span class="material-symbols-outlined text-[18px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--nm-accent-hi);">smart_toy</span>
+   <input id="recognizeInput" list="nm-known" placeholder="Jump to a node…" class="nm-field w-full pl-9 pr-3 py-2 rounded-full text-[13px]" style="border-style: dashed; border-color: var(--nm-accent-hi);" />
    <datalist id="nm-known"></datalist>
   </div>
 
@@ -1272,7 +1278,7 @@ function openNode(n) {
    <div>
     <div class="flex items-center justify-between mb-1.5">
      <span class="text-[10px] font-bold tracking-widest uppercase nm-sub">Connections (${conns.length})</span>
-     <button id="npLink" class="flex items-center gap-1 text-[12px] font-semibold hover:underline" style="color: var(--accent-soft)">
+     <button id="npLink" class="flex items-center gap-1 text-[12px] font-semibold hover:underline" style="color: var(--nm-accent-hi)">
       <span class="material-symbols-outlined text-[13px]">add</span>connect
      </button>
     </div>
@@ -1380,7 +1386,7 @@ async function loadLivingProfile(n) {
   holder.innerHTML = `
    <div class="rounded-xl p-3 flex flex-col gap-2.5" style="border: 1px solid var(--border)">
     <div class="flex items-center justify-between">
-     <span class="text-[10px] font-bold tracking-widest uppercase" style="color: var(--accent-soft)">Living memory</span>
+     <span class="text-[10px] font-bold tracking-widest uppercase" style="color: var(--nm-accent-hi)">Living memory</span>
      <span class="text-[10px] nm-sub font-mono">${node.ownerAgent ? 'curated by ' + esc(node.ownerAgent) : ''}</span>
     </div>
     ${node.summary ? `<div class="text-[13px] leading-relaxed" style="color: var(--txt)">${esc(node.summary)}</div>` : ''}
@@ -1399,7 +1405,7 @@ async function loadLivingProfile(n) {
       ${p.connections.slice(0, 6).map(c => `
        <div class="nm-field rounded-lg px-2 py-1.5">
         <div class="text-[11px] font-semibold" style="color: var(--txt)">
-         ${c.direction === 'out' ? '' : '← '}${esc(c.type.replace(/_/g, ' '))} <span style="color: var(--accent-soft)">${esc(c.other.name)}</span>
+         ${c.direction === 'out' ? '' : '← '}${esc(c.type.replace(/_/g, ' '))} <span style="color: var(--nm-accent-hi)">${esc(c.other.name)}</span>
          <span class="nm-sub font-mono text-[9px]">· ${Math.round(c.strength * 100)}%</span>
         </div>
         ${c.reason ? `<div class="text-[10px] nm-sub leading-snug">${esc(c.reason)}</div>` : ''}
@@ -1423,7 +1429,7 @@ async function loadLivingProfile(n) {
      <div class="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
       ${p.timeline.slice(0, 10).map(ev => `
        <div class="flex items-start gap-1.5">
-        <span class="material-symbols-outlined text-[13px] mt-0.5" style="color: var(--accent-soft)">${EVENT_ICON[ev.event_type] || 'circle'}</span>
+        <span class="material-symbols-outlined text-[13px] mt-0.5" style="color: var(--nm-accent-hi)">${EVENT_ICON[ev.event_type] || 'circle'}</span>
         <div class="min-w-0">
          <span class="text-[11px]" style="color: var(--txt)">${esc(ev.detail || ev.event_type)}</span>
          <span class="text-[9px] nm-sub font-mono"> · ${fmtAgo(ev.created_at)}${ev.agent_id ? ' · ' + esc(ev.agent_id) : ''}</span>
@@ -1448,7 +1454,7 @@ function openEdge(e) {
     <div class="text-[10px] uppercase tracking-widest nm-sub">Connection${e.derived ? '' : ' · yours'}</div>
     <div class="flex items-center gap-2 mt-1 text-[16px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">
      <span>${esc(a ? a.label : '?')}</span>
-     <span class="material-symbols-outlined text-[18px]" style="color: var(--accent-soft)">arrow_forward</span>
+     <span class="material-symbols-outlined text-[18px]" style="color: var(--nm-accent-hi)">arrow_forward</span>
      <span>${esc(b ? b.label : '?')}</span>
     </div>
    </div>

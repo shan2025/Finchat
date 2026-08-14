@@ -1,0 +1,262 @@
+/* ============================================================================
+   finchat_theme.css — the single design layer for every FinChat page.
+   ----------------------------------------------------------------------------
+   Before this file each page shipped its own :root block, so the app had two
+   backgrounds, two accents, two token vocabularies (--text/--text2 vs
+   --txt/--sub) and four font stacks. Pages read as separate websites.
+
+   This file is the one place those decisions live. Rules:
+     1. Every page links this file FIRST, before its own <style>.
+     2. A page must not redefine a token here. Page-local tokens are for things
+        only that page has (e.g. finchat_mindmap.html's --mm-* canvas palette,
+        which is deliberately left alone).
+     3. Legacy token names are kept as aliases at the bottom so existing page
+        CSS keeps working. Write new CSS against the canonical names.
+
+   Dark brown is the primary accent and the chrome colour — it is the app's
+   identity, kept from the dashboard/agents pages and the mind map's dark mode.
+   ========================================================================== */
+
+:root {
+  /* --- channels ----------------------------------------------------------
+     Colours are authored as raw RGB channels so Tailwind can apply opacity
+     modifiers to them (`bg-cream-bg/50` compiles to
+     `rgb(var(--bg-rgb) / 0.5)`). The hex-equivalent tokens below are derived
+     from these, so there is exactly one place to change a colour.          */
+  --bg-rgb:          247 244 237;
+  --surface-rgb:     255 253 248;
+  --surface-2-rgb:   243 238 227;
+  --surface-3-rgb:   239 232 222;
+  --border-rgb:      226 217 201;
+  --border-2-rgb:    214 204 188;
+  --text-rgb:         43  33  24;
+  --text-2-rgb:       91  74  58;
+  --text-3-rgb:      138 125 106;
+  --accent-rgb:       74  56  40;
+  --accent-warm-rgb: 198 113  57;
+  --gold-rgb:        212 175  55;
+  --chrome-rgb:       42  36  29;
+
+  /* --- surfaces ---------------------------------------------------------- */
+  --bg:          rgb(var(--bg-rgb));         /* page background              */
+  --surface:     rgb(var(--surface-rgb));    /* cards, panels, raised things */
+  --surface-2:   rgb(var(--surface-2-rgb));  /* insets, stripes, muted fills */
+  --surface-3:   rgb(var(--surface-3-rgb));  /* pressed / selected fills     */
+  --border:      rgb(var(--border-rgb));     /* default hairline             */
+  --border-2:    rgb(var(--border-2-rgb));   /* divider, input outline       */
+
+  /* --- ink --------------------------------------------------------------- */
+  --text:        rgb(var(--text-rgb));       /* headings, primary copy       */
+  --text-2:      rgb(var(--text-2-rgb));     /* secondary copy, labels       */
+  --text-3:      rgb(var(--text-3-rgb));     /* meta, timestamps, placeholder*/
+
+  /* --- accents ----------------------------------------------------------- */
+  --accent:      rgb(var(--accent-rgb));      /* PRIMARY. dark brown         */
+  --accent-hover:#3a2b1e;
+  --accent-ink:  #f5ead8;   /* text on top of --accent                       */
+  --accent-warm: rgb(var(--accent-warm-rgb)); /* SECONDARY. burnt orange     */
+  --accent-warm-hover:#b2622d;
+  --accent-soft: #e9d6c2;   /* tinted background for warm accent             */
+  --gold:        rgb(var(--gold-rgb));  /* selection, pins, "new" markers    */
+
+  /* --- status ------------------------------------------------------------ */
+  --ok:          #4f8a52;
+  --warn:        #c99a3a;
+  --danger:      #b0472e;
+  --info:        #3b82f6;
+
+  /* --- chrome (sidebar / topbar) ----------------------------------------- */
+  --chrome:      rgb(var(--chrome-rgb));  /* dark brown nav rail            */
+  --chrome-fg:   #efe6d6;
+  --chrome-muted:#a99e88;
+  --chrome-active:#3a3128;
+
+  /* --- type -------------------------------------------------------------- */
+  --sans:  'Figtree', 'Inter', system-ui, -apple-system, sans-serif;
+  --serif: 'Caprasimo', 'Playfair Display', Georgia, serif;
+  --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* --- elevation & shape ------------------------------------------------- */
+  --shadow:    0 1px 2px rgba(46, 43, 37, .06);
+  --shadow-md: 0 8px 28px rgba(46, 43, 37, .12);
+  --radius:    10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark mode. Values come from the mind map's [data-nm-theme="dark"] palette so
+   the two agree — deep espresso browns, never neutral grey.
+   Opt in with <html data-theme="dark">.
+   ------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  /* Only the channels are restated — the rgb() tokens above resolve from them,
+     so dark mode stays a single list of numbers. */
+  --bg-rgb:          18  16  12;
+  --surface-rgb:     29  25  19;
+  --surface-2-rgb:   38  33  26;
+  --surface-3-rgb:   44  37  28;
+  --border-rgb:      53  44  33;
+  --border-2-rgb:    74  61  45;
+  --text-rgb:       240 231 215;
+  --text-2-rgb:     203 188 164;
+  --text-3-rgb:     155 141 120;
+  --accent-rgb:     201 169 127;
+  --accent-warm-rgb:224 138  78;
+  --gold-rgb:       224 194  92;
+
+  --accent-hover:#dcc09a;
+  --accent-ink:  #1a1510;
+  --accent-warm-hover:#ee9a5e;
+  --accent-soft: #3a2e21;
+
+  --ok:     #7aa77c;
+  --warn:   #d9b45f;
+  --danger: #d1705a;
+
+  --chrome-rgb:      13  11   8;
+  --chrome-muted:#8a7d6a;
+  --chrome-active:#26211a;
+
+  --shadow:    0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 10px 34px rgba(0, 0, 0, .5);
+}
+
+/* ---------------------------------------------------------------------------
+   Base. Deliberately thin — pages own their layout, this owns the feel.
+   ------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { color: var(--text); font-weight: 700; }
+
+/* The display face is opt-in per element, not global — Caprasimo is a poster
+   face and sets badly at paragraph sizes. */
+.fc-display, .mm-serif { font-family: var(--serif); font-weight: 400; }
+
+a { color: var(--accent-warm); text-decoration: none; }
+a:hover { color: var(--accent-warm-hover); text-decoration: underline; }
+
+code, pre, .fc-mono { font-family: var(--mono); }
+
+hr { border: 0; border-top: 1px solid var(--border); }
+
+::selection { background: var(--gold); color: #2b2118; }
+
+:focus-visible {
+  outline: 2px solid var(--accent-warm);
+  outline-offset: 2px;
+}
+
+/* Scrollbars, so panels don't show OS chrome that fights the palette. */
+* { scrollbar-color: var(--border-2) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2); border-radius: var(--radius-pill);
+  border: 3px solid transparent; background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: var(--text-3); }
+
+/* Material Symbols are loaded with different axes per page; pin the rendering
+   so an icon is the same weight everywhere. */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared components. These exist so a button on Reports is the same object as
+   a button on Agents, rather than two coincidentally similar rectangles.
+   ------------------------------------------------------------------------- */
+.fc-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 600 12.5px/1 var(--sans);
+  cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.fc-btn:hover { color: var(--accent-warm); border-color: var(--accent-warm); }
+.fc-btn:disabled { opacity: .5; cursor: default; }
+
+.fc-btn-primary {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+}
+.fc-btn-primary:hover {
+  background: var(--accent-hover); border-color: var(--accent-hover);
+  color: var(--accent-ink);
+}
+
+.fc-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.fc-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-3); font-size: 11px; font-weight: 700;
+}
+
+.fc-input {
+  width: 100%; padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  color: var(--text); font: 400 13px/1.4 var(--sans);
+}
+.fc-input::placeholder { color: var(--text-3); }
+.fc-input:focus { border-color: var(--accent-warm); outline: none; }
+
+/* ---------------------------------------------------------------------------
+   LEGACY ALIASES
+   Page CSS written before this file used three different vocabularies. Each is
+   mapped onto the canonical token so old rules keep resolving. Do not use
+   these in new code; they exist to make the migration non-breaking.
+   ------------------------------------------------------------------------- */
+:root {
+  /* dashboard / agents / settings / blockchain / groupchat vocabulary */
+  --surface2:  var(--surface-2);
+  --border2:   var(--border-2);
+  --text2:     var(--text-2);
+  --text3:     var(--text-3);
+  --accent-blue:  var(--info);
+  --accent-green: var(--ok);
+  --accent-amber: var(--warn);
+  --accent-red:   var(--danger);
+
+  /* knowledge / reports vocabulary */
+  --card:  var(--surface);
+  --txt:   var(--text);
+  --sub:   var(--text-3);
+  --good:  var(--ok);
+  --muted: var(--text-3);
+
+  /* one-off names that predate the token layer and are referenced with an
+     inline fallback (var(--bg2,#efe8de)); defining them here means those call
+     sites resolve to the palette instead of their stale hardcoded fallback */
+  --border-color: var(--border);
+  --bg2:          var(--surface-3);
+
+  /* chat vocabulary */
+  --user-bubble: var(--chrome);
+  --user-text:   var(--chrome-fg);
+  --bot-bubble:  var(--surface);
+  --side-bg:     var(--chrome);
+  --side-fg:     var(--chrome-fg);
+  --side-muted:  var(--chrome-muted);
+}

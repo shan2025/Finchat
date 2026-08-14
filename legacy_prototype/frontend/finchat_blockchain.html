@@ -1,24 +1,23 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Blockchain</title>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
  if (typeof io === 'undefined') {
   document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
  }
 </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
- body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
- :root { --bg:#f7f4ed; --surface:#efe8de; --surface2:#f3eee3; --border:#d6ccbc; --text:#3a2e23; --text2:#5c4a38; --text3:#8c7a6b; }
+ body { font-family: var(--sans); background-color: var(--bg); color: var(--text); }
  ::-webkit-scrollbar { width: 6px; height:6px; } ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
  .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .3s; pointer-events:none; z-index:9999; transform:translateY(20px); }
  .toast.show { opacity:1; transform:translateY(0); }

@@ -1,35 +1,38 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Neural Network</title>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, fontFamily: {display: ["Inter"], body: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}}}};
 </script>
 <script src="nn_core.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
  /* Same two-theme system as Neural Map — shared localStorage key so switching
    theme on one page carries over to the other. */
+ /* Page-specific model-lab tokens only; shared colours come from
+    finchat_theme.css. --chrome/--accent-soft renamed to --nm-panel/
+    --nm-accent-hi to stop colliding with the shared nav-rail and tint tokens. */
  :root, [data-nm-theme="warm"] {
-  --bg: #f7f4ed; --chrome: #efe8de; --field: #f3eee3; --border: #d6ccbc;
-  --txt: #3a2e23; --sub: #8c7a6b; --accent: #4a3828; --accent-soft: #c67139;
-  --danger: #b0472e; --good: #7a8a5e; --rail: #3a2e23; --rail-txt: #efe8de;
+  --nm-panel: #efe8de; --field: #f3eee3; --nm-accent-hi: #c67139;
+  --good: #7a8a5e; --rail: #2a241d; --rail-txt: #efe6d6;
   --rail-hover: #4a3828; --rail-muted: #c9c0b0; --track: #e3d3ba; --graphbg: #fbf5e9;
   --wpos: #7a8a5e; --wneg: #c67139; --pulse: #c67139; --node: #fffaf0; --nodestroke: #f5ead8; --nodetext: #2a221b;
  }
+ /* Espresso dark, matching the mind map — was navy/cyan. */
  [data-nm-theme="dark"] {
-  --bg: #0b1220; --chrome: #131c2e; --field: #0e1626; --border: #243349;
-  --txt: #e8eef8; --sub: #7f93b3; --accent: #5fd0e6; --accent-soft: #5fd0e6;
-  --danger: #e8867a; --good: #5fd0e6; --rail: #131c2e; --rail-txt: #e8eef8;
-  --rail-hover: #1c2942; --rail-muted: #7f93b3; --track: #1b2740; --graphbg: #0a111f;
-  --wpos: #5fd0e6; --wneg: #e08a3c; --pulse: #fff2c8; --node: #dfe9f7; --nodestroke: #0b1220; --nodetext: #0b1220;
+  --bg: #12100c; --nm-panel: #1d1913; --field: #26211a; --border: #352c21;
+  --txt: #f0e7d7; --sub: #9b8d78; --accent: #c9a97f; --nm-accent-hi: #e08a4e;
+  --danger: #d1705a; --good: #7aa77c; --rail: #0d0b08; --rail-txt: #efe6d6;
+  --rail-hover: #26211a; --rail-muted: #8a7d6a; --track: #352c21; --graphbg: #171310;
+  --wpos: #7aa77c; --wneg: #e08a4e; --pulse: #e0c25c; --node: #2c251c; --nodestroke: #4a3d2d; --nodetext: #f0e7d7;
  }
- body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
+ body { font-family: var(--sans); background-color: var(--bg); color: var(--txt); transition: color .2s ease; }
  ::-webkit-scrollbar { width: 6px; height: 6px; }
  ::-webkit-scrollbar-track { background: transparent; }
  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
@@ -44,8 +47,8 @@
  @media (min-width: 768px) { #sideNav { transform: none !important; } }
  .nn-canvas { display: block; }
  .nm-rail  { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
- .nm-chrome { background: var(--chrome); border-color: var(--border); }
- .nm-surface { background: var(--chrome); border: 1px solid var(--border); color: var(--txt); }
+ .nm-chrome { background: var(--nm-panel); border-color: var(--border); }
+ .nm-surface { background: var(--nm-panel); border: 1px solid var(--border); color: var(--txt); }
  .nm-field  { background: var(--field); border: 1px solid var(--border); color: var(--txt); }
  .nm-sub   { color: var(--sub); }
  .nm-btn   { background: var(--field); border: 1px solid var(--border); color: var(--txt); transition: filter .12s ease; cursor: pointer; }
@@ -54,13 +57,13 @@
  .nm-btn-primary { background: var(--accent); border: none; cursor: pointer; transition: filter .12s ease; }
  .nm-btn-primary:hover { filter: brightness(1.1); }
  [data-nm-theme="warm"] .nm-btn-primary { color: #efe8de; }
- [data-nm-theme="dark"] .nm-btn-primary { color: #0b1220; }
+ [data-nm-theme="dark"] .nm-btn-primary { color: #12100c; }
  .nm-rail-link:hover { background: var(--rail-hover); }
- .nm-rail-active { background: var(--chrome); color: var(--txt); border: 1px solid var(--border); }
+ .nm-rail-active { background: var(--nm-panel); color: var(--txt); border: 1px solid var(--border); }
  .seg-btn { cursor: pointer; font-weight: 600; font-size: 13px; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--field); color: var(--txt); transition: filter .1s ease; }
  .seg-btn.on { background: var(--accent); border-color: transparent; }
  [data-nm-theme="warm"] .seg-btn.on { color: #efe8de; }
- [data-nm-theme="dark"] .seg-btn.on { color: #0b1220; }
+ [data-nm-theme="dark"] .seg-btn.on { color: #12100c; }
  input[type=range] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px; outline: none; background: var(--track); }
  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 999px; cursor: pointer; border: 2px solid var(--bg); background: var(--accent); }
@@ -157,7 +160,7 @@
    <span class="material-symbols-outlined text-[15px]">arrow_back</span> Neural Map
   </a>
   <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
-  <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--accent-soft); max-width: 260px;" />
+  <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--nm-accent-hi); max-width: 260px;" />
   <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline-block truncate min-w-0" style="max-width:200px">—</span>
   <div class="flex-1"></div>
   <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
@@ -582,7 +585,7 @@ function updateMetrics() {
  vb.textContent = diag.verdict;
  const toneColors = {
   good: ['rgba(122,138,94,.16)', 'var(--good)'],
-  warn: ['rgba(198,113,57,.16)', 'var(--accent-soft)'],
+  warn: ['rgba(198,113,57,.16)', 'var(--nm-accent-hi)'],
   bad: ['rgba(176,71,46,.16)', 'var(--danger)']
  };
  const [bg, fg] = toneColors[diag.tone] || toneColors.good;
@@ -606,7 +609,7 @@ function updateMetrics() {
   rows.map(([label, tr, te]) => `
    <div class="metric-tile"><div class="text-[10px] nm-sub uppercase">${label}</div></div>
    <div class="metric-tile grid grid-cols-2 gap-1">
-    <span class="font-bold text-[12px]" style="color: var(--accent-soft)">${tr}</span>
+    <span class="font-bold text-[12px]" style="color: var(--nm-accent-hi)">${tr}</span>
     <span class="font-bold text-[12px]" style="color: var(--accent)">${te}</span>
    </div>`).join('');
 }

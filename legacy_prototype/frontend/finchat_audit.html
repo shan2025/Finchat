@@ -1,25 +1,23 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>FinChat - Audit Explorer</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet"/>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     "colors": {
-                        "primary-brown": "#4B3621",
-                        "cream-bg": "#FDFBF7",
-                        "cream-card": "#F7F4EA",
-                        "cream-card-hover": "#F0EBE0",
-                        "accent-gold": "#C19C4D",
-                        "text-primary": "#2D241B",
-                        "text-secondary": "#6B5D4E",
+                        "primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)",
+                        "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)",
+                        "cream-card": "rgb(var(--surface-rgb) / <alpha-value>)",
+                        "cream-card-hover": "rgb(var(--surface-2-rgb) / <alpha-value>)",
+                        "accent-gold": "rgb(var(--gold-rgb) / <alpha-value>)",
+                        "text-primary": "rgb(var(--text-rgb) / <alpha-value>)",
+                        "text-secondary": "rgb(var(--text-2-rgb) / <alpha-value>)",
                         "border-color": "#E5DEC5",
                         "inverse-on-surface": "#2b322f",
                         "primary-fixed": "#5ffbd6",
@@ -85,8 +83,11 @@
             }
         }
     </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
     <style>
-        body { background-color: theme('colors.cream-bg'); color: theme('colors.text-primary'); font-family: 'Inter', sans-serif; }
+        body { background-color: theme('colors.cream-bg'); color: theme('colors.text-primary'); font-family: var(--sans); }
         .glass-panel { background: rgba(247, 244, 234, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid theme('colors.border-color'); }
         .glass-edge { position: relative; }
         .glass-edge::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-top: 1px solid rgba(255,255,255,0.5); border-left: 1px solid rgba(255,255,255,0.5); pointer-events: none; border-radius: inherit; }

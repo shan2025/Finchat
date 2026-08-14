@@ -1,19 +1,16 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Knowledge Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script>tailwind.config = {darkMode:"class", theme:{extend:{colors:{"primary-brown":"#3a2e23","cream-bg":"#efe8de"}}}};</script>
+<script>tailwind.config = {darkMode:"class", theme:{extend:{colors:{"primary-brown":"rgb(var(--chrome-rgb) / <alpha-value>)","cream-bg":"rgb(var(--bg-rgb) / <alpha-value>)"}}}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
- :root {
-  --bg:#f7f4ed; --card:#fffdf8; --border:#e2d9c9; --txt:#3a2e23; --sub:#8c7a6b;
-  --accent:#c67139; --accent-soft:#e9d6c2; --good:#4f8a52; --warn:#c99a3a; --muted:#b3a693;
- }
- body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--txt); }
+ body { font-family:var(--sans); background:var(--bg); color:var(--txt); }
  ::-webkit-scrollbar { width:7px; height:7px; }
  ::-webkit-scrollbar-thumb { background:var(--muted); border-radius:6px; }
  .card { background:var(--card); border:1px solid var(--border); border-radius:18px; }
@@ -239,6 +236,7 @@ loadVitals(); loadGrowth(); loadStores(); loadInference(); loadAgents(); loadIns
 </script>
 <script src="sidebar_nav.js"></script>
 <script src="sidebar_collapse.js"></script>
+<script src="notifications_widget.js"></script>
 </body>
 </html>
 

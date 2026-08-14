@@ -1,18 +1,17 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Settings</title>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <style>
- body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
- :root { --bg:#f7f4ed; --surface:#efe8de; --surface2:#f3eee3; --border:#d6ccbc; --text:#3a2e23; --text2:#5c4a38; --text3:#8c7a6b; }
+ body { font-family: var(--sans); background-color: var(--bg); color: var(--text); }
  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
  textarea:focus, input:focus, select:focus {
   outline: none !important; box-shadow: none !important;
@@ -86,8 +85,11 @@
     <div id="channels" class="mt-5 space-y-3"><!-- populated by JS --></div>
 
     <div class="mt-4 text-[11px] font-mono px-1" style="color:var(--text3);">
-     Channels marked "server not configured" need credentials in backend/.env
-     (SMTP_* for email, TWILIO_* for WhatsApp/SMS, TELEGRAM_BOT_TOKEN for Telegram). Push works out of the box.
+     Channels marked "server not configured" need credentials in backend/.env — SMTP_* for email,
+     TELEGRAM_BOT_TOKEN for Telegram, TWILIO_* for SMS. WhatsApp takes either
+     TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_FROM or
+     WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN (Meta Cloud API), plus a public webhook URL
+     so inbound replies reach /api/whatsapp/webhook. Push works out of the box.
     </div>
    </section>
 
@@ -146,11 +148,44 @@
   { key: 'inapp',  icon: 'notifications', label: 'In-app bell', desc: 'The bell on every FinChat page. Always recommended.', field: null },
   { key: 'push',   icon: 'smartphone',  label: 'Mobile / browser push', desc: 'Real push notifications on this device, even with FinChat closed.', field: null },
   { key: 'email',  icon: 'mail',     label: 'Email', desc: 'One email per notification.', field: 'email_to', placeholder: 'you@example.com' },
-  { key: 'whatsapp', icon: 'chat',     label: 'WhatsApp', desc: 'Via Twilio WhatsApp.', field: 'whatsapp_to', placeholder: '+91 98765 43210' },
+  { key: 'whatsapp', icon: 'chat',     label: 'WhatsApp', desc: 'Link your number below — you message FinChat once, and we confirm it automatically.', field: 'whatsapp_to', placeholder: '+91 98765 43210 (country code required)' },
   { key: 'telegram', icon: 'send',     label: 'Telegram', desc: 'Tap "Link Telegram" below — message the bot once and we capture your chat ID automatically.', field: 'telegram_chat_id', placeholder: 'e.g. 123456789' },
   { key: 'sms',   icon: 'sms',      label: 'SMS', desc: 'Text message via Twilio.', field: 'sms_to', placeholder: '+91 98765 43210' }
  ];
- let prefs = {}, serverChannels = {};
+ let prefs = {}, serverChannels = {}, waStatus = {};
+
+ // WhatsApp only accepts freeform text within 24h of the user's last inbound
+ // message. That single fact explains most "why didn't my briefing arrive",
+ // so the card states it rather than leaving it to the delivery log.
+ function waWindowLine() {
+  const w = waStatus.window || {};
+  if (!waStatus.verified) return '';
+  if (w.open) {
+   const h = Math.floor((w.minutesLeft || 0) / 60), m = (w.minutesLeft || 0) % 60;
+   return `<div style="color:#16a34a;">✅ Reply window open — ${h}h ${m}m left. Freeform alerts deliver now.</div>`;
+  }
+  return `<div style="color:#d97706;">⏳ Reply window closed. WhatsApp only allows freeform messages within 24h of your last message${waStatus.templateName ? ' — scheduled items will go out as your approved template' : '; message the FinChat number to reopen it'}.</div>`;
+ }
+
+ function waCardHtml(on) {
+  if (!on) return '';
+  const linked = waStatus.verified && waStatus.to;
+  const provider = waStatus.provider === 'meta' ? 'Meta Cloud API'
+   : waStatus.provider === 'twilio' ? 'Twilio' : null;
+  return `
+  <div id="waLinkWrap" style="margin-top:8px;">
+   <button onclick="linkWhatsApp(event)" id="waLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#25D366; color:#0b2e13; border:none; cursor:pointer;">
+    ${linked ? '🔗 Re-link WhatsApp' : '🔗 Link WhatsApp automatically'}
+   </button>
+   <button onclick="testWhatsApp(event)" id="waTestBtn" class="w-full py-2 rounded-xl text-[12px] font-bold mt-1.5" style="background:transparent; border:1px solid var(--border); color:var(--text2); cursor:pointer;">
+    Send a WhatsApp test
+   </button>
+   <div id="waLinkStatus" style="font-size:11.5px; color:var(--text3); margin-top:6px; line-height:1.55;">
+    ${linked ? `Linked to <b>${esc(waStatus.to)}</b>${provider ? ' via ' + provider : ''}.` : (waStatus.to ? `Saved <b>${esc(waStatus.to)}</b> — not confirmed yet. Tap “Link WhatsApp” so we can verify it.` : '')}
+    ${waWindowLine()}
+   </div>
+  </div>`;
+ }
 
  function renderChannels() {
   const wrap = document.getElementById('channels');
@@ -171,6 +206,7 @@
      <div class="tgl ${on ? 'on' : ''} ${serverOk ? '' : ''}" data-chan="${c.key}" onclick="toggleChannel('${c.key}')"></div>
     </div>
     ${c.field ? `<input class="chan-input" id="fld_${c.field}" placeholder="${c.placeholder}" value="${esc(prefs[c.field] || '')}" onchange="markDirty()" style="display:${on ? 'block' : 'none'}">` : ''}
+    ${c.key === 'whatsapp' ? waCardHtml(on) : ''}
     ${c.key === 'telegram' ? `
     <div id="tgLinkWrap" style="display:${on ? 'block' : 'none'}; margin-top:8px;">
      <button onclick="linkTelegram(event)" id="tgLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#229ED9; color:#fff; border:none; cursor:pointer;">
@@ -200,6 +236,7 @@
    const d = await r.json();
    prefs = d.prefs || {};
    serverChannels = d.serverChannels || {};
+   waStatus = d.whatsapp || {};
    renderChannels();
    renderDeliveries(d.recentDeliveries || []);
   } catch (e) {
@@ -234,7 +271,9 @@
   try {
    const r = await fetch(API + '/api/settings/notifications', { method: 'PUT', headers: AUTH, body: JSON.stringify(body) });
    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'save failed');
-   prefs = (await r.json()).prefs;
+   const d = await r.json();
+   prefs = d.prefs;
+   if (d.whatsapp) waStatus = d.whatsapp;
    renderChannels();
    showToast('✅ Notification settings saved');
   } catch (e) { showToast('Save failed: ' + e.message); }
@@ -254,6 +293,89 @@
    loadPrefs();
   } catch (e) { showToast('Test failed: ' + e.message); }
   finally { btn.disabled = false; }
+ }
+
+ // ── WhatsApp link ──
+ // The user sends us a code from their own number; our webhook sees it and
+ // links the account. We poll for that rather than asking them to copy an ID.
+ let waPollTimer = null;
+ async function linkWhatsApp(e) {
+  if (e) e.preventDefault();
+  const status = document.getElementById('waLinkStatus');
+  const btn = document.getElementById('waLinkBtn');
+  try {
+   if (btn) btn.disabled = true;
+   if (status) status.textContent = 'Preparing your link…';
+   const r = await fetch(API + '/api/settings/whatsapp/start-link', { method: 'POST', headers: AUTH });
+   const d = await r.json();
+   if (!r.ok) throw new Error(d.error || 'could not start linking');
+
+   // Twilio's sandbox ignores every message until the number has sent the
+   // join phrase, so that gets its own step and its own button.
+   const joinStep = d.joinLink
+    ? `<div style="margin-top:6px;"><b>Step 1 —</b> join the sandbox: <a href="${esc(d.joinLink)}" target="_blank" style="color:#25D366;text-decoration:underline;">send “${esc(d.joinPhrase)}”</a></div>
+       <div style="margin-top:4px;"><b>Step 2 —</b> <a href="${esc(d.deepLink)}" target="_blank" style="color:#25D366;text-decoration:underline;">send “${esc(d.linkMessage)}”</a></div>`
+    : `<div style="margin-top:6px;">Send <b>${esc(d.linkMessage)}</b> to <b>${esc(d.senderNumber)}</b> — <a href="${esc(d.deepLink)}" target="_blank" style="color:#25D366;text-decoration:underline;">open WhatsApp</a></div>`;
+   window.open(d.deepLink, '_blank');
+   if (status) status.innerHTML = `Waiting for your WhatsApp message…${joinStep}`;
+
+   let tries = 0;
+   clearInterval(waPollTimer);
+   waPollTimer = setInterval(async () => {
+    tries++;
+    if (tries > 60) { // ~2min — the join step takes longer than Telegram's
+     clearInterval(waPollTimer);
+     if (status) status.innerHTML = 'Timed out. Tap “Link WhatsApp” to try again.' +
+      '<div style="margin-top:4px;">If you sent the message and nothing happened, the inbound webhook is probably not reachable — check <code>/api/whatsapp/health</code>.</div>';
+     if (btn) btn.disabled = false;
+     return;
+    }
+    try {
+     const pr = await fetch(API + '/api/settings/whatsapp/poll?code=' + encodeURIComponent(d.code), { headers: AUTH });
+     const pd = await pr.json();
+     if (pd.linked) {
+      clearInterval(waPollTimer);
+      prefs.channel_whatsapp = true;
+      prefs.whatsapp_to = pd.to;
+      if (pd.whatsapp) waStatus = pd.whatsapp;
+      renderChannels();
+      showToast('✅ WhatsApp linked (' + pd.to + ')');
+     } else if (pd.expired) {
+      clearInterval(waPollTimer);
+      if (status) status.textContent = 'Link code expired. Tap “Link WhatsApp” to try again.';
+      if (btn) btn.disabled = false;
+     }
+    } catch (err) { /* keep polling */ }
+   }, 2000);
+  } catch (err) {
+   if (status) status.textContent = 'Could not start linking: ' + err.message;
+   if (btn) btn.disabled = false;
+  }
+ }
+
+ // Waits for the real provider response instead of the all-channel test's
+ // fixed delay, so a failure names its cause.
+ async function testWhatsApp(e) {
+  if (e) e.preventDefault();
+  const btn = document.getElementById('waTestBtn');
+  const status = document.getElementById('waLinkStatus');
+  try {
+   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+   const r = await fetch(API + '/api/settings/whatsapp/test', { method: 'POST', headers: AUTH });
+   const d = await r.json();
+   if (!r.ok) throw new Error(d.error || 'test failed');
+   if (d.whatsapp) waStatus = d.whatsapp;
+   if (d.status === 'sent') showToast('✅ WhatsApp test sent' + (d.detail ? ' — ' + d.detail : ''));
+   else showToast(`WhatsApp ${d.status}: ${d.detail || 'no detail'}`);
+   if (status && d.detail) {
+    status.innerHTML = `<div style="color:${d.status === 'sent' ? '#16a34a' : '#d97706'};">${esc(d.detail)}</div>` + waWindowLine();
+   }
+   loadPrefs();
+  } catch (err) {
+   showToast('WhatsApp test failed: ' + err.message);
+  } finally {
+   if (btn) { btn.disabled = false; btn.textContent = 'Send a WhatsApp test'; }
+  }
  }
 
  // ── Telegram auto-link ──

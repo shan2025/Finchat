@@ -1,15 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Group Chat</title>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "#3a2e23", "cream-bg": "#efe8de", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}}}};</script>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", error: "#dc2626", "on-surface": "#3a2e23", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}}}};</script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
  if (typeof io === 'undefined') {
@@ -17,13 +14,12 @@
  }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 <style>
- body { font-family: 'Inter', sans-serif; background-color: #f7f4ed; color: #3a2e23; }
- :root {
-  --bg: #f7f4ed; --surface: #efe8de; --surface2: #f3eee3; --border: #d6ccbc;
-  --accent: #4a3828; --text: #3a2e23; --text2: #5c4a38; --text3: #8c7a6b;
- }
+ body { font-family: var(--sans); background-color: var(--bg); color: var(--text); }
  ::-webkit-scrollbar { width: 6px; height: 6px; }
  ::-webkit-scrollbar-thumb { background: #8c7a6b; border-radius: 4px; }
  /* Tailwind's forms plugin paints a blue focus ring on inputs — off-theme here */
