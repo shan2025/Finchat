@@ -4,6 +4,8 @@
     "description":  "FinChat — Governed Internal Messaging Backend",
     "main":  "server.js",
     "scripts":  {
+                    "test":  "node --test test/",
+                    "test:watch":  "node --test --watch test/",
                     "start":  "node server.js",
                     "start:3100":  "set PORT=3100\u0026\u0026 node server.js",
                     "dev":  "nodemon server.js",

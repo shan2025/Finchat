@@ -1,5 +1,12 @@
 // services/cognitive/MemoryService.js — Unified memory API (Sprint 2 Full Taxonomy)
-const { query } = require('../../database');
+//
+// SQL for memories/knowledge/knowledge_embeddings lives in
+// repositories/MemoryRepository.js; the episodic read lives in
+// ExecutionRepository (it reads the `executions` table). This module keeps the
+// memory policy: id minting, the embedding fallback chain, and how the four
+// stores are assembled for ContextBuilder.
+const { memoryRepository } = require('../../repositories/MemoryRepository');
+const { executionRepository } = require('../../repositories/ExecutionRepository');
 const { setWorkingMemory, getWorkingMemory } = require('../redis');
 const embeddingsConfig = require('../../config/embeddings');
 const axios = require('axios');
@@ -33,88 +40,40 @@ async function appendToScratchpad(contextId, entry) {
  * Scoped by userId and/or agentName.
  */
 async function retrieveEpisodicHistory({ userId, agentId, limit = 5 } = {}) {
-  let sql = `
-    SELECT e.execution_id, e.goal, e.result, e.assigned_agent, e.completion_reason, e.created_at
-    FROM executions e
-    WHERE e.current_state = 'completed'
-  `;
-  const params = [];
-  let paramIdx = 1;
-
-  if (userId) {
-    sql += ` AND e.user_id = $${paramIdx++}`;
-    params.push(userId);
-  }
-  if (agentId) {
-    sql += ` AND e.assigned_agent = $${paramIdx++}`;
-    params.push(agentId);
-  }
-
-  sql += ` ORDER BY e.created_at DESC LIMIT $${paramIdx}`;
-  params.push(limit);
-
-  const res = await query(sql, params);
-  return res.rows;
+  return executionRepository.findCompletedEpisodes({ userId, agentId, limit });
 }
 
 // ─── 3. Long-Term Memory & Procedural Workflows (PostgreSQL — memories table) ───
 
 async function store({ userId, memoryType, content, metadata = {}, importance = 5 }) {
-  // Ensure userId exists in users table to satisfy foreign key constraint
+  const uid = userId || 'system';
+
+  // Best-effort: synthetic ids ('system', agent names) have no users row, and
+  // memories.user_id is a foreign key. A failure here is not fatal — the insert
+  // below will surface a real constraint problem.
   try {
-    const uid = userId || 'system';
-    await query(`
-      INSERT INTO users (user_id, email, name, role, password_hash)
-      VALUES ($1, $1 || '@system.finchat.local', 'System User ' || $1, 'user', 'none')
-      ON CONFLICT (user_id) DO NOTHING
-    `, [uid]);
+    await memoryRepository.ensureUserExists(uid);
   } catch (err) {
-    // Ignore if constraint check fails
+    // ignore
   }
 
   const memoryId = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-
-  await query(`
-    INSERT INTO memories (memory_id, user_id, memory_type, content, metadata, importance)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [memoryId, userId || 'system', memoryType, content, JSON.stringify(metadata), importance]);
+  await memoryRepository.insertMemory({
+    memoryId, userId: uid, memoryType, content, metadata, importance,
+  });
 
   return { memoryId, memoryType, content, importance };
 }
 
 async function retrieve({ userId, memoryType, limit = 5 } = {}) {
-  let sql = 'SELECT * FROM memories WHERE 1=1';
-  const params = [];
-  let paramIdx = 1;
-
-  if (userId) {
-    sql += ` AND user_id = $${paramIdx++}`;
-    params.push(userId);
-  }
-  if (memoryType) {
-    sql += ` AND memory_type = $${paramIdx++}`;
-    params.push(memoryType);
-  }
-
-  sql += ` ORDER BY importance DESC, created_at DESC LIMIT $${paramIdx}`;
-  params.push(limit);
-
-  const res = await query(sql, params);
-  return res.rows;
+  return memoryRepository.findMemories({ userId, memoryType, limit });
 }
 
 /**
  * Retrieve learned procedural workflows (memory_type = 'procedural') for an agent.
  */
 async function retrieveProceduralWorkflows({ agentId, limit = 5 } = {}) {
-  const sql = `
-    SELECT * FROM memories
-    WHERE memory_type = 'procedural' AND (metadata->>'agentId' = $1 OR metadata->>'agentId' = 'global' OR metadata->>'agentId' IS NULL)
-    ORDER BY importance DESC, created_at DESC
-    LIMIT $2
-  `;
-  const res = await query(sql, [agentId || 'global', limit]);
-  return res.rows;
+  return memoryRepository.findProceduralWorkflows({ agentId, limit });
 }
 
 // ─── 4. Semantic Memory (Embedding-Based Retrieval) ───
@@ -179,21 +138,16 @@ function generateDeterministicEmbedding(text, dimension) {
 
 async function storeWithEmbedding({ title, content, source = 'cognitive_core' }) {
   const knowledgeId = `know_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  await memoryRepository.insertKnowledge({ knowledgeId, title, content, source });
 
-  await query(`
-    INSERT INTO knowledge (knowledge_id, title, content, source)
-    VALUES ($1, $2, $3, $4)
-  `, [knowledgeId, title, content, source]);
-
+  // The knowledge row is stored either way — an embedding failure must not lose
+  // the content, it only costs similarity search on that row.
   const embedding = await generateEmbedding(content);
   if (embedding) {
     const embeddingId = `emb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const vectorStr = `[${embedding.join(',')}]`;
-    await query(`
-      INSERT INTO knowledge_embeddings (embedding_id, knowledge_id, embedding)
-      VALUES ($1, $2, $3::vector)
-    `, [embeddingId, knowledgeId, vectorStr]);
-
+    await memoryRepository.insertKnowledgeEmbedding({
+      embeddingId, knowledgeId, vector: embedding,
+    });
     return { knowledgeId, embeddingId, embeddingDimension: embedding.length, stored: true };
   }
 
@@ -203,21 +157,10 @@ async function storeWithEmbedding({ title, content, source = 'cognitive_core' })
 async function retrieveBySimilarity(queryText, limit = 3) {
   const embedding = await generateEmbedding(queryText);
   if (!embedding) {
-    const res = await query('SELECT * FROM knowledge ORDER BY created_at DESC LIMIT $1', [limit]);
-    return res.rows;
+    // No vector to search with — fall back to newest-first rather than nothing.
+    return memoryRepository.findRecentKnowledge(limit);
   }
-
-  const vectorStr = `[${embedding.join(',')}]`;
-  const res = await query(`
-    SELECT k.*, ke.embedding_id,
-           (ke.embedding <=> $1::vector) as distance
-    FROM knowledge k
-    JOIN knowledge_embeddings ke ON k.knowledge_id = ke.knowledge_id
-    ORDER BY ke.embedding <=> $1::vector
-    LIMIT $2
-  `, [vectorStr, limit]);
-
-  return res.rows;
+  return memoryRepository.findKnowledgeBySimilarity(embedding, limit);
 }
 
 // ─── 5. Context Retrieval (for ContextBuilder integration) ───
