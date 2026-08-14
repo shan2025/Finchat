@@ -1,6 +1,10 @@
 # ADR-0003: IPFS with Blockchain Anchors
 
-- **Status**: Accepted
+> ✅ **IMPLEMENTED.** Hash chain in `services/proof.js`, IPFS pinning via Pinata in
+> `services/ipfs.js`, Solana anchoring in `services/solana.js` (devnet, not mainnet).
+> Note this is an audit-evidence layer only — it is not on the authorization path.
+
+- **Status**: Accepted — implemented (devnet)
 - **Date**: 2026-07-03
 - **Deciders**: Platform Architecture Team
 - **Technical Domain**: Decentralized Storage & Audit Trail

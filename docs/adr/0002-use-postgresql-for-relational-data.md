@@ -1,6 +1,10 @@
 # ADR-0002: PostgreSQL Database Selection
 
-- **Status**: Accepted
+> ✅ **IMPLEMENTED.** PostgreSQL is live on Supabase, with pgvector serving the vector
+> workload (this ADR's companion choice of a separate vector DB was not taken —
+> see [CURRENT_ARCHITECTURE.md](../CURRENT_ARCHITECTURE.md)).
+
+- **Status**: Accepted — implemented
 - **Date**: 2026-07-03
 - **Deciders**: Platform Architecture Team
 - **Technical Domain**: Relational Database & Audit Trail

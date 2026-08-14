@@ -1,6 +1,12 @@
 # ADR-0001: FastAPI Framework Selection
 
-- **Status**: Accepted
+> ⚠ **NOT IMPLEMENTED.** This decision was never carried out. The backend is Node.js +
+> Express (`finchat/legacy_prototype/backend`). The FastAPI attempt was abandoned and
+> now sits dead in `finchat/_ARCHIVED_api/`. Retained as a historical record of the
+> reasoning; do not treat it as describing the current stack. See
+> [CURRENT_ARCHITECTURE.md](../CURRENT_ARCHITECTURE.md).
+
+- **Status**: Superseded — decision reversed in practice, never implemented
 - **Date**: 2026-07-03
 - **Deciders**: Platform Architecture Team
 - **Technical Domain**: Backend Services

@@ -1,8 +1,30 @@
+> ## ⚠ THIS IS A TARGET DESIGN, NOT A DESCRIPTION OF THE SYSTEM
+>
+> **For what actually runs, read [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).**
+>
+> This document describes an intended future architecture. Significant parts of it were
+> never built and, as of 2026-08-13, conflict with the running system:
+>
+> | This document says | Reality |
+> |---|---|
+> | FastAPI API gateway | Node.js + Express |
+> | React frontend | Static HTML + vanilla JS |
+> | Qdrant vector DB | pgvector inside PostgreSQL |
+> | Kubernetes scaling layout, HA strategy | One Render container |
+>
+> The "Approvals" table below (CTO / VP Engineering / CISO signatures) is **template
+> boilerplate produced when this document was generated. Those approvals did not occur
+> and those people are not real.** Do not cite this document as evidence of review,
+> sign-off, or compliance, and do not share it externally in its current form.
+>
+> Retained because the target design — Plato orchestrator over governance, token, agent
+> and memory layers — is still the direction of travel.
+
 # System Architecture Document (SAD)
 **Document Reference: FC-SAD-001**  
 **Version: 1.0.0-RC**  
 **Date: July 3, 2026**  
-**Status: APPROVED**  
+**Status: TARGET / ASPIRATIONAL — NOT IMPLEMENTED AS WRITTEN**  
 **Classification: INTERNAL ONLY**  
 
 ---
