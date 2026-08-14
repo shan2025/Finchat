@@ -55,14 +55,32 @@ function genId(prefix = 'tc') {
 const ADVANCED_SYSTEM_TOOLS = new Set(['bash', 'file_read', 'file_write', 'file_edit', 'glob']);
 
 /**
+ * Tools that reach the host directly — BashTool shells out via child_process.exec,
+ * the file tools write to the real filesystem. Holding one of these is equivalent
+ * to holding a host shell, so they are DENY-BY-DEFAULT (P0-1): an agent may use
+ * them only with an explicit `allowed = 1` row, and every other answer is a denial.
+ *
+ * The permissive Sprint 1 defaults below still apply to every other tool.
+ */
+const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
+
+/** The one agent permitted to hold host-access tools. Must match migration 026. */
+const ADMIN_AGENT_ID = 'plato';
+
+/**
  * Check if an agent has permission to use a given tool.
  * For Sprint 1: if no explicit permission row exists, allow by default (permissive mode).
+ * Host-access tools invert that default — see HOST_ACCESS_TOOLS.
  */
 async function checkPermission(agentId, toolName) {
-  if (!agentId) return true; // System-level calls are always allowed
+  const hostAccess = HOST_ACCESS_TOOLS.has(toolName);
 
-  // Hardcode restriction: Only plato can use advanced system tools for now
-  if (ADVANCED_SYSTEM_TOOLS.has(toolName) && agentId !== 'plato') {
+  // Host access is never ambient: a call with no agent identity carries no grant
+  // to check, so it is denied rather than waved through as a system-level call.
+  if (!agentId) return !hostAccess;
+
+  // Hardcode restriction: Only the admin agent can use advanced system tools for now
+  if (ADVANCED_SYSTEM_TOOLS.has(toolName) && agentId !== ADMIN_AGENT_ID) {
     return false;
   }
 
@@ -71,9 +89,16 @@ async function checkPermission(agentId, toolName) {
       'SELECT allowed FROM tool_permissions WHERE agent_id = $1 AND tool_name = $2',
       [agentId, toolName]
     );
-    if (res.rows.length === 0) return true; // No row = allowed by default in Sprint 1
+    // No row: still allowed by default in Sprint 1, except for host-access tools,
+    // which require a grant to exist — so a newly added agent starts with none.
+    if (res.rows.length === 0) return !hostAccess;
     return res.rows[0].allowed === 1;
-  } catch {
+  } catch (err) {
+    if (hostAccess) {
+      // Fail CLOSED. A database outage must not hand out shell access.
+      console.error(`🔒 ToolManager: permission lookup failed for "${toolName}" (${agentId}) — denying: ${err.message}`);
+      return false;
+    }
     return true; // Fail open for Sprint 1
   }
 }
@@ -248,4 +273,7 @@ async function logToolResult(callId, output, error, cached, durationMs) {
   }
 }
 
-module.exports = { executeTool, checkPermission, checkRateLimit, ApprovalRequiredError };
+module.exports = {
+  executeTool, checkPermission, checkRateLimit, ApprovalRequiredError,
+  HOST_ACCESS_TOOLS, ADMIN_AGENT_ID
+};
