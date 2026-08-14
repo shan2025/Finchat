@@ -112,6 +112,69 @@ function buildPreferenceDirective(prefs) {
     `If the user's current message contradicts one, the current message wins.`;
 }
 
+// Character budget for the whole tool-results block.
+//
+// This block used to be unbounded: every tool result was JSON.stringify'd in
+// full and concatenated. A five-source research mission built a 32,667-char
+// request, which Groq answered with 413, and inference.js then rescued it by
+// capping EVERY message at 12000 (then 4000) chars — blind truncation applied
+// equally to the agent's instructions. The run burned 37k tokens on retries
+// and never wrote its report.
+//
+// Budgeting here instead means the request is the right size on the first
+// attempt, on any provider, and the truncation is deliberate rather than an
+// emergency measure applied to whatever happened to be longest.
+const TOOL_BLOCK_BUDGET = parseInt(process.env.TOOL_CONTEXT_BUDGET_CHARS || '12000', 10);
+
+// Never drop a tool entirely. A result trimmed to nothing reads to the model
+// as "that tool returned nothing", which invites it to call the tool again —
+// the exact loop the "NEVER call a tool that already has a result" rule exists
+// to prevent.
+const MIN_PER_TOOL = 300;
+
+/**
+ * Fit tool results into a fixed character budget.
+ *
+ * Allocation is fair-share, smallest first: a tool that needs less than its
+ * share releases the remainder to the larger ones. A single enormous search
+ * result therefore cannot crowd out the four other sources — which is what
+ * naive head-truncation of the concatenated block would do.
+ *
+ * @param {Array<{tool: string, result: *}>} toolResults
+ * @param {number} [budget] - total characters available
+ * @returns {string}
+ */
+function packToolResults(toolResults, budget = TOOL_BLOCK_BUDGET) {
+  const entries = toolResults.map(tr => ({
+    tool: tr.tool,
+    text: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
+  }));
+  if (!entries.length) return '';
+
+  const render = (e, text) => `[Tool: ${e.tool}] Result: ${text}`;
+  const total = entries.reduce((n, e) => n + e.text.length, 0);
+  if (total <= budget) return entries.map(e => render(e, e.text)).join('\n');
+
+  const caps = new Map();
+  let remaining = budget;
+  let claimants = entries.length;
+  // Ascending, so satisfied-in-full results hand their slack to the big ones.
+  for (const e of [...entries].sort((a, b) => a.text.length - b.text.length)) {
+    const fair = Math.max(MIN_PER_TOOL, Math.floor(remaining / claimants));
+    const take = Math.min(e.text.length, fair);
+    caps.set(e, take);
+    remaining -= take;
+    claimants--;
+  }
+
+  return entries.map(e => {
+    const cap = caps.get(e);
+    if (e.text.length <= cap) return render(e, e.text);
+    const dropped = e.text.length - cap;
+    return render(e, `${e.text.slice(0, cap)}…[${dropped} more chars trimmed to fit the context budget]`);
+  }).join('\n');
+}
+
 /**
  * Build the full message array for the LLM inference call.
  *
@@ -202,9 +265,7 @@ function buildContext({
 
   // 3. Tool results from previous iterations
   if (toolResults.length > 0) {
-    const toolBlock = toolResults.map(tr =>
-      `[Tool: ${tr.tool}] Result: ${typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)}`
-    ).join('\n');
+    const toolBlock = packToolResults(toolResults);
     messages.push({
       role: 'system',
       content:
@@ -239,6 +300,8 @@ function buildContext({
 
 module.exports = {
   buildContext,
+  packToolResults,
+  TOOL_BLOCK_BUDGET,
   buildTraitDirective,
   buildPreferenceDirective,
   getActionSchema,
