@@ -33,7 +33,14 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '10mb' }));
+// `verify` stashes the unparsed body. Meta signs the exact bytes it sent
+// (X-Hub-Signature-256), so routes/whatsappWebhook.js cannot re-serialise
+// req.body to check it — key order and spacing would differ and every
+// legitimate webhook would look forged.
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files statically
@@ -73,6 +80,9 @@ app.use('/api/mind-maps', require('./routes/mindMaps'));
 // External-scheduler triggers (shared-secret auth, not user JWT) — lets missions
 // and briefings fire on a host that sleeps when idle. See routes/cron.js.
 app.use('/api/cron', require('./routes/cron'));
+// Inbound WhatsApp (provider-signed, no user JWT). Carries the link
+// confirmations and the 24-hour-window clock. See routes/whatsappWebhook.js.
+app.use('/api/whatsapp', require('./routes/whatsappWebhook'));
 
 // ── EventBus → Socket.io Real-Time Agent Pulse ───────────────
 const { eventBus } = require('./services/cognitive/EventBus');

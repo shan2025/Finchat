@@ -27,11 +27,15 @@ async function getPrefs(userId) {
 async function savePrefs(userId, prefs) {
   const cols = ['channel_inapp', 'channel_email', 'email_to', 'channel_whatsapp', 'whatsapp_to',
     'channel_telegram', 'telegram_chat_id', 'channel_sms', 'sms_to', 'channel_push',
-    'push_subscription', 'muted_types'];
+    'push_subscription', 'muted_types',
+    // Migration 027 — WhatsApp link state. Written by the inbound webhook, not
+    // by the user, so routes/settings.js keeps these out of its allowed list.
+    'whatsapp_provider', 'whatsapp_verified', 'whatsapp_last_inbound_at'];
   // Defaults keep NOT NULL columns satisfied when a field was never set.
   const DEFAULTS = {
     channel_inapp: true, channel_email: false, channel_whatsapp: false,
     channel_telegram: false, channel_sms: false, channel_push: false,
+    whatsapp_verified: false,
     muted_types: '[]'
   };
   const existing = await getPrefs(userId);
@@ -57,7 +61,10 @@ async function savePrefs(userId, prefs) {
 function channelConfigStatus() {
   return {
     email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
-    whatsapp: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM),
+    // WhatsApp can be served by Twilio *or* the Meta Cloud API — ask the
+    // service which, rather than assuming the Twilio variables are the only
+    // way the channel can be configured.
+    whatsapp: require('./whatsapp').configStatus().configured,
     sms: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_SMS_FROM),
     telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     // Reflect reality rather than assuming: getVapidKeys() returns null when the
@@ -120,6 +127,16 @@ async function sendEmail(to, subject, text, html) {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: process.env.SMTP_PORT === '465',
+    // Force IPv4. smtp.gmail.com resolves to both A and AAAA records, and on a
+    // host with no IPv6 route Node picks the AAAA and the connection dies with
+    // "connect ENETUNREACH 2607:f8b0:...:587" — surfacing in the delivery log
+    // as a bare "Connection timeout" on every single email.
+    family: 4,
+    // Without these nodemailer waits on the OS default, so an unreachable
+    // address hangs the dispatch loop for minutes per notification.
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
   });
   await transporter.sendMail({
@@ -140,9 +157,11 @@ async function twilioSend(to, from, body) {
   return { status: 'sent' };
 }
 
+// Freeform WhatsApp text. Delegates to services/whatsapp.js, which picks the
+// provider, normalises the number and splits long reports. Callers that need
+// the 24-hour-window fallback should use its sendNotification instead.
 async function sendWhatsApp(to, body) {
-  if (!channelConfigStatus().whatsapp) return { status: 'unconfigured', detail: 'TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_FROM not set in .env' };
-  return twilioSend(`whatsapp:${to}`, `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`, body);
+  return require('./whatsapp').sendText(to, body);
 }
 
 async function sendSMS(to, body) {
@@ -256,7 +275,12 @@ async function dispatchToChannels(n) {
       prefs.email_to, `FinChat: ${n.title}`, text, toEmailHtml(n.title, n.content || ''))]);
   }
   if (prefs.channel_whatsapp && prefs.whatsapp_to) {
-    attempts.push(['whatsapp', prefs.whatsapp_to, () => sendWhatsApp(prefs.whatsapp_to, text)]);
+    // Not sendWhatsApp: a scheduled briefing usually lands outside WhatsApp's
+    // 24-hour freeform window, where only an approved template gets through.
+    // sendNotification picks freeform or template and explains the outcome.
+    attempts.push(['whatsapp', prefs.whatsapp_to, () => require('./whatsapp').sendNotification(prefs, {
+      title: n.title, body, summary: toSnippet(n.content, 400)
+    })]);
   }
   if (prefs.channel_sms && prefs.sms_to) {
     attempts.push(['sms', prefs.sms_to, () => sendSMS(prefs.sms_to, `${n.title}\n${toSnippet(n.content, 260)}`)]);
