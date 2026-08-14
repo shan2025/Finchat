@@ -5,7 +5,7 @@ const TOOLS = {
   search: {
     name: 'search',
     web: true, // open-web tool — gated by the chat composer's WEB toggle
-    description: 'Search the web for current information. Use this when you need up-to-date facts, news, or data that you do not already know.',
+    description: 'Search the web for current information. Use this when you need up-to-date facts, news, or data that you do not already know. If the result has "searchUnavailable": true, the search tool itself is broken — report that outage to the user and never claim the subject was not found or does not exist. If the result has "degraded": true, the results came from a limited Wikipedia-only fallback — say so when you answer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -394,7 +394,10 @@ const TOOLS = {
 
   bash: {
     name: 'bash',
-    description: 'Execute a shell command inside the Node backend environment (sandboxed to the Docker container). Use this to run scripts, interact with the system, or run builds. Input: {"command":"..."}',
+    // NOT sandboxed — the previous wording claimed a Docker container that does not
+    // exist (P0-1). This text goes into the system prompt and onto the human approval
+    // card, so it must not imply containment that isn't there.
+    description: 'Execute a shell command directly on the backend HOST with the server\'s own privileges. There is no sandbox, no command allowlist and no filesystem confinement. Restricted to the admin agent and gated on human approval. Input: {"command":"..."}',
     requires_approval: true,
     inputSchema: {
       type: 'object',
