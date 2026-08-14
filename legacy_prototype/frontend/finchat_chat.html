@@ -54,7 +54,15 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
   .markdown-body pre code { background: transparent; padding: 0; }
   .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
   .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
-  
+  /* Tables had no rules at all, so they were squeezed to the bubble width and the
+     bubble's word-break:break-word then split words mid-character ("Accessib ility").
+     width:max-content lets columns take their natural size; max-width + overflow-x
+     means a wide table scrolls inside its own box instead of crushing its columns. */
+  .markdown-body table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0.6em 0; font-size: 13.5px; }
+  .markdown-body th, .markdown-body td { padding: 7px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; word-break: normal; overflow-wrap: break-word; hyphens: none; }
+  .markdown-body th { font-weight: 600; background: rgba(0,0,0,0.045); white-space: nowrap; }
+  .markdown-body tbody tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+
   .bot .bubble.markdown-body a { color: #4a3828; text-decoration-color: rgba(74, 56, 40, 0.4); }
   .bot .bubble.markdown-body a:hover { text-decoration-color: #4a3828; }
   .user .bubble.markdown-body a { color: #efe8de; text-decoration-color: rgba(239, 232, 222, 0.4); }
