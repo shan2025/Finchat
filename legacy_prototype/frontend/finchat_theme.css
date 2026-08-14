@@ -18,6 +18,13 @@
    ========================================================================== */
 
 :root {
+  /* Tell the browser this page themes itself. Without it, Samsung Internet /
+     Edge / Opera's built-in "dark mode for websites" assumes the page is
+     light-only and algorithmically recolours everything — which is why the
+     rail and buttons come out the wrong browns on those browsers while
+     Chrome (no such rewriter) looks right. */
+  color-scheme: light;
+
   /* --- channels ----------------------------------------------------------
      Colours are authored as raw RGB channels so Tailwind can apply opacity
      modifiers to them (`bg-cream-bg/50` compiles to
@@ -90,6 +97,8 @@
    Opt in with <html data-theme="dark">.
    ------------------------------------------------------------------------- */
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   /* Only the channels are restated — the rgb() tokens above resolve from them,
      so dark mode stays a single list of numbers. */
   --bg-rgb:          18  16  12;
