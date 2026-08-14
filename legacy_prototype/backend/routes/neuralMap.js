@@ -253,12 +253,22 @@ router.get('/', requireAuth, async (req, res) => {
         query(`SELECT ac.agent_id, a.name, ac.capabilities, ac.tools, ac.runtime_settings, ac.memory_namespace
                FROM agent_configs ac JOIN agents a ON a.agent_id = ac.agent_id
                ORDER BY ac.agent_id`),
+        // The knowledge layer is PER USER. This used to select every active entity
+        // with no owner filter, which is why every account opened the identical
+        // "master" map and saw topics mined from other people's chats. Rows with a
+        // NULL user_id are pre-ownership legacy data and belong to nobody, so they
+        // stay hidden rather than being shown to everyone.
         query(`SELECT entity_id, canonical_name, entity_type, mention_count,
                       summary, importance, confidence, activation_count, last_activated_at, owner_agent, community_id
-               FROM entities WHERE status = 'active'
-               ORDER BY importance DESC, mention_count DESC LIMIT 120`),
-        query(`SELECT from_entity_id, to_entity_id, edge_type, weight, strength, reason, source
-               FROM entity_edges ORDER BY strength DESC, weight DESC LIMIT 400`),
+               FROM entities WHERE status = 'active' AND user_id = $1
+               ORDER BY importance DESC, mention_count DESC LIMIT 120`, [userId]),
+        // Edges are constrained to those whose BOTH endpoints belong to this user,
+        // so a legacy cross-user edge cannot drag a foreign node onto the map.
+        query(`SELECT ee.from_entity_id, ee.to_entity_id, ee.edge_type, ee.weight, ee.strength, ee.reason, ee.source
+               FROM entity_edges ee
+               JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1
+               JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1
+               ORDER BY ee.strength DESC, ee.weight DESC LIMIT 400`, [userId]),
         query(`SELECT COUNT(*)::int AS total_blocks,
                       COUNT(*) FILTER (WHERE solana_confirmed = 1)::int AS anchored,
                       COALESCE(MAX(chain_height), 0) AS max_height

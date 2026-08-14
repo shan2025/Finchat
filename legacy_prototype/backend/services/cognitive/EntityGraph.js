@@ -54,29 +54,36 @@ async function extractEntities(text) {
  * handles the (canonical_name, entity_type) unique constraint if a different
  * id was previously generated for the same name+type, by re-reading.
  */
-async function upsertEntity({ name, type }) {
+async function upsertEntity({ name, type, userId = null }) {
   const canonical = name.trim();
   const t = (type || 'topic').toLowerCase();
-  const id = `ent_${t}_${canonical.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}`;
+  // The id MUST include the owner. It used to be derived from name+type alone, so
+  // two users mentioning "Bitcoin" produced the same entity_id and collided on the
+  // primary key — one shared node for everyone, which is how the graph (and the
+  // neural map derived from it) ended up identical across accounts.
+  const ownerTag = userId ? String(userId).replace(/[^a-zA-Z0-9]+/g, '').slice(0, 24) : 'anon';
+  const id = `ent_${ownerTag}_${t}_${canonical.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await query(`
-        INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at)
-        VALUES ($1, $2, $3, 1, now())
+        INSERT INTO entities (entity_id, canonical_name, entity_type, user_id, mention_count, last_seen_at)
+        VALUES ($1, $2, $3, $4, 1, now())
         ON CONFLICT (entity_id) DO UPDATE
           SET mention_count = entities.mention_count + 1,
               last_seen_at = now()
-      `, [id, canonical, t]);
+      `, [id, canonical, t, userId]);
 
       return id; // success — the id we generated is the row's id
     } catch (err) {
-      // If it's a unique constraint violation on (canonical_name, entity_type),
-      // the row exists with a different entity_id. Re-read and return that.
+      // Unique violation on (user_id, canonical_name, entity_type): this user already
+      // has the node under a different id (e.g. one created before ids were scoped).
+      // Re-read THEIR row — never another user's.
       if (err.message && err.message.includes('duplicate key') && attempt === 0) {
         const r = await query(
-          `SELECT entity_id FROM entities WHERE canonical_name = $1 AND entity_type = $2`,
-          [canonical, t]
+          `SELECT entity_id FROM entities
+            WHERE canonical_name = $1 AND entity_type = $2 AND user_id IS NOT DISTINCT FROM $3`,
+          [canonical, t, userId]
         );
         if (r.rows[0]?.entity_id) {
           // Bump its mention count while we're here
@@ -92,10 +99,11 @@ async function upsertEntity({ name, type }) {
     }
   }
 
-  // Fallback: re-read whatever is there
+  // Fallback: re-read whatever is there for THIS user
   const r = await query(
-    `SELECT entity_id FROM entities WHERE canonical_name = $1 AND entity_type = $2`,
-    [canonical, t]
+    `SELECT entity_id FROM entities
+      WHERE canonical_name = $1 AND entity_type = $2 AND user_id IS NOT DISTINCT FROM $3`,
+    [canonical, t, userId]
   );
   return r.rows[0]?.entity_id || id;
 }
@@ -124,10 +132,13 @@ async function ingestExecution(execution) {
   const raw = await extractEntities(text);
   if (raw.length === 0) return [];
 
+  // The execution knows who it belongs to; everything it produces is theirs.
+  const userId = execution.user_id || execution.userId || null;
+
   const ids = [];
   for (const e of raw) {
     try {
-      const id = await upsertEntity(e);
+      const id = await upsertEntity({ ...e, userId });
       if (id) ids.push(id);
     } catch (err) {
       console.warn(`⚠️ EntityGraph upsertEntity failed for "${e.name}": ${err.message}`);
@@ -141,13 +152,13 @@ async function ingestExecution(execution) {
         await upsertEdge({
           fromId: ids[i], toId: ids[j],
           edgeType: 'co_mentioned',
-          userId: null,
+          userId, // was hardcoded null — that is why 4,632 of 4,646 edges had no owner
           executionId: execution.execution_id
         });
         await upsertEdge({
           fromId: ids[j], toId: ids[i],
           edgeType: 'co_mentioned',
-          userId: null,
+          userId, // was hardcoded null — that is why 4,632 of 4,646 edges had no owner
           executionId: execution.execution_id
         });
       } catch (err) {
@@ -167,9 +178,12 @@ async function ingestExecution(execution) {
  * @param {string}  text      - Goal / query text
  * @param {number}  limit     - Max neighbor results (anchors always included)
  * @param {string|null} agentName - Current agent id; owned nodes are boosted
+ * @param {string|null} userId    - Owner scope. Only this user's graph is walked;
+ *                                  without it an agent could recall another user's
+ *                                  topics as if they were this user's memory.
  * Returns [{entity_id, name, type, viaEdge, weight}], anchors first.
  */
-async function findRelatedForText(text, limit = 8, agentName = null) {
+async function findRelatedForText(text, limit = 8, agentName = null, userId = null) {
   if (!text) return [];
 
   const anchors = await query(`
@@ -177,18 +191,20 @@ async function findRelatedForText(text, limit = 8, agentName = null) {
     FROM entities
     WHERE $1 ILIKE '%' || canonical_name || '%'
       AND status = 'active'
+      AND user_id IS NOT DISTINCT FROM $2
     ORDER BY mention_count DESC
     LIMIT 6
-  `, [text]);
+  `, [text, userId]);
   if (anchors.rows.length === 0) return [];
 
   const anchorIds = anchors.rows.map(r => r.entity_id);
   const N = anchorIds.length;
-  // Params: $1..$N = anchorIds, $N+1 = agentName, $N+2 = limit
+  // Params: $1..$N = anchorIds, $N+1 = agentName, $N+2 = limit, $N+3 = userId
   const inList  = anchorIds.map((_, i) => `$${i + 1}`).join(',');
   const agentP  = `$${N + 1}`;
   const limitP  = `$${N + 2}`;
-  const params  = [...anchorIds, agentName, Math.max(1, Math.min(20, limit))];
+  const userP   = `$${N + 3}`;
+  const params  = [...anchorIds, agentName, Math.max(1, Math.min(20, limit)), userId];
 
   // 2-hop CTE:
   //   hop1 score = strength × confidence × weight  (falls back gracefully when
@@ -206,6 +222,7 @@ async function findRelatedForText(text, limit = 8, agentName = null) {
       WHERE ee.from_entity_id IN (${inList})
         AND ee.to_entity_id   NOT IN (${inList})
         AND e.status = 'active'
+        AND e.user_id IS NOT DISTINCT FROM ${userP}
     ),
     hop2 AS (
       SELECT e.entity_id, e.canonical_name, e.entity_type, ee2.edge_type AS via,
@@ -216,6 +233,7 @@ async function findRelatedForText(text, limit = 8, agentName = null) {
       JOIN entities e ON e.entity_id = ee2.to_entity_id
       WHERE ee2.to_entity_id NOT IN (${inList})
         AND e.status = 'active'
+        AND e.user_id IS NOT DISTINCT FROM ${userP}
     ),
     ranked AS (
       SELECT entity_id, canonical_name, entity_type, via,

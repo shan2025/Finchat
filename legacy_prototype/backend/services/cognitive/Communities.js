@@ -84,16 +84,37 @@ async function nameCluster(memberNames, fallback) {
  * @param {boolean} [opts.name=true]   - run the LLM naming pass
  * @returns {Promise<{communities, clustered, singletons}>}
  */
-async function detectCommunities({ minSize = 3, name = true } = {}) {
+/**
+ * Drop community rows no entity points at any more. This replaces the old
+ * `DELETE FROM graph_communities`, which was safe only while the graph was
+ * global and destroys other users' clusters once it is not.
+ */
+async function pruneOrphanCommunities() {
+  await query(`
+    DELETE FROM graph_communities gc
+    WHERE NOT EXISTS (
+      SELECT 1 FROM entities e WHERE e.community_id = gc.community_id
+    )
+  `);
+}
+
+/**
+ * Clusters ONE user's graph. Previously this ran over every entity on the
+ * instance, so clusters spanned accounts and one person's topics coloured
+ * another person's map. Every read and every reset below is user-scoped.
+ */
+async function detectCommunities({ minSize = 3, name = true, userId = null } = {}) {
   const entsQ = await query(`
     SELECT entity_id, canonical_name, importance
-    FROM entities WHERE status = 'active'
-  `);
+    FROM entities WHERE status = 'active' AND user_id IS NOT DISTINCT FROM $1
+  `, [userId]);
   const nodes = entsQ.rows;
   if (nodes.length < minSize) {
-    // Not enough graph to cluster — clear any stale assignments and bail.
-    await query(`UPDATE entities SET community_id = NULL WHERE community_id IS NOT NULL`);
-    await query(`DELETE FROM graph_communities`);
+    // Not enough graph to cluster — clear this user's stale assignments and bail.
+    await query(
+      `UPDATE entities SET community_id = NULL WHERE community_id IS NOT NULL AND user_id IS NOT DISTINCT FROM $1`,
+      [userId]);
+    await pruneOrphanCommunities();
     return { communities: [], clustered: 0, singletons: nodes.length };
   }
 
@@ -102,9 +123,14 @@ async function detectCommunities({ minSize = 3, name = true } = {}) {
   const impById = new Map(nodes.map(n => [n.entity_id, Number(n.importance) || 0]));
   const idSet = new Set(nodeIds);
 
+  // Only edges whose endpoints are both in this user's node set matter; addEdge
+  // drops anything outside idSet anyway, but filtering here keeps the scan small.
   const edgesQ = await query(`
-    SELECT from_entity_id, to_entity_id, strength, weight FROM entity_edges
-  `);
+    SELECT ee.from_entity_id, ee.to_entity_id, ee.strength, ee.weight
+    FROM entity_edges ee
+    JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id IS NOT DISTINCT FROM $1
+    JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id IS NOT DISTINCT FROM $1
+  `, [userId]);
   const adjacency = new Map(nodeIds.map(id => [id, new Map()]));
   const addEdge = (a, b, w) => {
     if (!idSet.has(a) || !idSet.has(b) || a === b) return;
@@ -132,9 +158,14 @@ async function detectCommunities({ minSize = 3, name = true } = {}) {
   const kept = [...groups.values()].filter(g => g.length >= minSize)
     .sort((a, b) => b.length - a.length);
 
-  // Rebuild persistence from scratch (idempotent; content-addressed ids).
-  await query(`UPDATE entities SET community_id = NULL WHERE community_id IS NOT NULL`);
-  await query(`DELETE FROM graph_communities`);
+  // Rebuild persistence for THIS user (idempotent; content-addressed ids).
+  // The old code wiped entities.community_id and the whole graph_communities
+  // table globally, so running detection for one user destroyed every other
+  // user's clusters. Reset only this user's rows, then drop rows nobody points at.
+  await query(
+    `UPDATE entities SET community_id = NULL WHERE community_id IS NOT NULL AND user_id IS NOT DISTINCT FROM $1`,
+    [userId]);
+  await pruneOrphanCommunities();
 
   const communities = [];
   let clustered = 0;

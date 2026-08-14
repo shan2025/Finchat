@@ -219,7 +219,9 @@ async function retrieveEnrichedContext({ userId, conversationId, goal, agentName
   try {
     if (goal) {
       const { findRelatedForText } = require('./EntityGraph');
-      graphContext = await findRelatedForText(goal, 6, agentName || null);
+      // userId scopes the walk to this user's own graph — without it, retrieval
+      // could surface another account's topics as this user's memory.
+      graphContext = await findRelatedForText(goal, 6, agentName || null, userId || null);
       // Cognitive Memory Engine: the nodes used to answer "light up" —
       // fire-and-forget so retrieval latency is untouched.
       const activatedIds = graphContext.map(g => g.entity_id).filter(Boolean);

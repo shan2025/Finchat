@@ -21,7 +21,12 @@ const { dream, detectGaps, ingestDocument } = require('../services/cognitive/Mem
 router.get('/nodes/:entityId', requireAuth, async (req, res) => {
   try {
     const { entityId } = req.params;
-    const entQ = await query(`SELECT * FROM entities WHERE entity_id = $1`, [entityId]);
+    // Ownership is part of the lookup, not a check afterwards: without it any user
+    // could read any node just by knowing its id. A node you do not own is a 404,
+    // not a 403 — existence itself is not yours to learn.
+    const entQ = await query(
+      `SELECT * FROM entities WHERE entity_id = $1 AND user_id = $2`,
+      [entityId, req.user.id]);
     if (entQ.rows.length === 0) return res.status(404).json({ error: 'Node not found' });
     const ent = entQ.rows[0];
 
@@ -235,20 +240,20 @@ router.get('/cortex/:agentId', requireAuth, async (req, res) => {
         SELECT entity_id, canonical_name, entity_type, importance, confidence,
                activation_count, last_activated_at, mention_count
         FROM entities
-        WHERE owner_agent = $1 AND status = 'active'
+        WHERE owner_agent = $1 AND status = 'active' AND user_id = $2
         ORDER BY importance DESC, activation_count DESC
         LIMIT 50
-      `, [agentId]),
+      `, [agentId, req.user.id]),
       query(`
         SELECT e.canonical_name AS node, COUNT(*) AS connections,
                SUM(ee.weight) AS total_weight
         FROM entities e
         JOIN entity_edges ee ON ee.from_entity_id = e.entity_id
-        WHERE e.owner_agent = $1 AND e.status = 'active'
+        WHERE e.owner_agent = $1 AND e.status = 'active' AND e.user_id = $2
         GROUP BY e.canonical_name
         ORDER BY total_weight DESC
         LIMIT 10
-      `, [agentId])
+      `, [agentId, req.user.id])
     ]);
     res.json({
       agentId,
@@ -332,6 +337,7 @@ router.post('/communities/detect', requireAuth, async (req, res) => {
   try {
     const { detectCommunities } = require('../services/cognitive/Communities');
     const result = await detectCommunities({
+      userId: req.user.id,
       minSize: Math.max(2, parseInt(req.body?.minSize) || 3),
       name: req.body?.name !== false
     });
@@ -346,18 +352,18 @@ router.post('/communities/detect', requireAuth, async (req, res) => {
 router.get('/stats', requireAuth, async (req, res) => {
   try {
     const [nodesQ, edgesQ, eventsQ, hotQ, freshQ] = await Promise.all([
-      query(`SELECT COUNT(*)::int AS n FROM entities WHERE status = 'active'`),
-      query(`SELECT COUNT(*)::int AS n FROM entity_edges`),
-      query(`SELECT COUNT(*)::int AS n FROM node_events`),
+      query(`SELECT COUNT(*)::int AS n FROM entities WHERE status = 'active' AND user_id = $1`, [req.user.id]),
+      query(`SELECT COUNT(*)::int AS n FROM entity_edges WHERE user_id = $1`, [req.user.id]),
+      query(`SELECT COUNT(*)::int AS n FROM node_events WHERE user_id = $1`, [req.user.id]),
       query(`
         SELECT entity_id, canonical_name, activation_count FROM entities
-        WHERE status = 'active' AND activation_count > 0
+        WHERE status = 'active' AND activation_count > 0 AND user_id = $1
         ORDER BY activation_count DESC LIMIT 5
-      `),
+      `, [req.user.id]),
       query(`
         SELECT entity_id, canonical_name, created_at FROM entities
-        WHERE status = 'active' ORDER BY created_at DESC LIMIT 5
-      `)
+        WHERE status = 'active' AND user_id = $1 ORDER BY created_at DESC LIMIT 5
+      `, [req.user.id])
     ]);
     res.json({
       nodes: nodesQ.rows[0].n,
@@ -400,14 +406,14 @@ router.get('/memory/overview', requireAuth, async (req, res) => {
       procedural, recipes,
       semantic, knowledgeDocs, embeddings, reflections
     ] = await Promise.all([
-      safeScalar(`SELECT COUNT(*) FROM entities WHERE status = 'active'`),
-      safeScalar(`SELECT COUNT(*) FROM entity_edges`),
-      safeScalar(`SELECT COUNT(*) FROM node_events`),
-      safeScalar(`SELECT COUNT(*) FROM executions WHERE current_state = 'completed'`),
-      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'episodic'`),
-      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'procedural'`),
+      safeScalar(`SELECT COUNT(*) FROM entities WHERE status = 'active' AND user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM entity_edges WHERE user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM node_events WHERE user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM executions WHERE current_state = 'completed' AND user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'episodic' AND user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'procedural' AND user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM skill_recipes`),
-      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'semantic'`),
+      safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'semantic' AND user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM knowledge`),
       safeScalar(`SELECT COUNT(*) FROM knowledge_embeddings`),
       safeScalar(`SELECT COUNT(*) FROM reflections`)
@@ -503,19 +509,19 @@ router.get('/agents/overview', requireAuth, async (req, res) => {
              ROUND(AVG(importance)::numeric, 1)  AS avg_importance,
              MAX(last_activated_at)              AS last_active
       FROM entities
-      WHERE status = 'active' AND owner_agent IS NOT NULL
+      WHERE status = 'active' AND owner_agent IS NOT NULL AND user_id = $1
       GROUP BY owner_agent
       ORDER BY node_count DESC
       LIMIT 20
-    `);
+    `, [req.user.id]);
     // Top concept per agent (best-effort, one extra query per agent is fine at ≤20).
     const agents = [];
     for (const row of q.rows) {
       const topQ = await query(`
         SELECT canonical_name FROM entities
-        WHERE owner_agent = $1 AND status = 'active'
+        WHERE owner_agent = $1 AND status = 'active' AND user_id = $2
         ORDER BY activation_count DESC, importance DESC LIMIT 3
-      `, [row.agent_id]);
+      `, [row.agent_id, req.user.id]);
       agents.push({ ...row, topConcepts: topQ.rows.map(r => r.canonical_name) });
     }
     const totalNodes = agents.reduce((s, a) => s + a.node_count, 0) || 1;

@@ -310,10 +310,10 @@ router.get('/:agentId/audit', requireAuth, async (req, res) => {
 router.get('/memory-graph', requireAuth, async (req, res) => {
   try {
     const [ents, edges, recipes, topEnts] = await Promise.all([
-      query(`SELECT COUNT(*)::int AS c FROM entities`),
-      query(`SELECT COUNT(*)::int AS c FROM entity_edges`),
+      query(`SELECT COUNT(*)::int AS c FROM entities WHERE user_id = $1`, [req.user.id]),
+      query(`SELECT COUNT(*)::int AS c FROM entity_edges WHERE user_id = $1`, [req.user.id]),
       query(`SELECT COUNT(*)::int AS c, COALESCE(SUM(times_reused),0)::int AS reuses FROM skill_recipes`),
-      query(`SELECT canonical_name, entity_type, mention_count FROM entities ORDER BY mention_count DESC LIMIT 6`)
+      query(`SELECT canonical_name, entity_type, mention_count FROM entities WHERE user_id = $1 ORDER BY mention_count DESC LIMIT 6`, [req.user.id])
     ]);
     res.json({
       entities: ents.rows[0].c,

@@ -335,7 +335,7 @@ async function generateFromTopic(userId, topic, opts = {}) {
 
   // Give the model whatever the user already knows about this, so the map
   // extends their graph instead of restating a generic outline.
-  const known = await relatedContext(cleanTopic);
+  const known = await relatedContext(cleanTopic, userId);
   const prompt = `TOPIC: ${cleanTopic}` + (known ? `\n\nThe learner has already studied these related concepts — connect to them where honest, and do not re-teach them from scratch:\n${known}` : '');
 
   const { raw, provider, model } = await generateHierarchy(prompt, opts);
@@ -1011,16 +1011,22 @@ function buildSources(map, docs) {
   return out;
 }
 
-/** Concepts the user already has in the living graph, as prompt context. */
-async function relatedContext(topic) {
+/**
+ * Concepts THIS user already has in the living graph, as prompt context.
+ * The user scope is the whole point: "the learner has already studied these"
+ * is a claim about one person, and an unscoped query made it a claim about
+ * everyone on the instance.
+ */
+async function relatedContext(topic, userId = null) {
   try {
     const words = topic.toLowerCase().split(/\W+/).filter(w => w.length > 3).slice(0, 6);
     if (words.length === 0) return '';
     const res = await query(`
       SELECT canonical_name, entity_type FROM entities
-      WHERE status = 'active' AND (${words.map((_, i) => `LOWER(canonical_name) LIKE $${i + 1}`).join(' OR ')})
+      WHERE status = 'active' AND user_id IS NOT DISTINCT FROM $${words.length + 1}
+        AND (${words.map((_, i) => `LOWER(canonical_name) LIKE $${i + 1}`).join(' OR ')})
       ORDER BY importance DESC NULLS LAST, mention_count DESC LIMIT 12
-    `, words.map(w => `%${w}%`));
+    `, [...words.map(w => `%${w}%`), userId]);
     return res.rows.map(r => `- ${r.canonical_name} (${r.entity_type})`).join('\n');
   } catch (err) {
     return ''; // graph unavailable — generate from the topic alone

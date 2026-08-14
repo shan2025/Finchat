@@ -149,15 +149,16 @@ async function extractFromExchange(userText, aiText) {
  * any type. This is the duplicate gate: "python" (topic) and "Python"
  * (technology) resolve to the same node instead of forking.
  */
-async function findExisting(name) {
+async function findExisting(name, userId = null) {
   const r = await query(`
     SELECT entity_id, canonical_name, entity_type, summary, importance, confidence
     FROM entities
     WHERE status = 'active'
       AND (LOWER(canonical_name) = LOWER($1) OR aliases @> to_jsonb(ARRAY[LOWER($1)]))
+      AND user_id IS NOT DISTINCT FROM $2
     ORDER BY mention_count DESC
     LIMIT 1
-  `, [name.trim()]);
+  `, [name.trim(), userId]);
   return r.rows[0] || null;
 }
 
@@ -192,7 +193,9 @@ async function recordLink(entityId, linkType, linkRef, label) {
  * replaces an empty/shorter one. Returns { entityId, isNew }.
  */
 async function upsertLivingEntity(e, ctx = {}) {
-  const existing = await findExisting(e.name);
+  const userId = ctx.userId || null;
+  // Scoped lookup: another user's node with the same name must not be grown here.
+  const existing = await findExisting(e.name, userId);
   if (existing) {
     const newSummary = (e.summary && e.summary.length > (existing.summary || '').length) ? e.summary : existing.summary;
     await query(`
@@ -213,17 +216,20 @@ async function upsertLivingEntity(e, ctx = {}) {
   try {
     await query(`
       INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at,
-                            summary, importance, confidence, owner_agent)
-      VALUES ($1, $2, $3, 1, now(), $4, $5, $6, $7)
-      ON CONFLICT (canonical_name, entity_type) DO UPDATE
+                            summary, importance, confidence, owner_agent, user_id)
+      VALUES ($1, $2, $3, 1, now(), $4, $5, $6, $7, $8)
+      ON CONFLICT (user_id, canonical_name, entity_type) DO UPDATE
         SET mention_count = entities.mention_count + 1, last_seen_at = now()
-    `, [id, e.name, e.type, e.summary || '', e.importance, e.confidence, ctx.agentId || null]);
+    `, [id, e.name, e.type, e.summary || '', e.importance, e.confidence, ctx.agentId || null, userId]);
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.upsertLivingEntity insert failed for "${e.name}": ${err.message}`);
     return { entityId: null, isNew: false };
   }
-  // Re-read: on a (name,type) conflict the surviving id is the old row's.
-  const r = await query(`SELECT entity_id FROM entities WHERE canonical_name = $1 AND entity_type = $2`, [e.name, e.type]);
+  // Re-read: on a (user,name,type) conflict the surviving id is the old row's.
+  const r = await query(
+    `SELECT entity_id FROM entities
+      WHERE canonical_name = $1 AND entity_type = $2 AND user_id IS NOT DISTINCT FROM $3`,
+    [e.name, e.type, userId]);
   const entityId = r.rows[0]?.entity_id || id;
   await recordEvent(entityId, 'created', e.summary || `Learned about ${e.name}.`, ctx);
   return { entityId, isNew: true };
@@ -293,18 +299,22 @@ async function userNode(userId) {
   try {
     await query(`
       INSERT INTO entities (entity_id, canonical_name, entity_type, mention_count, last_seen_at,
-                            summary, importance, confidence)
-      VALUES ($1, $2, 'person', 1, now(), $3, 9, 1.0)
-      ON CONFLICT (canonical_name, entity_type) DO NOTHING
-    `, [entityId, name, 'The person this assistant works for.']);
+                            summary, importance, confidence, user_id)
+      VALUES ($1, $2, 'person', 1, now(), $3, 9, 1.0, $4)
+      ON CONFLICT (user_id, canonical_name, entity_type) DO NOTHING
+    `, [entityId, name, 'The person this assistant works for.', userId]);
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.userNode insert failed: ${err.message}`);
   }
-  // A name collision (same display name already in the graph) means that node
-  // IS this person — reuse it rather than forking.
+  // A name collision WITHIN this user's own graph means that node is this person.
+  // The name match must stay user-scoped: two accounts can share a display name,
+  // and matching across users would hand one person's node to another.
   const r = await query(
-    `SELECT entity_id FROM entities WHERE entity_id = $1 OR (canonical_name = $2 AND entity_type = 'person') LIMIT 1`,
-    [entityId, name]);
+    `SELECT entity_id FROM entities
+      WHERE entity_id = $1
+         OR (canonical_name = $2 AND entity_type = 'person' AND user_id IS NOT DISTINCT FROM $3)
+      LIMIT 1`,
+    [entityId, name, userId]);
   return r.rows[0]?.entity_id || null;
 }
 
@@ -554,8 +564,9 @@ Return {"gaps": []} if the graph has no obvious holes.`;
 async function detectGaps({ userId = null } = {}) {
   const nodes = await query(`
     SELECT entity_id, canonical_name, entity_type FROM entities
-    WHERE status = 'active' ORDER BY importance DESC, mention_count DESC LIMIT 40
-  `);
+    WHERE status = 'active' AND user_id IS NOT DISTINCT FROM $1
+    ORDER BY importance DESC, mention_count DESC LIMIT 40
+  `, [userId]);
   if (nodes.rows.length < 3) return [];
   const ids = nodes.rows.map(n => n.entity_id);
   const ph = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -621,10 +632,13 @@ async function detectGaps({ userId = null } = {}) {
 
 /** Merge duplicate nodes that share a name across types (keeps the most-mentioned). */
 async function mergeDuplicates() {
+  // Grouping must include user_id. Without it this would treat two DIFFERENT
+  // users' same-named nodes as duplicates and merge one person's memory into
+  // another's — the most destructive form of the cross-user bug.
   const dupes = await query(`
     SELECT LOWER(canonical_name) AS lname, array_agg(entity_id ORDER BY mention_count DESC, created_at ASC) AS ids
     FROM entities WHERE status = 'active'
-    GROUP BY LOWER(canonical_name) HAVING COUNT(*) > 1
+    GROUP BY user_id, LOWER(canonical_name) HAVING COUNT(*) > 1
   `);
   const merged = [];
   for (const row of dupes.rows) {
@@ -683,7 +697,7 @@ async function dream({ userId = null } = {}) {
   let communities = [];
   try {
     const { detectCommunities } = require('./Communities');
-    const cr = await detectCommunities({});
+    const cr = await detectCommunities({ userId });
     communities = cr.communities;
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.dream community detection failed: ${err.message}`);

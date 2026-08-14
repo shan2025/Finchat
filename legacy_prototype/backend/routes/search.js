@@ -82,14 +82,17 @@ router.get('/', requireAuth, async (req, res) => {
       });
     }
 
-    // 4. Knowledge-graph entities (shared graph, harmless metadata)
+    // 4. Knowledge-graph entities — THIS USER'S only. The graph used to be shared
+    // and this was assumed to be harmless metadata; it is not. Entity names come
+    // out of chat content, so an unscoped search here let one user discover what
+    // other people had been talking about.
     const ents = await query(`
       SELECT canonical_name, entity_type, mention_count, last_seen_at
       FROM entities
-      WHERE canonical_name ILIKE $1
+      WHERE canonical_name ILIKE $1 AND user_id = $2
       ORDER BY mention_count DESC
       LIMIT 5
-    `, [like]);
+    `, [like, req.user.id]);
     for (const row of ents.rows) {
       results.push({
         type: 'entity',
