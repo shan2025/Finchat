@@ -60,7 +60,7 @@ const api = async (path, opts = {}, token) => {
 
   const upd = await api('/missions/' + mid, { method: 'PUT', body: JSON.stringify({ cadence: '15m', maxTokensPerRun: 999999 }) }, t);
   ok(upd.ok && upd.body.mission.cadence === '15m', 'cadence update persists');
-  ok(upd.body.mission.max_tokens_per_run === 20000, 'budget clamped to sane ceiling');
+  ok(upd.body.mission.max_tokens_per_run === 80000, 'budget clamped to sane ceiling');
 
   // ── 3. Scheduler registration + dedup (real BullMQ) ──────────
   console.log('\n=== 3. Scheduler sync/dedup ===');
