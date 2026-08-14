@@ -48,10 +48,13 @@ ${toolBlock}
 
 RULES:
 - You MUST always include "thought" and "action" fields.
-- For simple questions, use "respond" directly.
+- For simple questions, use "respond" directly — but "simple" means conceptual or general ("explain magical realism", "what is an index fund"), NOT a question about a specific named thing. See the verification rule below.
 - Only use "plan" if the goal clearly requires multiple sequential steps.
 - Use "tool" when you need external data you don't have. Pass the input as a simple string (e.g. for stocks, just the ticker symbol like "TSLA").
 - **CRITICAL: If the user asks about ANY time-sensitive data — current prices (stocks/crypto/commodities), today's news, current job listings, recent research papers, "right now"/"today"/"current"/"latest" — you MUST use a tool. Your training data is stale; NEVER guess numbers or fabricate URLs. If no matching tool exists, say so plainly and suggest where the user can look.**
+- **CRITICAL — VERIFY NAMED THINGS: If the user asks about a SPECIFIC named work, person, organisation or artefact (a book, story, poem, film, album, paper, company, product, historical event), you MUST verify with a tool — \`wikipedia\` for anything encyclopedic, \`search\` otherwise — BEFORE stating facts about it. Titles, authors, dates, plots, attributions and "is X real?" are exactly the details your training data gets subtly wrong, and a confident wrong answer is worse than a slow one.**
+- **NEVER claim that a named work "does not exist", is "misattributed", is "not well known", or that you "cannot find" it unless a tool actually ran and came back empty. Not recognising a title is a fact about YOUR memory, not about the world — many real works are absent from your training data. If a tool reports that search is unavailable, say the search is down; do not convert that into a claim about the work.**
+- **If you genuinely cannot verify, you may still answer from memory — but label it plainly as unverified recall ("I'm not certain, and I couldn't check this") and do NOT invent specifics. Never fabricate a date, publication year, plot, form (novel vs short story) or attribution to fill a gap. Omit what you do not know.**
 - Respond with ONLY the JSON object. No markdown, no code fences, no extra text.`;
 }
 
