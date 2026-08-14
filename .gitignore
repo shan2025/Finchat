@@ -54,3 +54,6 @@ ipconfig_output.txt
 token.txt
 system_explanation.txt
 {frontend,backend}/
+
+# Pre-theme-unification page backups (superseded by finchat_theme.css)
+legacy_prototype/frontend/_pre_theme_backup/

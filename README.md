@@ -1,5 +1,5 @@
-# FinChat — Governed AI Messaging Platform
-### v0.2.0 | Cognitive Memory Engine + Multi-Agent Collaboration
+﻿# FinChat — Governed AI Messaging Platform
+### v0.2.0 | Cognitive Memory Engine · Multi-Agent Collaboration · Study Mode · Mind Map Studio
 
 **FinChat is where humans and AI agents collaborate in the same chat.** A silent supervisor engine (Plato) monitors every message for fraud, manages a token economy, cryptographically anchors conversation history to the Solana blockchain — and the standout feature: **a living knowledge graph that learns from every chat, consolidates itself during "dream cycles," and shows you exactly which concepts it used to answer you.**
 
@@ -12,7 +12,7 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
 | Feature | Status | Notes |
 |---|---|---|
 | **Cognitive Memory Engine** | Implemented | Includes name-based deduplication, retrieval, activation, dream consolidation, and gap detection; run the verification commands before claiming a live result. |
-| **4 AI agents** (Plato, Aurelius, Rasha, Nova) | Implemented | Specialized domains, real system prompts, avatars |
+| **4 chat agents** (Plato, Aurelius, Rasha, Nova) | Implemented | Specialized domains, real system prompts, avatars. Plus Sentinel + Memory as non-chat agents |
 | **Neural Map visualization** | Implemented | Real-time thinking, heatmap mode, **neighborhoods mode**, activation pulses |
 | **Community detection** | Implemented | Label propagation clusters the graph into named neighborhoods (LLM-named) |
 | **Nightly dream digest** | Implemented | "While you were away: learned N, merged K, found G gaps" → your channels |
@@ -21,11 +21,16 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
 | **Real-time chat** | Implemented | Socket.io, typing indicators, group chat, read receipts |
 | **Fraud detection** | Implemented | Uses Ollama when configured; otherwise the prototype uses deterministic pattern-based fallback scanning. |
 | **Missions scheduler** | Implemented | BullMQ + Redis, per-mission budgets, autonomous agents |
-| **Notifications** | Implemented | In-app notifications are wired; email, Telegram, and Web Push require their respective service configuration. |
+| **Notifications** | Implemented | In-app notifications are wired; email, Telegram, Web Push and WhatsApp require their respective service configuration. |
 | **Knowledge Center dashboard** | Implemented | Four-quadrant memory view (Semantic/Episodic/Procedural/RAG) |
 | **Reports module** | Implemented | Periodic narratives (growth, agent learning, dream digest, gaps, profile) |
+| **Study Mode** | Implemented | Answers render as typed JSON blocks (9 card types) instead of plain markdown; per-session toggle. 1:1 chat only — group chat and missions ignore it |
+| **Mind Map Studio** | Implemented | AI-generated radial maps from a topic, chat, document or a slice of the memory graph; node → scoped conversation |
+| **Agent tools (23)** | Implemented | search, news, paper, fetch, crawl, wikipedia, reddit, quora, stocks, crypto, commodities, jobs, resume, watchlist, notifications, neural_map, bash, file/glob, … |
+| **WhatsApp channel** | Code complete, unconfigured | Twilio + Meta paths, 24-hour-window logic, signed webhook. Awaiting credentials — see `docs/WHATSAPP_NOTIFICATIONS.md` |
 | **Cluster summarization in dreams** | 🛣️ Roadmap | AI writes a paragraph per neighborhood (Stage 2 of the memory sprint) |
 | **Embedding-based dedup** | 🛣️ Roadmap | Merge "LLM" ≈ "large language model" by vector similarity (Stage 3) |
+| **Agent sandboxing** | 🛣️ Roadmap | `bash` and the file tools reach the host directly. See "Security posture" below and `docs/SECURITY_FOUNDATION_GAP_ANALYSIS.md` |
 
 ---
 
@@ -39,7 +44,7 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
                         │ HTTPS / WebSocket
 ┌───────────────────────▼─────────────────────────────────────┐
 │              Node.js + Express + Socket.io                  │
-│   ├─ 15 REST routes (auth, messages, tokens, agents, etc.)  │
+│   ├─ 19 REST routes (auth, messages, tokens, agents, etc.)  │
 │   ├─ Real-time events (chat, agent pulses, graph activation)│
 │   └─ EventBus + StateMachine (cognitive coordination)       │
 └───────────────────────┬─────────────────────────────────────┘
@@ -68,7 +73,7 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
    - Isolated sandboxes with token budgets
    - Health checks + auto-restart on crash
 
-3. **Data Layer** — PostgreSQL (21 migrations)
+3. **Data Layer** — PostgreSQL (28 migrations)
    - `entities` & `entity_edges` (the living knowledge graph)
    - `graph_communities` (named neighborhoods from community detection)
    - `node_events` (append-only timeline per concept)
@@ -76,6 +81,7 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
    - `user_tokens` & `token_ledger` (spend history)
    - `fraud_logs` (governance events)
    - `missions` & `executions` (agent work tracking)
+   - `mind_maps`, `mind_map_nodes`, `mind_map_edges` (Mind Map Studio)
 
 ---
 
@@ -84,17 +90,23 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
 ```
 finchat/
 ├── docs/
+│   ├── CURRENT_ARCHITECTURE.md             ← The system that actually exists (start here)
+│   ├── SECURITY_FOUNDATION_GAP_ANALYSIS.md ← Honest security posture + open P0s
 │   ├── system_architecture_document.md     ← Enterprise vision (FastAPI/Qdrant/K8s)
-│   ├── SPRINT_X_COGNITIVE_MEMORY_ENGINE.md ← What's shipped (Stages 1–3)
-│   └── SPRINT_Y_KNOWLEDGE_AND_REPORTS.md   ← Next (Knowledge Center + Reports)
+│   ├── WHATSAPP_NOTIFICATIONS.md           ← WhatsApp channel setup
+│   ├── SPRINT_X_COGNITIVE_MEMORY_ENGINE.md ← Shipped (Stages 1–4)
+│   ├── SPRINT_Y_KNOWLEDGE_AND_REPORTS.md   ← Shipped (Knowledge Center + Reports)
+│   ├── SPRINT_Z_STUDY_MODE_AND_MIND_MAPS.md ← Shipped (Study Mode + Mind Map Studio)
+│   └── adr/                                ← Architecture decision records
 │
 +-- legacy_prototype/                        ? The working Node.js/PostgreSQL prototype
 │   ├── backend/
 │   │   ├── server.js                        ← Express + Socket.io entry point
 │   │   ├── database.js                      ← PostgreSQL connection
-│   │   ├── migrations/                      ← 20 schema evolutions (001–019)
-│   │   │   ├── 001-core-governance-and-users.js
-│   │   │   ├── 019-cognitive-memory-engine.js  ← The big one
+│   │   ├── migrations/                      ← 28 schema evolutions (node-pg-migrate)
+│   │   │   ├── 1720000000001_core-governance-and-users.js
+│   │   │   ├── 1720000000019_cognitive-memory-engine.js  ← The big one
+│   │   │   ├── 1720000000028_entities-per-user.js        ← Graph ownership
 │   │   │   └── ...
 │   │   ├── routes/
 │   │   │   ├── auth.js                      ← Login, wallet, JWT
@@ -107,7 +119,13 @@ finchat/
 │   │   │   ├── missions.js                  ← Autonomous agent work
 │   │   │   ├── group-chat.js                ← Multi-party rooms
 │   │   │   ├── tokens.js                    ← Ledger queries
-│   │   │   └── ... (11 more)
+│   │   │   ├── mindMaps.js                  ← Mind Map Studio API
+│   │   │   ├── neuralMap.js                 ← System graph view
+│   │   │   ├── reports.js                   ← Generated narratives
+│   │   │   ├── search.js                    ← Knowledge search
+│   │   │   ├── cron.js                      ← External-scheduler triggers
+│   │   │   ├── whatsappWebhook.js           ← Inbound WhatsApp (signed)
+│   │   │   └── ... (admin, executions, settings)
 │   │   ├── services/
 │   │   │   ├── cognitive/
 │   │   │   │   ├── CognitiveCore.js         ← Main orchestrator
@@ -121,6 +139,9 @@ finchat/
 │   │   │   │   ├── DebateOrchestrator.js    ← Multi-agent debates
 │   │   │   │   ├── EventBus.js              ← Pub/sub for real-time
 │   │   │   │   ├── StateMachine.js          ← State transitions
+│   │   │   │   ├── MindMapEngine.js         ← Mind map generation
+│   │   │   │   ├── ToolManager.js           ← THE execution boundary: permission
+│   │   │   │   │                               → rate limit → approval → audit
 │   │   │   │   └── ToolRegistry.js          ← Tool definitions
 │   │   │   ├── agents/
 │   │   │   │   ├── MissionScheduler.js      ← Cron job orchestration
@@ -132,6 +153,7 @@ finchat/
 │   │   │   │   └── WorkerPool.js            ← BullMQ worker orchestration
 │   │   │   ├── personas.js                  ← Plato, Aurelius, Rasha, Nova
 │   │   │   ├── notificationChannels.js      ← Email, Telegram, Web Push
+│   │   │   ├── whatsapp.js                  ← Twilio + Meta WhatsApp
 │   │   │   ├── solana.js                    ← Blockchain anchor calls
 │   │   │   ├── ipfs.js                      ← Pinata archival
 │   │   │   ├── inference.js                 ← LLM calls (Groq primary)
@@ -152,14 +174,25 @@ finchat/
 │       ├── finchat_audit.html               ← Auditor panel (fraud logs)
 │       ├── finchat_inbox.html               ← Notifications
 │       ├── finchat_dashboard.html           ← Overview
+│       ├── finchat_knowledge.html           ← Knowledge Center (memory quad)
+│       ├── finchat_reports.html             ← Generated narratives
+│       ├── finchat_mindmap.html             ← Mind Map Studio
+│       ├── finchat_neuralnetwork.html       ← Neural network lab
+│       ├── finchat_signup.html              ← Registration
+│       ├── finchat_link_wallet.html         ← Wallet linking
 │       ├── finchat_settings.html            ← Preferences
+│       ├── finchat_theme.css                ← THE shared design layer (all pages)
+│       ├── study_blocks.js / .css           ← Study Mode block renderer
 │       ├── sidebar_nav.js                   ← Shared navigation
 │       ├── knowledge_search.js              ← Graph search box
 │       ├── notifications_widget.js          ← Live bell
 │       ├── missions_widget.js               ← Agent missions panel
 │       └── sw.js                            ← Service worker (Web Push)
 │
-├── backend/ & api/                          ← Newer / experimental paths
+├── _ARCHIVED_api/ & _ARCHIVED_backend_unused/  ← Dead ends. Not used, not built.
+│                                               The live backend is the one above.
+├── render.yaml                              ← Render deploy config (documentation
+│                                               of the dashboard settings)
 │
 └── README.md                                ← This file
 ```
@@ -210,15 +243,13 @@ You'll see:
 
 ### Step 4 — Open the frontend
 
-```bash
-# In the project root, or use a simple HTTP server
-cd ../frontend
-python3 -m http.server 8000
-# Or: npx serve
-# Or: double-click finchat_login.html (basic mode)
-```
+**Do not start a second server.** `server.js` serves `legacy_prototype/frontend`
+statically on the same port, so the backend is the only thing that needs to run.
 
-Open http://localhost:8000/finchat_login.html in your browser.
+Open **http://localhost:3000/finchat_login.html** in your browser.
+
+(Serving the frontend separately on another port is the usual cause of "I can't
+log in" — the page loads, but every API call goes to the wrong origin.)
 
 ### Step 5 — Create an account & explore
 
@@ -227,10 +258,6 @@ Register a new account, then:
 2. **Neural Map** — click to see what the AI just learned
 3. **Agents** — view the 4 specialist personas
 4. **Blockchain** — see the hash-chain proofs in real-time
-
----
-
-## Quick Start (5 steps) — Legacy (SQLite)
 
 ---
 
@@ -269,12 +296,15 @@ Once a day, after consolidating, the system tells each active user what changed 
 
 Four specialist AI personas, each with its own brain:
 
-| Agent | Role | Cortex size |
-|---|---|---|
-| **Plato** | Chief AI Officer · system supervisor | — |
-| **Aurelius** | Finance & investment strategist | 2 finance nodes |
-| **Rasha** | Career strategist · job finder | 3 career nodes |
-| **Nova** | Frontier science researcher | 6 research nodes |
+| Agent | Role |
+|---|---|
+| **Plato** | Chief AI Officer · system supervisor · the one admin agent |
+| **Aurelius** | Finance & investment strategist |
+| **Rasha** | Career strategist · job finder |
+| **Nova** | Frontier science researcher |
+
+Plus two non-chat agents in `services/agents/`: **Sentinel** (pre-execution safety checks)
+and **Memory** (knowledge curation).
 
 Each agent:
 - Has a **system prompt** (immutable, stored in DB)
@@ -318,14 +348,37 @@ Every AI action is constrained:
 - **Phantom wallet login** (Solana keystore-based auth)
 - **JWT + bcrypt**: email/password also supported
 - **GDPR/DPDP crypto-shredding**: delete a user → delete their decryption key. Raw IPFS records remain on-chain (immutable ledger) but become mathematically unreadable.
-- **Sandbox isolation**: agents run in isolated worker processes with resource limits
-- **Input guardrails**: system prompts are read-only; user input is filtered for jailbreak attempts
+- **One execution boundary**: every tool call goes through `ToolManager.executeTool()` —
+  permission check → rate limit → human-approval gate → cache → structured audit row.
+  Agents never touch a tool implementation directly.
+- **Host-access tools are deny-by-default**: `bash`, `file_write` and `file_edit` require an
+  explicit grant (migration 026); a database outage fails *closed*, not open.
+
+### Security posture — read this before deploying
+
+This is a prototype, and the honest assessment lives in
+[`docs/SECURITY_FOUNDATION_GAP_ANALYSIS.md`](docs/SECURITY_FOUNDATION_GAP_ANALYSIS.md).
+The short version of what is **not** yet true:
+
+- **Agents are not sandboxed.** `BashTool` calls `child_process.exec` on the host with only
+  a timeout and a buffer cap — no container, no allowlist, no filesystem confinement. Access
+  is restricted to one admin agent, which reduces *who* can reach the host; it does not make
+  reaching the host safe.
+- **Tool output carries no trust boundary.** Text from `crawl`, `fetch`, `reddit`, `quora`
+  and `paper` is concatenated into the next prompt with no provenance envelope, so indirect
+  prompt injection is an open surface.
+- **Approval is a boolean, not a risk tier.** There is no LOW/MEDIUM/HIGH classification.
+- **Memory has no ACL or provenance**, and the `dream()` loop consolidates it into
+  persistent, trusted context.
+- **There is no kill switch** for a running execution.
+
+Do not deploy this in a position to reach anything you care about until those are closed.
 
 ---
 
 ### 📊 What's in the database
 
-PostgreSQL (Supabase or local), 21 migrations:
+PostgreSQL (Supabase or local), 28 migrations:
 
 - **Core**: `users`, `messages`, `channels`, `sessions`
 - **Knowledge**: `entities`, `entity_edges`, `node_events`, `entity_links`, `graph_insights`, `graph_communities`
@@ -333,9 +386,15 @@ PostgreSQL (Supabase or local), 21 migrations:
 - **Governance**: `fraud_logs`, `user_tokens`, `token_ledger`, `auditor_decisions`
 - **Blockchain**: `proof_chain` (hash chains), `solana_anchors` (finalized tx hashes)
 - **Agents**: `agent_registry`, `executions`, `execution_logs`, `missions`, `mission_runs`
-- **Notifications**: `notification_channels`, `notifications`, `notification_read`
+- **Mind maps**: `mind_maps`, `mind_map_nodes`, `mind_map_edges`, `mind_map_chats`
+- **Notifications**: `notification_preferences`, `notifications`, `notification_deliveries`
 
-Every table is immutable by design — history is the feature.
+> Migrations are **not** run automatically — not on boot, not on deploy. Apply them
+> yourself with `npm run migrate:up` before starting a version that expects new columns.
+
+`proof_chain` and `node_events` are append-only by design — history is the feature there.
+The graph tables (`entities`, `entity_edges`) are deliberately mutable: the dream cycle
+merges duplicates, decays unused links and reinforces recent ones in place.
 
 ---
 
@@ -351,6 +410,20 @@ Every table is immutable by design — history is the feature.
 - ✅ **Knowledge Center dashboard** — four-quadrant memory view (Semantic/Episodic/Procedural/RAG)
 - ✅ **Reports module** — periodic narratives (growth, agent learning, dream digest, gaps, user profile)
 - ✅ Inference & context-reuse instrumentation (`inference_metrics`)
+
+**Sprint Z** (shipped ✅):
+- ✅ **Study Mode** — nine typed block types (card, flow, compare, steps, note, keyterms,
+  formula, checkpoint, takeaway) rendered client-side from model-emitted JSON
+- ✅ **Mind Map Studio** — generate from a topic, chat, document or memory-graph slice;
+  radial/collapsible; each node opens a scoped conversation
+- 🛣️ Study Mode in group chat and missions (currently 1:1 chat only)
+
+**Open security work** (see `docs/SECURITY_FOUNDATION_GAP_ANALYSIS.md`):
+- 🛣️ Sandbox `bash` and the file tools (P0-1c)
+- 🛣️ Untrusted-content envelope on tool output (P0-2)
+- 🛣️ Risk tiers on the tool registry (P0-3)
+- 🛣️ Memory ACL + provenance (P0-4)
+- 🛣️ Agent-to-agent authorisation (P0-5)
 
 **Vision (in `docs/system_architecture_document.md`)**:
 - FastAPI microservices (Python/async focus)
@@ -532,7 +605,7 @@ POST /api/knowledge/communities/detect
 
 # Ingest a document (PDF/Word/text) into an agent's cortex
 POST /api/knowledge/ingest-document
-{ "agentId": "research", "content": "...", "title": "..." }
+{ "agentId": "nova", "content": "...", "title": "..." }
 
 # Graph stats
 GET /api/knowledge/stats
@@ -567,7 +640,7 @@ Authorization: Bearer <jwt>
 ## VS Code Extensions (recommended)
 
 - **REST Client** — test API calls inline
-- **SQLite Viewer** — inspect the schema (if using SQLite locally)
+- **PostgreSQL** (ms-ossdata.vscode-pgsql) — inspect the schema
 - **Thunder Client** or **Postman** — API testing
 
 ---
@@ -580,6 +653,26 @@ Authorization: Bearer <jwt>
 | Ollama (if running) | 11434 | Local LLM inference |
 | PostgreSQL | 5432 | DB (default) |
 | Redis | 6379 | Job queue (default) |
+
+---
+
+## Deployment (Render)
+
+A live instance runs at **https://finchat-6.onrender.com** — a free-plan Docker service
+that deploys automatically from `main`.
+
+Two things about the free plan that will bite you:
+
+- **The instance sleeps when idle**, which stops the in-process mission scheduler. Scheduled
+  briefings and missions are therefore driven by an *external* cron hitting
+  `POST /api/cron/tick` with the `CRON_SECRET` bearer token. Without that, nothing fires.
+- **"Live" in the dashboard can mean crash-looping.** Check `/health` — it returns `degraded`
+  with a 503 when the database is unreachable, rather than killing the process.
+
+`render.yaml` documents the intended configuration but does **not** control the existing
+service, which was created through the dashboard. If you change one, change the other.
+
+Migrations do not run on deploy. Apply them against the database yourself first.
 
 ---
 
@@ -597,10 +690,12 @@ Authorization: Bearer <jwt>
 
 This is a working prototype with real-world constraints (time, teams, resources). The vision doc (`docs/system_architecture_document.md`) describes the enterprise version. The code you see is the *proven core* — contributions should focus on:
 
-1. **Knowledge Center** (Sprint Y phase 1) — dashboard over the memory quad
-2. **Reports** — periodic summaries + weekly digest automation
-3. **RAG** — pgvector integration for document retrieval
+1. **Agent sandboxing** — containerise `bash` and the file tools (the top open P0)
+2. **Untrusted-content boundary** — provenance envelope on tool/web output
+3. **Risk tiers + memory ACLs** — replace the boolean approval gate
 4. **Observability** — better logging, tracing, cost analytics
+
+(Knowledge Center, Reports and pgvector RAG have shipped — don't start there.)
 
 ---
 
@@ -618,134 +713,3 @@ FinChat is proprietary. Reach out to **shan20192020@gmail.com** for licensing in
 - **Memory isn't learning?** Run `POST /api/knowledge/dream` to force a consolidation cycle.
 
 **Reach out:** issues, feature requests, or just want to see it in action → email or open a GitHub issue.
-
----
-
-## Optional: Connect Qwen 2.5 3B
-
-For real AI fraud detection using your local model:
-
-```bash
-# Terminal 1 — start Ollama
-ollama serve
-
-# Terminal 2 — pull model (first time only)
-ollama pull qwen2.5:3b
-```
-
-Then in the chat UI, click the 🧠 button in the top toolbar to switch from simulation to Qwen mode.
-
----
-
-## Optional: Connect IPFS (Pinata)
-
-1. Go to https://pinata.cloud → Sign up free
-2. Create API keys
-3. Add to `backend/.env`:
-```
-PINATA_API_KEY=your_key
-PINATA_SECRET_KEY=your_secret
-```
-Restart the backend — proof logs will now be pinned to IPFS automatically.
-
----
-
-## Test the backend is running
-
-```bash
-curl http://localhost:3000/health
-```
-
----
-
-## VS Code Extensions (recommended)
-
-- **Live Server** — serve HTML files locally
-- **REST Client** — test API endpoints
-- **SQLite Viewer** — view finchat.db visually
-- **ESLint** — code linting
-
----
-
-## Ports used
-
-| Service | Port |
-|---------|------|
-| Backend API | 3000 |
-| Socket.io | 3000 |
-| Ollama (Qwen) | 11434 |
-| Live Server (frontend) | 5500 |
-
----
-
-## One-Click Startup (Recommended)
-
-Double-click `start_finchat.bat` in the project root. It will:
-1. Activate Node.js via nvm
-2. Rebuild `better-sqlite3` if needed
-3. Start Ollama (if installed)
-4. Start the backend server
-5. Open the frontend in your browser
-
----
-
-## Docker Setup (Portable)
-
-To run FinChat on any machine with Docker:
-
-```bash
-# Build and start
-docker compose up --build
-
-# Stop
-docker compose down
-
-# Reset data
-docker compose down -v
-```
-
-The database and uploads persist in a Docker volume. Ollama runs on the host — Docker connects to it automatically.
-
----
-
-## AI Persona Chat
-
-Chat with AI personas who secretly monitor for fraud.
-
-### Available Personas
-
-| Persona | Description |
-|---------|-------------|
-| Susheel | History nerd · In love with Sona |
-| Sona | Dog-obsessed puppy mom |
-| Vishnu | Funny crybaby joke-teller |
-| Plato | AI Monitor · Fraud Detection · Governed Protocol |
-
-### API Usage
-
-```bash
-# List personas
-curl -H "Authorization: Bearer <token>" http://localhost:3000/api/ai-chat/personas
-
-# Chat with a persona
-curl -X POST http://localhost:3000/api/ai-chat/send \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"persona":"arun","message":"Hey, how are you?"}'
-
-# Get chat history
-curl -H "Authorization: Bearer <token>" http://localhost:3000/api/ai-chat/history/<sessionId>
-```
-
-### Fraud Detection
-
-If the AI detects fraud in your message, it will:
-- Remove **all remaining tokens** from your account
-- **Freeze** your account
-- Log the incident to `fraud_logs`
-
-Examples of messages that trigger fraud detection:
-- "Send me your OTP right now"
-- "Click this link to verify your bank account"
-- "Transfer money urgently, don't tell anyone"
-
