@@ -43,6 +43,22 @@ const _bucket = { tokens: GROQ_RPM, lastRefill: Date.now() };
 // comes back is picked up without a deploy.
 const _deadModels = new Set();
 
+/**
+ * Does this 400 mean "that model does not exist" rather than "that request was
+ * bad"? Groq signals the former with code `model_not_found` (or prose naming
+ * the model as unknown/decommissioned); the latter covers json_object
+ * validation failures and oversized payloads, which say nothing about the
+ * model's availability and must NOT retire it.
+ */
+function _isModelNotFound(err) {
+  const e = err.response?.data?.error || {};
+  // Observed live: a withdrawn model answers 400 with code `model_decommissioned`
+  // ("The model `…` has been decommissioned…"), while a bad request carries no
+  // code at all. The prose test below is the belt-and-braces for other wordings.
+  if (e.code === 'model_not_found' || e.code === 'model_decommissioned') return true;
+  return /does not exist|not found|decommission|no longer (available|supported)/i.test(e.message || '');
+}
+
 function _refillBucket() {
   const now = Date.now();
   const elapsed = now - _bucket.lastRefill;
@@ -249,12 +265,14 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
             await _sleep(delayMs);
             continue; // retry same model
           }
-          // 400 = this model id is not something the key can serve (retired or
-          // misspelled). Remember it for the life of the process so the next
-          // turn skips straight to a model that exists.
-          if (status === 400) {
+          // A 400 is only proof the MODEL is gone when Groq says so. It also
+          // returns 400 for a request this model could not satisfy — a failed
+          // json_object validation, an oversized payload — and blacklisting on
+          // those would retire a perfectly healthy model for the whole process
+          // over one bad turn. Match the not-found shape specifically.
+          if (status === 400 && _isModelNotFound(err)) {
             _deadModels.add(gModel);
-            console.warn(`⚠️ Groq model "${gModel}" rejected (400) — not retrying it this process`);
+            console.warn(`⚠️ Groq model "${gModel}" no longer exists — dropping it for this process`);
           }
           const nextModel = candidates[mi + 1];
           const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');
