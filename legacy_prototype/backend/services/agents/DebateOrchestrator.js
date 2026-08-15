@@ -210,7 +210,7 @@ function renderTranscript(transcript) {
  * Run one structured rebuttal round. Each agent reasons over the running transcript.
  * Uses direct inference (no tool loop) — the evidence was gathered in the opening round.
  */
-async function runDebateRound({ goal, participants, transcript, roundNumber, conflict }) {
+async function runDebateRound({ goal, participants, transcript, roundNumber, conflict, userId = null }) {
   const roundArgs = [];
   const transcriptText = renderTranscript(transcript);
 
@@ -247,9 +247,13 @@ async function runDebateRound({ goal, participants, transcript, roundNumber, con
     roundArgs.push({ agentId, name, position, round: roundNumber });
   }
 
+  // userId rides along on every debate event so server.js can deliver the
+  // pulse to the one user who started the debate. Without it the bridge drops
+  // the event rather than broadcasting a stranger's debate to every browser.
   eventBus.emit('debate:round', {
     roundNumber,
     participants,
+    userId,
     timestamp: new Date().toISOString()
   });
 
@@ -373,13 +377,13 @@ async function runDebate({ goal, userId = 'system', conversationId = null, parti
   await persistArguments(debateId, transcript);
 
   eventBus.emit('debate:positions_gathered', {
-    debateId, participants: chosen, timestamp: new Date().toISOString()
+    debateId, participants: chosen, userId, timestamp: new Date().toISOString()
   });
 
   // 3. Conflict detection
   const conflict = await detectConflict({ goal, positions: opening });
   eventBus.emit('debate:conflict', {
-    debateId, conflict: conflict.conflict, summary: conflict.summary, timestamp: new Date().toISOString()
+    debateId, conflict: conflict.conflict, summary: conflict.summary, userId, timestamp: new Date().toISOString()
   });
 
   // 4. Debate rounds (only if there's a real conflict to resolve)
@@ -387,7 +391,7 @@ async function runDebate({ goal, userId = 'system', conversationId = null, parti
   if (conflict.conflict) {
     for (let r = 1; r <= maxRounds; r++) {
       const roundArgs = await runDebateRound({
-        goal, participants: chosen, transcript, roundNumber: r, conflict
+        goal, participants: chosen, transcript, roundNumber: r, conflict, userId
       });
       transcript.push(...roundArgs);
       await persistArguments(debateId, roundArgs);
@@ -431,6 +435,7 @@ async function runDebate({ goal, userId = 'system', conversationId = null, parti
     conflictDetected: conflict.conflict,
     roundsRun,
     participantCount: chosen.length,
+    userId,
     timestamp: new Date().toISOString()
   });
 

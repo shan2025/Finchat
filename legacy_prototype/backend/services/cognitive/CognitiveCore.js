@@ -6,6 +6,7 @@ const { plan: generatePlan } = require('./PlanningEngine');
 const { retrieveEnrichedContext, appendToScratchpad } = require('./MemoryService');
 const { reflect } = require('./ReflectionEngine');
 const { eventBus } = require('./EventBus');
+const { runWithStallClock, stalledMs } = require('./StallClock');
 const { createExecution, updateState, completeExecution, failExecution, checkBudget, incrementUsage, evaluateBudget } = require('./ExecutionManager');
 const { STATES, WAIT_REASONS } = require('./StateMachine');
 const { query } = require('../../database');
@@ -110,7 +111,13 @@ async function logPhase(executionId, phase, stepNumber, content, startedAt) {
  * @param {Array}  [options.conversationHistory] - Prior messages [{role, content}]
  * @returns {Promise<{ executionId, response, execution, logs }>}
  */
-async function run({
+// Public entry: every run gets its own stall ledger, so provider backoff time is
+// discounted from the runtime ceiling rather than charged to the goal.
+async function run(args) {
+  return runWithStallClock(() => _runWithinStallClock(args));
+}
+
+async function _runWithinStallClock({
   goal,
   userId = 'system',
   conversationId = null,
@@ -185,6 +192,14 @@ async function run({
     const logs = [];
     const accumulatedToolResults = []; // Carry tool results across loop iterations
 
+    // Write-reserve state. `forceSynthesis` is set when research stopped early
+    // (mid-plan budget breach) and the run still owes the user a report;
+    // `synthesisDone` makes that funded pass strictly one-shot, so the reserve
+    // cannot become an open-ended second budget.
+    let forceSynthesis = false;
+    let synthesisDone = false;
+    let missingSources = [];
+
     // Sprint X Stage 2 — explainability: which memories/graph nodes fed this answer
     const traceConcepts = new Map();
     let traceMemories = 0, traceRecipes = 0;
@@ -216,7 +231,7 @@ async function run({
       // and only then acted on the by-then-stale verdict: the turn that first
       // saw the breach was itself charged to the budget it had already broken.
       // That is the token overshoot visible across the live rows.
-      const verdict = await checkBudget(execId);
+      const verdict = await checkBudget(execId, Date.now() - stalledMs());
 
       // Iterations are the loop's own currency: once they are gone there is no
       // turn left to spend, not even a wrap-up one. (The loop bound above
@@ -230,12 +245,25 @@ async function run({
 
       stepNumber++;
 
+      // Tokens and tool calls used to reach `lastTurn` only through
+      // verdict.breached — i.e. once the ceiling was already crossed, with
+      // nothing left to pay for the wrap-up. A research mission therefore
+      // gathered five sources and then died holding them: "Monitor the stock
+      // market" spent 37166/40000 tokens on tools and never wrote a word of the
+      // brief. Reserve a slice of the budget for the synthesis pass and enter it
+      // BEFORE the ceiling, so the write is funded rather than cut off.
+      const tokenCeiling = Number(verdict.details.tokens.max) || 0;
+      const writeReserve = Math.max(2000, Math.round(tokenCeiling * 0.15));
+      const tokensLeft = tokenCeiling - Number(verdict.details.tokens.used || 0);
+      const reserveEntered = tokenCeiling > 0 && tokensLeft <= writeReserve;
+      const toolCallsSpent = verdict.details.toolCalls.used >= verdict.details.toolCalls.max;
+
       // This is the last turn the budget allows — either a non-iteration ceiling
       // has already breached, or spending this iteration exhausts the iteration
       // ceiling. Either way the model gets the restricted respond-only schema
       // and the loop stops afterwards, so the wrap-up turn now happens INSIDE
       // the budget instead of one turn past it.
-      const lastTurn = verdict.breached ||
+      const lastTurn = verdict.breached || forceSynthesis || reserveEntered || toolCallsSpent ||
         verdict.details.iterations.used + 1 >= verdict.details.iterations.max;
 
       // 3b. Retrieve memories + graph-hop entities + skill recipes for context (Phase 6 + Sprint 5C)
@@ -264,6 +292,7 @@ async function run({
         graphContext: enriched.graphContext,
         recipeHints: enriched.recipeHints,
         budgetExceeded: lastTurn,
+        missingSources,
         traits: agentTraits,
         userPreferences,
         allowWeb,
@@ -299,6 +328,11 @@ async function run({
       const usage = await incrementUsage(execId, { iterations: 1, tokens: result.tokens || 0 });
       const spent = evaluateBudget(usage);
 
+      // This turn ran on the reserve, so the run has now had its one funded
+      // chance to write. Anything after this falls through to the ordinary
+      // breach handling below.
+      if (lastTurn) { synthesisDone = true; forceSynthesis = false; }
+
       // 3f. Handle action
       if (verdict.breached || spent.breached) {
         finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
@@ -318,6 +352,7 @@ async function run({
 
         eventBus.emit('execution:waiting', {
           executionId: execId,
+          userId,
           reason: waitReason,
           message: waitMessage,
           timestamp: new Date().toISOString()
@@ -375,11 +410,24 @@ async function run({
         for (const step of planResult.plan.steps) {
           stepNumber++;
 
-          // Re-check budget before each plan step
-          const stepBudget = await checkBudget(execId);
+          // Re-check budget before each plan step. Running out here used to end
+          // the whole run on a placeholder string, throwing away every result
+          // already gathered — the mission had the data and still delivered
+          // "Budget exceeded during plan execution." as the day's brief. Stop
+          // researching, but hand what we have to the synthesis pass; only a run
+          // that gathered nothing at all has no report to write.
+          const stepBudget = await checkBudget(execId, Date.now() - stalledMs());
           if (stepBudget.breached) {
-            finalResponse = 'Budget exceeded during plan execution. Partial results may be available.';
-            completionReason = 'budget_exceeded';
+            if (accumulatedToolResults.length && !synthesisDone) {
+              missingSources = planResult.plan.steps
+                .filter(s => s.action === 'tool' && s.tool)
+                .map(s => s.tool)
+                .filter(t => !accumulatedToolResults.some(tr => tr.tool === t));
+              forceSynthesis = true;
+            } else {
+              finalResponse = 'Budget exceeded during plan execution. Partial results may be available.';
+              completionReason = 'budget_exceeded';
+            }
             break;
           }
 
@@ -569,9 +617,11 @@ async function run({
     // Record the timestamp the user-visible response is ready
     const responseReadyAt = new Date().toISOString();
 
-    // Emit execution:completed event
+    // Emit execution:completed event. userId is required for the socket bridge
+    // in server.js to route this pulse to the owning user instead of dropping it.
     eventBus.emit('execution:completed', {
       executionId: execId,
+      userId,
       completionReason,
       responseReadyAt
     });

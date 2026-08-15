@@ -31,10 +31,23 @@ services:
 
     envVars:
       # PORT is injected by Render; server.js already honours it.
+      # NODE_ENV is set in the Dockerfile, but declared here too because
+      # server.js only allows localhost origins when it is not "production".
+      - key: NODE_ENV
+        value: production
+
+      # REQUIRED — server.js exits at boot if this is missing or under 32
+      # characters, rather than minting tokens the verifier cannot check.
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN
         value: 7d
+
+      # Browser origins allowed to call the API, comma-separated. FRONTEND_URL
+      # below is always allowed, so this only needs the extras (staging, a
+      # custom domain). Leave unset to allow FRONTEND_URL alone.
+      - key: ALLOWED_ORIGINS
+        sync: false
 
       # Supabase session pooler. Must be URL-encoded — the password contains
       # characters that are otherwise parsed as URL delimiters. Re-check this

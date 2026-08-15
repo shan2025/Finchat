@@ -29,9 +29,10 @@ searching the repo, confirm which tree a file belongs to before editing it.
 | Layer | Actual |
 |---|---|
 | API | Node 18 + Express 4, single process (`server.js`) |
-| Realtime | Socket.io, JWT-authenticated |
+| Edge | `helmet` (CSP, HSTS, frame-deny), `cors` allowlist, `express-rate-limit`, `compression` |
+| Realtime | Socket.io, JWT-authenticated, events routed per-user (`services/realtime.js`) |
 | Database | PostgreSQL on Supabase via `pg` Pool (`DATABASE_URL`, session pooler) |
-| Migrations | `node-pg-migrate`, 25 applied (`…001` → `…025_mind-map-text-notes`) |
+| Migrations | `node-pg-migrate`, 28 applied (`…001` → `…028_entities-per-user`) |
 | Cache / queue | Redis + BullMQ (`services/queue/WorkerPool.js`) |
 | Vectors | pgvector, `config/embeddings.js` (nomic-embed-text, 768-dim) |
 | Inference | Groq-primary, via `services/inference.js` |
@@ -56,6 +57,15 @@ Browser (static HTML/JS)
 
 Routes are thin. Agent behaviour lives in `services/cognitive` and `services/agents`,
 not in route handlers.
+
+### Realtime delivery
+
+`services/realtime.js` owns the EventBus → Socket.io map. Every socket joins
+`user:<userId>` from its JWT-verified identity on connect, and each event is
+addressed to that room. **An event carrying no `userId`/`user_id` is dropped,
+not broadcast** — if a new pulse never reaches the UI, add the owner at the
+emit site rather than widening delivery. `test/realtime.test.js` holds the
+regression test, including a live two-client isolation check.
 
 ## 4. The cognitive layer (18 modules)
 
@@ -149,8 +159,8 @@ Scheduled delivery is driven by an **external cron** hitting `/api/cron/tick` wi
    entirely untracked — deleting it would be unrecoverable, so check before removing).
    `finchat/backend/` no longer exists; it was renamed to `_ARCHIVED_backend_unused`.
 3. **Test coverage is thin, but no longer absent.** `npm test` now runs Node's built-in
-   runner (`node --test test/`, no new dependencies) over `backend/test/`:
-   112 assertions covering the LLM-output parser (`ReasoningEngine.parseActionResponse`),
+   runner (`node --test test/`) over `backend/test/`:
+   182 assertions covering the LLM-output parser (`ReasoningEngine.parseActionResponse`),
    the execution `StateMachine` transition matrix, the proof-chain hash contract,
    `ExecutionManager` lifecycle/budget policy, and the `executions` / `memories` /
    `knowledge` SQL contracts — including every filter combination of the

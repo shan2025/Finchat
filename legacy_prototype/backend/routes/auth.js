@@ -10,8 +10,13 @@ const { requireAuth, clearUserCache } = require('../middleware/auth');
 const TOKEN_EXPIRY = '7d';
 
 function generateJWT(userId) {
-  const secret = process.env.JWT_SECRET || 'dev_finchat_secret_change_me';
-  return jwt.sign({ userId }, secret, { expiresIn: TOKEN_EXPIRY });
+  // No fallback secret. This used to sign with a literal committed to the
+  // repository whenever JWT_SECRET was unset — while middleware/auth.js and the
+  // Socket.io handshake verify against process.env.JWT_SECRET with no fallback,
+  // so the two halves disagreed and every token minted that way was unusable.
+  // server.js refuses to boot without the variable, so reaching here means it
+  // is set.
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
 }
 
 function sanitizeUser(user) {

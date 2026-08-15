@@ -1,5 +1,32 @@
 # FinChat — Agent Security Foundation: Gap Analysis
 
+> **Status update — 2026-08-15.** The edge hardening below the agent layer has
+> since landed, along with one leak this document never covered. Closed:
+>
+> - **Realtime cross-user leak** (found 2026-08-15, not in the original list).
+>   `server.js` broadcast every EventBus event to every connected socket, so one
+>   user's notification content — which carries the full mission report — plus
+>   knowledge-graph entity names and debate goals reached anyone logged in.
+>   Events are now addressed to `user:<id>` rooms by `services/realtime.js`, and
+>   an event with no owner is dropped rather than broadcast.
+>   Regression test: `test/realtime.test.js`.
+> - **Unauthenticated abuse of credential endpoints.** `express-rate-limit` now
+>   throttles login/register/forgot/reset/wallet (10 failures / 15 min) with a
+>   300 req/min backstop on the rest of `/api`.
+> - **Open CORS.** The API reflected every origin back with credentials enabled.
+>   It now serves an explicit allowlist (`ALLOWED_ORIGINS` + `FRONTEND_URL`).
+> - **Missing security headers.** `helmet` adds CSP, HSTS, nosniff, frame-deny.
+> - **Committed JWT fallback secret.** Removed; `server.js` refuses to boot
+>   without a `JWT_SECRET` of at least 32 characters.
+> - **Container ran as root.** The image now sets `NODE_ENV=production` and
+>   drops to the unprivileged `node` user.
+>
+> Also since corrected in the list below: **P0-1 is half done** — host-access
+> tools are deny-by-default (migration 026), but `BashTool` is still an
+> unsandboxed `child_process.exec`. **P1-6 is mostly done** — time, tool-call,
+> iteration and token budgets all landed; cost and delegation depth have not.
+> P0-2, P0-3, P0-4, P0-5, P1-7 and P1-8 remain open and unchanged.
+
 **Date:** 2026-08-13
 **Method:** the 30-item P0/P1/P2 list was checked line by line against the code in
 `finchat/legacy_prototype/backend`. Every "already built" claim below cites a file and
