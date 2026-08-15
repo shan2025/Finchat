@@ -36,7 +36,13 @@
     return localStorage.getItem('finchat_token') || localStorage.getItem('finchat_jwt') || '';
   }
   var API_BASE = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';
+
+  // Routed through the shared client so a request this file makes on boot is
+  // coalesced with the identical one the host page makes — /api/tokens/balance
+  // was being fetched twice on every chat load, once from each side. Falls back
+  // to a plain fetch if api_client.js is not on the page.
   async function api(path) {
+    if (window.fcApi) return window.fcApi.get(path);
     const res = await fetch(API_BASE + path, {
       headers: { 'Authorization': 'Bearer ' + getToken() }
     });

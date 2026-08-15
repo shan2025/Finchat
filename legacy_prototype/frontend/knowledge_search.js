@@ -100,4 +100,8 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  // Rebind after spa_router.js swaps <main> — the search input it hooks is
+  // part of the page body, not the persistent shell.
+  window.fcKnowledgeSearch = { init };
 })();

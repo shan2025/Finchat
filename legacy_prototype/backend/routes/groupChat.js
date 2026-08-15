@@ -4,7 +4,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { getAgentConfig, listActiveAgents } = require('../services/agents/AgentRegistry');
+const { getAgentConfig, getAllAgentConfigs, listActiveAgents } = require('../services/agents/AgentRegistry');
 const { handleUserMessage, assignTask, saveMessage } = require('../services/agents/GroupChatOrchestrator');
 
 async function loadGroup(groupId, userId) {
@@ -16,16 +16,19 @@ async function membersOf(groupId) {
   const res = await query(
     'SELECT member_type, member_id, added_at FROM group_chat_members WHERE group_id = $1 ORDER BY added_at ASC',
     [groupId]);
-  const members = [];
-  for (const r of res.rows) {
-    if (r.member_type === 'agent') {
-      const cfg = await getAgentConfig(r.member_id);
-      members.push({ ...r, name: cfg?.name || r.member_id, capabilities: cfg?.capabilities || [] });
-    } else {
-      members.push({ ...r, name: 'You' });
-    }
-  }
-  return members;
+  // Read the registry once rather than per agent member — getAgentConfig()
+  // pulls the entire registry on each call, so a six-agent group meant six
+  // round trips to answer from one cached object.
+  const hasAgents = res.rows.some(r => r.member_type === 'agent');
+  const configById = hasAgents
+    ? new Map((await getAllAgentConfigs()).map(c => [c.agentId, c]))
+    : new Map();
+
+  return res.rows.map(r => {
+    if (r.member_type !== 'agent') return { ...r, name: 'You' };
+    const cfg = configById.get(r.member_id);
+    return { ...r, name: cfg?.name || r.member_id, capabilities: cfg?.capabilities || [] };
+  });
 }
 
 // ── GET /api/group-chat/agents ── which agents can be added ──
@@ -69,21 +72,34 @@ router.post('/', requireAuth, async (req, res) => {
     if (!agents.length) return res.status(400).json({ error: 'Pick at least one agent' });
     if (agents.length > 6) return res.status(400).json({ error: 'Maximum 6 agents per group' });
 
-    const valid = [];
-    for (const id of agents) {
-      const cfg = await getAgentConfig(id);
-      if (cfg && cfg.type !== 'middleware') valid.push(id);
-    }
+    // One registry read, then look up in memory. getAgentConfig() fetches the
+    // whole registry on every call, so the two loops here cost up to a dozen
+    // Redis round trips to answer questions about six agents.
+    const configs = await getAllAgentConfigs();
+    const configById = new Map(configs.map(c => [c.agentId, c]));
+
+    const valid = agents.filter(id => {
+      const cfg = configById.get(id);
+      return cfg && cfg.type !== 'middleware';
+    });
     if (!valid.length) return res.status(400).json({ error: 'No valid agents in selection' });
 
     const groupId = `grp_${uuidv4()}`;
     await query('INSERT INTO group_chats (group_id, owner_id, name) VALUES ($1, $2, $3)', [groupId, req.user.id, name]);
-    await query(`INSERT INTO group_chat_members (group_id, member_type, member_id) VALUES ($1, 'user', $2)`, [groupId, req.user.id]);
-    for (const id of valid) {
-      await query(`INSERT INTO group_chat_members (group_id, member_type, member_id) VALUES ($1, 'agent', $2) ON CONFLICT DO NOTHING`, [groupId, id]);
-    }
-    const names = [];
-    for (const id of valid) { const c = await getAgentConfig(id); names.push(c?.name || id); }
+
+    // Owner + every agent in one statement instead of one per member.
+    await query(`
+      INSERT INTO group_chat_members (group_id, member_type, member_id)
+      SELECT $1, m.member_type, m.member_id
+      FROM UNNEST($2::text[], $3::text[]) AS m(member_type, member_id)
+      ON CONFLICT DO NOTHING
+    `, [
+      groupId,
+      ['user', ...valid.map(() => 'agent')],
+      [req.user.id, ...valid]
+    ]);
+
+    const names = valid.map(id => configById.get(id)?.name || id);
     await saveMessage(groupId, 'system', 'system',
       `👥 Group "${name}" created with ${names.join(', ')}. Ask anything, @mention an agent to address them directly, or type "/task @agent <goal>" to assign real work.`);
 

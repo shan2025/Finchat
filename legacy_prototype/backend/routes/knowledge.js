@@ -502,28 +502,43 @@ router.get('/stats/growth', requireAuth, async (req, res) => {
 // Per-agent learning footprint — how much each agent knows and how active it is.
 router.get('/agents/overview', requireAuth, async (req, res) => {
   try {
+    // The top concepts used to be fetched one query per agent, on the
+    // assumption that "one extra query per agent is fine at ≤20". It is not:
+    // a round trip to the database costs ~126ms regardless of how small the
+    // query is, so twenty agents meant ~2.6s of pure waiting. The LATERAL
+    // join does the same work in a single trip.
     const q = await query(`
-      SELECT owner_agent AS agent_id,
-             COUNT(*)::int                       AS node_count,
-             COALESCE(SUM(activation_count), 0)::int AS activations,
-             ROUND(AVG(importance)::numeric, 1)  AS avg_importance,
-             MAX(last_activated_at)              AS last_active
-      FROM entities
-      WHERE status = 'active' AND owner_agent IS NOT NULL AND user_id = $1
-      GROUP BY owner_agent
-      ORDER BY node_count DESC
-      LIMIT 20
+      WITH agg AS (
+        SELECT owner_agent AS agent_id,
+               COUNT(*)::int                          AS node_count,
+               COALESCE(SUM(activation_count), 0)::int AS activations,
+               ROUND(AVG(importance)::numeric, 1)     AS avg_importance,
+               MAX(last_activated_at)                 AS last_active
+        FROM entities
+        WHERE status = 'active' AND owner_agent IS NOT NULL AND user_id = $1
+        GROUP BY owner_agent
+        ORDER BY node_count DESC
+        LIMIT 20
+      )
+      SELECT agg.*, COALESCE(top.concepts, ARRAY[]::text[]) AS top_concepts
+      FROM agg
+      LEFT JOIN LATERAL (
+        SELECT array_agg(e.canonical_name) AS concepts
+        FROM (
+          SELECT canonical_name
+          FROM entities
+          WHERE owner_agent = agg.agent_id AND status = 'active' AND user_id = $1
+          ORDER BY activation_count DESC, importance DESC
+          LIMIT 3
+        ) e
+      ) top ON TRUE
+      ORDER BY agg.node_count DESC
     `, [req.user.id]);
-    // Top concept per agent (best-effort, one extra query per agent is fine at ≤20).
-    const agents = [];
-    for (const row of q.rows) {
-      const topQ = await query(`
-        SELECT canonical_name FROM entities
-        WHERE owner_agent = $1 AND status = 'active' AND user_id = $2
-        ORDER BY activation_count DESC, importance DESC LIMIT 3
-      `, [row.agent_id, req.user.id]);
-      agents.push({ ...row, topConcepts: topQ.rows.map(r => r.canonical_name) });
-    }
+
+    const agents = q.rows.map(({ top_concepts, ...row }) => ({
+      ...row,
+      topConcepts: top_concepts || []
+    }));
     const totalNodes = agents.reduce((s, a) => s + a.node_count, 0) || 1;
     agents.forEach(a => { a.share = Math.round((a.node_count / totalNodes) * 100); });
     res.json({ agents, totalNodes });

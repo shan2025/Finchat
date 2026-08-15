@@ -8,28 +8,10 @@
 <!-- Google Fonts: Inter -->
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link rel="stylesheet" href="finchat_tw.css">
 <!-- Theme Configuration -->
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", error: "#dc2626", "on-surface": "#3a2e23", "tertiary-fixed-dim": "#cec3cd", "secondary-fixed": "#e6e2da", "on-tertiary-container": "#453e45", "on-background": "#3a2e23", "on-primary": "#ffffff", "on-secondary": "#31312b", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", "surface-container-highest": "#4a3828", "surface-bright": "#5c4a38", outline: "#8c7a6b", "error-container": "#fca5a5", "primary-container": "#efe8de", tertiary: "#cfc4cd", "tertiary-container": "#b3a9b2", "surface-dim": "#e8dfd1", "surface-container-lowest": "#ffffff", surface: "#efe8de", "surface-variant": "#e8dfd1", "on-tertiary-fixed-variant": "#4c444c", "on-secondary-fixed": "#1c1c17", "on-tertiary": "#352e35", "secondary-container": "#e8dfd1", "on-error": "#ffffff", "secondary-fixed-dim": "#c9c6bf", "on-primary-fixed-variant": "#48473b", "tertiary-fixed": "#ebdfe9", "on-surface-variant": "#8c7a6b", background: "#f7f4ed", secondary: "#8c7a6b", "on-primary-container": "#3a2e23", "surface-container-low": "#efe8de", "on-secondary-container": "#3a2e23", "on-error-container": "#7f1d1d", "on-primary-fixed": "#1c1c12", primary: "#3a2e23", "primary-fixed": "#efe8de", "on-tertiary-fixed": "#1f1a20", "inverse-on-surface": "#f7f4ed", "surface-container-high": "#e8dfd1", "inverse-surface": "#3a2e23", "surface-tint": "#c9c7b7", "inverse-primary": "#efe8de", "on-secondary-fixed-variant": "#484741", "primary-fixed-dim": "#c9c7b7"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px"}, spacing: {unit: "4px", xl: "40px", lg: "24px", sm: "8px", md: "16px", "margin-mobile": "16px", xs: "4px", gutter: "20px", "margin-desktop": "64px"}, "fontFamily": {
-                        "headline-lg": ["Inter"],
-                        "code-md": ["JetBrains Mono"],
-                        "headline-md": ["Inter"],
-                        "code-sm": ["JetBrains Mono"],
-                        "body-md": ["Inter"],
-                        "body-lg": ["Inter"],
-                        "headline-xl": ["Inter"],
-                        "label-caps": ["JetBrains Mono"],
-                        "body-sm": ["Inter"],
-                        "serif": ["Playfair Display", "serif"],
-headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono: ["ui-monospace", "SFMono-Regular", "monospace"]}, fontSize: {"headline-lg": ["32px", {lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "600"}], "headline-xl": ["48px", {lineHeight: "56px", letterSpacing: "-0.04em", fontWeight: "700"}], "body-lg": ["18px", {lineHeight: "28px", letterSpacing: "0em", fontWeight: "400"}], "body-md": ["16px", {lineHeight: "24px", letterSpacing: "0em", fontWeight: "400"}], "label-md": ["14px", {lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "headline-md": ["24px", {lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600"}]}}}};
-</script>
 <!-- Socket.io -->
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
-  if (typeof io === 'undefined') {
-    document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
-  }
-</script>
+<script src="/socket.io/socket.io.js"></script>
 <!-- Markdown and DOMPurify -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
@@ -638,6 +620,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
          panel updates from the inline script land in hidden stubs installed
          by system_panels.js (shared-JS pattern — survives design-tool regen
          with a single re-added include). -->
+    <script src="api_client.js"></script>
     <script src="system_panels.js"></script>
     <script src="knowledge_search.js"></script>
     <script src="notifications_widget.js"></script>
@@ -704,7 +687,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
         <div class="admin-stat-card"><div class="admin-stat-val" id="adminActiveUsers" style="color:var(--accent-green)">0</div><div class="admin-stat-label">Active</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span class="text-[11px] text-text-primary-variant font-mono">Registered accounts</span>
+        <span class="text-[11px] text-text-secondary font-mono">Registered accounts</span>
         <button class="unblock-all-btn" id="unblockAllBtn" onclick="adminUnblockAll()">🔓 Unblock All Frozen</button>
       </div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -858,6 +841,12 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Pre-fill user info from session
     const SESSION_USER = _session || { name: 'User', role: 'user', email: '' };
 
+    // Authenticated GET, coalesced across the whole page (see api_client.js).
+    // Boot ran several independent paths that each wanted the same endpoint —
+    // syncRealBalance and syncServerState both asked for /api/tokens/balance,
+    // as did system_panels.js from its own file. They now share one request.
+    const apiGet = (pathname) => window.fcApi.get(pathname);
+
     // ─────────────────────────────────
     // STATE
     // ─────────────────────────────────
@@ -877,10 +866,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Sync the displayed balance with the authoritative backend value on load
     (async function syncRealBalance() {
       try {
-        const t = SESSION_USER.token || _session?.token || localStorage.getItem('finchat_token') || '';
-        const r = await fetch(`${API_URL}/api/tokens/balance`, { headers: { Authorization: 'Bearer ' + t } });
-        if (!r.ok) return;
-        const d = await r.json();
+        const d = await apiGet('/api/tokens/balance');
         if (typeof d.balance === 'number') {
           tokenBalance = d.balance;
           personaBalances.plato = d.balance;
@@ -2767,31 +2753,37 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
       if (!token) return;
 
       try {
-        // 1. Sync Token Balance & Ledger Stats
-        const ledgerRes = await fetch(`${API_URL}/api/messages/tokens/ledger`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (ledgerRes.ok) {
-          const ledgerData = await ledgerRes.json();
+        // The ledger, the balance and the channel list do not depend on each
+        // other, but used to be awaited one after another — four serial round
+        // trips before the chat was usable, on an app where every navigation is
+        // a fresh document. Fire them together and settle independently so one
+        // failing endpoint cannot blank the other two panels. Only the proof
+        // chain has a real dependency (it needs the channel id), so it stays
+        // behind the channel call.
+        const [ledgerOutcome, balOutcome, channelsOutcome] = await Promise.allSettled([
+          apiGet('/api/messages/tokens/ledger'),
+          apiGet('/api/tokens/balance'),
+          apiGet('/api/messages/channels')
+        ]);
+
+        // Token balance is a single authoritative value on the backend — show that
+        // real number for every persona instead of inventing per-persona counters.
+        if (balOutcome.status === 'fulfilled') {
+          const balData = balOutcome.value;
+          const realBal = typeof balData.balance === 'number' ? balData.balance : (personaBalances[activePersona] || 1000);
+          personaBalances = { plato: realBal, aurelius: realBal, rasha: realBal, nova: realBal };
+          savePersonaBalances();
+          tokenBalance = realBal;
+          updateTokenUI();
+        }
+
+        if (ledgerOutcome.status === 'fulfilled') {
+          const ledgerData = ledgerOutcome.value;
           // Persona balances handled locally
 
           totalSpent = 0;
           totalPenalties = 0;
           txLog = [];
-
-          // Token balance is a single authoritative value on the backend — show that
-          // real number for every persona instead of inventing per-persona counters.
-          const balRes = await fetch(`${API_URL}/api/tokens/balance`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (balRes.ok) {
-            const balData = await balRes.json();
-            const realBal = typeof balData.balance === 'number' ? balData.balance : (personaBalances[activePersona] || 1000);
-            personaBalances = { plato: realBal, aurelius: realBal, rasha: realBal, nova: realBal };
-            savePersonaBalances();
-            tokenBalance = realBal;
-            updateTokenUI();
-          }
 
           if (ledgerData.ledger && ledgerData.ledger.length > 0) {
             ledgerData.ledger.forEach(tx => {
@@ -2813,13 +2805,11 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
           applyTokens(0, 'Sync with server', 'pos');
         }
 
-        // 2. Get channel ID first, then sync Chain State
-        const channelsRes = await fetch(`${API_URL}/api/messages/channels`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // Chain state — the one genuinely dependent step, since the proof
+        // endpoint is keyed by channel id.
         let generalChannelId = 'general';
-        if (channelsRes.ok) {
-          const channelsData = await channelsRes.json();
+        if (channelsOutcome.status === 'fulfilled') {
+          const channelsData = channelsOutcome.value;
           // The proof chain lives under whatever channel the backend uses
           // (currently "system_channel"), not a hardcoded "general". Prefer a
           // channel literally named general, else fall back to the first one.
@@ -3005,12 +2995,7 @@ headline: ["Inter"], display: ["Inter"], body: ["Inter"], label: ["Inter"], mono
     // Pull the authoritative token balance + frozen state from the backend
     async function refreshSettingsBalance() {
       try {
-        const token = _session?.token;
-        const r = await fetch(`${API_URL}/api/tokens/balance`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!r.ok) return;
-        const d = await r.json();
+        const d = await apiGet('/api/tokens/balance');
         if (typeof d.balance === 'number') {
           document.getElementById('settingsBalance').textContent = d.balance;
           const banner = document.getElementById('unfreezeBanner');

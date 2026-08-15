@@ -109,23 +109,47 @@ router.post('/unblock-all', async (req, res) => {
     const results = [];
     const recoveryTokens = 50;
 
+    // Proof generation is CPU-bound and stays per user, but the two writes it
+    // used to make each are now one statement apiece — unblocking twenty users
+    // was forty sequential database round trips.
+    const ledgerRows = [];
     for (const user of frozenUsers) {
       const zkpProof = await generateUnblockProof(req.user.id, user.id, reason || 'Bulk admin unblock');
       const newBalance = user.token_balance + recoveryTokens;
 
-      await query('UPDATE users SET token_balance = $1, is_frozen = 0 WHERE user_id = $2', [newBalance, user.id]);
-      clearUserCache(user.id);
-      await query(`
-        INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)
-        VALUES ($1, $2, $3, $4, 'grant', $5)
-      `, [uuidv4(), user.id, recoveryTokens, newBalance, `Bulk unblock — ZKP: ${zkpProof.commitmentHash.substring(0, 8)}...`]);
-
+      ledgerRows.push({
+        ledgerId: uuidv4(),
+        userId: user.id,
+        newBalance,
+        reason: `Bulk unblock — ZKP: ${zkpProof.commitmentHash.substring(0, 8)}...`
+      });
       results.push({
         userId: user.id,
         name: user.name,
         zkpCommitment: zkpProof.commitmentHash
       });
     }
+
+    await query(`
+      UPDATE users SET token_balance = u.new_balance::bigint, is_frozen = 0
+      FROM UNNEST($1::text[], $2::text[]) AS u(user_id, new_balance)
+      WHERE users.user_id = u.user_id
+    `, [ledgerRows.map(r => r.userId), ledgerRows.map(r => String(r.newBalance))]);
+
+    await query(`
+      INSERT INTO token_ledger (ledger_id, user_id, amount, balance, type, reason)
+      SELECT l.ledger_id, l.user_id, $3::bigint, l.balance::bigint, 'grant', l.reason
+      FROM UNNEST($1::text[], $2::text[], $4::text[], $5::text[])
+           AS l(ledger_id, user_id, balance, reason)
+    `, [
+      ledgerRows.map(r => r.ledgerId),
+      ledgerRows.map(r => r.userId),
+      recoveryTokens,
+      ledgerRows.map(r => String(r.newBalance)),
+      ledgerRows.map(r => r.reason)
+    ]);
+
+    ledgerRows.forEach(r => clearUserCache(r.userId));
 
     res.json({ success: true, message: `Unblocked ${results.length} users`, unblocked: results.length, users: results });
   } catch (err) {

@@ -142,14 +142,32 @@ router.post('/:channelId', requireAuth, upload.array('files', 5), async (req, re
 
     const proof = await createProof(messageId, senderId, content || '', channelId);
 
-    const savedFiles = [];
-    for (const f of files) {
-      const fileId = uuidv4();
+    // One statement for the whole attachment set — this was a round trip per
+    // file, which is the difference between one and ten on a multi-file upload.
+    // local_path stays server-side: fileRows carries it for the INSERT, while
+    // savedFiles (which goes out in the response below) deliberately does not.
+    const fileRows = files.map(f => ({
+      id: uuidv4(),
+      filename: f.originalname,
+      size: f.size,
+      mimetype: f.mimetype,
+      path: f.path
+    }));
+    const savedFiles = fileRows.map(({ path, ...rest }) => rest);
+
+    if (fileRows.length) {
       await query(`
         INSERT INTO files (file_id, message_id, uploader_id, filename, mimetype, size_bytes, local_path)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [fileId, messageId, senderId, f.originalname, f.mimetype, f.size, f.path]);
-      savedFiles.push({ id: fileId, filename: f.originalname, size: f.size, mimetype: f.mimetype });
+        SELECT f.file_id, $2, $3, f.filename, f.mimetype, f.size_bytes::bigint, f.local_path
+        FROM UNNEST($1::text[], $4::text[], $5::text[], $6::text[], $7::text[])
+             AS f(file_id, filename, mimetype, size_bytes, local_path)
+      `, [
+        fileRows.map(f => f.id), messageId, senderId,
+        fileRows.map(f => f.filename),
+        fileRows.map(f => f.mimetype),
+        fileRows.map(f => String(f.size)),
+        fileRows.map(f => f.path)
+      ]);
     }
 
     const resFraud = await query('SELECT *, fraud_log_id as id FROM fraud_logs WHERE message_id = $1', [messageId]);

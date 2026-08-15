@@ -601,41 +601,74 @@ router.post('/graphify', requireAuth, async (req, res) => {
     const nodesAdded = [];
     const edgesAdded = [];
 
-    // Add extracted concepts
-    for (let i = 0; i < keywords.length; i++) {
-      const kw = keywords[i];
-      const nodeKey = `concept:${kw.toLowerCase().replace(/\s+/g, '_')}`;
-      const label = kw;
-      const note = `Extracted via /graphify from conversation context (${topic || 'general session'}).`;
-      
+    // Build the whole node/edge set first, then write it in three statements.
+    // This used to issue three queries per keyword inside the loop — at ~126ms
+    // per database round trip, eight keywords cost roughly three seconds of
+    // pure waiting.
+    //
+    // Keys are de-duplicated before the insert: two keywords can normalise to
+    // the same node_key ("Risk Model" / "risk model"), and Postgres rejects an
+    // ON CONFLICT DO UPDATE that would touch the same row twice in one
+    // statement.
+    const note = `Extracted via /graphify from conversation context (${topic || 'general session'}).`;
+    const conceptKey = (kw) => `concept:${kw.toLowerCase().replace(/\s+/g, '_')}`;
+    const rootKey = conceptKey(keywords[0]);
+
+    const nodeByKey = new Map();
+    const edgeByKey = new Map();
+
+    keywords.forEach((kw, i) => {
+      const nodeKey = conceptKey(kw);
+      if (!nodeByKey.has(nodeKey)) nodeByKey.set(nodeKey, { key: nodeKey, label: kw });
+
+      const fromKey = i === 0 ? 'agent:plato' : rootKey;
+      if (fromKey === nodeKey) return;
+      const edgeKey = `${fromKey}~${nodeKey}`;
+      if (!edgeByKey.has(edgeKey)) {
+        edgeByKey.set(edgeKey, {
+          key: edgeKey, from: fromKey, to: nodeKey,
+          note: `Synthesized relationship for ${kw}`
+        });
+      }
+    });
+
+    const nodes = [...nodeByKey.values()];
+    const edges = [...edgeByKey.values()];
+
+    if (nodes.length) {
       await query(`
         INSERT INTO neural_map_nodes (node_key, user_id, map_id, label, node_type, note, meta, apis)
-        VALUES ($1, $2, $3, $4, 'idea', $5, $6, $7)
+        SELECT n.node_key, $2, $3, n.label, 'idea', $4, $5::jsonb, $6::jsonb
+        FROM UNNEST($1::text[], $7::text[]) AS n(node_key, label)
         ON CONFLICT (node_key) DO UPDATE SET
           label = EXCLUDED.label,
           note = EXCLUDED.note
-      `, [nodeKey, userId, mapId, label, note, JSON.stringify([['Source', '/graphify'], ['Confidence', '98%']]), JSON.stringify([])]);
-      
-      nodesAdded.push({ key: nodeKey, label });
+      `, [
+        nodes.map(n => n.key), userId, mapId, note,
+        JSON.stringify([['Source', '/graphify'], ['Confidence', '98%']]),
+        JSON.stringify([]),
+        nodes.map(n => n.label)
+      ]);
+      nodesAdded.push(...nodes.map(n => ({ key: n.key, label: n.label })));
+    }
 
-      // Connect to root or Plato agent node
-      const fromKey = i === 0 ? 'agent:plato' : `concept:${keywords[0].toLowerCase().replace(/\s+/g, '_')}`;
-      const edgeKey = `${fromKey}~${nodeKey}`;
-      if (fromKey !== nodeKey) {
-        await query(`
-          INSERT INTO neural_map_edges (edge_key, user_id, map_id, from_key, to_key)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (edge_key) DO NOTHING
-        `, [edgeKey, userId, mapId, fromKey, nodeKey]);
-        
-        await query(`
-          INSERT INTO neural_map_edge_meta (user_id, map_id, edge_key, note, flow, updated_at)
-          VALUES ($2, $3, $1, $4, $5, NOW())
-          ON CONFLICT (user_id, map_id, edge_key) DO UPDATE SET
-            note = EXCLUDED.note, flow = EXCLUDED.flow, updated_at = NOW()
-        `, [edgeKey, userId, mapId, `Synthesized relationship for ${kw}`, 'neural link']);
-        edgesAdded.push({ from: fromKey, to: nodeKey });
-      }
+    if (edges.length) {
+      await query(`
+        INSERT INTO neural_map_edges (edge_key, user_id, map_id, from_key, to_key)
+        SELECT e.edge_key, $2, $3, e.from_key, e.to_key
+        FROM UNNEST($1::text[], $4::text[], $5::text[]) AS e(edge_key, from_key, to_key)
+        ON CONFLICT (edge_key) DO NOTHING
+      `, [edges.map(e => e.key), userId, mapId, edges.map(e => e.from), edges.map(e => e.to)]);
+
+      await query(`
+        INSERT INTO neural_map_edge_meta (user_id, map_id, edge_key, note, flow, updated_at)
+        SELECT $1, $2, m.edge_key, m.note, $5, NOW()
+        FROM UNNEST($3::text[], $4::text[]) AS m(edge_key, note)
+        ON CONFLICT (user_id, map_id, edge_key) DO UPDATE SET
+          note = EXCLUDED.note, flow = EXCLUDED.flow, updated_at = NOW()
+      `, [userId, mapId, edges.map(e => e.key), edges.map(e => e.note), 'neural link']);
+
+      edgesAdded.push(...edges.map(e => ({ from: e.from, to: e.to })));
     }
 
     res.json({

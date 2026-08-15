@@ -57,3 +57,13 @@ system_explanation.txt
 
 # Pre-theme-unification page backups (superseded by finchat_theme.css)
 legacy_prototype/frontend/_pre_theme_backup/
+
+# Tailwind build output — produced in the Dockerfile builder stage (and by
+# `npm run build:css` locally), never hand-committed, so it cannot go stale
+# against the markup it was generated from.
+legacy_prototype/frontend/finchat_tw.css
+legacy_prototype/frontend/finchat_tw_audit.css
+
+# Pre-resize avatar sources. The full-resolution originals remain in git
+# history; this is just a local working copy from the resize pass.
+legacy_prototype/frontend/_avatar_originals/

@@ -5,14 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>FinChat | Blockchain</title>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"primary-brown": "rgb(var(--chrome-rgb) / <alpha-value>)", "cream-bg": "rgb(var(--bg-rgb) / <alpha-value>)", "surface-container": "#f3eee3", "outline-variant": "#d6ccbc", outline: "#8c7a6b", background: "#f7f4ed", primary: "#3a2e23"}, borderRadius: {DEFAULT: "1rem", lg: "2rem", full: "9999px"}}}};</script>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
- if (typeof io === 'undefined') {
-  document.write('<script src="' + (location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000') + '/socket.io/socket.io.js"><\/script>');
- }
-</script>
+<link rel="stylesheet" href="finchat_tw.css">
+<script src="/socket.io/socket.io.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="finchat_theme.css">
@@ -265,6 +259,7 @@
  refreshAll(false);
  setInterval(() => { if (!document.hidden) refreshAll(false); }, 30000); // egress guard
 </script>
+<script src="api_client.js"></script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>
 <script src="sidebar_collapse.js"></script>

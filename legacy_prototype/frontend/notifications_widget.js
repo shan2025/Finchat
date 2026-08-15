@@ -314,4 +314,10 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  // The bell lives inside the page's <main>, which spa_router.js replaces on a
+  // client-side navigation. Re-running init() rebinds to the new element; the
+  // 30s poll above is registered once per init, so the router tears the old
+  // view's timers down before calling this.
+  window.fcNotifications = { init };
 })();
