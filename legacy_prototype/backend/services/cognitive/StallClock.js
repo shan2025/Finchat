@@ -9,8 +9,9 @@
 //
 // So: stall time is measured where it is incurred (inference.js) and subtracted
 // where the budget is read (CognitiveCore). AsyncLocalStorage rather than a
-// module-level counter because WorkerPool runs executions concurrently, and a
-// shared total would let one mission's backoff pay for another's overrun.
+// module-level counter because executions overlap — one cron tick runs a batch
+// of missions while interactive chats are being served — and a shared total
+// would let one mission's backoff pay for another's overrun.
 const { AsyncLocalStorage } = require('node:async_hooks');
 
 const storage = new AsyncLocalStorage();

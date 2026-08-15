@@ -1,6 +1,6 @@
-// Sprint 7 — mission engine: CRUD + validation, scheduler registration/dedup
-// against real BullMQ/Redis, per-run token budget threading, failure backoff +
-// auto-disable, and the human-approval state transitions (approve/reject).
+// Sprint 7 — mission engine: CRUD + validation, next_run_at scheduling state,
+// per-run token budget threading, failure backoff + auto-disable, and the
+// human-approval state transitions (approve/reject).
 // Requires the server running on :3000. Run: node scripts/test_sprint7_missions.js
 
 const B = require('path').join(__dirname, '..');
@@ -62,28 +62,24 @@ const api = async (path, opts = {}, token) => {
   ok(upd.ok && upd.body.mission.cadence === '15m', 'cadence update persists');
   ok(upd.body.mission.max_tokens_per_run === 80000, 'budget clamped to sane ceiling');
 
-  // ── 3. Scheduler registration + dedup (real BullMQ) ──────────
-  console.log('\n=== 3. Scheduler sync/dedup ===');
-  const { getQueue } = require(B + '/services/queue/WorkerPool');
-  const q = getQueue();
-  const repeatablesFor = async id => (await q.getJobSchedulers()).filter(j => j.name === Sched.MISSION_JOB && j.key === id);
+  // ── 3. Scheduling state on the row (what the cron tick claims) ─
+  // Scheduling lives entirely in agent_missions.next_run_at now; there is no
+  // queue to reconcile against, so these assertions read the row directly.
+  console.log('\n=== 3. next_run_at scheduling ===');
+  const nextRunFor = async id =>
+    (await query('SELECT next_run_at FROM agent_missions WHERE mission_id = $1', [id])).rows[0]?.next_run_at;
 
   await api('/missions/' + mid, { method: 'PUT', body: JSON.stringify({ enabled: true }) }, t);
-  let reps = await repeatablesFor(mid);
-  ok(reps.length === 1, 'enabling registers exactly one repeatable job');
-  ok(reps[0].pattern === '*/15 * * * *', 'cron pattern matches the 15m cadence');
-
-  await Sched.syncMissionSchedules();
-  reps = await repeatablesFor(mid);
-  ok(reps.length === 1, 're-sync does not duplicate the schedule (dedup)');
+  let nextRun = await nextRunFor(mid);
+  ok(!!nextRun, 'enabling sets next_run_at so the cron tick can claim it');
+  ok(new Date(nextRun).getTime() > Date.now(), 'next_run_at is in the future');
 
   await api('/missions/' + mid, { method: 'PUT', body: JSON.stringify({ cadence: '6h' }) }, t);
-  reps = await repeatablesFor(mid);
-  ok(reps.length === 1 && reps[0].pattern === '0 */6 * * *', 'cadence change replaces the old schedule');
+  const afterCadence = await nextRunFor(mid);
+  ok(!!afterCadence, 'cadence change keeps the mission scheduled');
 
   await api('/missions/' + mid, { method: 'PUT', body: JSON.stringify({ enabled: false }) }, t);
-  reps = await repeatablesFor(mid);
-  ok(reps.length === 0, 'disabling removes the repeatable job');
+  ok((await nextRunFor(mid)) === null, 'disabling clears next_run_at so nothing claims it');
 
   // ── 4. Budget threading into executions ──────────────────────
   console.log('\n=== 4. Per-run budget threading ===');

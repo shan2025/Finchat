@@ -147,17 +147,31 @@ router.get('/status', requireAuth, async (req, res) => {
       durationSeconds: Math.round((new Date(row.updated_at).getTime() - new Date(row.created_at).getTime()) / 1000)
     }));
 
-    // 4. Get queue / background job status from BullMQ
+    // 4. Background work status. These counts used to come from BullMQ's job
+    // registry; with the queue gone the executions table is the record of what
+    // ran, and agent_missions.next_run_at is what "waiting" now means — a
+    // mission due to be claimed by the next cron tick.
     let queueStatus = { active: 0, waiting: 0, completed: 0, failed: 0 };
     try {
-      const { getQueue } = require('../services/queue/WorkerPool');
-      const q = getQueue();
-      if (q) {
-        const counts = await q.getJobCounts('active', 'waiting', 'completed', 'failed');
-        queueStatus = counts;
-      }
+      const counts = await query(`
+        SELECT
+          count(*) FILTER (WHERE current_state IN ('running', 'ready'))                      AS active,
+          count(*) FILTER (WHERE current_state = 'completed' AND updated_at >= date_trunc('day', now())) AS completed,
+          count(*) FILTER (WHERE current_state = 'failed'    AND updated_at >= date_trunc('day', now())) AS failed
+        FROM executions
+      `);
+      const due = await query(`
+        SELECT count(*) AS n FROM agent_missions
+        WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= now()
+      `);
+      queueStatus = {
+        active: Number(counts.rows[0].active),
+        waiting: Number(due.rows[0].n),
+        completed: Number(counts.rows[0].completed),
+        failed: Number(counts.rows[0].failed)
+      };
     } catch (qErr) {
-      // Ignore if queue not reachable right now
+      // Cosmetic panel — never fail the status endpoint over it.
     }
 
     res.json({

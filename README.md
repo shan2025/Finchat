@@ -20,7 +20,7 @@ This is not a chatbot wrapper. It's a **governed AI operating-system prototype**
 | **Token economy** | Implemented | Per-user & per-agent budgets, real cost tracking |
 | **Real-time chat** | Implemented | Socket.io, typing indicators, group chat, read receipts |
 | **Fraud detection** | Implemented | Uses Ollama when configured; otherwise the prototype uses deterministic pattern-based fallback scanning. |
-| **Missions scheduler** | Implemented | BullMQ + Redis, per-mission budgets, autonomous agents |
+| **Missions scheduler** | Implemented | External cron → `/api/cron/tick`, per-mission budgets, autonomous agents |
 | **Notifications** | Implemented | In-app notifications are wired; email, Telegram, Web Push and WhatsApp require their respective service configuration. |
 | **Knowledge Center dashboard** | Implemented | Four-quadrant memory view (Semantic/Episodic/Procedural/RAG) |
 | **Reports module** | Implemented | Periodic narratives (growth, agent learning, dream digest, gaps, profile) |
@@ -149,8 +149,7 @@ finchat/
 │   │   │   │   ├── BaseAgent.js             ← Agent base class
 │   │   │   │   ├── MemoryAgent.js           ← Knowledge curator
 │   │   │   │   └── ... (4+ more)
-│   │   │   ├── queue/
-│   │   │   │   └── WorkerPool.js            ← BullMQ worker orchestration
+│   │   │   ├── briefing.js                  ← Morning executive briefing (run by cron)
 │   │   │   ├── personas.js                  ← Plato, Aurelius, Rasha, Nova
 │   │   │   ├── notificationChannels.js      ← Email, Telegram, Web Push
 │   │   │   ├── whatsapp.js                  ← Twilio + Meta WhatsApp
@@ -680,7 +679,7 @@ Migrations do not run on deploy. Apply them against the database yourself first.
 
 - **Database**: Use Supabase PostgreSQL (one-click backup + monitoring) or manage your own with HA + replicas.
 - **Inference**: Groq is fast and cheap; Ollama keeps everything local. Route based on sensitivity/cost (see `services/inference.js`).
-- **Job queue**: BullMQ + Redis for missions. In production, use managed Redis (Upstash, ElastiCache) or Redis Cluster.
+- **Scheduled work**: no broker required. Point any cron service (cron-job.org, GitHub Actions, your own crontab) at `/api/cron/tick` every few minutes and `/api/cron/briefing?userId=…` daily, authenticated with `CRON_SECRET`. Due-time state lives in Postgres, and claims are atomic, so overlapping ticks and multiple instances are safe.
 - **Storage**: Pinata for IPFS (or self-host IPFS). Solana devnet is free; use mainnet only if you need permanent anchors.
 - **Secrets**: Use a vault (HashiCorp Vault, AWS Secrets Manager, 1Password Secrets Automation). Never commit `.env`.
 

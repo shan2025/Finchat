@@ -288,7 +288,7 @@ contentious but leaves no single party who can quietly rewrite the constraints.`
 
   // ── 6. Briefing conversations are named ────────────────────────
   console.log('\n=== 6. Briefing session title ===');
-  const { briefingSessionTitle } = require(B + '/services/queue/WorkerPool');
+  const { briefingSessionTitle } = require(B + '/services/briefing');
   const when = new Date('2026-08-13T06:00:00Z');
   ok(/Daily News/.test(briefingSessionTitle(when)) && /2026/.test(briefingSessionTitle(when)),
     `the title is dated ("${briefingSessionTitle(when)}")`);

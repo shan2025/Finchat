@@ -33,7 +33,7 @@ searching the repo, confirm which tree a file belongs to before editing it.
 | Realtime | Socket.io, JWT-authenticated, events routed per-user (`services/realtime.js`) |
 | Database | PostgreSQL on Supabase via `pg` Pool (`DATABASE_URL`, session pooler) |
 | Migrations | `node-pg-migrate`, 28 applied (`…001` → `…028_entities-per-user`) |
-| Cache / queue | Redis + BullMQ (`services/queue/WorkerPool.js`) |
+| Background work | No queue and no broker. External cron → `/api/cron/*`, state in `agent_missions.next_run_at` |
 | Vectors | pgvector, `config/embeddings.js` (nomic-embed-text, 768-dim) |
 | Inference | Groq-primary, via `services/inference.js` |
 | Crypto | snarkjs + circom (Groth16); SHA-256 hash chain; Solana devnet; IPFS via Pinata |
@@ -120,11 +120,26 @@ live conversation) — do not add `sidebar_nav.js` to it.
 
 ## 8. Background work
 
-Started inside `server.listen`: Solana init → `sweepStaleExecutions` → BullMQ
-`startWorkerPool` → `syncMissionSchedules` → `dream()` → `runNightlyDigest`.
+Started inside `server.listen`: Solana init → `sweepStaleExecutions` → `dream()` →
+`runNightlyDigest`. These are periodic housekeeping only; nothing user-visible is
+scheduled in-process.
 
-Scheduled delivery is driven by an **external cron** hitting `/api/cron/tick` with
-`CRON_SECRET`, because Render free-tier spin-down kills in-process schedulers.
+**Everything scheduled is driven by an external cron** calling `/api/cron/*` with
+`CRON_SECRET`, because Render free-tier spin-down kills in-process schedulers:
+
+| Trigger | Endpoint | What decides when |
+|---|---|---|
+| Agent missions | `POST /api/cron/tick` | `agent_missions.next_run_at`; the tick claims due rows atomically (`FOR UPDATE SKIP LOCKED`, 15-min lease, max 5 per tick) |
+| Morning briefing | `POST /api/cron/briefing?userId=…` | the cron service's own schedule — briefings carry no due date |
+
+There is **no job queue and no Redis**. Missions and briefings used to be mirrored
+into BullMQ repeatable jobs on top of the cron path; that duplicated what
+`next_run_at` already recorded, and because BullMQ's `Queue`/`Worker` re-emit
+connection faults as unhandled `error` events, a Redis outage crash-looped the
+entire web service (Aug 2026). An idle worker also held a blocking poll that spent
+Upstash's whole free monthly allowance on its own. Both the queue and the
+`bullmq`/`ioredis` dependencies are gone; `test/no-queue.test.js` fails the build
+if either comes back.
 
 ## 9. Known structural weaknesses
 

@@ -1,13 +1,17 @@
 // services/agents/MissionScheduler.js — Sprint 7 mission engine.
-// A mission = a standing goal an agent re-runs on a schedule. Backed by the
-// agent_missions table + BullMQ repeatable jobs (same queue/worker as the
-// morning briefing). Every run goes through the normal PlatoOrchestrator path,
-// so Sentinel pre-checks, token telemetry, and the approval gate all apply.
+// A mission = a standing goal an agent re-runs on a schedule, held entirely in
+// the agent_missions table: `next_run_at` says when it is due, and the external
+// cron trigger (/api/cron/tick) claims and runs whatever has come due. Every run
+// goes through the normal PlatoOrchestrator path, so Sentinel pre-checks, token
+// telemetry, and the approval gate all apply.
+//
+// The same schedules were once mirrored into BullMQ repeatable jobs as well.
+// That mirror owned nothing next_run_at did not already own, and it made a
+// Redis outage fatal to the whole process, so it is gone.
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../../database');
 const { eventBus } = require('../cognitive/EventBus');
 
-const MISSION_JOB = 'agent-mission';
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 // A research mission's plan is several tool steps, and the synthesis pass that
@@ -62,7 +66,7 @@ class DegradedRunError extends Error {
 // fire at exactly 08:00, so three of them plus the morning briefing hit the
 // same rate-limited Groq model within four minutes of each other — which is
 // what "AI Inference unavailable across providers" was reporting. Stable per
-// mission id, so syncMissionSchedules still recognises its own patterns.
+// mission id, so a mission keeps its slot across restarts.
 function minuteOffset(missionId) {
   let h = 0;
   for (const ch of String(missionId)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -98,7 +102,9 @@ function isValidCadence(cadence) {
   return /^(\S+\s+){4}\S+$/.test(c);
 }
 
-// Rough next-fire estimate for UI display (exact scheduling is BullMQ's job).
+// When this mission next comes due. This is the schedule, not an estimate of
+// one: the cron tick claims rows whose next_run_at has passed, so whatever this
+// returns is exactly when the mission runs (give or take the cron interval).
 function estimateNextRun(cadence, missionId = null) {
   const now = Date.now();
   const c = String(cadence || 'daily');
@@ -134,7 +140,6 @@ async function createMission({ userId, agentId, title, goal, cadence = 'daily', 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `, [id, userId, agentId, title, goal, cadence, !!enabled, maxTokensPerRun, enabled ? estimateNextRun(cadence, id) : null]);
-  await syncMissionSchedules();
   return res.rows[0];
 }
 
@@ -169,73 +174,19 @@ async function updateMission(missionId, userId, patch = {}) {
   params.push(missionId, userId);
   const res = await query(
     `UPDATE agent_missions SET ${fields.join(', ')} WHERE mission_id = $${i++} AND user_id = $${i} RETURNING *`, params);
-  await syncMissionSchedules();
   return res.rows[0];
 }
 
 async function deleteMission(missionId, userId) {
   const res = await query(
     'DELETE FROM agent_missions WHERE mission_id = $1 AND user_id = $2 RETURNING mission_id', [missionId, userId]);
-  if (res.rows.length) await syncMissionSchedules();
   return res.rows.length > 0;
-}
-
-// ── Scheduling: one BullMQ repeatable job per enabled mission ───
-
-/**
- * Reconcile BullMQ repeatable jobs with the agent_missions table:
- * remove schedules for disabled/deleted/re-cadenced missions, add missing ones.
- * Idempotent — safe to call after any mission mutation and on boot.
- */
-async function syncMissionSchedules() {
-  const { getQueue } = require('../queue/WorkerPool');
-  const q = getQueue();
-  // No queue (Redis down or out of quota) means nothing to reconcile against.
-  // Missions stay in the table and get re-scheduled on the next sync, so this
-  // is a pause, not a loss — and it must not fail the mutation that called us.
-  if (!q) return { scheduled: 0, added: 0, skipped: 'queue unavailable' };
-
-  const enabledRes = await query('SELECT mission_id, cadence FROM agent_missions WHERE enabled = true');
-  const wanted = new Map(enabledRes.rows.map(m => [m.mission_id, cadenceToCron(m.cadence, m.mission_id)]));
-
-  // BullMQ job schedulers: key = mission_id, so reconciliation is exact.
-  // (Plain repeatable jobs don't expose their jobId in this BullMQ version.)
-  const schedulers = await q.getJobSchedulers();
-  const existing = new Map();
-  for (const s of schedulers) {
-    if (s.name !== MISSION_JOB) continue;
-    const want = wanted.get(s.key);
-    if (!want || want !== s.pattern) {
-      await q.removeJobScheduler(s.key); // stale: disabled, deleted, or cadence changed
-    } else {
-      existing.set(s.key, s.pattern);
-    }
-  }
-
-  let added = 0;
-  for (const [missionId, cron] of wanted) {
-    if (existing.has(missionId)) continue;
-    await q.upsertJobScheduler(missionId, { pattern: cron }, {
-      name: MISSION_JOB,
-      data: { missionId },
-      opts: {
-        attempts: 1, // failure handling is ours (consecutive_failures backoff)
-        removeOnComplete: { count: 50 },
-        removeOnFail: { count: 100 }
-      }
-    });
-    added++;
-  }
-
-  const summary = { scheduled: wanted.size, added };
-  if (added > 0) console.log(`🗓️ [Missions] Schedules synced: ${wanted.size} enabled, ${added} newly registered`);
-  return summary;
 }
 
 // ── Execution: what happens when a mission fires ────────────────
 
 /**
- * Run one mission now (called by the BullMQ worker on schedule, or by
+ * Run one mission now (called by the cron tick once it claims the row, or by
  * POST /api/missions/:id/run-now). Enforces per-run token budget, records
  * telemetry on the mission row, notifies the user, and backs off after
  * repeated failures (auto-disable at MAX_CONSECUTIVE_FAILURES).
@@ -352,9 +303,8 @@ async function runMission(missionId, { manual = false } = {}) {
       });
     } catch (e) { /* notification is best-effort; the row already records it */ }
 
-    if (autoDisable) {
-      await syncMissionSchedules(); // drop the repeatable job
-    }
+    // Auto-disable needs no extra bookkeeping: the UPDATE above already cleared
+    // next_run_at, and the cron tick only claims rows that are enabled and due.
 
     eventBus.emit('mission:failed', { missionId, failures, autoDisabled: autoDisable });
     return { success: false, error: err.message, failures, autoDisabled: autoDisable };
@@ -378,6 +328,6 @@ async function missionHistory(missionId, userId, limit = 10) {
 
 module.exports = {
   listMissions, getMission, createMission, updateMission, deleteMission,
-  syncMissionSchedules, runMission, missionHistory,
-  cadenceToCron, isValidCadence, MISSION_JOB, MAX_CONSECUTIVE_FAILURES
+  runMission, missionHistory,
+  cadenceToCron, isValidCadence, estimateNextRun, MAX_CONSECUTIVE_FAILURES
 };

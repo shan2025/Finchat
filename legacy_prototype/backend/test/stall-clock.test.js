@@ -3,7 +3,7 @@
 // A mission hit Groq's daily allowance, spent ~120s of a 180s runtime budget
 // asleep in 429 retries, and was cut off at 203s having done under a minute of
 // real work. The ledger exists so that waiting is measured separately; the
-// isolation test is the one that matters, because WorkerPool runs executions
+// isolation test is the one that matters, because the server runs executions
 // concurrently and a shared counter would let one run's backoff pay for
 // another's overrun.
 const test = require('node:test');

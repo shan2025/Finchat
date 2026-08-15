@@ -152,11 +152,11 @@ async function main() {
   const firstFive2 = embedding2.slice(0, 5).map(v => v.toFixed(6)).join(',');
   assert(firstFive1 === firstFive2, 'Deterministic: same input produces same embedding');
 
-  // ─── Test 7: WorkerPool morning briefing scheduler ───
-  console.log('\n▸ Test 7: WorkerPool morning briefing exports');
-  const WorkerPool = require('../services/queue/WorkerPool');
-  assert(typeof WorkerPool.scheduleMorningBriefing === 'function', 'scheduleMorningBriefing() exported');
-  assert(typeof WorkerPool.cancelMorningBriefings === 'function', 'cancelMorningBriefings() exported');
+  // ─── Test 7: morning briefing service ───
+  console.log('\n▸ Test 7: morning briefing exports');
+  const briefing = require('../services/briefing');
+  assert(typeof briefing.runMorningBriefing === 'function', 'runMorningBriefing() exported');
+  assert(typeof briefing.briefingSessionTitle === 'function', 'briefingSessionTitle() exported');
 
   // ─── Test 8: ReflectionEngine imports MemoryService ───
   console.log('\n▸ Test 8: ReflectionEngine pgvector integration');

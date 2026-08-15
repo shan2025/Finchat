@@ -219,7 +219,7 @@ async function _runWithinStallClock({
     // overshoot for real.
     //
     // The 8 survives as an explicit upper safety net rather than the bound
-    // itself. Budgets configured above it — aiChat's 12/15/20, WorkerPool's 14 —
+    // itself. Budgets configured above it — aiChat's 12/15/20, the briefing's 14 —
     // have never actually been reachable, so letting them through here would
     // raise real LLM spend as a side effect of a containment fix. That is a
     // deliberate decision to take separately, not to smuggle in.

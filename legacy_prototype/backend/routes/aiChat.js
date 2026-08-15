@@ -9,7 +9,6 @@ const { listPersonas, getPersona } = require('../services/personas');
 const { createProof, updateProofIPFS, updateProofSolana, isCheckpoint } = require('../services/proof');
 const { anchorHash } = require('../services/solana');
 const { pinJSON, buildProofDocument } = require('../services/ipfs');
-const { enqueueExecutionJob, getJobStatus } = require('../services/queue/WorkerPool');
 const { createNotification } = require('../services/notifications');
 const multer = require('multer');
 const { extractFromUpload, persistUpload, buildAttachmentBlock } = require('../services/attachments');
@@ -400,7 +399,7 @@ router.get('/sessions', requireAuth, async (req, res) => {
     // all read "New conversation". New ones are titled at generation time; this
     // covers the ones already in the database, and keeps a briefing named after
     // the briefing even when the user has since replied inside it.
-    const { briefingSessionTitle } = require('../services/queue/WorkerPool');
+    const { briefingSessionTitle } = require('../services/briefing');
     const briefingTitle = (sessionId) => {
       const stamp = Number(String(sessionId).split('_')[1]);
       return briefingSessionTitle(Number.isFinite(stamp) ? new Date(stamp) : new Date());
@@ -472,89 +471,35 @@ router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
   }
 });
 
-// ── POST /api/ai-chat/enqueue ──────────────────────────────────
-router.post('/enqueue', requireAuth, async (req, res) => {
-  const userId = req.user.id;
-  const { persona: personaId, message, sessionId } = req.body;
-
-  if (!personaId) return res.status(400).json({ error: 'Persona ID required' });
-  if (!message) return res.status(400).json({ error: 'Message required' });
-
-  const activeSession = sessionId || uuidv4();
-
-  try {
-    const jobInfo = await enqueueExecutionJob({
-      personaId,
-      userMessage: message,
-      history: [],
-      options: { userId, sessionId: activeSession }
-    });
-
-    res.status(202).json({
-      status: 'enqueued',
-      jobId: jobInfo.jobId,
-      queue: jobInfo.queueName,
-      sessionId: activeSession,
-      pollUrl: `/api/ai-chat/job/${jobInfo.jobId}`
-    });
-  } catch (err) {
-    console.error('Enqueue error:', err);
-    res.status(500).json({ error: 'Failed to enqueue job', details: err.message });
-  }
-});
-
-// ── GET /api/ai-chat/job/:jobId ────────────────────────────────
-router.get('/job/:jobId', requireAuth, async (req, res) => {
-  try {
-    const status = await getJobStatus(req.params.jobId);
-    if (!status) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
-    res.json(status);
-  } catch (err) {
-    console.error('Job polling error:', err);
-    res.status(500).json({ error: 'Failed to fetch job status', details: err.message });
-  }
-});
-
 // ── POST /api/ai-chat/schedule-briefing ────────────────────────
-// Schedule recurring morning executive briefings or trigger one instantly
+// Run a morning executive briefing now.
+//
+// The `instant` flag used to choose between running one immediately and
+// registering a BullMQ repeatable job. Recurrence is no longer the app's to
+// own: the external cron service calls /api/cron/briefing on whatever schedule
+// it is configured with, which is the only schedule that survives this host
+// spinning down when idle. So this endpoint runs one briefing, and says so.
 router.post('/schedule-briefing', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const { cron = '0 8 * * *', instant = false } = req.body;
 
   try {
-    const { scheduleMorningBriefing } = require('../services/queue/WorkerPool');
-    const result = await scheduleMorningBriefing({ userId, cron, instant });
+    const { runMorningBriefing } = require('../services/briefing');
 
-    res.status(instant ? 202 : 200).json({
-      status: instant ? 'briefing_queued' : 'briefing_scheduled',
-      ...result,
-      message: instant
-        ? '🌅 Instant morning briefing has been queued! Check your inbox shortly.'
-        : `🌅 Recurring briefing scheduled at cron "${cron}". Your executive team will report every morning!`
+    // Fire and forget: a briefing takes minutes, and the dashboard button
+    // should not sit on an open connection waiting for it.
+    runMorningBriefing({ userId, requestedAt: new Date().toISOString() })
+      .catch(err => console.error(`❌ Briefing for ${userId} failed: ${err.message}`));
+
+    res.status(202).json({
+      status: 'briefing_started',
+      userId,
+      recurring: false,
+      message: '🌅 Morning briefing started — it will appear in your chat and notifications when the team finishes.',
+      note: 'Recurring briefings are scheduled by the external cron service against /api/cron/briefing.'
     });
   } catch (err) {
-    console.error('Schedule briefing error:', err);
-    res.status(500).json({ error: 'Failed to schedule briefing', details: err.message });
-  }
-});
-
-// ── DELETE /api/ai-chat/schedule-briefing ───────────────────────
-// Cancel all scheduled morning briefings
-router.delete('/schedule-briefing', requireAuth, async (req, res) => {
-  try {
-    const { cancelMorningBriefings } = require('../services/queue/WorkerPool');
-    const result = await cancelMorningBriefings();
-
-    res.json({
-      status: 'cancelled',
-      ...result,
-      message: `🌅 Cancelled ${result.cancelled} scheduled briefing(s).`
-    });
-  } catch (err) {
-    console.error('Cancel briefing error:', err);
-    res.status(500).json({ error: 'Failed to cancel briefings', details: err.message });
+    console.error('Briefing error:', err);
+    res.status(500).json({ error: 'Failed to start briefing', details: err.message });
   }
 });
 

@@ -441,17 +441,20 @@ server.listen(PORT, async () => {
   try { await sweepStaleExecutions(); } catch (e) { console.error('Stale-execution sweep failed:', e.message); }
   setInterval(() => sweepStaleExecutions().catch(e => console.error('Stale-execution sweep failed:', e.message)), 5 * 60 * 1000);
 
-  // Sprint 7: start the BullMQ worker (missions + briefings + queued chats) and
-  // register one repeatable job per ENABLED mission. Seeds ship disabled, so
-  // nothing burns tokens until the user flips a mission on.
+  // Missions and briefings are started by the EXTERNAL cron service calling
+  // /api/cron/tick and /api/cron/briefing — see routes/cron.js. There is
+  // deliberately no in-process scheduler and no worker to start: this host
+  // spins down when idle, so anything scheduled in-process simply stops firing.
+  // Missions carry their own next_run_at, which the tick claims atomically.
   try {
-    const { startWorkerPool } = require('./services/queue/WorkerPool');
-    startWorkerPool();
-    const { syncMissionSchedules } = require('./services/agents/MissionScheduler');
-    const sync = await syncMissionSchedules();
-    console.log(`🗓️ Mission scheduler ready — ${sync.scheduled} enabled mission(s) scheduled`);
+    const due = await query(
+      'SELECT count(*)::int AS n FROM agent_missions WHERE enabled = true');
+    console.log(`🗓️ Missions: ${due.rows[0].n} enabled — fired by external cron via /api/cron/tick`);
+    if (!process.env.CRON_SECRET) {
+      console.warn('⚠️ CRON_SECRET is not set — /api/cron/* is disabled, so nothing scheduled will run.');
+    }
   } catch (e) {
-    console.error('⚠️ Mission scheduler init failed (missions will not fire until restart):', e.message);
+    console.error('⚠️ Could not read mission state:', e.message);
   }
 
   // Sprint X: dream cycle — consolidate the knowledge graph every 6 hours

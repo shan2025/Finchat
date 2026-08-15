@@ -1,13 +1,18 @@
 // routes/cron.js — trigger endpoints for an EXTERNAL scheduler.
 //
-// Why this exists: the in-process BullMQ scheduler only fires while the process
-// is alive. On a host that sleeps when idle (Render's free tier spins down after
+// Why this exists: an in-process scheduler only fires while the process is
+// alive. On a host that sleeps when idle (Render's free tier spins down after
 // ~15 minutes of no requests) that means scheduled work silently stops, so
 // missions and briefings only ran while somebody happened to be using the app.
 //
 // Moving the *schedule* outside the app fixes that: an external cron service
 // calls these endpoints, and the request itself wakes the container. A cold
 // start costs ~50s, which is irrelevant for background work.
+//
+// These endpoints are now the ONLY thing that starts scheduled work. The app
+// once mirrored the same schedules into BullMQ repeatable jobs; that was pure
+// duplication of what is already in agent_missions.next_run_at, and it made a
+// Redis outage fatal to the whole server. Both are gone.
 //
 // Auth is a shared secret in CRON_SECRET, sent either as
 //   Authorization: Bearer <secret>        (preferred)
@@ -135,6 +140,10 @@ router.all('/tick', async (req, res) => {
  * Briefings are not stored with a next_run_at the way missions are, so there is
  * no due-check to make here — the external cron's own schedule IS the schedule.
  * Point a daily trigger at this endpoint at whatever hour you want the brief.
+ *
+ * Like /tick, this answers as soon as the run starts. A briefing is a full
+ * agent execution with a 240s budget, far longer than a cron caller should be
+ * held. Pass ?wait=1 to await the result instead.
  */
 router.all('/briefing', async (req, res) => {
   const userId = req.query.userId || req.body?.userId;
@@ -142,15 +151,26 @@ router.all('/briefing', async (req, res) => {
     return res.status(400).json({ error: 'userId is required (?userId=<uuid>).' });
   }
 
-  try {
-    const { scheduleMorningBriefing } = require('../services/queue/WorkerPool');
-    const job = await scheduleMorningBriefing({ userId, instant: true });
-    console.log(`⏰ [Cron] Queued morning briefing for ${userId} → job ${job.jobId}`);
-    res.status(202).json({ ok: true, userId, jobId: job.jobId, note: 'Briefing queued.' });
-  } catch (err) {
-    console.error('❌ [Cron] Could not queue briefing:', err.message);
-    res.status(503).json({ ok: false, error: err.message });
+  const wait = req.query.wait === '1' || req.query.wait === 'true';
+  const { runMorningBriefing } = require('../services/briefing');
+
+  if (wait) {
+    try {
+      const result = await runMorningBriefing({ userId, requestedAt: new Date().toISOString() });
+      return res.json({ ok: true, userId, waited: true, sessionId: result.sessionId, durationMs: result.durationMs });
+    } catch (err) {
+      console.error('❌ [Cron] Briefing failed:', err.message);
+      return res.status(503).json({ ok: false, error: err.message });
+    }
   }
+
+  // Fire and forget — nothing retries behind this now that the queue is gone,
+  // so the failure has to be logged here or it is lost entirely.
+  runMorningBriefing({ userId, requestedAt: new Date().toISOString() })
+    .catch(err => console.error(`❌ [Cron] Briefing for ${userId} failed: ${err.message}`));
+
+  console.log(`⏰ [Cron] Started morning briefing for ${userId}`);
+  res.status(202).json({ ok: true, userId, note: 'Briefing started in the background.' });
 });
 
 /** Cheap authenticated no-op, so you can verify the secret without side effects. */

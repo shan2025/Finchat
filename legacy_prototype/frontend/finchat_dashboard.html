@@ -253,15 +253,15 @@
         <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h3 class="text-sm font-bold uppercase tracking-wider text-[#8c7a6b] mb-4 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[18px]">memory</span> Cognitive Worker Pool
+              <span class="material-symbols-outlined text-[18px]">memory</span> Cognitive Executions
             </h3>
             <div class="grid grid-cols-2 gap-4">
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">ACTIVE JOBS</div>
+                <div class="text-xs text-[#8c7a6b] font-mono">RUNNING NOW</div>
                 <div class="text-2xl font-bold font-mono text-[#3b82f6] mt-1" id="qActive">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">WAITING IN QUEUE</div>
+                <div class="text-xs text-[#8c7a6b] font-mono">MISSIONS DUE</div>
                 <div class="text-2xl font-bold font-mono text-[#d97706] mt-1" id="qWaiting">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
@@ -269,12 +269,12 @@
                 <div class="text-2xl font-bold font-mono text-[#16a34a] mt-1" id="qCompleted">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">FAILED</div>
+                <div class="text-xs text-[#8c7a6b] font-mono">FAILED TODAY</div>
                 <div class="text-2xl font-bold font-mono text-[#dc2626] mt-1" id="qFailed">0</div>
               </div>
             </div>
           </div>
-          <div class="text-[11px] text-[#8c7a6b] mt-4 font-mono">Powered by BullMQ & Redis Upstash Engine</div>
+          <div class="text-[11px] text-[#8c7a6b] mt-4 font-mono">Missions fired by external cron · state in Postgres</div>
         </div>
 
         <!-- Morning Executive Briefing Trigger Card -->
@@ -293,11 +293,8 @@
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-3 mt-6 pt-4 border-t border-border-color">
-            <button onclick="scheduleBriefing(true)" class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2">
+            <button onclick="scheduleBriefing()" class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2">
               <span class="material-symbols-outlined text-[16px] text-[#facc15]">bolt</span> Trigger Instant Executive Briefing Now
-            </button>
-            <button onclick="scheduleBriefing(false)" class="bg-[#f3eee3] text-[#3a2e23] hover:bg-[#e8dfd1] border border-border-color px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px]">schedule</span> Re-Verify Daily Cron
             </button>
           </div>
         </div>
@@ -588,23 +585,25 @@
     });
   }
 
-  async function scheduleBriefing(instant) {
+  // Runs one briefing now. The daily 8:00 AM run is owned by the external cron
+  // service (it calls /api/cron/briefing), not by anything on this page — this
+  // host sleeps when idle, so an in-app schedule would simply stop firing.
+  async function scheduleBriefing() {
     try {
-      showToast(instant ? '⚡ Triggering instant executive briefing...' : '⏰ Confirming daily cron schedule...');
+      showToast('⚡ Triggering instant executive briefing...');
       const res = await fetch('/api/ai-chat/schedule-briefing', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ instant, cron: '0 8 * * *' })
+        body: JSON.stringify({})
       });
       if (res.ok) {
-        const result = await res.json();
-        showToast(instant ? '✅ Executive Briefing triggered! Watch Plato organize the team!' : '✅ Daily cron verified for 8:00 AM');
+        showToast('✅ Executive Briefing triggered! Watch Plato organize the team!');
         fetchStatus();
       } else {
-        showToast('❌ Failed to schedule briefing');
+        showToast('❌ Failed to start briefing');
       }
     } catch (err) {
       showToast('❌ Network error');
