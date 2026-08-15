@@ -669,12 +669,14 @@ async function mergeDuplicates() {
 }
 
 /**
- * One dream cycle: merge duplicates, decay stale edges, strengthen hot ones,
- * hunt for gaps. Returns a report and stores it as a graph_insight.
+ * The graph-wide half of a dream cycle: merge duplicate nodes, fade stale
+ * edges, strengthen recently-replayed ones.
+ *
+ * Split out from dream() so a sweep over every user runs it once rather than
+ * once per user — merging is idempotent and the two UPDATEs are unfiltered
+ * table sweeps, so repeating them per user is pure waste. See dreamAllUsers().
  */
-async function dream({ userId = null } = {}) {
-  const startedAt = new Date().toISOString();
-
+async function consolidateGraph() {
   const merged = await mergeDuplicates();
 
   // Edges untouched for 14+ days slowly fade (never below 0.05 — memories dim, not vanish)
@@ -691,25 +693,62 @@ async function dream({ userId = null } = {}) {
     RETURNING edge_id
   `);
 
+  return {
+    merged,
+    edgesDecayed: decayed.rowCount,
+    edgesStrengthened: strengthened.rowCount
+  };
+}
+
+/**
+ * One dream cycle: merge duplicates, decay stale edges, strengthen hot ones,
+ * hunt for gaps. Returns a report and stores it as a graph_insight.
+ *
+ * @param {object} opts
+ * @param {string} [opts.userId]        - whose graph to report on. Required for the
+ *                                        `memory:dream_completed` pulse to be
+ *                                        delivered; an ownerless report is not
+ *                                        emitted, because it cannot be routed to
+ *                                        anyone without broadcasting private
+ *                                        entity names to every browser.
+ * @param {object} [opts.consolidation] - pre-computed consolidateGraph() result, so a
+ *                                        multi-user sweep does the graph-wide work once.
+ * @param {boolean} [opts.nameCommunities=true] - spend an LLM call naming each NEW
+ *                                        cluster. Clusters keep any label they
+ *                                        already had either way; turning this off
+ *                                        only means a brand-new cluster is named
+ *                                        after its most important member instead.
+ *                                        The unattended sweep turns it off — see
+ *                                        dreamAllUsers().
+ */
+async function dream({ userId = null, consolidation = null, nameCommunities = true } = {}) {
+  const startedAt = new Date().toISOString();
+
+  const { merged, edgesDecayed, edgesStrengthened } = consolidation || await consolidateGraph();
+
   const gaps = await detectGaps({ userId });
 
   // Re-cluster the consolidated graph into named neighborhoods (Stage 4b).
   let communities = [];
   try {
     const { detectCommunities } = require('./Communities');
-    const cr = await detectCommunities({ userId });
+    const cr = await detectCommunities({ userId, name: nameCommunities });
     communities = cr.communities;
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.dream community detection failed: ${err.message}`);
   }
 
   const report = {
+    // Whose graph was consolidated. `mergedDetail` and `gaps` are entity names
+    // lifted straight out of that user's knowledge graph, so the report cannot
+    // be broadcast — server.js routes it to this user's sockets alone.
+    userId,
     startedAt,
     finishedAt: new Date().toISOString(),
     merged: merged.length,
     mergedDetail: merged.map(m => m.name),
-    edgesDecayed: decayed.rowCount,
-    edgesStrengthened: strengthened.rowCount,
+    edgesDecayed,
+    edgesStrengthened,
     gapsFound: gaps.length,
     gaps: gaps.map(g => g.concept),
     communities: communities.length,
@@ -721,15 +760,69 @@ async function dream({ userId = null } = {}) {
       INSERT INTO graph_insights (insight_id, user_id, kind, title, detail, payload, status)
       VALUES ($1, $2, 'dream_report', $3, $4, $5, 'accepted')
     `, [`ins_${randomUUID().slice(0, 12)}`, userId,
-      `Dream cycle: ${merged.length} merged, ${decayed.rowCount} faded, ${gaps.length} gaps found`,
-      `Consolidation run. Merged ${merged.length} duplicate node(s), decayed ${decayed.rowCount} stale edge(s), strengthened ${strengthened.rowCount} recent edge(s), surfaced ${gaps.length} knowledge gap(s).`,
+      `Dream cycle: ${merged.length} merged, ${edgesDecayed} faded, ${gaps.length} gaps found`,
+      `Consolidation run. Merged ${merged.length} duplicate node(s), decayed ${edgesDecayed} stale edge(s), strengthened ${edgesStrengthened} recent edge(s), surfaced ${gaps.length} knowledge gap(s).`,
       JSON.stringify(report)]);
   } catch (err) {
     console.warn(`⚠️ MemoryEngine dream report insert failed: ${err.message}`);
   }
 
-  eventBus.emit('memory:dream_completed', report);
+  // Only an owned report can be delivered. Emitting without a userId would
+  // reach nobody (server.js drops ownerless events) and log a warning on every
+  // scheduled run, so skip it rather than pretend.
+  if (userId) eventBus.emit('memory:dream_completed', report);
   return report;
+}
+
+/**
+ * The scheduled dream cycle across every user whose graph has changed.
+ *
+ * Runs the graph-wide consolidation once, then produces a per-user report —
+ * gaps and communities are already per-user queries, and the live neural-map
+ * pulse can only be delivered to a named owner. Before this, the scheduler
+ * called dream({}) once with no owner, which is what made the pulse broadcast
+ * one user's entity names to every connected browser.
+ *
+ * Only graphs touched inside the window are processed. The per-user pass costs
+ * a gap query plus a re-clustering each, and this runs every six hours — there
+ * is nothing to consolidate in an account that has been dormant for a month,
+ * and sweeping it anyway makes the job scale with total signups rather than
+ * with activity.
+ *
+ * Community naming is OFF here. Naming spends one LLM call per new cluster, and
+ * a graph carries a dozen or more, so an unattended four-times-a-day sweep was
+ * measured burning the whole daily allowance of the primary model on cosmetic
+ * labels — starving the chat path, which is what users are actually waiting on.
+ * Existing labels survive (community ids are content-addressed, so an unchanged
+ * cluster keeps its name), and the on-demand path in routes/knowledge.js still
+ * names properly because a human asked for it and is waiting on the answer.
+ *
+ * @param {object} opts
+ * @param {number} [opts.activeWithinDays=7] - how recently a graph must have been touched
+ * @returns {Promise<{consolidation, reports: object[]}>}
+ */
+async function dreamAllUsers({ activeWithinDays = 7 } = {}) {
+  const consolidation = await consolidateGraph();
+
+  const owners = await query(`
+    SELECT DISTINCT user_id FROM entities
+    WHERE user_id IS NOT NULL
+      AND status = 'active'
+      AND COALESCE(last_activated_at, last_seen_at, created_at) > now() - ($1 || ' days')::interval
+  `, [String(activeWithinDays)]);
+
+  const reports = [];
+  for (const row of owners.rows) {
+    try {
+      reports.push(await dream({ userId: row.user_id, consolidation, nameCommunities: false }));
+    } catch (err) {
+      // One user's graph failing must not abandon the rest of the sweep.
+      console.warn(`⚠️ Dream cycle failed for user ${row.user_id}: ${err.message}`);
+    }
+  }
+
+  console.log(`🌙 Dream cycle: merged ${consolidation.merged.length}, faded ${consolidation.edgesDecayed}, strengthened ${consolidation.edgesStrengthened} across ${reports.length} user graph(s).`);
+  return { consolidation, reports };
 }
 
 module.exports = {
@@ -739,6 +832,8 @@ module.exports = {
   recordActivation,
   detectGaps,
   dream,
+  dreamAllUsers,
+  consolidateGraph,
   findExisting,
   upsertLivingEntity,
   upsertLivingEdge,

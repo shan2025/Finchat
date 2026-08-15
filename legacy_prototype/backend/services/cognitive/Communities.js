@@ -167,17 +167,36 @@ async function detectCommunities({ minSize = 3, name = true, userId = null } = {
     [userId]);
   await pruneOrphanCommunities();
 
+  // Community ids are content-addressed over their member set, so a cluster
+  // whose membership has not changed keeps its id — and therefore its label.
+  // Look those up once and reuse them: naming costs one LLM call per cluster,
+  // and the scheduled dream cycle re-clusters every user's graph four times a
+  // day, where the overwhelming majority of clusters are unchanged. Without
+  // this, that sweep re-buys every label it already owns.
+  const candidateIds = kept.map(members => communityIdFor(members));
+  const existingLabels = new Map();
+  if (candidateIds.length > 0) {
+    const known = await query(
+      `SELECT community_id, label FROM graph_communities WHERE community_id = ANY($1)`,
+      [candidateIds]
+    );
+    for (const row of known.rows) {
+      if (row.label) existingLabels.set(row.community_id, row.label);
+    }
+  }
+
   const communities = [];
   let clustered = 0;
   for (let i = 0; i < kept.length; i++) {
     const members = kept[i];
-    const communityId = communityIdFor(members);
+    const communityId = candidateIds[i];
     const color = PALETTE[i % PALETTE.length];
     // Representative nodes: highest importance first.
     const topIds = [...members].sort((a, b) => impById.get(b) - impById.get(a)).slice(0, 6);
     const topNames = topIds.map(id => nameById.get(id));
     const fallback = topNames[0] || 'Cluster';
-    const label = name ? await nameCluster(members.map(id => nameById.get(id)), fallback) : fallback;
+    const label = existingLabels.get(communityId)
+      || (name ? await nameCluster(members.map(id => nameById.get(id)), fallback) : fallback);
 
     await query(`
       INSERT INTO graph_communities (community_id, label, color, size, top_nodes, algo, updated_at)

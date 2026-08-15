@@ -14,7 +14,7 @@
 // Best-effort throughout: a digest must never break the dream cycle or chat.
 
 const { query } = require('../../database');
-const { dream } = require('./MemoryEngine');
+const { dreamAllUsers } = require('./MemoryEngine');
 const { createNotification } = require('../notifications');
 
 // ── Recipients: users who taught the graph something in the window ──────────
@@ -93,8 +93,19 @@ function composeMessage(user, consolidation, newLinks) {
  * @returns {Promise<{consolidation, newLinks, recipients, notified, digests}>}
  */
 async function runNightlyDigest({ notify = true, windowHours = 24 } = {}) {
-  // 1. Consolidate. dream() already writes its own dream_report insight.
-  const consolidation = await dream({});
+  // 1. Consolidate every user's graph. dreamAllUsers() does the graph-wide
+  //    sweep once and writes a per-user dream_report insight for each owner.
+  const { consolidation: sweep, reports } = await dreamAllUsers();
+
+  // Merging, decay and strengthening are graph-wide, so every digest quotes the
+  // same figures. Gaps are not — they come out of one user's own graph, so each
+  // digest quotes that user's own count rather than a system-wide total.
+  const shared = {
+    merged: sweep.merged.length,
+    edgesDecayed: sweep.edgesDecayed,
+    edgesStrengthened: sweep.edgesStrengthened
+  };
+  const reportByUser = new Map(reports.map(r => [r.userId, r]));
 
   // 2 + 3. Per-user digests.
   const [users, newLinks] = await Promise.all([activeUsers(windowHours), newLinkCount(windowHours)]);
@@ -106,6 +117,10 @@ async function runNightlyDigest({ notify = true, windowHours = 24 } = {}) {
     // with a pure system-maintenance report.
     if (user.learned === 0 && user.touched === 0 && user.recalled === 0) continue;
 
+    const consolidation = {
+      ...shared,
+      gapsFound: reportByUser.get(user.userId)?.gapsFound || 0
+    };
     const { title, content } = composeMessage(user, consolidation, newLinks);
     digests.push({ userId: user.userId, title, content, ...user });
 
@@ -129,8 +144,16 @@ async function runNightlyDigest({ notify = true, windowHours = 24 } = {}) {
     console.warn(`⚠️ DreamDigest report snapshot failed: ${err.message}`);
   }
 
-  console.log(`🌙 Dream digest: consolidated (merged ${consolidation.merged}, faded ${consolidation.edgesDecayed}, gaps ${consolidation.gapsFound}); notified ${notified}/${users.length} active user(s).`);
-  return { consolidation, newLinks, recipients: users.length, notified, digests };
+  const gapsFound = reports.reduce((n, r) => n + (r.gapsFound || 0), 0);
+
+  console.log(`🌙 Dream digest: consolidated (merged ${shared.merged}, faded ${shared.edgesDecayed}, gaps ${gapsFound} across ${reports.length} graph(s)); notified ${notified}/${users.length} active user(s).`);
+  return {
+    consolidation: { ...shared, gapsFound },
+    newLinks,
+    recipients: users.length,
+    notified,
+    digests
+  };
 }
 
 module.exports = { runNightlyDigest, composeMessage };
