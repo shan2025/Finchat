@@ -15,7 +15,7 @@
 // Every write is best-effort: memory must never break chat.
 
 const { randomUUID } = require('crypto');
-const { query } = require('../../database');
+const { query, getPool } = require('../../database');
 const { runInference } = require('../inference');
 const { eventBus } = require('./EventBus');
 
@@ -645,19 +645,7 @@ async function mergeDuplicates() {
     const [survivor, ...losers] = row.ids;
     for (const loser of losers) {
       try {
-        await query(`UPDATE entity_edges SET from_entity_id = $1 WHERE from_entity_id = $2 AND to_entity_id <> $1`, [survivor, loser]);
-        await query(`UPDATE entity_edges SET to_entity_id = $1 WHERE to_entity_id = $2 AND from_entity_id <> $1`, [survivor, loser]);
-        await query(`DELETE FROM entity_edges WHERE from_entity_id = $1 AND to_entity_id = $1`, [survivor]);
-        await query(`UPDATE node_events SET entity_id = $1 WHERE entity_id = $2`, [survivor, loser]);
-        await query(`
-          UPDATE entities s SET
-            mention_count = s.mention_count + l.mention_count,
-            importance = GREATEST(s.importance, l.importance),
-            summary = CASE WHEN LENGTH(s.summary) >= LENGTH(l.summary) THEN s.summary ELSE l.summary END,
-            aliases = (SELECT to_jsonb(ARRAY(SELECT DISTINCT x FROM jsonb_array_elements_text(s.aliases || to_jsonb(ARRAY[LOWER(l.canonical_name)])) AS x)))
-          FROM entities l WHERE s.entity_id = $1 AND l.entity_id = $2
-        `, [survivor, loser]);
-        await query(`UPDATE entities SET status = 'merged', merged_into = $1 WHERE entity_id = $2`, [survivor, loser]);
+        await mergeEntityPair(survivor, loser);
         await recordEvent(survivor, 'merged', `Absorbed duplicate node during dream consolidation.`, { sourceType: 'dream' });
         merged.push({ survivor, loser, name: row.lname });
       } catch (err) {
@@ -666,6 +654,78 @@ async function mergeDuplicates() {
     }
   }
   return merged;
+}
+
+/**
+ * Fold the loser's edges of one direction onto the survivor's colliding edge.
+ *
+ * entity_edges_unique_triple is (from, to, edge_type, user_id), so simply
+ * repointing an edge onto the survivor explodes whenever the survivor already
+ * connects to the same neighbour with the same relation. Instead: sum the
+ * weight, keep the strongest strength/confidence and the latest activation on
+ * the survivor's edge, drop the loser's now-redundant row, and only then move
+ * whatever is left (which by construction can no longer collide).
+ *
+ * `dir` is the column being repointed; `other` is the fixed end of the edge.
+ * user_id is compared with IS NOT DISTINCT FROM because the constraint treats
+ * NULL user_id rows as distinct — matching it exactly is what makes the
+ * follow-up UPDATE collision-free.
+ */
+async function foldEdges(client, dir, survivor, loser) {
+  const other = dir === 'from_entity_id' ? 'to_entity_id' : 'from_entity_id';
+  await client.query(`
+    WITH folded AS (
+      UPDATE entity_edges s SET
+        weight = s.weight + l.weight,
+        strength = LEAST(1.0, GREATEST(s.strength, l.strength)),
+        confidence = GREATEST(s.confidence, l.confidence),
+        activation_count = s.activation_count + l.activation_count,
+        reason = CASE WHEN COALESCE(s.reason, '') <> '' THEN s.reason ELSE l.reason END,
+        last_activated_at = GREATEST(s.last_activated_at, l.last_activated_at),
+        updated_at = now()
+      FROM entity_edges l
+      WHERE l.${dir} = $2 AND l.${other} <> $1
+        AND s.${dir} = $1 AND s.${other} = l.${other}
+        AND s.edge_type = l.edge_type
+        AND s.user_id IS NOT DISTINCT FROM l.user_id
+      RETURNING l.edge_id
+    )
+    DELETE FROM entity_edges WHERE edge_id IN (SELECT edge_id FROM folded)
+  `, [survivor, loser]);
+  await client.query(
+    `UPDATE entity_edges SET ${dir} = $1, updated_at = now() WHERE ${dir} = $2 AND ${other} <> $1`,
+    [survivor, loser]
+  );
+}
+
+/** Absorb `loser` into `survivor` atomically — edges, events, counters, tombstone. */
+async function mergeEntityPair(survivor, loser) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await foldEdges(client, 'from_entity_id', survivor, loser);
+    await foldEdges(client, 'to_entity_id', survivor, loser);
+    // Anything still touching the loser is a self-loop (loser↔loser or the
+    // survivor↔loser edge we just repointed onto itself).
+    await client.query(`DELETE FROM entity_edges WHERE from_entity_id = $1 OR to_entity_id = $1`, [loser]);
+    await client.query(`DELETE FROM entity_edges WHERE from_entity_id = $1 AND to_entity_id = $1`, [survivor]);
+    await client.query(`UPDATE node_events SET entity_id = $1 WHERE entity_id = $2`, [survivor, loser]);
+    await client.query(`
+      UPDATE entities s SET
+        mention_count = s.mention_count + l.mention_count,
+        importance = GREATEST(s.importance, l.importance),
+        summary = CASE WHEN LENGTH(s.summary) >= LENGTH(l.summary) THEN s.summary ELSE l.summary END,
+        aliases = (SELECT to_jsonb(ARRAY(SELECT DISTINCT x FROM jsonb_array_elements_text(s.aliases || to_jsonb(ARRAY[LOWER(l.canonical_name)])) AS x)))
+      FROM entities l WHERE s.entity_id = $1 AND l.entity_id = $2
+    `, [survivor, loser]);
+    await client.query(`UPDATE entities SET status = 'merged', merged_into = $1 WHERE entity_id = $2`, [survivor, loser]);
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /**

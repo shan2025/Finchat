@@ -14,9 +14,20 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 // localhost, which does not exist on a cloud host, so Groq running out used to
 // mean no inference at all. Deliberately spans three model families, since a
 // spent quota is scoped to one model.
-const GROQ_PRIMARY_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+//
+// llama-3.3-70b-versatile was the primary until Groq announced its
+// decommission (notice dated 2026-08-15). gpt-oss-120b replaces it: verified
+// against the real agent prompt in JSON mode and the strongest model this key
+// still serves. Note it is a reasoning model and bills its reasoning tokens —
+// the same turn cost 511 tokens against 70B's 209 — so runs burn roughly twice
+// the budget for the same work.
+//
+// qwen/qwen3.6-27b is available on the key and deliberately NOT listed: it
+// emits a <think> preamble, fails Groq's own json_object validation, and never
+// parses into an action. Do not add it.
+const GROQ_PRIMARY_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
-  'openai/gpt-oss-120b,llama-3.1-8b-instant')
+  'openai/gpt-oss-20b,llama-3.1-8b-instant')
   .split(',').map(s => s.trim()).filter(Boolean);
 
 // ── Token-bucket rate limiter ────────────────────────────────────
@@ -26,6 +37,11 @@ const BUCKET_REFILL_MS = 60_000; // 1 minute window
 const MAX_WAIT_MS = 5_000;       // max time to wait for a token before fallback
 
 const _bucket = { tokens: GROQ_RPM, lastRefill: Date.now() };
+
+// Model ids this key has already rejected outright (HTTP 400 — retired or
+// misspelled). Process-lifetime only: a restart re-probes, so a model that
+// comes back is picked up without a deploy.
+const _deadModels = new Set();
 
 function _refillBucket() {
   const now = Date.now();
@@ -48,15 +64,23 @@ async function _acquireToken() {
   _refillBucket();
   if (_bucket.tokens > 0) { _bucket.tokens--; return true; }
 
-  // Wait for the next partial refill
+  // Wait for the next partial refill (also stall time, not work time)
   const waitMs = Math.min(MAX_WAIT_MS, Math.ceil(BUCKET_REFILL_MS / GROQ_RPM));
-  await new Promise(r => setTimeout(r, waitMs));
+  await _sleep(waitMs);
   _refillBucket();
   if (_bucket.tokens > 0) { _bucket.tokens--; return true; }
   return false; // still empty after waiting — fall to Ollama
 }
 
-const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// Sleeping here is time the caller is rate-limited, not time it is working, so
+// it is logged against the current execution's stall ledger and later subtracted
+// from the runtime budget. See StallClock.js.
+const { recordStall } = require('./cognitive/StallClock');
+const _sleep = async (ms) => {
+  const started = Date.now();
+  await new Promise(r => setTimeout(r, ms));
+  recordStall(Date.now() - started);
+};
 
 /**
  * Record one inference call for the Knowledge Center's "Inference & Context Reuse"
@@ -111,7 +135,7 @@ async function _callGroq({ apiKey, model, messages, temperature, jsonMode }) {
   const response = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
     {
-      model: model || 'llama-3.3-70b-versatile',
+      model: model || GROQ_PRIMARY_MODEL,
       messages,
       temperature,
       response_format: jsonMode ? { type: 'json_object' } : undefined
@@ -145,7 +169,19 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
     // An explicit `model` argument still wins, but it is only the first thing
     // tried — the rest of the chain covers it running out of daily allowance.
     const candidates = [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS]
-      .filter((m, i, arr) => m && arr.indexOf(m) === i);
+      .filter((m, i, arr) => m && arr.indexOf(m) === i)
+      // A model Groq has retired answers 400 forever, not transiently. Nova sat
+      // pinned to deepseek-r1-distill-llama-70b long after it was withdrawn and
+      // paid a doomed round-trip on EVERY reasoning turn before falling back —
+      // latency and stall time charged to the run for a call that could not
+      // succeed. Once a model 400s on a decommission, stop offering it.
+      .filter(m => !_deadModels.has(m));
+
+    // Everything retired: fall through to the chain's defaults rather than
+    // making no Groq call at all.
+    if (candidates.length === 0) {
+      candidates.push(...[GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS].filter(Boolean));
+    }
 
     // Trimming persists across models: once a payload proves too large for one
     // fallback the next is unlikely to accept it either, so the smaller version
@@ -212,6 +248,13 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
             _bucket.tokens = 0; // Drain bucket so other concurrent calls also wait
             await _sleep(delayMs);
             continue; // retry same model
+          }
+          // 400 = this model id is not something the key can serve (retired or
+          // misspelled). Remember it for the life of the process so the next
+          // turn skips straight to a model that exists.
+          if (status === 400) {
+            _deadModels.add(gModel);
+            console.warn(`⚠️ Groq model "${gModel}" rejected (400) — not retrying it this process`);
           }
           const nextModel = candidates[mi + 1];
           const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');

@@ -29,9 +29,14 @@ const TOOLS = {
     inputSchema: {
       type: 'object',
       properties: {
-        ticker: { type: 'string', description: 'Stock ticker symbol (e.g. TSLA, AAPL, GOOGL)' }
+        ticker: { type: 'string', description: 'Stock ticker symbol (e.g. TSLA, AAPL, GOOGL)' },
+        symbols: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of ticker symbols to look up in one call (e.g. ["AAPL", "TSLA"])'
+        }
       },
-      required: ['ticker']
+      required: []
     },
     outputSchema: {
       type: 'object',

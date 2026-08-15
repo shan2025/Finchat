@@ -198,6 +198,7 @@ function buildContext({
   graphContext = [],
   recipeHints = [],
   budgetExceeded = false,
+  missingSources = [],
   traits = null,
   userPreferences = [],
   allowWeb = true,
@@ -225,6 +226,19 @@ function buildContext({
     role: 'system',
     content: `${personaPrompt}${traitDirective}${prefDirective}${studyDirective}\n\n--- RESPONSE FORMAT ---\n${actionSchema}`
   });
+
+  // Research stopped short of the plan. Name the sources that never ran so the
+  // write-up states the gap instead of quietly reading as a complete brief —
+  // and so the model does not fill the hole with invented numbers.
+  if (budgetExceeded && Array.isArray(missingSources) && missingSources.length > 0) {
+    messages.push({
+      role: 'system',
+      content:
+        `--- PARTIAL RESEARCH ---\nThese planned sources were NOT retrieved: ${missingSources.join(', ')}.\n` +
+        `Write the report from the results you do have, and state plainly near the top which sources are ` +
+        `missing. Do NOT invent figures for the missing sources.`
+    });
+  }
 
   // 2. Memory context (Phase 6 — now live via MemoryService)
   if (memories.length > 0) {

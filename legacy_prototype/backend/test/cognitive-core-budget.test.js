@@ -123,7 +123,7 @@ const waitingRow = (over = {}) => ({
  * @param {Function} reason - fake ReasoningEngine.reason, called with the turn index
  * @param {Array}    [seed] - executions to pre-seed (for resumption tests)
  */
-function buildCore({ reason, seed = [] } = {}) {
+function buildCore({ reason, seed = [], planSteps = [] } = {}) {
   const repo = fakeRepo(seed);
   const calls = { reason: [], buildContext: [], executeTool: [] };
 
@@ -172,7 +172,7 @@ function buildCore({ reason, seed = [] } = {}) {
   });
 
   stub('../services/cognitive/PlanningEngine', {
-    async plan() { return { plan: { steps: [] }, stored: false }; },
+    async plan() { return { plan: { steps: planSteps }, stored: false }; },
   });
   stub('../services/cognitive/MemoryService', {
     async retrieveEnrichedContext() { return { memories: [], graphContext: [], recipeHints: [] }; },
@@ -231,6 +231,123 @@ test.describe('the reasoning loop stops at its ceiling', () => {
 
     assert.deepEqual(h.calls.buildContext.map(c => c.budgetExceeded), [false, false, true]);
     assert.equal(h.repo.only().iterations_used, 3);
+  });
+
+  // --- Write reserve -------------------------------------------------------
+  //
+  // A research mission spent its whole token budget gathering five sources and
+  // then had nothing left to write the brief, so it delivered the placeholder
+  // "Budget exceeded during plan execution." holding good data. A slice of the
+  // budget is now reserved for the synthesis pass.
+
+  test('the write pass is entered on the reserve, before the token ceiling', async () => {
+    // maxTokens 10000 → reserve 2000. Two 4000-token turns leave exactly the
+    // reserve, so the third turn is the funded write — while the row is still
+    // inside its ceiling (8000/10000), not past it.
+    const brief = '# Markets & Macro Intelligence Brief\n\nGold is bid.';
+    const h = buildCore({
+      reason: async (i) => i < 2
+        ? { action: { thought: `turn ${i}`, action: 'think' }, tokens: 4000, provider: 'fake', model: 'fake' }
+        : { action: { thought: 'writing', action: 'respond', response: brief }, tokens: 500, provider: 'fake', model: 'fake' },
+    });
+    const out = await h.core.run({ goal: 'g', userId: 'u1', budget: { maxTokens: 10000 } });
+
+    assert.deepEqual(h.calls.buildContext.map(c => c.budgetExceeded), [false, false, true],
+      'the restricted write schema arrives on the reserve turn');
+    const row = h.repo.only();
+    assert.ok(row.tokens_used <= row.max_tokens,
+      `the write was funded, not overshot: ${row.tokens_used}/${row.max_tokens}`);
+    assert.equal(row.completion_reason, 'natural');
+    assert.match(out.response, /Markets & Macro/, 'the brief is delivered, not a placeholder');
+  });
+
+  test('a report written on the last of the budget counts as delivered', async () => {
+    // The reserve buys a wrap-up turn, but that turn carries every accumulated
+    // tool result in its context and can still land over the ceiling. The loop
+    // used to read the breach before the action, so the finished brief was
+    // stamped 'budget_exceeded' — and MissionScheduler, which treats that reason
+    // as a failed run, binned the report and mailed "Mission didn't complete"
+    // instead. A run holding a real report has succeeded, whatever it cost.
+    const brief = '# Daily Research Digest\n\nThree sources, one conclusion.';
+    const h = buildCore({
+      reason: async (i) => i === 0
+        ? { action: { thought: 'researching', action: 'think' }, tokens: 5000, provider: 'fake', model: 'fake' }
+        : { action: { thought: 'writing', action: 'respond', response: brief }, tokens: 6000, provider: 'fake', model: 'fake' },
+    });
+    const out = await h.core.run({ goal: 'g', userId: 'u1', budget: { maxTokens: 10000 } });
+
+    const row = h.repo.only();
+    assert.ok(row.tokens_used > row.max_tokens, 'the write did overshoot the ceiling');
+    assert.equal(row.completion_reason, 'natural', 'an overshooting write is still a delivered report');
+    assert.match(out.response, /Daily Research Digest/);
+  });
+
+  test('the reserve is sized from the priciest turn, not a flat percentage', async () => {
+    // 15% of a 15000 ceiling is 2250 — less than half of what one turn holding
+    // the tool results costs. Every "funded" write was underfunded, which is why
+    // live missions kept ending at 19808/15000. The reserve now tracks the
+    // largest turn the run has actually paid for.
+    const h = buildCore({
+      reason: async (i) => i < 2
+        ? { action: { thought: `turn ${i}`, action: 'think' }, tokens: 5000, provider: 'fake', model: 'fake' }
+        : { action: { thought: 'writing', action: 'respond', response: 'done' }, tokens: 100, provider: 'fake', model: 'fake' },
+    });
+    await h.core.run({ goal: 'g', userId: 'u1', budget: { maxTokens: 15000 } });
+
+    // After one 5000-token turn the reserve is 5000, and 10000 left is still
+    // above it; after two, 5000 left trips it. The write lands on turn 3.
+    assert.deepEqual(h.calls.buildContext.map(c => c.budgetExceeded), [false, false, true]);
+  });
+
+  test('a mid-plan budget breach synthesizes what it gathered', async () => {
+    // The plan wants three sources; the tool-call budget covers one. The run
+    // used to end on the placeholder, discarding the result it already had.
+    const brief = '# Brief\n\nStocks only — commodities and crypto unavailable.';
+    const h = buildCore({
+      planSteps: [
+        { step: 1, action: 'tool', tool: 'stocks', input: 'AAPL' },
+        { step: 2, action: 'tool', tool: 'commodities', input: 'gold' },
+        { step: 3, action: 'tool', tool: 'crypto', input: 'BTC' },
+      ],
+      reason: async (i) => i === 0
+        ? { action: { thought: 'planning', action: 'plan' }, tokens: 10, provider: 'fake', model: 'fake' }
+        : { action: { thought: 'writing', action: 'respond', response: brief }, tokens: 10, provider: 'fake', model: 'fake' },
+    });
+    const out = await h.core.run({ goal: 'g', userId: 'u1', budget: { maxToolCalls: 1, maxTokens: 50000 } });
+
+    assert.match(out.response, /^# Brief/, 'the report was written from partial research');
+    assert.doesNotMatch(out.response, /Budget exceeded/);
+    const writeTurn = h.calls.buildContext.find(c => c.budgetExceeded);
+    assert.deepEqual(writeTurn.missingSources, ['commodities', 'crypto'],
+      'the sources that never ran are named for the write-up');
+  });
+
+  test('a mid-plan breach with nothing gathered still reports failure', async () => {
+    // The MissionScheduler gate keys off completion_reason: a run that got no
+    // data at all must stay a failure, or empty runs go out as reports again.
+    const h = buildCore({
+      planSteps: [{ step: 1, action: 'tool', tool: 'stocks', input: 'AAPL' }],
+      reason: async () => ({ action: { thought: 'planning', action: 'plan' }, tokens: 10, provider: 'fake', model: 'fake' }),
+    });
+    const out = await h.core.run({ goal: 'g', userId: 'u1', budget: { maxToolCalls: 0, maxTokens: 50000 } });
+
+    // Which placeholder comes back depends on how early the budget ran out;
+    // what must hold is that the row says the run failed, because that is the
+    // field MissionScheduler's FAILED_REASONS gate reads before delivering.
+    assert.equal(h.repo.only().completion_reason, 'budget_exceeded');
+    assert.match(out.response, /Budget exceeded/);
+    assert.equal(h.calls.executeTool.length, 0, 'nothing was gathered to write from');
+  });
+
+  test('the reserve funds exactly one write pass', async () => {
+    // The reserve must not become a second open-ended budget: a model that
+    // never volunteers an answer gets one restricted turn, then the run ends.
+    const h = buildCore({ reason: neverResponds(4000) });
+    await h.core.run({ goal: 'g', userId: 'u1', budget: { maxTokens: 10000 } });
+
+    assert.equal(h.calls.buildContext.filter(c => c.budgetExceeded).length, 1,
+      'one funded write pass, not a repeating one');
+    assert.equal(h.repo.only().completion_reason, 'budget_exceeded');
   });
 
   test('an exhausted token ceiling starts no further turn', async () => {
@@ -336,3 +453,4 @@ test.describe('resumeExecution re-enters the loop under the remaining budget', (
     assert.equal(original.completion_reason, 'budget_exceeded');
   });
 });
+

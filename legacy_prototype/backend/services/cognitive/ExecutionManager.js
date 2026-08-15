@@ -123,8 +123,11 @@ function createExecutionManager({ repository = executionRepository } = {}) {
   /**
    * Check whether any budget ceiling has been breached.
    */
-  async function checkBudget(executionId) {
-    return evaluateBudget(await getExecution(executionId));
+  // `now` is injectable so a caller can discount time the run spent stalled in a
+  // provider backoff — that is waiting, not working, and charging it to the
+  // runtime ceiling cut off runs that had barely started. Defaults to real time.
+  async function checkBudget(executionId, now = Date.now()) {
+    return evaluateBudget(await getExecution(executionId), now);
   }
 
   /**

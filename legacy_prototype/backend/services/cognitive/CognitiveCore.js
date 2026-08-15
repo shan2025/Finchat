@@ -199,6 +199,12 @@ async function _runWithinStallClock({
     let forceSynthesis = false;
     let synthesisDone = false;
     let missingSources = [];
+    // Largest single reasoning turn this run has paid for. The write reserve is
+    // sized from it, because the synthesis turn carries every accumulated tool
+    // result in its context and so costs at least as much as the priciest turn
+    // so far — a flat percentage of a small ceiling (15% of 15000 = 2250) did
+    // not come close, and the "funded" wrap-up blew the budget writing itself.
+    let maxTurnTokens = 0;
 
     // Sprint X Stage 2 — explainability: which memories/graph nodes fed this answer
     const traceConcepts = new Map();
@@ -253,7 +259,7 @@ async function _runWithinStallClock({
       // brief. Reserve a slice of the budget for the synthesis pass and enter it
       // BEFORE the ceiling, so the write is funded rather than cut off.
       const tokenCeiling = Number(verdict.details.tokens.max) || 0;
-      const writeReserve = Math.max(2000, Math.round(tokenCeiling * 0.15));
+      const writeReserve = Math.max(4000, maxTurnTokens, Math.round(tokenCeiling * 0.15));
       const tokensLeft = tokenCeiling - Number(verdict.details.tokens.used || 0);
       const reserveEntered = tokenCeiling > 0 && tokensLeft <= writeReserve;
       const toolCallsSpent = verdict.details.toolCalls.used >= verdict.details.toolCalls.max;
@@ -327,6 +333,7 @@ async function _runWithinStallClock({
       // that no further turn is started once it has.
       const usage = await incrementUsage(execId, { iterations: 1, tokens: result.tokens || 0 });
       const spent = evaluateBudget(usage);
+      maxTurnTokens = Math.max(maxTurnTokens, Number(result.tokens) || 0);
 
       // This turn ran on the reserve, so the run has now had its one funded
       // chance to write. Anything after this falls through to the ordinary
@@ -334,9 +341,18 @@ async function _runWithinStallClock({
       if (lastTurn) { synthesisDone = true; forceSynthesis = false; }
 
       // 3f. Handle action
+      // A wrap-up turn that actually WROTE the report is a success, even though
+      // writing it spent the last of the budget — that is precisely what the
+      // reserve above exists to buy. The old ordering read the breach first, so
+      // every reserve-funded synthesis was still stamped 'budget_exceeded',
+      // MissionScheduler discarded the finished report as a failed run, and the
+      // user got "Mission didn't complete" while the brief itself sat unread in
+      // the execution. The breach now only decides the reason when the turn left
+      // us with nothing to deliver.
       if (verdict.breached || spent.breached) {
-        finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
-        completionReason = 'budget_exceeded';
+        const written = withStudyBlocks(result.action);
+        finalResponse = written || 'Budget exceeded. Here is my best response given the constraints.';
+        completionReason = (written && !result.fallback) ? 'natural' : 'budget_exceeded';
         break;
       }
 

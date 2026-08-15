@@ -9,13 +9,15 @@ const { refreshRegistry, getAgentConfig } = require('../services/agents/AgentReg
 
 const VALID_RISK = ['Low', 'Medium', 'High'];
 // Optional per-agent model override — any Groq-supported model string, plus '' meaning "use default".
+// Every entry is verified to parse into a valid action under JSON mode against
+// the live key — an unusable model here fails as a mangled run, not an error.
+// Dropped: llama-3.3-70b-versatile (Groq decommission notice, 2026-08-15) and
+// deepseek-r1-distill-llama-70b (no longer served on this key at all).
 const VALID_MODELS = [
-  '', // default (llama-3.3-70b-versatile)
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
+  '', // default (GROQ_PRIMARY_MODEL — openai/gpt-oss-120b)
   'openai/gpt-oss-120b',
   'openai/gpt-oss-20b',
-  'deepseek-r1-distill-llama-70b'
+  'llama-3.1-8b-instant'
 ];
 
 /**

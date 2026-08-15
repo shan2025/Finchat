@@ -18,6 +18,22 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 // market brief. Give missions room to research *and* write.
 const MISSION_MAX_TOOL_CALLS = 12;
 
+// Floor for a mission run's token ceiling. Every reasoning turn re-sends the
+// accumulated tool results, so a multi-source research run costs tens of
+// thousands of tokens before a word of the report is written — the runs that
+// DID succeed landed at 25k–54k. Missions created against the old 4000 default
+// (and the 15000 rows) could not finish under any circumstances; they breached
+// mid-research and mailed "Mission didn't complete" every single day. A user
+// may still raise the ceiling, but not set one that guarantees failure.
+const MISSION_MIN_TOKENS = 40000;
+
+// Wall-clock ceiling for one scheduled run. 180s was tuned for an interactive
+// chat where someone is watching a spinner; nobody is watching a 4am mission,
+// and successful research runs were finishing at 190–240s — i.e. the timeout
+// was killing runs that were about to deliver. Provider backoff is already
+// discounted from this by StallClock, so it measures real work.
+const MISSION_MAX_RUNTIME_SECONDS = 420;
+
 // Upper bound a user may set for one mission run. Generous on purpose: the
 // binding cost is the provider's daily allowance, not this number, and a
 // too-low ceiling fails invisibly as a truncated run rather than as an error.
@@ -249,8 +265,8 @@ async function runMission(missionId, { manual = false } = {}) {
       targetAgentId: mission.agent_id,
       allowWeb: true,
       budget: {
-        maxTokens: mission.max_tokens_per_run,
-        maxRuntimeSeconds: 180,
+        maxTokens: Math.max(Number(mission.max_tokens_per_run) || 0, MISSION_MIN_TOKENS),
+        maxRuntimeSeconds: MISSION_MAX_RUNTIME_SECONDS,
         maxToolCalls: MISSION_MAX_TOOL_CALLS
       }
     });
