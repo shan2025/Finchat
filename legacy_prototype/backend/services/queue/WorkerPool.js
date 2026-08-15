@@ -24,6 +24,50 @@ function getRedisConnectionConfig() {
   return 'redis://127.0.0.1:6379';
 }
 
+// ── Queue availability ──────────────────────────────────────────
+// The queue is a background convenience, not a dependency of serving HTTP.
+// When Redis is unusable we switch it off deliberately and keep the app up,
+// rather than letting an unhandled 'error' event take the process down.
+let queueDisabledReason = process.env.DISABLE_QUEUE === 'true'
+  ? 'DISABLE_QUEUE=true'
+  : null;
+
+/**
+ * Is this error the provider saying "you are out of quota" rather than
+ * "the network hiccuped"? Upstash answers every command — including AUTH —
+ * with `ERR max requests limit exceeded` once the plan's monthly request cap
+ * is spent. Retrying that spends more of the very thing that ran out, so it
+ * has to be told apart from a transient connection fault.
+ */
+function _isQuotaError(err) {
+  return /max requests limit exceeded|max daily request limit/i.test(err?.message || '');
+}
+
+/**
+ * Switch the queue off for the life of the process and tear down whatever is
+ * still connected. Logged once: the failure that gets us here repeats on every
+ * reconnect, and a thousand identical stack traces bury the real boot output.
+ */
+function disableQueue(reason) {
+  if (queueDisabledReason) return;
+  queueDisabledReason = reason;
+  console.error(`⛔ Background queue disabled — ${reason}`);
+  console.error('   HTTP, chat and the DB are unaffected; missions and briefings will not fire until this is resolved.');
+
+  for (const conn of [connection, workerConnection]) {
+    // disconnect() drops the socket without issuing QUIT — a QUIT would be one
+    // more request against a quota we already know is spent.
+    try { conn?.disconnect(false); } catch { /* already gone */ }
+  }
+  queue = null;
+  queueEvents = null;
+  worker = null;
+}
+
+function isQueueAvailable() {
+  return !queueDisabledReason;
+}
+
 function getConnectionOptions(url) {
   const isTls = typeof url === 'string' && url.startsWith('rediss://');
   return {
@@ -32,6 +76,7 @@ function getConnectionOptions(url) {
     tls: isTls ? { rejectUnauthorized: false } : undefined,
     // ── Fix 3: Reconnect with exponential backoff ────────────────
     retryStrategy(times) {
+      if (queueDisabledReason) return null; // switched off — stop reconnecting
       if (times > 20) {
         console.error(`❌ Redis: giving up after ${times} retries`);
         return null; // stop retrying
@@ -57,6 +102,7 @@ let queue = null;
 let worker = null;
 let queueEvents = null;
 let connection = null;
+let workerConnection = null;
 
 /**
  * Attach event listeners to an ioredis connection for visibility.
@@ -64,21 +110,40 @@ let connection = null;
 function _attachRedisListeners(conn, label) {
   conn.on('connect', () => console.log(`🟢 Redis [${label}]: connected`));
   conn.on('ready', () => console.log(`🟢 Redis [${label}]: ready`));
-  conn.on('error', (err) => console.warn(`🔴 Redis [${label}] error: ${err.message}`));
+  conn.on('error', (err) => {
+    if (_isQuotaError(err)) return disableQueue(`Redis quota exhausted (${err.message})`);
+    console.warn(`🔴 Redis [${label}] error: ${err.message}`);
+  });
   conn.on('reconnecting', (ms) => console.warn(`🔄 Redis [${label}]: reconnecting in ${ms || '?'}ms`));
   conn.on('close', () => console.warn(`⚪ Redis [${label}]: connection closed`));
+}
+
+/**
+ * BullMQ's Queue/Worker/QueueEvents are EventEmitters in their own right and
+ * re-emit connection faults. In Node an 'error' event with no listener is an
+ * uncaught exception, so without this every Redis blip killed the whole
+ * server — the app would crash-loop on a background feature being down.
+ */
+function _attachBullListeners(emitter, label) {
+  emitter.on('error', (err) => {
+    if (_isQuotaError(err)) return disableQueue(`Redis quota exhausted (${err.message})`);
+    console.warn(`🔴 BullMQ [${label}] error: ${err.message}`);
+  });
 }
 
 /**
  * Get or initialize the BullMQ Queue instance.
  */
 function getQueue() {
+  if (queueDisabledReason) return null;
   if (!queue) {
     const redisUrl = getRedisConnectionConfig();
     connection = new Redis(redisUrl, getConnectionOptions(redisUrl));
     _attachRedisListeners(connection, 'queue');
     queue = new Queue(QUEUE_NAME, { connection });
     queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+    _attachBullListeners(queue, 'queue');
+    _attachBullListeners(queueEvents, 'queue-events');
 
     queueEvents.on('completed', ({ jobId, returnvalue }) => {
       eventBus.emit('worker:job_completed', { jobId, returnvalue, timestamp: new Date().toISOString() });
@@ -92,10 +157,21 @@ function getQueue() {
 }
 
 /**
+ * The queue for callers that cannot do anything useful without one. Fails with
+ * the reason it is off, so a route reports "queue disabled — quota exhausted"
+ * instead of a bare `Cannot read properties of null`.
+ */
+function _requireQueue() {
+  const q = getQueue();
+  if (!q) throw new Error(`Background queue unavailable — ${queueDisabledReason}`);
+  return q;
+}
+
+/**
  * Enqueue a cognitive execution request into BullMQ.
  */
 async function enqueueExecutionJob(jobData, jobOptions = {}) {
-  const q = getQueue();
+  const q = _requireQueue();
   const job = await q.add('execute-cognitive-chat', jobData, {
     attempts: 3,
     backoff: {
@@ -119,7 +195,7 @@ async function enqueueExecutionJob(jobData, jobOptions = {}) {
  * Check the status and outcome of a queued job.
  */
 async function getJobStatus(jobId) {
-  const q = getQueue();
+  const q = _requireQueue();
   const job = await q.getJob(jobId);
   if (!job) return null;
 
@@ -143,9 +219,13 @@ async function getJobStatus(jobId) {
  */
 function startWorkerPool(concurrency = 5) {
   if (worker) return worker;
+  if (queueDisabledReason) {
+    console.warn(`⛔ Worker pool not started — ${queueDisabledReason}`);
+    return null;
+  }
 
   const redisUrl = getRedisConnectionConfig();
-  const workerConnection = new Redis(redisUrl, getConnectionOptions(redisUrl));
+  workerConnection = new Redis(redisUrl, getConnectionOptions(redisUrl));
   _attachRedisListeners(workerConnection, 'worker');
 
   worker = new Worker(QUEUE_NAME, async (job) => {
@@ -179,8 +259,19 @@ function startWorkerPool(concurrency = 5) {
     };
   }, {
     connection: workerConnection,
-    concurrency
+    concurrency,
+    // An idle BullMQ worker is not free: it holds a blocking poll on the wait
+    // list and runs a stalled-job sweep on a timer, and every one of those is a
+    // billable request against Upstash's monthly cap. At the defaults (5s drain,
+    // 30s stalled check) a worker that processes nothing at all still spends
+    // roughly half a million requests a month — which is exactly the free plan's
+    // entire allowance. Missions are cron-paced in minutes, not milliseconds, so
+    // a slower idle heartbeat costs nothing that matters.
+    drainDelay: Number(process.env.QUEUE_DRAIN_DELAY_SEC || 60),      // default 5s
+    stalledInterval: Number(process.env.QUEUE_STALLED_INTERVAL_MS || 300_000) // default 30s
   });
+
+  _attachBullListeners(worker, 'worker');
 
   worker.on('failed', (job, err) => {
     console.error(`[WorkerPool] Job #${job?.id} failed:`, err.message);
@@ -362,7 +453,7 @@ async function processMorningBriefing(job) {
  * @returns {Promise<{ jobId, scheduled, cron, nextRun }>}
  */
 async function scheduleMorningBriefing({ userId = 'system', cron = '0 8 * * *', instant = false } = {}) {
-  const q = getQueue();
+  const q = _requireQueue();
 
   if (instant) {
     // Run immediately as a one-shot job
@@ -415,7 +506,7 @@ async function scheduleMorningBriefing({ userId = 'system', cron = '0 8 * * *', 
  * Cancel all scheduled morning briefings for a user.
  */
 async function cancelMorningBriefings() {
-  const q = getQueue();
+  const q = _requireQueue();
   const repeatable = await q.getRepeatableJobs();
   let cancelled = 0;
 
@@ -450,10 +541,15 @@ async function shutdownWorkerPool() {
     await connection.quit();
     connection = null;
   }
+  if (workerConnection) {
+    await workerConnection.quit();
+    workerConnection = null;
+  }
 }
 
 module.exports = {
   getQueue,
+  isQueueAvailable,
   enqueueExecutionJob,
   getJobStatus,
   startWorkerPool,

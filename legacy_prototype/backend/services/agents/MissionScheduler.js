@@ -190,6 +190,10 @@ async function deleteMission(missionId, userId) {
 async function syncMissionSchedules() {
   const { getQueue } = require('../queue/WorkerPool');
   const q = getQueue();
+  // No queue (Redis down or out of quota) means nothing to reconcile against.
+  // Missions stay in the table and get re-scheduled on the next sync, so this
+  // is a pause, not a loss — and it must not fail the mutation that called us.
+  if (!q) return { scheduled: 0, added: 0, skipped: 'queue unavailable' };
 
   const enabledRes = await query('SELECT mission_id, cadence FROM agent_missions WHERE enabled = true');
   const wanted = new Map(enabledRes.rows.map(m => [m.mission_id, cadenceToCron(m.cadence, m.mission_id)]));
