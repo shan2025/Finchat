@@ -116,24 +116,11 @@ const io = new Server(server, {
 // Security headers. Tailwind is now a prebuilt stylesheet rather than a
 // runtime compiler, and Socket.io is served from this origin, so 'unsafe-eval'
 // and both of those CDN hosts are gone. 'unsafe-inline' has to stay until the
-// inline <script> blocks on all 17 pages move into files.
+// inline <script> blocks on all 17 pages move into files. The CSP directives
+// live in config/csp.js so the guard test can render and assert the real
+// header — read the note there before changing them.
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-      // jsdelivr is not listed here: the only things still loaded from it are
-      // marked and DOMPurify, which are scripts.
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      connectSrc: ["'self'", 'ws:', 'wss:'],
-      frameAncestors: ["'none'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"]
-    }
-  },
+  contentSecurityPolicy: { directives: require('./config/csp') },
   // Cross-origin isolation would block the CDN assets above.
   crossOriginEmbedderPolicy: false,
   // Match the CSP's frame-ancestors 'none' for browsers that only honour the
