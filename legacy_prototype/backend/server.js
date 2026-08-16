@@ -30,11 +30,19 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 // ── CORS allowlist ───────────────────────────────────────────
 // Previously every origin was reflected back, which let any website on the
 // internet call this API with a victim's bearer token. The allowlist is
-// explicit: ALLOWED_ORIGINS (comma-separated) plus FRONTEND_URL. Outside
-// production, localhost on any port is also accepted so the app can be opened
-// from a dev server without editing env files.
+// explicit: ALLOWED_ORIGINS (comma-separated) plus FRONTEND_URL, and on Render
+// also RENDER_EXTERNAL_URL, which the platform injects with the service's own
+// public URL. That last one matters: this process serves the frontend as well
+// as the API, so if the deploy's env is missing FRONTEND_URL the app's own
+// requests get rejected and nothing works. Outside production, localhost on any
+// port is also accepted so the app can be opened from a dev server without
+// editing env files.
 const ALLOWED_ORIGINS = new Set(
-  [...(process.env.ALLOWED_ORIGINS || '').split(','), process.env.FRONTEND_URL]
+  [
+    ...(process.env.ALLOWED_ORIGINS || '').split(','),
+    process.env.FRONTEND_URL,
+    process.env.RENDER_EXTERNAL_URL
+  ]
     .map(s => (s || '').trim().replace(/\/$/, ''))
     .filter(Boolean)
 );
@@ -42,11 +50,10 @@ const ALLOWED_ORIGINS = new Set(
 const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 /**
- * A request with no Origin header is same-origin, a native client, or a
- * server-to-server call — the browser only sends Origin on cross-origin
- * requests, so there is nothing to protect against here. The literal string
- * "null" is NOT in that category: it is what sandboxed iframes and file://
- * pages send, and it is rejected.
+ * A request with no Origin header is a native client or a server-to-server
+ * call: no browser is enforcing anything, so there is nothing to protect
+ * against here. The literal string "null" is NOT in that category: it is what
+ * sandboxed iframes and file:// pages send, and it is rejected.
  */
 function isOriginAllowed(origin) {
   if (!origin) return true;
@@ -56,8 +63,33 @@ function isOriginAllowed(origin) {
   return false;
 }
 
-function corsOriginCallback(origin, callback) {
-  if (isOriginAllowed(origin)) return callback(null, true);
+/**
+ * Same-origin requests carry an Origin header too — browsers send it on every
+ * POST/PUT/DELETE and on the Socket.io handshake, not only cross-origin. CORS
+ * never guards same-origin traffic, so rejecting it protects nothing and just
+ * 403s the app's own frontend. Compare the Origin's host against the host the
+ * request was addressed to (behind Render's proxy, X-Forwarded-Host).
+ */
+function isSameOrigin(origin, req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host === String(host).split(',')[0].trim();
+  } catch {
+    return false; // "null" and other unparseable origins fall through to reject
+  }
+}
+
+/**
+ * cors() delegate: resolves per request so the same-origin check can see the
+ * headers. Socket.io hands its `cors` option straight to the same middleware,
+ * so both entry points share this.
+ */
+function corsDelegate(req, callback) {
+  const origin = req.headers.origin;
+  if (isOriginAllowed(origin) || isSameOrigin(origin, req)) {
+    return callback(null, { origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] });
+  }
   console.warn(`🚫 CORS: rejected origin "${origin}"`);
   // Tagged so the error handler answers 403 instead of logging a rejected
   // origin as a server fault and returning 500.
@@ -77,11 +109,7 @@ const server = http.createServer(app);
 
 // ── Socket.io setup ──────────────────────────────────────────
 const io = new Server(server, {
-  cors: {
-    origin: corsOriginCallback,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
+  cors: corsDelegate
 });
 
 // ── Express middleware ───────────────────────────────────────
@@ -113,10 +141,7 @@ app.use(helmet({
   frameguard: { action: 'deny' }
 }));
 
-app.use(cors({
-  origin: corsOriginCallback,
-  credentials: true
-}));
+app.use(cors(corsDelegate));
 
 // ── Rate limiting ────────────────────────────────────────────
 // Credential endpoints get a tight bucket keyed on IP: login, register and the
