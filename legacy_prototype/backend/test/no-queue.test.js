@@ -2,9 +2,15 @@
 //
 // Missions and briefings are started by the external cron service hitting
 // /api/cron/tick and /api/cron/briefing. Scheduling state lives in
-// agent_missions.next_run_at. There is no Redis, no BullMQ, and no in-process
-// scheduler — which is what stops a Redis outage from crash-looping the server
-// and what stops an idle worker from silently spending an entire Upstash plan.
+// agent_missions.next_run_at. There is no queue and no in-process scheduler —
+// which is what stops a Redis outage from crash-looping the server and what
+// stops an idle worker from silently spending an entire Upstash plan.
+//
+// What is banned is the *queue*: bullmq and its persistent ioredis socket.
+// services/redis.js is a different thing and stays — it caches over Upstash's
+// REST API with axios, makes a request only when something asks it to, and
+// returns null (falling back to no-op) when the credentials are absent, so it
+// can neither crash-loop the process nor burn quota while idle.
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');

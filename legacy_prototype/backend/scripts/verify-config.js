@@ -10,7 +10,7 @@ const warnings = [];
 
 function check(label, condition, detail = '') {
   if (condition) console.log(`PASS  ${label}`);
-  else { failures.push(label); console.log(`FAIL  ${label}${detail ? ` — ${detail}` : ''}`); }
+  else { failures.push(label); console.log(`FAIL  ${label}${detail ? ` ï¿½ ${detail}` : ''}`); }
 }
 function warn(label) { warnings.push(label); console.log(`WARN  ${label}`); }
 function exists(relativePath) { return fs.existsSync(path.join(backendRoot, relativePath)); }
@@ -45,7 +45,8 @@ else {
   check('DATABASE_URL is configured', Boolean(env.DATABASE_URL && env.DATABASE_URL.trim()));
   check('JWT_SECRET is configured', Boolean(env.JWT_SECRET && env.JWT_SECRET.trim() && !env.JWT_SECRET.includes('change_this')));
   if (!env.GROQ_API_KEY && !env.OLLAMA_URL) warn('No Groq key or Ollama URL found; AI inference may be unavailable');
-  if (!env.REDIS_URL && !env.QUEUE_REDIS_URL) warn('No Redis URL found; missions and queued jobs may be unavailable');
+  if (!env.CRON_SECRET) warn('No CRON_SECRET found; /api/cron/* is disabled, so missions and briefings will never fire');
+  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) warn('Upstash REST is not configured; caching and working memory fall back to no-ops (correct, but slower)');
   if (!env.PINATA_API_KEY || !env.PINATA_SECRET_KEY) warn('Pinata is not fully configured; IPFS archival will use its fallback');
 }
 console.log(`\nResult: ${failures.length} failure(s), ${warnings.length} warning(s).`);
