@@ -72,3 +72,8 @@ legacy_prototype/frontend/_avatar_originals/
 # ENDING in .env, so .env.bak / .env.local / .env.save slipped through — and a
 # pg password ended up in one of them during the Singapore migration.
 .env*
+
+# Throwaway diagnostic scripts. They get written next to the code they probe
+# rather than in a temp directory, so they show up as untracked beside real
+# work and ride along on a `git add -A`.
+_tmp_*
