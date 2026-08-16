@@ -18,6 +18,15 @@ const { query } = require('../database');
 
 const VAPID_PATH = path.join(__dirname, '..', '.vapid-keys.json');
 
+// The host is not a secret and has exactly one value in practice — SMTP_USER
+// and SMTP_PASS are a Gmail address and its app password. It was previously
+// mandatory, which meant a deploy that had the credentials but not the host
+// reported email as "unconfigured" and silently dropped every message. The
+// credentials still decide whether the channel is usable; only the address of
+// the server they authenticate against is assumed.
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+
 // ── Prefs ────────────────────────────────────────────────────
 async function getPrefs(userId) {
   const res = await query('SELECT * FROM notification_preferences WHERE user_id = $1', [userId]);
@@ -60,7 +69,7 @@ async function savePrefs(userId, prefs) {
 // ── Channel configuration status (for the Settings page) ─────
 function channelConfigStatus() {
   return {
-    email: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+    email: Boolean(SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
     // WhatsApp can be served by Twilio *or* the Meta Cloud API — ask the
     // service which, rather than assuming the Twilio variables are the only
     // way the channel can be configured.
@@ -120,13 +129,13 @@ function getVapidKeys() {
  *                          it show headings and bold instead of "#" and "**".
  */
 async function sendEmail(to, subject, text, html) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) return { status: 'unconfigured', detail: 'SMTP_HOST / SMTP_USER not set in .env' };
+  if (!process.env.SMTP_USER) return { status: 'unconfigured', detail: 'SMTP_USER not set in .env' };
   if (!process.env.SMTP_PASS) return { status: 'unconfigured', detail: 'SMTP_PASS not set — generate a Gmail App Password and paste it into .env' };
   const nodemailer = require('nodemailer');
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
     // Force IPv4. smtp.gmail.com resolves to both A and AAAA records, and on a
     // host with no IPv6 route Node picks the AAAA and the connection dies with
     // "connect ENETUNREACH 2607:f8b0:...:587" — surfacing in the delivery log

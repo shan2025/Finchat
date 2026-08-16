@@ -7,7 +7,9 @@ const { v4: uuidv4 } = require('uuid');
 const { query, getPool } = require('../database');
 const { requireAuth, clearUserCache } = require('../middleware/auth');
 
-const TOKEN_EXPIRY = '7d';
+// render.yaml has always declared JWT_EXPIRES_IN, but nothing read it: the
+// lifetime was hardcoded here, so changing the variable did nothing.
+const TOKEN_EXPIRY = process.env.JWT_EXPIRES_IN || '7d';
 
 function generateJWT(userId) {
   // No fallback secret. This used to sign with a literal committed to the

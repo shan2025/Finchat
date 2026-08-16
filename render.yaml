@@ -66,13 +66,15 @@ services:
         sync: false
 
       # Groq's free allowance is per-model per-day, so an exhausted primary is
-      # recovered by switching model, not by waiting. Listed in try-order and
-      # spanning three families so one spent quota cannot stall inference.
-      # This matters more here than locally: the Ollama fallback in
-      # services/inference.js points at localhost, which does not exist on
-      # Render, so without these a spent Groq quota means no inference at all.
+      # recovered by switching model, not by waiting. Listed in try-order.
+      #
+      # Optional: services/inference.js already defaults to exactly this list,
+      # so leaving it unset costs nothing. Set it only to override the ladder.
+      # The primary (openai/gpt-oss-120b) is deliberately absent — retrying the
+      # model whose daily quota is spent just burns the attempt, which is what
+      # the previous value here did.
       - key: GROQ_FALLBACK_MODELS
-        value: openai/gpt-oss-120b,llama-3.1-8b-instant
+        value: openai/gpt-oss-20b,llama-3.1-8b-instant
 
       - key: PINATA_API_KEY
         sync: false
@@ -85,9 +87,17 @@ services:
       - key: SOLANA_SECRET_KEY
         sync: false
 
+      # Optional since the CORS fix: server.js also allowlists
+      # RENDER_EXTERNAL_URL (injected by the platform) and accepts requests
+      # whose Origin matches the host they were sent to. This was missing from
+      # the dashboard for the whole life of the service, and the symptom was
+      # every same-origin POST and every Socket.io handshake answered 403.
       - key: FRONTEND_URL
         value: https://finchat-6.onrender.com
 
+      # Both optional: services/notificationChannels.js defaults to
+      # smtp.gmail.com:587. SMTP_USER and SMTP_PASS below are what actually
+      # decide whether email works.
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

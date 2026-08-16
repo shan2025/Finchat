@@ -475,9 +475,6 @@ server.listen(PORT, async () => {
     const due = await query(
       'SELECT count(*)::int AS n FROM agent_missions WHERE enabled = true');
     console.log(`🗓️ Missions: ${due.rows[0].n} enabled — fired by external cron via /api/cron/tick`);
-    if (!process.env.CRON_SECRET) {
-      console.warn('⚠️ CRON_SECRET is not set — /api/cron/* is disabled, so nothing scheduled will run.');
-    }
   } catch (e) {
     console.error('⚠️ Could not read mission state:', e.message);
   }
@@ -499,6 +496,10 @@ server.listen(PORT, async () => {
     () => runNightlyDigest({}).catch(e => console.error('Dream digest failed:', e.message)),
     24 * 60 * 60 * 1000
   );
+
+  // Last, so the list of what is unconfigured sits directly above the banner
+  // instead of scrolling away under the migration output.
+  require('./config/envAudit').auditEnv();
 
   console.log('');
   console.log('╔══════════════════════════════════════╗');
