@@ -49,42 +49,92 @@ Rejected alternatives:
   new service gets a new subdomain unless you delete the old one first and
   reclaim the name, or attach a custom domain.
 
+## Concrete values for this migration
+
+| | |
+|---|---|
+| Source project (Tokyo) | `oktchjdmajlylvdeeikl` — `ap-northeast-1` |
+| **Target project (Singapore)** | **`mtrgeojpykbttblyzmsx`** — `ap-southeast-1` |
+| Organisation (both) | `oghjsdvpdfmhbzzedeiw`, free plan, $0/month |
+| Database size | 33 MB |
+
+Both projects sit in the **same** organisation, so the free plan's 2-active-project
+limit is now fully used. Egress during the move is negligible at 33 MB.
+
+Baseline captured from the source on 2026-08-16 — the restore must reproduce
+these exactly:
+
+| Table | Rows |
+|---|---|
+| public tables | 61 (60 with RLS) |
+| users | 27 |
+| messages | 372 |
+| entities | 564 (379 with `user_id`, 185 legacy NULL — the NULLs are intentional) |
+| ai_conversations | 301 |
+| neural_map_nodes | 23 |
+
+Extensions installed on the source: `vector` 0.8.2 **in the `public` schema**,
+`pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `supabase_vault`.
+
 ## Order of operations
 
 Do the database first. It can be validated while the old app still runs, so
 there is no window where the app is pointing at nothing.
 
-### 1. New Supabase project
+### 1. Set the new project's database password
 
-1. Create project in **`ap-southeast-1` (Singapore)**, in an org with egress
-   headroom. Record the new project ref.
-2. Note the new connection string. Use the **session pooler on 5432**, matching
-   the current setup, and URL-encode the password (this bit us before).
+The project was created through the API, so no password was ever shown. In the
+dashboard: **Project `finchat-singapore` → Settings → Database → Reset database
+password**. Keep it; you need it for step 2, and URL-encode it in the
+connection string (an unencoded `@`, `#` or `/` silently breaks the URL — this
+bit us on the last migration).
+
+Use the **session pooler on port 5432**, matching the current setup.
 
 ### 2. Move the data
 
-The last migration hit a dollar-quoting problem; this filter is the one that
-worked. Run from a machine with `pg_dump` 17.x:
+Your `pg_dump` is at `E:\PostgreSQL\17\bin\` (17.10, matching the source's
+17.6) and is **not on PATH**. Run these from PowerShell.
 
-```bash
-pg_dump \
-  --dbname="$OLD_TOKYO_URL" \
-  --no-owner --no-privileges --no-publications --no-subscriptions \
-  --schema=public \
-  --file=finchat_public.sql
+Set both connection strings as environment variables first, so neither ends up
+in shell history or a process listing:
+
+```powershell
+$env:OLD_URL = (Get-Content E:\FinChat\finchat\legacy_prototype\backend\.env | Where-Object { $_ -match '^\s*DATABASE_URL\s*=' }) -replace '^\s*DATABASE_URL\s*=\s*','' -replace '^["'']|["'']$',''
 ```
 
-```bash
-psql --dbname="$NEW_SINGAPORE_URL" --single-transaction --file=finchat_public.sql
+```powershell
+$env:NEW_URL = 'postgresql://postgres.mtrgeojpykbttblyzmsx:<URL-ENCODED-PASSWORD>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres'
+```
+
+Extensions must exist before the schema restore. `vector` goes in `public`,
+because that is where the source has it and every embedding column references
+the type unqualified:
+
+```powershell
+& 'E:\PostgreSQL\17\bin\psql.exe' --dbname=$env:NEW_URL -c "CREATE EXTENSION IF NOT EXISTS vector SCHEMA public; CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions; CREATE EXTENSION IF NOT EXISTS ""uuid-ossp"" SCHEMA extensions;"
+```
+
+Dump:
+
+```powershell
+& 'E:\PostgreSQL\17\bin\pg_dump.exe' --dbname=$env:OLD_URL --no-owner --no-privileges --no-publications --no-subscriptions --schema=public --file=finchat_public.sql
+```
+
+Restore:
+
+```powershell
+& 'E:\PostgreSQL\17\bin\psql.exe' --dbname=$env:NEW_URL --single-transaction --file=finchat_public.sql
 ```
 
 Notes:
 - `--schema=public` only. Do **not** dump `auth`, `storage` or `extensions` —
   Supabase manages those and restoring them over a fresh project breaks it.
-- If `pgvector` is used by RAG, enable it on the new project *before* the
-  restore: `CREATE EXTENSION IF NOT EXISTS vector;`
 - `--single-transaction` means a partial failure rolls back cleanly instead of
   leaving a half-populated database.
+- Expect harmless `extension "vector" already exists` style notices; errors
+  mentioning `type "vector" does not exist` mean the extension step above did
+  not run first.
 
 ### 3. Verify the data before cutting over
 
