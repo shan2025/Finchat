@@ -10,7 +10,7 @@ const warnings = [];
 
 function check(label, condition, detail = '') {
   if (condition) console.log(`PASS  ${label}`);
-  else { failures.push(label); console.log(`FAIL  ${label}${detail ? ` � ${detail}` : ''}`); }
+  else { failures.push(label); console.log(`FAIL  ${label}${detail ? ` — ${detail}` : ''}`); }
 }
 function warn(label) { warnings.push(label); console.log(`WARN  ${label}`); }
 function exists(relativePath) { return fs.existsSync(path.join(backendRoot, relativePath)); }
@@ -27,9 +27,21 @@ check('Reports API route', exists('routes/reports.js'));
 check('Knowledge Center page', fs.existsSync(path.join(projectRoot, 'frontend', 'finchat_knowledge.html')));
 check('Reports page', fs.existsSync(path.join(projectRoot, 'frontend', 'finchat_reports.html')));
 
+// Migrations are checked for shape, not for a fixed count. Pinning the number
+// meant every migration added afterwards failed this script, so it reported a
+// problem on the one occasion nothing was wrong. What actually breaks a
+// deployment is two migrations sharing a numeric prefix — node-pg-migrate
+// orders by filename, so duplicates apply in an undefined order.
 const migrationsDir = path.join(backendRoot, 'migrations');
-const migrationCount = fs.existsSync(migrationsDir) ? fs.readdirSync(migrationsDir).filter((file) => file.endsWith('.js')).length : 0;
-check('Database migrations (21 expected)', migrationCount === 21, `found ${migrationCount}`);
+const migrations = fs.existsSync(migrationsDir)
+  ? fs.readdirSync(migrationsDir).filter((file) => file.endsWith('.js')).sort()
+  : [];
+check('Database migrations present', migrations.length > 0, `found ${migrations.length}`);
+
+const prefixes = migrations.map((file) => file.split('_')[0]);
+const duplicates = prefixes.filter((prefix, i) => prefixes.indexOf(prefix) !== i);
+check('Migration prefixes are unique', duplicates.length === 0,
+  duplicates.length ? `duplicated: ${[...new Set(duplicates)].join(', ')}` : '');
 
 const examplePath = path.join(backendRoot, '.env.example');
 check('Environment template', fs.existsSync(examplePath));
