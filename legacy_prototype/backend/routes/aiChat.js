@@ -13,10 +13,23 @@ const { createNotification } = require('../services/notifications');
 const multer = require('multer');
 const { extractFromUpload, persistUpload, buildAttachmentBlock } = require('../services/attachments');
 
+const { cached } = require('../services/microCache');
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 4 }
 });
+
+// The channel list is looked up on every chat message (twice, when fraud is
+// detected) but effectively never changes. At ~108ms per Oregon→Tokyo round
+// trip that was pure overhead on the hottest path in the app.
+async function defaultChannelId(fallback) {
+  const id = await cached('channels:first', 5 * 60_000, async () => {
+    const res = await query('SELECT channel_id as id FROM channels LIMIT 1');
+    return res.rows[0] ? res.rows[0].id : null;
+  });
+  return id || fallback;
+}
 
 // ── POST /api/ai-chat/upload ───────────────────────────────────
 // Multipart upload for chat attachments. Extracts text from documents and
@@ -96,8 +109,7 @@ router.post('/send', requireAuth, async (req, res) => {
     });
     lastCleanResponse = result.cleanResponse;
 
-    const resChan = await query("SELECT channel_id as id FROM channels LIMIT 1");
-    channelId = resChan.rows[0] ? resChan.rows[0].id : 'general';
+    channelId = await defaultChannelId('general');
 
     userMsgId = uuidv4();
     await query(`
@@ -147,8 +159,7 @@ router.post('/send', requireAuth, async (req, res) => {
       console.log(`🚨 FRAUD DETECTED by ${persona.name} for user ${user.name} (${userId})`);
 
       const fraudMsgId = uuidv4();
-      const resChanFraud = await query("SELECT channel_id as id FROM channels LIMIT 1");
-      const fraudChannelId = resChanFraud.rows[0] ? resChanFraud.rows[0].id : 'system';
+      const fraudChannelId = await defaultChannelId('system');
 
       await query(`
         INSERT INTO messages (message_id, channel_id, sender_id, content, message_type, is_quarantined)

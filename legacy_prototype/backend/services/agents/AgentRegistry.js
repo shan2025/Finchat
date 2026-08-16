@@ -1,15 +1,27 @@
 // services/agents/AgentRegistry.js — Database-backed Agent Registry with Upstash Redis caching
 const { query } = require('../../database');
 const { cacheGet, cacheSet } = require('../redis');
+const microCache = require('../microCache');
 
 const REGISTRY_CACHE_KEY = 'agent_registry:all_configs';
 const REGISTRY_CACHE_TTL = 300; // 5 minutes
+// Shorter than the Redis TTL on purpose: this layer only absorbs the repeated
+// calls within a burst, and still defers to Redis/Postgres for freshness.
+const REGISTRY_MEMORY_TTL_MS = 30_000;
 
 /**
  * Fetch all agent configurations from PostgreSQL joined with agents table.
- * Uses Redis caching to prevent DB hits on the hot routing path.
+ *
+ * Three layers: process memory, then Redis, then Postgres. The memory layer
+ * exists because callers ask for one agent at a time — getAgentConfig() calls
+ * straight through to here — so a six-agent group chat was making six Redis
+ * round trips to read one object that had not changed between them.
  */
 async function getAllAgentConfigs() {
+  return microCache.cached('agent_registry', REGISTRY_MEMORY_TTL_MS, _loadAllAgentConfigs);
+}
+
+async function _loadAllAgentConfigs() {
   const cached = await cacheGet(REGISTRY_CACHE_KEY);
   if (cached && Array.isArray(cached) && cached.length > 0) {
     return cached;
@@ -82,6 +94,10 @@ async function refreshRegistry() {
   // silently no-ops and leaves the registry stale for the full TTL.
   const { cacheDel } = require('../redis');
   await cacheDel(REGISTRY_CACHE_KEY);
+  // The process-memory layer in front of Redis has to go too, or a forced
+  // refresh keeps serving the old configs for up to REGISTRY_MEMORY_TTL_MS —
+  // exactly the silent staleness the note above warns about, one layer up.
+  microCache.invalidate('agent_registry');
   return await getAllAgentConfigs();
 }
 
