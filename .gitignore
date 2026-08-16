@@ -67,3 +67,8 @@ legacy_prototype/frontend/finchat_tw_audit.css
 # Pre-resize avatar sources. The full-resolution originals remain in git
 # history; this is just a local working copy from the resize pass.
 legacy_prototype/frontend/_avatar_originals/
+
+# Anything derived from a .env file. The `*.env` rule above only matches paths
+# ENDING in .env, so .env.bak / .env.local / .env.save slipped through — and a
+# pg password ended up in one of them during the Singapore migration.
+.env*
