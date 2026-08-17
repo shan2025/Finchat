@@ -620,6 +620,7 @@
          panel updates from the inline script land in hidden stubs installed
          by system_panels.js (shared-JS pattern — survives design-tool regen
          with a single re-added include). -->
+    <script src="auth_session.js"></script>
     <script src="api_client.js"></script>
     <script src="system_panels.js"></script>
     <script src="knowledge_search.js"></script>
@@ -3180,7 +3181,18 @@
     }
 
     function logoutUser() {
-      sessionStorage.removeItem('finchat_user');
+      // Has to clear every slot, not just sessionStorage.finchat_user. The
+      // token also lives in localStorage under finchat_token/finchat_jwt and
+      // the remembered session under finchat_session, so dropping only the one
+      // key left the user signed in — the next page read the survivors.
+      if (window.fcAuth) {
+        window.fcAuth.clear();
+      } else {
+        sessionStorage.removeItem('finchat_user');
+        sessionStorage.removeItem('finchat_token');
+        ['finchat_session', 'finchat_token', 'finchat_jwt', 'finchat_remember']
+          .forEach(k => localStorage.removeItem(k));
+      }
       window.location.href = 'finchat_login.html';
     }
 

@@ -125,7 +125,19 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   // Match the CSP's frame-ancestors 'none' for browsers that only honour the
   // legacy header; helmet's default here is SAMEORIGIN.
-  frameguard: { action: 'deny' }
+  frameguard: { action: 'deny' },
+  // helmet defaults this to 'same-origin', which severs window.opener in BOTH
+  // directions — including for popups this page opened itself. Google Sign-In
+  // authenticates in a popup and then hands the credential back through that
+  // opener reference, so under 'same-origin' the user signs in successfully
+  // and the popup then hangs forever on accounts.google.com/gsi/transform with
+  // a blank page. No error is raised anywhere: the credential simply has
+  // nowhere to go.
+  //
+  // 'same-origin-allow-popups' keeps the protection that matters — a document
+  // that opens US still gets no handle on this window — while letting popups
+  // we open keep theirs.
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
 
 app.use(cors(corsDelegate));
@@ -206,8 +218,13 @@ app.get('/', (req, res) => {
 app.use('/api', apiLimiter);
 
 // Credential and account-recovery endpoints, before the router that serves
-// them. `/wallet` is included because it mints the same session token.
-for (const p of ['/api/auth/login', '/api/auth/register', '/api/auth/forgot', '/api/auth/reset', '/api/auth/wallet']) {
+// them. `/wallet` and `/google` are included because they mint the same session
+// token. `/api/auth/username-available` deliberately is not: the signup form
+// calls it while the field is being typed, and a 10-per-15-minutes bucket would
+// stop answering halfway through a first visit. It stays on the wide apiLimiter
+// above, which is sized for exactly that kind of interactive polling.
+for (const p of ['/api/auth/login', '/api/auth/register', '/api/auth/forgot',
+  '/api/auth/reset', '/api/auth/wallet', '/api/auth/google']) {
   app.use(p, authLimiter);
 }
 

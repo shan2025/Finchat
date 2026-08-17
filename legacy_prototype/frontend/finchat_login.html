@@ -17,7 +17,7 @@
     margin: 0;
     overflow-x: hidden;
   }
-  
+
   .scene-wrapper {
     position: relative;
     width: 100%;
@@ -41,7 +41,7 @@
     transform-origin: center;
     animation: blink 4s infinite;
   }
-  
+
   .robot-head {
     transform-origin: center 70px;
     animation: head-tilt 12s infinite cubic-bezier(0.4, 0, 0.2, 1);
@@ -78,6 +78,13 @@
     100% { transform: scaleY(1); }
   }
 
+  /* Respect the OS setting. The robot loops forever, which is exactly the kind
+     of motion "reduce motion" exists to switch off. */
+  @media (prefers-reduced-motion: reduce) {
+    .robot-container, .robot-head, .robot-eye { animation: none; }
+    .robot-container { transform: translateY(0); }
+  }
+
   .login-card {
     position: relative;
     z-index: 10;
@@ -86,7 +93,7 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     border: 1px solid rgba(0,0,0,0.03);
   }
-  
+
   .custom-input {
     border: 1px solid #e0e0e0;
     border-radius: 4px;
@@ -96,6 +103,7 @@
     outline: none;
     transition: border-color 0.2s;
     color: #374151;
+    background: white;
   }
   .custom-input::placeholder {
     color: #9ca3af;
@@ -103,7 +111,8 @@
   .custom-input:focus {
     border-color: #3a2b1c;
   }
-  
+  .custom-input:disabled { background:#f7f5f2; color:#9ca3af; cursor:not-allowed; }
+
   .custom-checkbox {
     width: 1rem;
     height: 1rem;
@@ -114,6 +123,7 @@
     position: relative;
     background: white;
     transition: all 0.2s;
+    flex-shrink: 0;
   }
   .custom-checkbox:checked {
     background-color: #3a2b1c;
@@ -130,33 +140,135 @@
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
+  .custom-checkbox:focus-visible { outline:2px solid #3a2b1c; outline-offset:2px; }
+
+  /* ── Validation ───────────────────────────────────────────
+     Errors are attached to the field that caused them. The alert() this
+     replaced named the problem but never the input, so "Email already
+     registered" arrived as a modal with nothing highlighted. */
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field-error {
+    display: none;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #b0472e;
+    font-weight: 500;
+  }
+  .field.has-error .field-error { display: block; }
+  .field.has-error .custom-input { border-color: #b0472e; }
+  .field.has-error .custom-input:focus { border-color: #b0472e; }
+
+  /* Whole-form problems with no single field to blame: the server being
+     unreachable, a frozen account, rate limiting. */
+  .form-banner {
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.5;
+    font-weight: 500;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+  .form-banner.show { display: flex; }
+  .form-banner.error { background:#fdf1ee; border:1px solid #f0cfc6; color:#8f3823; }
+  .form-banner.success { background:#eef6ee; border:1px solid #cbe3cc; color:#3d6d40; }
+  .form-banner.info { background:#f5f2ea; border:1px solid #e2d9c9; color:#5b4a3a; }
+  .form-banner svg { flex-shrink:0; margin-top:1px; }
+
+  /* ── Password field with a reveal toggle ─────────────────── */
+  .pw-wrap { position: relative; display: block; }
+  .pw-wrap .custom-input { padding-right: 44px; }
+  .pw-toggle {
+    position: absolute;
+    right: 4px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: #9ca3af;
+    line-height: 0;
+    border-radius: 4px;
+  }
+  .pw-toggle:hover { color: #3a2b1c; }
+  .pw-toggle:focus-visible { outline:2px solid #3a2b1c; outline-offset:-2px; }
+
+  .link-btn {
+    background: none; border: none; padding: 0;
+    font-size: 13px; font-weight: 500;
+    color: #6b7280; cursor: pointer;
+    font-family: inherit;
+    transition: color .2s;
+  }
+  .link-btn:hover { color: #3a2b1c; text-decoration: underline; }
+
+  .primary-btn {
+    width: 100%;
+    background: #3a2b1c;
+    color: white;
+    font-weight: 500;
+    font-size: 15px;
+    padding: 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .2s;
+    font-family: inherit;
+  }
+  .primary-btn:hover:not(:disabled) { background: #2e2216; }
+  .primary-btn:disabled { opacity: .65; cursor: not-allowed; }
+
+  .divider { display:flex; align-items:center; gap:12px; margin: 28px 0; }
+  .divider span { font-size:11px; color:#9ca3af; font-weight:500; text-transform:uppercase; letter-spacing:.08em; }
+  .divider i { height:1px; background:#e5e7eb; flex:1; display:block; }
+
+  /* The Google slot stays out of the layout entirely until /api/auth/config
+     confirms this deployment can complete the flow, so there is never a button
+     whose only behaviour is to apologise. */
+  #googleSection { display: none; }
+  #googleSection.available { display: block; }
+  #googleBtnHost { display: flex; justify-content: center; min-height: 44px; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .step-hint { font-size:12.5px; color:#6b7280; line-height:1.6; }
+  .code-input {
+    letter-spacing: .55em;
+    text-align: center;
+    font-family: var(--mono, ui-monospace, monospace);
+    font-size: 18px;
+    padding-left: .55em; /* re-centre against the trailing letter-spacing */
+  }
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
   <div class="scene-wrapper">
     <!-- Animated Robot SVG -->
-    <div class="robot-container w-[110px] h-[95px]">
+    <div class="robot-container w-[110px] h-[95px]" aria-hidden="true">
       <svg viewBox="0 0 110 95" fill="none" xmlns="http://www.w3.org/2000/svg">
-        
+
         <g class="robot-head">
           <!-- Body (hidden mostly, but here for the shoulders) -->
           <path d="M25 80 C 25 65, 85 65, 85 80 L 85 95 L 25 95 Z" fill="#3a2b1c" />
-          
+
           <!-- Antenna Top -->
           <circle cx="55" cy="12" r="5" fill="#3a2b1c" />
           <line x1="55" y1="16" x2="55" y2="28" stroke="#3a2b1c" stroke-width="3" />
-          
+
           <!-- Side Nubs -->
           <path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="#3a2b1c" />
           <path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="#3a2b1c" />
-          
+
           <!-- Main Head -->
           <rect x="25" y="27" width="60" height="46" rx="22" fill="#3a2b1c" />
-          
+
           <!-- Face Screen -->
           <rect x="35" y="37" width="40" height="26" rx="12" fill="#f6f3eb" />
-          
+
           <!-- Eyes -->
           <g class="robot-eye" style="transform-origin: 46px 48px;">
             <circle cx="46" cy="48" r="4.5" fill="#3a2b1c" />
@@ -164,7 +276,7 @@
           <g class="robot-eye" style="transform-origin: 64px 48px;">
             <circle cx="64" cy="48" r="4.5" fill="#3a2b1c" />
           </g>
-          
+
           <!-- Arms/Hands resting on the edge -->
           <circle cx="22" cy="85" r="10" fill="#3a2b1c" />
           <circle cx="88" cy="85" r="10" fill="#3a2b1c" />
@@ -178,120 +290,463 @@
     <!-- Main Login Card -->
     <div class="login-card p-10 flex flex-col w-full text-center">
       <h1 class="font-serif text-[44px] leading-tight text-[#1a1a1a] mb-2 tracking-tight">FinChat</h1>
-      <p class="text-gray-500 text-[15px] mb-8 font-medium tracking-wide">Welcome back</p>
-      
-      <form id="loginForm" class="flex flex-col gap-4 text-left">
-        <div>
-          <input id="institutional_id" type="email" placeholder="Email address" class="custom-input" required autocomplete="email">
+      <p class="text-gray-500 text-[15px] mb-8 font-medium tracking-wide" id="cardSubtitle">Welcome back</p>
+
+      <!-- ══ Sign-in view ══════════════════════════════════════ -->
+      <div class="view active" id="signInView">
+        <div class="form-banner" id="loginBanner" role="alert" aria-live="polite"></div>
+
+        <form id="loginForm" class="flex flex-col gap-4 text-left" novalidate>
+          <div class="field" id="fieldEmail">
+            <input id="loginEmail" type="text" placeholder="Email or username" class="custom-input"
+                   autocomplete="username" aria-describedby="errEmail">
+            <span class="field-error" id="errEmail"></span>
+          </div>
+          <div class="field" id="fieldPassword">
+            <label class="pw-wrap">
+              <input id="loginPassword" type="password" placeholder="Password" class="custom-input"
+                     autocomplete="current-password" aria-describedby="errPassword">
+              <button type="button" class="pw-toggle" data-target="loginPassword"
+                      onclick="togglePassword(this)" aria-label="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </label>
+            <span class="field-error" id="errPassword"></span>
+          </div>
+
+          <div class="flex items-center justify-between mt-1 mb-2">
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" class="custom-checkbox" id="rememberMe">
+              <span class="text-[13px] text-gray-500 font-medium select-none group-hover:text-gray-700 transition-colors">Remember me</span>
+            </label>
+            <button type="button" class="link-btn" onclick="openReset()">Forgot Password?</button>
+          </div>
+
+          <button type="submit" id="loginBtn" class="primary-btn mt-1">Sign In</button>
+        </form>
+
+        <div id="googleSection">
+          <div class="divider"><i></i><span>Or</span><i></i></div>
+          <div id="googleBtnHost"></div>
         </div>
-        <div>
-          <input id="decryption_key" type="password" placeholder="Password" class="custom-input" required autocomplete="current-password">
-        </div>
-        
-        <div class="flex items-center justify-between mt-1 mb-2">
-          <label class="flex items-center gap-2 cursor-pointer group">
-            <input type="checkbox" class="custom-checkbox">
-            <span class="text-[13px] text-gray-500 font-medium select-none group-hover:text-gray-700 transition-colors">Remember me</span>
-          </label>
-          <a href="#" class="text-[13px] text-gray-500 hover:text-darkBrown font-medium transition-colors">Forgot Password?</a>
-        </div>
-        
-        <button type="button" id="loginBtn" onclick="handleLogin()" class="w-full bg-darkBrown hover:bg-[#2e2216] transition-colors text-white font-medium text-[15px] py-[14px] rounded-[4px] shadow-sm mt-1">
-          Sign In
-        </button>
-      </form>
-      
-      <div class="flex items-center gap-3 my-7">
-        <div class="h-[1px] bg-gray-200 flex-1"></div>
-        <span class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Or</span>
-        <div class="h-[1px] bg-gray-200 flex-1"></div>
+
+        <p class="mt-8 text-[13px] text-gray-500 font-medium">
+          Don't have an account? <a href="finchat_signup.html" class="text-darkBrown hover:underline ml-1">Create an account</a>
+        </p>
       </div>
-      
-      <button type="button" onclick="handleGoogleSignIn()" class="w-full bg-white border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600 font-medium text-[14px] py-[12px] rounded-[4px] shadow-sm flex items-center justify-center gap-3">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-        </svg>
-        Continue with Google
-      </button>
-      
-      <p class="mt-8 text-[13px] text-gray-500 font-medium">
-        Don't have an account? <a href="finchat_signup.html" class="text-darkBrown hover:underline ml-1">Create an account</a>
-      </p>
+
+      <!-- ══ Password reset — request a code ═══════════════════ -->
+      <div class="view" id="resetRequestView">
+        <div class="form-banner" id="resetRequestBanner" role="alert" aria-live="polite"></div>
+
+        <p class="step-hint mb-5 text-left">
+          Enter the email on your account and we'll send you a 6-digit code to reset your password.
+        </p>
+
+        <form id="resetRequestForm" class="flex flex-col gap-4 text-left" novalidate>
+          <div class="field" id="fieldResetEmail">
+            <input id="resetEmail" type="email" placeholder="Email address" class="custom-input"
+                   autocomplete="email" aria-describedby="errResetEmail">
+            <span class="field-error" id="errResetEmail"></span>
+          </div>
+          <button type="submit" id="resetRequestBtn" class="primary-btn mt-1">Send reset code</button>
+        </form>
+
+        <p class="mt-7 text-[13px] text-gray-500 font-medium">
+          <button type="button" class="link-btn" onclick="closeReset()">← Back to sign in</button>
+        </p>
+      </div>
+
+      <!-- ══ Password reset — enter code + new password ════════ -->
+      <div class="view" id="resetConfirmView">
+        <div class="form-banner" id="resetConfirmBanner" role="alert" aria-live="polite"></div>
+
+        <p class="step-hint mb-5 text-left">
+          We sent a 6-digit code to <strong id="resetSentTo"></strong>. It expires in 15 minutes.
+        </p>
+
+        <form id="resetConfirmForm" class="flex flex-col gap-4 text-left" novalidate>
+          <div class="field" id="fieldCode">
+            <input id="resetCode" type="text" inputmode="numeric" maxlength="6" placeholder="······"
+                   class="custom-input code-input" autocomplete="one-time-code" aria-describedby="errCode">
+            <span class="field-error" id="errCode"></span>
+          </div>
+          <div class="field" id="fieldNewPassword">
+            <label class="pw-wrap">
+              <input id="newPassword" type="password" placeholder="New password" class="custom-input"
+                     autocomplete="new-password" aria-describedby="errNewPassword">
+              <button type="button" class="pw-toggle" data-target="newPassword"
+                      onclick="togglePassword(this)" aria-label="Show password">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </label>
+            <span class="field-error" id="errNewPassword">At least 8 characters</span>
+          </div>
+          <button type="submit" id="resetConfirmBtn" class="primary-btn mt-1">Reset password</button>
+        </form>
+
+        <p class="mt-7 text-[13px] text-gray-500 font-medium flex items-center justify-center gap-3">
+          <button type="button" class="link-btn" onclick="openReset()">Use a different email</button>
+          <span class="text-gray-300">·</span>
+          <button type="button" class="link-btn" onclick="closeReset()">Back to sign in</button>
+        </p>
+      </div>
+
     </div>
   </div>
 
+<script src="auth_session.js"></script>
 <script>
     // Configuration — same-origin when served by the backend, else the dev default
     const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
-    let currentUser = null;
-  
-    // Pressing Enter triggers login
-    document.getElementById('decryption_key').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') handleLogin();
+
+    // Maps the `field` a 4xx names to the markup that displays it, so the server
+    // decides which input lights up and the page does not have to guess.
+    const FIELD_NODES = {
+      email:       { field: 'fieldEmail',       error: 'errEmail',       input: 'loginEmail' },
+      password:    { field: 'fieldPassword',    error: 'errPassword',    input: 'loginPassword' },
+      resetEmail:  { field: 'fieldResetEmail',  error: 'errResetEmail',  input: 'resetEmail' },
+      code:        { field: 'fieldCode',        error: 'errCode',        input: 'resetCode' },
+      newPassword: { field: 'fieldNewPassword', error: 'errNewPassword', input: 'newPassword' }
+    };
+
+    const ICONS = {
+      error: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      success: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+      info: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    };
+
+    function setFieldError(key, message) {
+      const nodes = FIELD_NODES[key];
+      if (!nodes) return false;
+      const field = document.getElementById(nodes.field);
+      const error = document.getElementById(nodes.error);
+      if (!field || !error) return false;
+      error.textContent = message;
+      field.classList.add('has-error');
+      const input = document.getElementById(nodes.input);
+      if (input) input.setAttribute('aria-invalid', 'true');
+      return true;
+    }
+
+    function clearErrors(scope) {
+      (scope || document).querySelectorAll('.field.has-error').forEach(f => f.classList.remove('has-error'));
+      (scope || document).querySelectorAll('[aria-invalid]').forEach(i => i.removeAttribute('aria-invalid'));
+      document.querySelectorAll('.form-banner').forEach(b => b.classList.remove('show'));
+    }
+
+    function showBanner(id, message, kind) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const tone = kind || 'error';
+      el.className = 'form-banner show ' + tone;
+      el.innerHTML = ICONS[tone] + '<span></span>';
+      el.querySelector('span').textContent = message;
+    }
+
+    /**
+     * Route a failed response to the field it names, falling back to the banner
+     * when it names none (unreachable server, frozen account, rate limit).
+     */
+    function reportFailure(data, bannerId, fieldMap) {
+      const message = (data && data.error) || 'Something went wrong. Please try again.';
+      const key = data && data.field && (fieldMap ? fieldMap[data.field] : data.field);
+      if (key && setFieldError(key, message)) return;
+      showBanner(bannerId, message, 'error');
+    }
+
+    function busy(btn, isBusy, busyText) {
+      if (!btn) return;
+      if (isBusy) {
+        btn.dataset.idleText = btn.dataset.idleText || btn.textContent;
+        btn.textContent = busyText;
+        btn.disabled = true;
+      } else {
+        btn.textContent = btn.dataset.idleText || btn.textContent;
+        btn.disabled = false;
+      }
+    }
+
+    function togglePassword(btn) {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      btn.innerHTML = reveal
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    }
+
+    // ── View switching ─────────────────────────────────────────
+    const SUBTITLES = {
+      signInView: 'Welcome back',
+      resetRequestView: 'Reset your password',
+      resetConfirmView: 'Check your email'
+    };
+
+    function showView(id) {
+      clearErrors();
+      document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
+      document.getElementById('cardSubtitle').textContent = SUBTITLES[id] || '';
+      const firstInput = document.querySelector('#' + id + ' input:not([type=checkbox])');
+      if (firstInput) firstInput.focus();
+    }
+
+    function openReset() {
+      // Carry over whatever they already typed — retyping it is pure friction.
+      const typed = document.getElementById('loginEmail').value.trim();
+      if (typed.includes('@')) document.getElementById('resetEmail').value = typed;
+      showView('resetRequestView');
+    }
+
+    function closeReset() { showView('signInView'); }
+
+    // ── Sign in ────────────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleLogin();
     });
-  
+
     async function handleLogin() {
       const btn = document.getElementById('loginBtn');
-      const origText = btn.innerHTML;
-      btn.innerHTML = 'Signing In...';
-      btn.disabled = true;
-  
-      const email = document.getElementById('institutional_id').value;
-      const password = document.getElementById('decryption_key').value;
-  
-      if (!email || !password) {
-          alert("Please provide both Email and Password.");
-          btn.innerHTML = origText;
-          btn.disabled = false;
-          return;
-      }
-  
+      clearErrors(document.getElementById('signInView'));
+
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const remember = document.getElementById('rememberMe').checked;
+
+      // Client-side first so an empty form never costs a round-trip — and, more
+      // to the point, never burns one of the 10 attempts the auth rate limiter
+      // allows per 15 minutes.
+      let ok = true;
+      if (!email) { setFieldError('email', 'Enter your email or username'); ok = false; }
+      if (!password) { setFieldError('password', 'Enter your password'); ok = false; }
+      if (!ok) return;
+
+      busy(btn, true, 'Signing In...');
+
       try {
         const res = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        
-        const data = await res.json();
-  
+
+        const data = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          alert(data.error || 'Login failed. Please check your credentials.');
-          btn.innerHTML = origText;
-          btn.disabled = false;
+          reportFailure(data, 'loginBanner');
+          busy(btn, false);
           return;
         }
-  
-        currentUser = {
-          email: data.user.email,
-          name: data.user.name,
-          role: data.user.role,
-          token: data.token,
-          id: data.user.id,
-          token_balance: data.user.token_balance,
-          wallet: data.user.wallet_address,
-          avatar_url: data.user.avatar_url || null,
-          method: 'password'
-        };
-  
-        sessionStorage.setItem('finchat_user', JSON.stringify(currentUser));
-        sessionStorage.setItem('finchat_token', data.token);
-        localStorage.setItem('finchat_token', data.token);
-        window.location.href = 'finchat_chat.html';
+
+        completeSignIn(data, remember, email);
       } catch (err) {
         console.error(err);
-        alert('Backend unreachable or error occurred.');
-        btn.innerHTML = origText;
-        btn.disabled = false;
+        showBanner('loginBanner', 'Could not reach the FinChat server. Check your connection and try again.', 'error');
+        busy(btn, false);
       }
     }
 
-    function handleGoogleSignIn() {
-        alert("Google Sign In is not currently configured in the backend.");
+    /** Shared by the password and Google paths. */
+    function completeSignIn(data, remember, identifier) {
+      const user = {
+        email: data.user.email,
+        name: data.user.name,
+        username: data.user.username || null,
+        role: data.user.role,
+        token: data.token,
+        id: data.user.id,
+        token_balance: data.user.token_balance,
+        wallet: data.user.wallet_address,
+        avatar_url: data.user.avatar_url || null,
+        method: data.user.auth_method || 'password'
+      };
+      window.fcAuth.persist(user, data.token, remember, identifier || data.user.email);
+      window.location.href = 'finchat_chat.html';
     }
+
+    // ── Password reset: request a code ─────────────────────────
+    document.getElementById('resetRequestForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('resetRequestBtn');
+      clearErrors(document.getElementById('resetRequestView'));
+
+      const email = document.getElementById('resetEmail').value.trim();
+      if (!email) { setFieldError('resetEmail', 'Enter your email address'); return; }
+
+      busy(btn, true, 'Sending...');
+      try {
+        const res = await fetch(`${API_URL}/api/auth/forgot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          reportFailure(data, 'resetRequestBanner', { email: 'resetEmail' });
+          busy(btn, false);
+          return;
+        }
+
+        // The server answers identically whether or not the address has an
+        // account, so this screen cannot claim the email was found.
+        document.getElementById('resetSentTo').textContent = email;
+        showView('resetConfirmView');
+        if (data.delivery === 'unconfigured') {
+          showBanner('resetConfirmBanner',
+            'Email delivery is not configured on this server, so no message was sent. ' +
+            'The code is printed in the server log.', 'info');
+        } else {
+          showBanner('resetConfirmBanner',
+            'If an account exists for that email, the code is on its way.', 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        showBanner('resetRequestBanner', 'Could not reach the FinChat server. Check your connection and try again.', 'error');
+      } finally {
+        busy(btn, false);
+      }
+    });
+
+    // ── Password reset: confirm ────────────────────────────────
+    document.getElementById('resetConfirmForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('resetConfirmBtn');
+      clearErrors(document.getElementById('resetConfirmView'));
+
+      const email = document.getElementById('resetEmail').value.trim();
+      const code = document.getElementById('resetCode').value.trim();
+      const newPassword = document.getElementById('newPassword').value;
+
+      let ok = true;
+      if (!/^\d{6}$/.test(code)) { setFieldError('code', 'Enter the 6-digit code from your email'); ok = false; }
+      if (newPassword.length < 8) { setFieldError('newPassword', 'Password must be at least 8 characters'); ok = false; }
+      if (!ok) return;
+
+      busy(btn, true, 'Resetting...');
+      try {
+        const res = await fetch(`${API_URL}/api/auth/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, newPassword })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          reportFailure(data, 'resetConfirmBanner', { email: 'code', code: 'code', newPassword: 'newPassword' });
+          busy(btn, false);
+          return;
+        }
+
+        showView('signInView');
+        document.getElementById('loginEmail').value = email;
+        document.getElementById('loginPassword').value = '';
+        showBanner('loginBanner', 'Password updated. Sign in with your new password.', 'success');
+      } catch (err) {
+        console.error(err);
+        showBanner('resetConfirmBanner', 'Could not reach the FinChat server. Check your connection and try again.', 'error');
+      } finally {
+        busy(btn, false);
+      }
+    });
+
+    // Numeric-only, and submit the moment six digits are in.
+    document.getElementById('resetCode').addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    });
+
+    // ── Google Sign-In ─────────────────────────────────────────
+    // The button is rendered by Google Identity Services, and only after
+    // /api/auth/config confirms GOOGLE_CLIENT_ID is set on this server.
+    async function initGoogle() {
+      let config;
+      try {
+        const res = await fetch(`${API_URL}/api/auth/config`);
+        config = await res.json();
+      } catch (e) {
+        return; // Offline or server down — sign-in form still works.
+      }
+      if (!config.google || !config.google.enabled) return;
+
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.defer = true;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Google Identity Services failed to load'));
+        document.head.appendChild(s);
+      }).catch(err => { console.warn(err.message); });
+
+      if (!window.google || !window.google.accounts) return;
+
+      window.google.accounts.id.initialize({
+        client_id: config.google.clientId,
+        callback: onGoogleCredential
+      });
+      window.google.accounts.id.renderButton(document.getElementById('googleBtnHost'), {
+        theme: 'outline', size: 'large', text: 'continue_with',
+        shape: 'rectangular', logo_alignment: 'left', width: 340
+      });
+      document.getElementById('googleSection').classList.add('available');
+    }
+
+    async function onGoogleCredential(response) {
+      clearErrors(document.getElementById('signInView'));
+      try {
+        const res = await fetch(`${API_URL}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showBanner('loginBanner', data.error || 'Google sign-in failed.', 'error');
+          return;
+        }
+        // Google sessions are device-scoped by nature — the browser already
+        // holds the Google session that produced this credential.
+        completeSignIn(data, true, data.user.email);
+      } catch (err) {
+        console.error(err);
+        showBanner('loginBanner', 'Could not reach the FinChat server. Check your connection and try again.', 'error');
+      }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────
+    (function boot() {
+      // Restore the "remember me" state so the box reflects the last choice
+      // rather than resetting to unchecked on every visit.
+      const remembered = window.fcAuth.wasRemembered();
+      document.getElementById('rememberMe').checked = remembered;
+      const id = window.fcAuth.rememberedIdentifier();
+      if (id) {
+        document.getElementById('loginEmail').value = id;
+        document.getElementById('loginPassword').focus();
+      } else {
+        document.getElementById('loginEmail').focus();
+      }
+
+      // Clear a field's error as soon as the user starts fixing it.
+      document.querySelectorAll('.custom-input').forEach(input => {
+        input.addEventListener('input', () => {
+          const field = input.closest('.field');
+          if (field) field.classList.remove('has-error');
+          input.removeAttribute('aria-invalid');
+        });
+      });
+
+      initGoogle();
+    })();
 </script>
 
 </body>

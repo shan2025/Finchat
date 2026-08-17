@@ -137,8 +137,16 @@
  document.getElementById('accEmail').textContent = SESSION_USER.email || '—';
  document.getElementById('accRole').textContent = SESSION_USER.role || 'user';
  function logout() {
-  sessionStorage.clear();
-  localStorage.removeItem('finchat_session'); localStorage.removeItem('finchat_token');
+  // finchat_jwt was missed here, and knowledge.html / reports.html read it as
+  // their only localStorage fallback — so signing out left those two pages
+  // authenticated. fcAuth.clear() owns the full key list.
+  if (window.fcAuth) {
+   window.fcAuth.clear();
+  } else {
+   sessionStorage.clear();
+   ['finchat_session', 'finchat_token', 'finchat_jwt', 'finchat_remember']
+    .forEach(k => localStorage.removeItem(k));
+  }
   location.href = 'finchat_login.html';
  }
 
@@ -465,6 +473,7 @@
 
  loadPrefs();
 </script>
+<script src="auth_session.js"></script>
 <script src="api_client.js"></script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>

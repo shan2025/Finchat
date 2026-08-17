@@ -178,7 +178,7 @@ finchat/
 │       ├── finchat_mindmap.html             ← Mind Map Studio
 │       ├── finchat_neuralnetwork.html       ← Neural network lab
 │       ├── finchat_signup.html              ← Registration
-│       ├── finchat_link_wallet.html         ← Wallet linking
+│       ├── auth_session.js                  ← Where a session is stored (Remember me)
 │       ├── finchat_settings.html            ← Preferences
 │       ├── finchat_theme.css                ← THE shared design layer (all pages)
 │       ├── study_blocks.js / .css           ← Study Mode block renderer

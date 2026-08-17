@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -17,7 +17,7 @@
     margin: 0;
     overflow-x: hidden;
   }
-  
+
   .scene-wrapper {
     position: relative;
     width: 100%;
@@ -29,11 +29,11 @@
   .robot-container {
     position: absolute;
     top: 50%;
-    right: 0px; 
-    margin-top: -80px; 
-    margin-right: -100px; 
+    right: 0px;
+    margin-top: -80px;
+    margin-right: -100px;
     z-index: 0;
-    transform: rotate(90deg) translateY(120px); 
+    transform: rotate(90deg) translateY(120px);
     animation: peek-from-right 12s infinite cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -42,7 +42,7 @@
     transform-origin: center;
     animation: blink 4s infinite;
   }
-  
+
   .robot-head {
     transform-origin: center 70px;
     animation: head-tilt 12s infinite cubic-bezier(0.4, 0, 0.2, 1);
@@ -69,6 +69,11 @@
     100% { transform: scaleY(1); }
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .robot-container, .robot-head, .robot-eye { animation: none; }
+    .robot-container { transform: rotate(90deg); }
+  }
+
   .login-card {
     position: relative;
     z-index: 10;
@@ -77,7 +82,7 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     border: 1px solid rgba(0,0,0,0.03);
   }
-  
+
   .custom-input {
     border: 1px solid #e0e0e0;
     border-radius: 4px;
@@ -87,6 +92,7 @@
     outline: none;
     transition: border-color 0.2s;
     color: #374151;
+    background: white;
   }
   .custom-input::placeholder {
     color: #9ca3af;
@@ -94,33 +100,133 @@
   .custom-input:focus {
     border-color: #3a2b1c;
   }
+
+  /* ── Validation ───────────────────────────────────────────
+     Field-level, because the whole point is to say WHICH box is wrong.
+     "Email already registered" used to arrive as an alert() with nothing
+     highlighted and the form left mid-submit. */
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field-error, .field-hint {
+    display: none;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .field-error { color: #b0472e; }
+  .field-hint  { color: #6b7280; }
+  .field.has-error .field-error { display: block; }
+  .field.has-error .custom-input { border-color: #b0472e; }
+  .field.show-hint .field-hint { display: block; }
+  .field.is-ok .custom-input { border-color: #4f8a52; }
+  .field.is-ok .field-ok { display: block; }
+  .field-ok { display:none; font-size:12px; font-weight:500; color:#4f8a52; }
+
+  .form-banner {
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.5;
+    font-weight: 500;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  .form-banner.show { display: flex; }
+  .form-banner.error { background:#fdf1ee; border:1px solid #f0cfc6; color:#8f3823; }
+  .form-banner.success { background:#eef6ee; border:1px solid #cbe3cc; color:#3d6d40; }
+  .form-banner svg { flex-shrink:0; margin-top:1px; }
+
+  /* ── Username field ───────────────────────────────────────
+     Prefixed with @ so it reads as a handle and not a second name box. */
+  .at-wrap { position: relative; display: block; }
+  .at-wrap .at-sign {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: #9ca3af; font-size: 14px; font-weight: 600; pointer-events: none;
+  }
+  .at-wrap .custom-input { padding-left: 30px; padding-right: 40px; }
+  .at-status {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    line-height: 0;
+  }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid #e0e0e0; border-top-color: #8a7d6a;
+    animation: spin .7s linear infinite; display: block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+  .suggestion-btn {
+    background:none; border:none; padding:0; font:inherit; font-size:12px;
+    font-weight:600; color:#3a2b1c; cursor:pointer; text-decoration:underline;
+  }
+
+  .pw-wrap { position: relative; display: block; }
+  .pw-wrap .custom-input { padding-right: 44px; }
+  .pw-toggle {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; padding: 8px 10px; cursor: pointer;
+    color: #9ca3af; line-height: 0; border-radius: 4px;
+  }
+  .pw-toggle:hover { color: #3a2b1c; }
+  .pw-toggle:focus-visible { outline:2px solid #3a2b1c; outline-offset:-2px; }
+
+  /* Password requirements, shown while the field is in use. */
+  .pw-rules { display:none; flex-direction:column; gap:3px; margin-top:2px; }
+  .field.show-hint .pw-rules { display:flex; }
+  .pw-rule { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9ca3af; font-weight:500; }
+  .pw-rule.met { color:#4f8a52; }
+  .pw-rule .dot {
+    width:5px; height:5px; border-radius:50%; background:currentColor;
+    flex-shrink:0;
+  }
+
+  .primary-btn {
+    width: 100%;
+    background: #3a2b1c; color: white;
+    font-weight: 500; font-size: 15px; padding: 14px;
+    border: none; border-radius: 4px; cursor: pointer;
+    transition: background .2s; font-family: inherit;
+  }
+  .primary-btn:hover:not(:disabled) { background: #2e2216; }
+  .primary-btn:disabled { opacity: .65; cursor: not-allowed; }
+
+  .divider { display:flex; align-items:center; gap:12px; margin: 28px 0; }
+  .divider span { font-size:11px; color:#9ca3af; font-weight:500; text-transform:uppercase; letter-spacing:.08em; }
+  .divider i { height:1px; background:#e5e7eb; flex:1; display:block; }
+
+  #googleSection { display: none; }
+  #googleSection.available { display: block; }
+  #googleBtnHost { display: flex; justify-content: center; min-height: 44px; }
 </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
   <div class="scene-wrapper">
     <!-- Animated Robot SVG -->
-    <div class="robot-container w-[110px] h-[95px]">
+    <div class="robot-container w-[110px] h-[95px]" aria-hidden="true">
       <svg viewBox="0 0 110 95" fill="none" xmlns="http://www.w3.org/2000/svg">
-        
+
         <g class="robot-head">
           <!-- Body (hidden mostly, but here for the shoulders) -->
           <path d="M25 80 C 25 65, 85 65, 85 80 L 85 95 L 25 95 Z" fill="#3a2b1c" />
-          
+
           <!-- Antenna Top -->
           <circle cx="55" cy="12" r="5" fill="#3a2b1c" />
           <line x1="55" y1="16" x2="55" y2="28" stroke="#3a2b1c" stroke-width="3" />
-          
+
           <!-- Side Nubs -->
           <path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="#3a2b1c" />
           <path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="#3a2b1c" />
-          
+
           <!-- Main Head -->
           <rect x="25" y="27" width="60" height="46" rx="22" fill="#3a2b1c" />
-          
+
           <!-- Face Screen -->
           <rect x="35" y="37" width="40" height="26" rx="12" fill="#f6f3eb" />
-          
+
           <!-- Eyes -->
           <g class="robot-eye" style="transform-origin: 46px 48px;">
             <circle cx="46" cy="48" r="4.5" fill="#3a2b1c" />
@@ -128,7 +234,7 @@
           <g class="robot-eye" style="transform-origin: 64px 48px;">
             <circle cx="64" cy="48" r="4.5" fill="#3a2b1c" />
           </g>
-          
+
           <!-- Arms/Hands resting on the edge -->
           <circle cx="22" cy="85" r="10" fill="#3a2b1c" />
           <circle cx="88" cy="85" r="10" fill="#3a2b1c" />
@@ -143,122 +249,444 @@
     <div class="login-card p-10 flex flex-col w-full text-center">
       <h1 class="font-serif text-[44px] leading-tight text-[#1a1a1a] mb-2 tracking-tight">FinChat</h1>
       <p class="text-gray-500 text-[15px] mb-8 font-medium tracking-wide">Create Account</p>
-      
-      <form id="signupForm" class="flex flex-col gap-4 text-left">
-        <div>
-          <input id="full_name" type="text" placeholder="Full Name" class="custom-input" required autocomplete="name">
+
+      <div class="form-banner" id="signupBanner" role="alert" aria-live="polite"></div>
+
+      <form id="signupForm" class="flex flex-col gap-4 text-left" novalidate>
+        <div class="field" id="fieldName">
+          <input id="full_name" type="text" placeholder="Full Name" class="custom-input"
+                 autocomplete="name" aria-describedby="errName">
+          <span class="field-error" id="errName"></span>
         </div>
-        <div>
-          <input id="institutional_id" type="email" placeholder="Email address" class="custom-input" required autocomplete="email">
+
+        <div class="field" id="fieldUsername">
+          <label class="at-wrap">
+            <span class="at-sign">@</span>
+            <input id="username" type="text" placeholder="username" class="custom-input"
+                   autocomplete="off" autocapitalize="none" spellcheck="false"
+                   maxlength="20" aria-describedby="errUsername">
+            <span class="at-status" id="usernameStatus"></span>
+          </label>
+          <span class="field-error" id="errUsername"></span>
+          <span class="field-ok" id="okUsername">That username is available</span>
+          <span class="field-hint" id="hintUsername">3–20 characters. Letters, numbers and underscores.</span>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <input id="decryption_key" type="password" placeholder="Password" class="custom-input" required autocomplete="new-password">
-          <input id="confirm_password" type="password" placeholder="Confirm Password" class="custom-input" required autocomplete="new-password">
+
+        <div class="field" id="fieldEmail">
+          <input id="email" type="email" placeholder="Email address" class="custom-input"
+                 autocomplete="email" aria-describedby="errEmail">
+          <span class="field-error" id="errEmail"></span>
         </div>
-        
-        <button type="button" id="signupBtn" onclick="handleSignup()" class="w-full bg-darkBrown hover:bg-[#2e2216] transition-colors text-white font-medium text-[15px] py-[14px] rounded-[4px] shadow-sm mt-3">
-          Create account
-        </button>
+
+        <div class="field" id="fieldPassword">
+          <label class="pw-wrap">
+            <input id="password" type="password" placeholder="Password" class="custom-input"
+                   autocomplete="new-password" aria-describedby="errPassword">
+            <button type="button" class="pw-toggle" data-target="password"
+                    onclick="togglePassword(this)" aria-label="Show password">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </label>
+          <span class="field-error" id="errPassword"></span>
+          <div class="pw-rules" id="pwRules">
+            <span class="pw-rule" data-rule="len"><i class="dot"></i>At least 8 characters</span>
+            <span class="pw-rule" data-rule="mix"><i class="dot"></i>Mix letters and numbers</span>
+          </div>
+        </div>
+
+        <div class="field" id="fieldConfirm">
+          <input id="confirm_password" type="password" placeholder="Confirm Password" class="custom-input"
+                 autocomplete="new-password" aria-describedby="errConfirm">
+          <span class="field-error" id="errConfirm"></span>
+        </div>
+
+        <button type="submit" id="signupBtn" class="primary-btn mt-3">Create account</button>
       </form>
-      
-      <div class="flex items-center gap-3 my-7">
-        <div class="h-[1px] bg-gray-200 flex-1"></div>
-        <span class="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Or</span>
-        <div class="h-[1px] bg-gray-200 flex-1"></div>
+
+      <div id="googleSection">
+        <div class="divider"><i></i><span>Or</span><i></i></div>
+        <div id="googleBtnHost"></div>
       </div>
-      
-      <button type="button" onclick="handleGoogleSignIn()" class="w-full bg-white border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600 font-medium text-[14px] py-[12px] rounded-[4px] shadow-sm flex items-center justify-center gap-3">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-        </svg>
-        Continue with Google
-      </button>
-      
+
       <p class="mt-8 text-[13px] text-gray-500 font-medium">
         Already have an account? <a href="finchat_login.html" class="text-darkBrown hover:underline ml-1">Sign In</a>
       </p>
     </div>
   </div>
 
+<script src="auth_session.js"></script>
 <script>
     // Configuration
     const API_URL = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
-  
-    // Pressing Enter triggers signup
-    document.getElementById('confirm_password').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') handleSignup();
-    });
-  
-    async function handleSignup() {
-      const btn = document.getElementById('signupBtn');
-      const origText = btn.innerHTML;
-      btn.innerHTML = 'Creating Account...';
-      btn.disabled = true;
-  
-      const name = document.getElementById('full_name').value;
-      const email = document.getElementById('institutional_id').value;
-      const password = document.getElementById('decryption_key').value;
-      const confirmPassword = document.getElementById('confirm_password').value;
-  
-      if (!name || !email || !password || !confirmPassword) {
-          alert("Please fill out all fields.");
-          btn.innerHTML = origText;
-          btn.disabled = false;
-          return;
-      }
 
-      if (password !== confirmPassword) {
-          alert("Passwords do not match.");
-          btn.innerHTML = origText;
-          btn.disabled = false;
-          return;
-      }
-  
-      try {
-        const res = await fetch(`${API_URL}/api/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password })
-        });
-        
-        const data = await res.json();
-  
-        if (!res.ok) {
-          alert(data.error || 'Registration failed. Please try again.');
-          btn.innerHTML = origText;
-          btn.disabled = false;
-          return;
-        }
-        
-        // Auto-login and redirect to link wallet step
-        const currentUser = {
-          name: data.user.name,
-          email: data.user.email,
-          role: data.user.role,
-          token: data.token,
-          id: data.user.id,
-          token_balance: data.user.token_balance,
-          wallet: data.user.wallet_address,
-          method: 'password'
-        };
-        sessionStorage.setItem('finchat_user', JSON.stringify(currentUser));
-        sessionStorage.setItem('finchat_token', data.token);
-        localStorage.setItem('finchat_token', data.token);
-        window.location.href = 'finchat_link_wallet.html';
-      } catch (err) {
-        console.error(err);
-        alert('Backend unreachable or error occurred.');
-        btn.innerHTML = origText;
+    // The `field` name a 4xx carries → the markup that shows it.
+    const FIELD_NODES = {
+      name:     { field: 'fieldName',     error: 'errName',     input: 'full_name' },
+      username: { field: 'fieldUsername', error: 'errUsername', input: 'username' },
+      email:    { field: 'fieldEmail',    error: 'errEmail',    input: 'email' },
+      password: { field: 'fieldPassword', error: 'errPassword', input: 'password' },
+      confirm:  { field: 'fieldConfirm',  error: 'errConfirm',  input: 'confirm_password' }
+    };
+
+    const ICONS = {
+      error: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      success: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+    };
+
+    function setFieldError(key, message) {
+      const nodes = FIELD_NODES[key];
+      if (!nodes) return false;
+      const field = document.getElementById(nodes.field);
+      const error = document.getElementById(nodes.error);
+      if (!field || !error) return false;
+      error.textContent = message;
+      field.classList.add('has-error');
+      field.classList.remove('is-ok');
+      const input = document.getElementById(nodes.input);
+      if (input) input.setAttribute('aria-invalid', 'true');
+      return true;
+    }
+
+    function clearFieldError(key) {
+      const nodes = FIELD_NODES[key];
+      if (!nodes) return;
+      const field = document.getElementById(nodes.field);
+      if (field) field.classList.remove('has-error');
+      const input = document.getElementById(nodes.input);
+      if (input) input.removeAttribute('aria-invalid');
+    }
+
+    function clearErrors() {
+      Object.keys(FIELD_NODES).forEach(clearFieldError);
+      document.getElementById('signupBanner').classList.remove('show');
+    }
+
+    function showBanner(message, kind) {
+      const el = document.getElementById('signupBanner');
+      const tone = kind || 'error';
+      el.className = 'form-banner show ' + tone;
+      el.innerHTML = ICONS[tone] + '<span></span>';
+      el.querySelector('span').textContent = message;
+    }
+
+    function busy(btn, isBusy, busyText) {
+      if (isBusy) {
+        btn.dataset.idleText = btn.dataset.idleText || btn.textContent;
+        btn.textContent = busyText;
+        btn.disabled = true;
+      } else {
+        btn.textContent = btn.dataset.idleText || btn.textContent;
         btn.disabled = false;
       }
     }
 
-    function handleGoogleSignIn() {
-        alert("Google Sign In is not currently configured in the backend.");
+    function togglePassword(btn) {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      btn.innerHTML = reveal
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
     }
+
+    // ── Username availability ──────────────────────────────────
+    // Debounced, and the response is matched back to the value that asked for
+    // it — otherwise a slow early request can land after a fast later one and
+    // label the current handle with a verdict about a previous one.
+    const usernameInput = document.getElementById('username');
+    const usernameStatus = document.getElementById('usernameStatus');
+    const fieldUsername = document.getElementById('fieldUsername');
+
+    let usernameTimer = null;
+    let usernameSeq = 0;
+    // null = unknown/checking, true/false = last verdict for `usernameChecked`.
+    let usernameAvailable = null;
+    let usernameChecked = '';
+
+    const TICK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f8a52" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    const CROSS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0472e" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+    usernameInput.addEventListener('input', () => {
+      // Normalise as they type so what they see is what gets submitted.
+      const cleaned = usernameInput.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (cleaned !== usernameInput.value) usernameInput.value = cleaned;
+
+      usernameAvailable = null;
+      usernameChecked = '';
+      fieldUsername.classList.remove('has-error', 'is-ok');
+      fieldUsername.classList.add('show-hint');
+      usernameStatus.innerHTML = '';
+      clearTimeout(usernameTimer);
+
+      if (!cleaned) return;
+      usernameStatus.innerHTML = '<span class="spinner"></span>';
+      usernameTimer = setTimeout(() => checkUsername(cleaned), 400);
+    });
+
+    usernameInput.addEventListener('blur', () => {
+      if (!usernameInput.value) fieldUsername.classList.remove('show-hint');
+    });
+
+    async function checkUsername(value) {
+      const seq = ++usernameSeq;
+      try {
+        const res = await fetch(`${API_URL}/api/auth/username-available?u=${encodeURIComponent(value)}`);
+        const data = await res.json();
+        if (seq !== usernameSeq) return;          // a newer keystroke won
+        if (usernameInput.value !== value) return; // the field moved on
+
+        usernameChecked = value;
+        usernameAvailable = Boolean(data.available);
+
+        if (data.available) {
+          usernameStatus.innerHTML = TICK;
+          fieldUsername.classList.remove('has-error');
+          fieldUsername.classList.add('is-ok');
+          document.getElementById('okUsername').textContent = `@${value} is available`;
+        } else {
+          usernameStatus.innerHTML = CROSS;
+          fieldUsername.classList.remove('is-ok');
+          setFieldError('username', data.reason || 'That username is not available');
+          if (data.suggestion) offerSuggestion(data.suggestion);
+        }
+      } catch (err) {
+        if (seq !== usernameSeq) return;
+        // Availability is a convenience; the register call is the real gate.
+        usernameStatus.innerHTML = '';
+      }
+    }
+
+    function offerSuggestion(suggestion) {
+      const error = document.getElementById('errUsername');
+      error.textContent = 'That username is taken. Try ';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'suggestion-btn';
+      btn.textContent = '@' + suggestion;
+      btn.addEventListener('click', () => {
+        usernameInput.value = suggestion;
+        usernameInput.dispatchEvent(new Event('input'));
+        usernameInput.focus();
+      });
+      error.appendChild(btn);
+    }
+
+    // ── Password rules ─────────────────────────────────────────
+    const passwordInput = document.getElementById('password');
+    passwordInput.addEventListener('focus', () => {
+      document.getElementById('fieldPassword').classList.add('show-hint');
+    });
+    passwordInput.addEventListener('input', () => {
+      const v = passwordInput.value;
+      const rules = { len: v.length >= 8, mix: /[a-z]/i.test(v) && /\d/.test(v) };
+      document.querySelectorAll('#pwRules .pw-rule').forEach(el => {
+        el.classList.toggle('met', Boolean(rules[el.dataset.rule]));
+      });
+      clearFieldError('password');
+      // Re-check the confirmation against the new value rather than leaving a
+      // stale "passwords do not match" under a field that now matches.
+      const confirm = document.getElementById('confirm_password');
+      if (confirm.value && confirm.value === v) clearFieldError('confirm');
+    });
+
+    document.getElementById('confirm_password').addEventListener('input', () => {
+      clearFieldError('confirm');
+    });
+
+    // ── Submit ─────────────────────────────────────────────────
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleSignup();
+    });
+
+    async function handleSignup() {
+      const btn = document.getElementById('signupBtn');
+      clearErrors();
+
+      const name = document.getElementById('full_name').value.trim();
+      const username = document.getElementById('username').value.trim().toLowerCase();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirm_password').value;
+
+      // Everything checkable locally is checked locally: the auth rate limiter
+      // allows 10 attempts per 15 minutes, and spending them on a typo'd
+      // confirmation field would lock a new user out of their own signup.
+      let ok = true;
+      if (!name) { setFieldError('name', 'Enter your full name'); ok = false; }
+
+      if (!username) {
+        setFieldError('username', 'Choose a username'); ok = false;
+      } else if (username.length < 3) {
+        setFieldError('username', 'Username must be at least 3 characters'); ok = false;
+      } else if (!/^[a-z]/.test(username)) {
+        setFieldError('username', 'Username must start with a letter'); ok = false;
+      } else if (usernameChecked === username && usernameAvailable === false) {
+        setFieldError('username', 'That username is already taken'); ok = false;
+      }
+
+      if (!email) {
+        setFieldError('email', 'Enter your email address'); ok = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFieldError('email', 'Enter a valid email address'); ok = false;
+      }
+
+      if (!password) {
+        setFieldError('password', 'Choose a password'); ok = false;
+      } else if (password.length < 8) {
+        setFieldError('password', 'Password must be at least 8 characters'); ok = false;
+      }
+
+      if (!confirmPassword) {
+        setFieldError('confirm', 'Re-enter your password'); ok = false;
+      } else if (password !== confirmPassword) {
+        setFieldError('confirm', 'Passwords do not match'); ok = false;
+      }
+
+      if (!ok) {
+        const firstBad = document.querySelector('.field.has-error .custom-input');
+        if (firstBad) firstBad.focus();
+        return;
+      }
+
+      busy(btn, true, 'Creating Account...');
+
+      try {
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, username, email, password })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const message = data.error || 'Registration failed. Please try again.';
+          // The server names the offending field; only fall back to the banner
+          // when it cannot (rate limit, server fault).
+          if (!data.field || !setFieldError(data.field, message)) {
+            showBanner(message, 'error');
+          } else {
+            const bad = document.querySelector('.field.has-error .custom-input');
+            if (bad) bad.focus();
+          }
+          busy(btn, false);
+          return;
+        }
+
+        completeSignIn(data);
+      } catch (err) {
+        console.error(err);
+        showBanner('Could not reach the FinChat server. Check your connection and try again.', 'error');
+        busy(btn, false);
+      }
+    }
+
+    function completeSignIn(data) {
+      const user = {
+        name: data.user.name,
+        username: data.user.username || null,
+        email: data.user.email,
+        role: data.user.role,
+        token: data.token,
+        id: data.user.id,
+        token_balance: data.user.token_balance,
+        wallet: data.user.wallet_address,
+        avatar_url: data.user.avatar_url || null,
+        method: data.user.auth_method || 'password'
+      };
+      // A brand-new account on this browser is a device the user just chose to
+      // sign up on, so persist it; they can switch it off from the login page.
+      window.fcAuth.persist(user, data.token, true, data.user.email);
+      window.location.href = 'finchat_chat.html';
+    }
+
+    // ── Google Sign-In ─────────────────────────────────────────
+    async function initGoogle() {
+      let config;
+      try {
+        const res = await fetch(`${API_URL}/api/auth/config`);
+        config = await res.json();
+      } catch (e) {
+        return;
+      }
+      if (!config.google || !config.google.enabled) return;
+
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true; s.defer = true;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Google Identity Services failed to load'));
+        document.head.appendChild(s);
+      }).catch(err => { console.warn(err.message); });
+
+      if (!window.google || !window.google.accounts) return;
+
+      window.google.accounts.id.initialize({
+        client_id: config.google.clientId,
+        callback: onGoogleCredential
+      });
+      window.google.accounts.id.renderButton(document.getElementById('googleBtnHost'), {
+        theme: 'outline', size: 'large', text: 'signup_with',
+        shape: 'rectangular', logo_alignment: 'left', width: 340
+      });
+      document.getElementById('googleSection').classList.add('available');
+    }
+
+    async function onGoogleCredential(response) {
+      clearErrors();
+      try {
+        const res = await fetch(`${API_URL}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showBanner(data.error || 'Google sign-up failed.', 'error');
+          return;
+        }
+        completeSignIn(data);
+      } catch (err) {
+        console.error(err);
+        showBanner('Could not reach the FinChat server. Check your connection and try again.', 'error');
+      }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────
+    (function boot() {
+      document.getElementById('full_name').focus();
+
+      // Suggest a handle from the name, once, and only if they have not typed
+      // one — a live rewrite while they edit their own username is maddening.
+      document.getElementById('full_name').addEventListener('blur', () => {
+        const name = document.getElementById('full_name').value.trim();
+        if (!name || usernameInput.value) return;
+        let seed = name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+        if (!/^[a-z]/.test(seed)) seed = 'u' + seed;
+        seed = seed.slice(0, 20);
+        while (seed.length < 3) seed += '0';
+        usernameInput.value = seed;
+        usernameInput.dispatchEvent(new Event('input'));
+      });
+
+      document.querySelectorAll('.custom-input').forEach(input => {
+        input.addEventListener('input', () => {
+          document.getElementById('signupBanner').classList.remove('show');
+        });
+      });
+
+      document.getElementById('email').addEventListener('input', () => clearFieldError('email'));
+      document.getElementById('full_name').addEventListener('input', () => clearFieldError('name'));
+
+      initGoogle();
+    })();
 </script>
 
 </body>

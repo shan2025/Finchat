@@ -38,6 +38,10 @@ const CHECKS = [
     cost: 'Telegram notifications are dropped'
   },
   {
+    keys: ['GOOGLE_CLIENT_ID'],
+    cost: 'the "Continue with Google" button is not rendered on the login and signup pages'
+  },
+  {
     keys: ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'],
     all: true,
     cost: 'Web Push falls back to .vapid-keys.json on disk; where that does not survive a restart, ' +
