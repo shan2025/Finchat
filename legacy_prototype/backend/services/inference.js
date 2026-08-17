@@ -50,14 +50,24 @@ const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
 const PROVIDER_CHAIN = [
   {
     name: 'gemini',
+    // `style: 'gemini'` because Google's OpenAI-compatibility endpoint is not
+    // usable with every Google credential. It demands an `Authorization:
+    // Bearer` header and rejects a plain API key there with "Expected OAuth 2
+    // access token" — the newer `AQ.`-prefixed keys authenticate only as
+    // `x-goog-api-key` against the NATIVE endpoint. Talking native works for
+    // both key formats, so it is the one that always works.
+    style: 'gemini',
     apiKey: process.env.GEMINI_API_KEY,
     baseUrl: process.env.GEMINI_BASE_URL ||
-      'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    models: (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.0-flash')
+      'https://generativelanguage.googleapis.com/v1beta/models',
+    // gemini-2.5-flash is deliberately NOT the default: Google now answers 404
+    // for it on new keys ("no longer available to new users").
+    models: (process.env.GEMINI_MODELS || 'gemini-3.5-flash,gemini-flash-latest')
       .split(',').map(s => s.trim()).filter(Boolean)
   },
   {
     name: 'deepseek',
+    style: 'openai',
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1/chat/completions',
     models: (process.env.DEEPSEEK_MODELS || 'deepseek-chat')
@@ -190,7 +200,9 @@ function _trimMessages(messages, maxCharsPerMessage) {
  * trim and fallback logic below is written once and reused for all of them —
  * only the base URL, key and model name differ.
  */
-async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperature, jsonMode }) {
+async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperature, jsonMode, style }) {
+  if (style === 'gemini') return _callGemini({ baseUrl, apiKey, model, messages, temperature, jsonMode });
+
   const response = await axios.post(
     baseUrl,
     {
@@ -211,6 +223,66 @@ async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperat
 }
 
 /**
+ * Call Gemini's native generateContent and reshape the answer to look like an
+ * OpenAI response, so everything downstream — the retry loop, the metrics, the
+ * return value — stays provider-agnostic.
+ *
+ * Two shape differences matter. Gemini names the assistant role "model", and it
+ * carries system prompts in a separate `systemInstruction` field rather than as
+ * a message with role "system"; a system message left in the contents array is
+ * rejected. Both are normalised here.
+ */
+async function _callGemini({ baseUrl, apiKey, model, messages, temperature, jsonMode }) {
+  const systemText = messages
+    .filter(m => m.role === 'system')
+    .map(m => String(m.content || '')).join('\n\n');
+
+  const contents = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content || '') }]
+    }));
+
+  const body = {
+    contents,
+    generationConfig: {
+      temperature,
+      // Gemini's equivalent of response_format: { type: 'json_object' }.
+      responseMimeType: jsonMode ? 'application/json' : undefined
+    }
+  };
+  if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
+
+  const response = await axios.post(
+    `${baseUrl}/${model}:generateContent`,
+    body,
+    {
+      // Not `Authorization: Bearer` — see the note on the provider config.
+      headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+      timeout: 45000
+    }
+  );
+
+  const usage = response.data.usageMetadata || {};
+  const text = (response.data.candidates?.[0]?.content?.parts || [])
+    .map(p => p.text || '').join('');
+
+  // Hand back an OpenAI-shaped object so _runProviderChain needs no special
+  // case when reading the result.
+  return {
+    data: {
+      choices: [{ message: { content: text } }],
+      usage: {
+        prompt_tokens: usage.promptTokenCount || 0,
+        completion_tokens: usage.candidatesTokenCount || 0,
+        total_tokens: usage.totalTokenCount || 0
+      }
+    }
+  };
+}
+
+/**
  * Work through one provider's model list, handling 429 backoff, 413 payload
  * trimming and retired-model blacklisting. Returns a completion, or null when
  * this provider has nothing left to offer and the caller should move on.
@@ -220,7 +292,7 @@ async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperat
  */
 async function _runProviderChain({
   providerName, baseUrl, apiKey, models, messages, temperature, jsonMode,
-  feature, agentId, userId, startedAt, rateLimited = false
+  feature, agentId, userId, startedAt, rateLimited = false, style = 'openai'
 }) {
   const candidates = models
     .filter((m, i, arr) => m && arr.indexOf(m) === i)
@@ -257,7 +329,7 @@ async function _runProviderChain({
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const response = await _callChatCompletions({
-          baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode
+          baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode, style
         });
         console.log(`⚡ ${providerName} inference successful [Model: ${gModel}]` +
           (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
@@ -372,6 +444,7 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
       baseUrl: cfg.baseUrl,
       apiKey: cfg.apiKey,
       models: cfg.models,
+      style: cfg.style,
       messages, temperature, jsonMode, feature, agentId, userId,
       startedAt: _startedAt
     });
