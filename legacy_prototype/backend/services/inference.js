@@ -60,9 +60,16 @@ const PROVIDER_CHAIN = [
     apiKey: process.env.GEMINI_API_KEY,
     baseUrl: process.env.GEMINI_BASE_URL ||
       'https://generativelanguage.googleapis.com/v1beta/models',
-    // gemini-2.5-flash is deliberately NOT the default: Google now answers 404
-    // for it on new keys ("no longer available to new users").
-    models: (process.env.GEMINI_MODELS || 'gemini-3.5-flash,gemini-flash-latest')
+    // gemini-flash-latest leads on measured availability, not on version
+    // number. Probed repeatedly on 2026-08-17 while Groq's daily allowance was
+    // spent: gemini-3.5-flash answered 429 "You exceeded your current quota"
+    // almost every time, while gemini-flash-latest served a full 15k-token
+    // synthesis payload in the same minute. Trying the throttled one first cost
+    // 50s of backoff before reaching the one that works.
+    //
+    // gemini-2.5-flash is deliberately absent: Google now answers 404 for it on
+    // new keys ("no longer available to new users").
+    models: (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-3.5-flash')
       .split(',').map(s => s.trim()).filter(Boolean)
   },
   {
