@@ -5,6 +5,33 @@ const { SentinelAgent, classifyFraudSeverity } = require('./agents/SentinelAgent
 
 const FRAUD_TAG = '[FRAUD_DETECTED]';
 
+// ── Greeting fast path ─────────────────────────────────────────
+// "hi" used to take the full cognitive loop — a routing decision, a model call
+// and several seconds — to produce whatever pleasantry the model felt like that
+// day. A bare greeting carries no goal, so it is answered here, identically
+// every time, before any of that starts.
+const GREETING_REPLY = 'Welcome to our system! How can we help you today?';
+
+// Matches a message that is ONLY a greeting: "hi", "helloo", "hey there",
+// "good morning", "hello Plato 👋". Anything with an actual request attached
+// ("hi, check TSLA") falls through to the normal path.
+const GREETING_RE = new RegExp(
+  '^(?:h+i+|h+e+y+|h+e+l+o+|h+e+l+l+o+|hiya|yo|howdy|greetings|sup|namaste|hola|' +
+  'good\\s+(?:morning|afternoon|evening|day))' +
+  '(?:\\s+(?:there|again|all|team|everyone|folks|guys|bot|ai|agent|' +
+  'plato|aurelius|rasha|nova))*' +
+  '[\\s!.,?~\\-]*$',
+  'i'
+);
+
+function isGreeting(text) {
+  const t = String(text || '')
+    .replace(/^@[a-zA-Z0-9_-]+\s+/, '')          // "@nova hi" is still a greeting
+    .replace(/[\p{Extended_Pictographic}️]/gu, '') // drop 👋 / 🙂
+    .trim();
+  return t.length > 0 && t.length <= 40 && GREETING_RE.test(t);
+}
+
 /**
  * Route a chat message through the Cognitive Core via PlatoOrchestrator.
  * Supports Dual-Entry: direct addressing (e.g., "@rasha review my cv") vs. indirect Plato routing.
@@ -19,6 +46,18 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       fraudDetected: true,
       cleanResponse: 'Request flagged: Security indicator detected. Action restricted by Sentinel governance protocols.',
       delegatedAgent: 'sentinel'
+    };
+  }
+
+  if (isGreeting(userMessage)) {
+    return {
+      response: GREETING_REPLY,
+      cleanResponse: GREETING_REPLY,
+      fraudDetected: false,
+      delegatedAgent: personaId || 'plato',
+      provider: 'system',
+      model: 'greeting',
+      sources: []
     };
   }
 
