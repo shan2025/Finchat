@@ -94,11 +94,18 @@ const _bucket = { tokens: GROQ_RPM, lastRefill: Date.now() };
 const _deadModels = new Set();
 
 /**
- * Does this 400 mean "that model does not exist" rather than "that request was
- * bad"? Groq signals the former with code `model_not_found` (or prose naming
- * the model as unknown/decommissioned); the latter covers json_object
+ * Does this error mean "that model does not exist" rather than "that request
+ * was bad"? Groq signals the former with code `model_not_found` (or prose
+ * naming the model as unknown/decommissioned); the latter covers json_object
  * validation failures and oversized payloads, which say nothing about the
  * model's availability and must NOT retire it.
+ *
+ * Callers must apply this to 404 as well as 400. Observed live 2026-08-17:
+ * llama-3.1-8b-instant, which had been answering, began returning
+ * 404 "The model `…` does not exist or you do not have access to it" once it
+ * was withdrawn from the key — a permanent condition dressed as a status code
+ * the retry logic previously treated as ordinary failure, so every run paid a
+ * doomed round-trip for it.
  */
 function _isModelNotFound(err) {
   const e = err.response?.data?.error || {};
@@ -388,12 +395,30 @@ async function _runProviderChain({
           await _sleep(delayMs);
           continue; // retry same model
         }
+        // A 5xx is the provider having a bad moment, not a verdict on the
+        // request — retrying the SAME model is the right move, where a 4xx
+        // would just fail again. Gemini answers 503 "This model is currently
+        // experiencing high demand. Spikes in demand are usually temporary.
+        // Please try again later", which is an explicit instruction to retry;
+        // giving up on it immediately abandoned a working provider over a
+        // wobble that had usually passed within seconds.
+        if (status >= 500 && status < 600 && attempt < 3) {
+          const delayMs = Math.min((retryAfterSec || [2, 6, 15][attempt] || 15) * 1000, 15_000);
+          console.warn(`⚠️ ${providerName} ${status} on "${gModel}" (attempt ${attempt + 1}/3) — provider-side, waiting ${delayMs}ms before retry [${feature}]`);
+          await _sleep(delayMs);
+          continue; // retry same model
+        }
         // A 400 is only proof the MODEL is gone when the provider says so. It
         // also returns 400 for a request this model could not satisfy — a
         // failed json_object validation, an oversized payload — and
         // blacklisting on those would retire a perfectly healthy model for the
         // whole process over one bad turn. Match the not-found shape.
-        if (status === 400 && _isModelNotFound(err)) {
+        //
+        // 404 is included because that is how a model WITHDRAWN from the key
+        // answers: llama-3.1-8b-instant went from serving traffic to
+        // 404 "does not exist or you do not have access to it" mid-day. Without
+        // this, it stayed in the rotation and cost a wasted call every run.
+        if ((status === 400 || status === 404) && _isModelNotFound(err)) {
           _deadModels.add(`${providerName}:${gModel}`);
           console.warn(`⚠️ ${providerName} model "${gModel}" no longer exists — dropping it for this process`);
         }
