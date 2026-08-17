@@ -291,6 +291,26 @@
    </div>
   </div>
 
+  <!-- Empty state — what you land on with no map open. Opening the page no
+     longer force-loads the System Map; you choose what to look at. -->
+  <div id="emptyVeil" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6 z-40"
+       style="background: var(--bg); color: var(--sub);">
+   <span class="material-symbols-outlined" style="font-size:52px; opacity:.4;">hub</span>
+   <div style="font-family: Georgia, serif; font-size:22px; color: var(--txt);">No map open</div>
+   <div class="text-[13.5px] leading-relaxed" style="max-width:380px;">
+    Open the System Map to see the live wiring of your agents, tools and learned
+    concepts — or start a map of your own and build it node by node.
+   </div>
+   <div class="flex items-center gap-2 flex-wrap justify-center">
+    <button id="emptyOpenSystem" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold">
+     <span class="material-symbols-outlined text-[16px]">hub</span> Open the System Map
+    </button>
+    <button id="emptyNewMap" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold">
+     <span class="material-symbols-outlined text-[16px]">add</span> New map
+    </button>
+   </div>
+  </div>
+
   <div id="nodePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
   <div id="edgePanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[340px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
   <div id="insightsPanel" class="hidden nm-panel nm-surface absolute top-4 right-4 w-[360px] max-h-[calc(100%-2rem)] overflow-y-auto rounded-2xl shadow-2xl z-30"></div>
@@ -387,18 +407,43 @@ const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('f
 const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 
 // ══════════════════════════════════════════════════════════
-// Which map is open — like which chat thread is open. The System Map is the
-// default; picking or creating another map updates the URL so it's bookmarkable
-// and survives a reload.
+// Which map is open — like which chat thread is open. Nothing is open by
+// default: landing on the page shows the empty state and lets you choose,
+// rather than always dragging the System Map in. Picking or creating a map
+// updates the URL so it's bookmarkable and survives a reload.
 // ══════════════════════════════════════════════════════════
-let currentMapId = new URLSearchParams(location.search).get('mapId') || 'system';
-let currentMapName = 'System Map';
+let currentMapId = new URLSearchParams(location.search).get('mapId') || null;
+let currentMapName = '';
 let myMaps = [];  // cache from GET /maps, refreshed on load and after create/rename/delete
 const withMap = (url) => url + (url.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(currentMapId);
 function setUrlMapId(mapId) {
  const u = new URL(location.href);
- if (mapId === 'system') u.searchParams.delete('mapId'); else u.searchParams.set('mapId', mapId);
+ // No mapId in the URL now means "no map open", so even the System Map is
+ // written out explicitly — otherwise a reload would bounce back to empty.
+ if (mapId) u.searchParams.set('mapId', mapId); else u.searchParams.delete('mapId');
  history.replaceState(null, '', u);
+}
+
+// The empty state: no map loaded, canvas cleared, nothing polling.
+function showEmptyState() {
+ currentMapId = null;
+ currentMapName = '';
+ setUrlMapId(null);
+ nodes = []; edges = []; communities = [];
+ selection.clear(); syncSelBanner(); closePanels();
+ document.getElementById('loadingVeil').classList.add('hidden');
+ document.getElementById('emptyVeil').classList.remove('hidden');
+ const statsEl = document.getElementById('mapStats');
+ statsEl.textContent = 'no map open';
+ statsEl.title = '';
+ renderMapTabs();
+}
+
+// Guard for the toolbar actions that need something to act on.
+function requireMap() {
+ if (currentMapId) return true;
+ showToast('Open a map first — pick one above, or start a new one.');
+ return false;
 }
 
 (function initSidebar() {
@@ -536,6 +581,8 @@ window.addEventListener('resize', resize);
 // Load real graph from the backend
 // ══════════════════════════════════════════════════════════
 async function loadGraph() {
+ if (!currentMapId) return showEmptyState();
+ document.getElementById('emptyVeil').classList.add('hidden');
  try {
   const res = await fetch(withMap('/api/neural-map'), { headers: AUTH });
   if (res.status === 400) {
@@ -545,9 +592,8 @@ async function loadGraph() {
    return;
   }
   if (res.status === 404) {
-   showToast('That map no longer exists — back to the System Map.');
-   currentMapId = 'system'; setUrlMapId('system');
-   return loadGraph();
+   showToast('That map no longer exists.');
+   return showEmptyState();
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
@@ -726,12 +772,9 @@ async function deleteMap(mapId, name) {
   const res = await fetch(`/api/neural-map/maps/${encodeURIComponent(mapId)}`, { method: 'DELETE', headers: AUTH });
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-  // If we were viewing the deleted map, fall back to the System Map.
-  if (currentMapId === mapId) {
-   currentMapId = 'system'; setUrlMapId('system');
-   document.getElementById('loadingVeil').classList.remove('hidden');
-   await loadGraph();
-  }
+  // If we were viewing the deleted map, there is nothing to show — go back to
+  // the empty state rather than silently opening a different map.
+  if (currentMapId === mapId) showEmptyState();
   await loadMapList();
   showToast(`Deleted “${name}”.`);
  } catch (err) { showToast(`⚠️ Couldn't delete map: ${err.message}`); }
@@ -1656,8 +1699,10 @@ searchInput.onkeydown = e => {
   showToast(`No node matches “${searchQuery.trim()}”.`);
  }
 };
-document.getElementById('addNodeBtn').onclick = addNode;
-document.getElementById('addDocBtn').onclick = openDocPicker;
+document.getElementById('addNodeBtn').onclick = () => { if (requireMap()) addNode(); };
+document.getElementById('addDocBtn').onclick = () => { if (requireMap()) openDocPicker(); };
+document.getElementById('emptyOpenSystem').onclick = () => switchToMap('system', 'knowledge');
+document.getElementById('emptyNewMap').onclick = openNewMapModal;
 document.getElementById('docModalClose').onclick = () => document.getElementById('docModal').classList.add('hidden');
 document.getElementById('docModal').addEventListener('click', e => { if (e.target.id === 'docModal') document.getElementById('docModal').classList.add('hidden'); });
 document.getElementById('selectAllBtn').onclick = selectAll;
@@ -1871,6 +1916,7 @@ document.getElementById('dreamBtn').onclick = async () => {
 refreshInsightsDot();
 
 document.getElementById('reloadBtn').onclick = async () => {
+ if (!requireMap()) return;
  closePanels();
  document.getElementById('loadingVeil').classList.remove('hidden');
  await loadGraph();
@@ -1908,7 +1954,8 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════
 applyTheme(theme);  // now that palette, legend and panel state all exist
 resize();
-loadGraph().then(() => { resize(); });
+if (currentMapId) loadGraph().then(() => { resize(); });
+else showEmptyState();
 loadMapList();
 loop();
 

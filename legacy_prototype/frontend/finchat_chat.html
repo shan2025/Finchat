@@ -2217,7 +2217,7 @@
               <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;">
                 ${data.nodesAdded.map(n => `<span style="padding:4px 10px; border-radius:8px; background:#efe8de; border:1px solid #e3d3ba; font-size:12px; font-weight:600; color:#3a2e23;">✦ ${escHtml(n.label)}</span>`).join('')}
               </div>
-              <a href="finchat_neuralmap.html" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:999px; background:#3a2e23; color:#fff; font-size:13px; font-weight:700; text-decoration:none; box-shadow:0 4px 12px rgba(58,46,35,0.2); transition:background 0.15s;">
+              <a href="finchat_neuralmap.html?mapId=system" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:999px; background:#3a2e23; color:#fff; font-size:13px; font-weight:700; text-decoration:none; box-shadow:0 4px 12px rgba(58,46,35,0.2); transition:background 0.15s;">
                 Explore on Neural Map →
               </a>
             `;
@@ -2407,7 +2407,7 @@
                 traceDiv.style.cssText = 'margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--text2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
                 traceDiv.innerHTML = `
                   <span title="This answer was generated using these knowledge-graph memories">🧠  ${shown}${more}${memBit}</span>
-                  <a href="finchat_neuralmap.html" style="color:var(--text2);text-decoration:underline;opacity:.8">view on map</a>`;
+                  <a href="finchat_neuralmap.html?mapId=system" style="color:var(--text2);text-decoration:underline;opacity:.8">view on map</a>`;
                 contentEl.appendChild(traceDiv);
               }
             }
