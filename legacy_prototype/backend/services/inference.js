@@ -368,7 +368,21 @@ async function _runProviderChain({
           if (after < before) continue; // retry same model with the smaller payload
         }
         if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
-          const delayMs = Math.min((retryAfterSec || (2 * (attempt + 1))) * 1000, 15_000);
+          // A 429 with no retry-after header gives no guidance on how long to
+          // wait, and the old ladder (2s/4s/6s — 12s in total) was far too
+          // short for the case that actually matters. Gemini's free tier allows
+          // roughly six requests per MINUTE and sends no header, so a research
+          // run burst through the allowance, exhausted 12s of backoff inside a
+          // 60s window, and abandoned the provider as if its whole day were
+          // spent — which is how a briefing ended in "unavailable across
+          // providers (tried: groq, gemini)" while Gemini was merely throttled.
+          //
+          // Back off on a minute-shaped ladder instead: 5s, 15s, 30s clears a
+          // per-minute window. Sleeping here is charged to StallClock and
+          // subtracted from the run's runtime budget, so waiting costs the run
+          // no working time.
+          const noHeaderBackoff = [5, 15, 30][attempt] || 30;
+          const delayMs = Math.min((retryAfterSec || noHeaderBackoff) * 1000, 30_000);
           console.warn(`⚠️ ${providerName} 429 rate-limited on "${gModel}" (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
           if (rateLimited) _bucket.tokens = 0; // Drain bucket so concurrent calls also wait
           await _sleep(delayMs);
