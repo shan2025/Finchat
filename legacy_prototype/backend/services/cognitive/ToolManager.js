@@ -164,6 +164,25 @@ async function executeTool({ executionId, agentId, toolName, input, allowWeb = t
     throw new Error(`Tool "${toolName}" needs web access, which the user has turned OFF for this conversation. Answer from your other tools or ask the user to enable the WEB toggle.`);
   }
 
+  // 1. Permission check
+  //
+  // This MUST come before the approval gate below, and used to come after it —
+  // which is how the seeded "Daily research digest" mission hung for a day.
+  // Nova planned a `bash` step, the gate parked the run and asked a human to
+  // approve it, and approving would then have hit this check and been refused,
+  // because bash is an ADVANCED_SYSTEM_TOOL restricted to the admin agent. The
+  // human was being asked to authorise something that could not run either way,
+  // and the mission waited forever on a decision with no effect.
+  //
+  // Checking permission first turns that into an immediate error the agent can
+  // actually recover from mid-plan. It also stops the app from ever showing an
+  // approval card for unsandboxed host shell access to an agent that is not
+  // allowed to use it — a prompt no one should be trained to click through.
+  const permitted = await checkPermission(agentId, toolName);
+  if (!permitted) {
+    throw new Error(`Agent "${agentId}" does not have permission to use tool "${toolName}"`);
+  }
+
   // Human-in-the-loop gate: irreversible tools park the execution for approval
   if (meta.requires_approval && !approvedTools.includes(toolName)) {
     throw new ApprovalRequiredError(toolName, input);
@@ -172,12 +191,6 @@ async function executeTool({ executionId, agentId, toolName, input, allowWeb = t
   const impl = TOOL_IMPLEMENTATIONS[toolName];
   if (!impl || typeof impl.execute !== 'function') {
     throw new Error(`Tool "${toolName}" is registered but has no execute() implementation`);
-  }
-
-  // 1. Permission check
-  const permitted = await checkPermission(agentId, toolName);
-  if (!permitted) {
-    throw new Error(`Agent "${agentId}" does not have permission to use tool "${toolName}"`);
   }
 
   // 2. Cache check
