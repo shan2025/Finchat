@@ -498,7 +498,10 @@ router.post('/schedule-briefing', requireAuth, async (req, res) => {
 
     // Fire and forget: a briefing takes minutes, and the dashboard button
     // should not sit on an open connection waiting for it.
-    runMorningBriefing({ userId, requestedAt: new Date().toISOString() })
+    // force: a person just pressed the button, so the once-a-day floor that
+    // protects the scheduled path from a misconfigured cron should not silently
+    // turn their click into a no-op.
+    runMorningBriefing({ userId, requestedAt: new Date().toISOString(), force: true })
       .catch(err => console.error(`❌ Briefing for ${userId} failed: ${err.message}`));
 
     res.status(202).json({

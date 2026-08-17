@@ -1,4 +1,4 @@
-// services/inference.js — Multi-Provider AI Inference Engine
+﻿// services/inference.js — Multi-Provider AI Inference Engine
 // Fix 1: Token-bucket rate limiter for Groq (28 RPM) + retry-with-backoff on 429.
 const axios = require('axios');
 require('dotenv').config();
@@ -29,6 +29,46 @@ const GROQ_PRIMARY_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
   'openai/gpt-oss-20b,llama-3.1-8b-instant')
   .split(',').map(s => s.trim()).filter(Boolean);
+
+// ── Cross-provider fallback chain ────────────────────────────────
+// Groq's allowance is per model per DAY, so once the key's models are spent
+// there is no Groq answer until midnight UTC — every model in the chain above
+// is exhausted at roughly the same time because they share one key and one
+// day. Below Groq there was only Ollama on localhost, which does not exist on
+// a cloud host, so "Groq is out" meant a hard failure: the user got
+// "AI Inference unavailable across providers" as their morning news.
+//
+// These providers are separate companies on separate infrastructure with
+// separate quotas, so a spent Groq day (or a Groq incident) is survivable.
+// Both speak the OpenAI /chat/completions shape, which is why they slot into
+// the same call path — Gemini via its OpenAI-compatibility endpoint.
+//
+// Order is deliberate: Gemini first because its free tier is the largest, then
+// DeepSeek, which is paid and so should only be reached when the free options
+// are genuinely gone. A provider with no key configured is skipped silently,
+// so this file works unchanged whether one key is set or all three.
+const PROVIDER_CHAIN = [
+  {
+    name: 'gemini',
+    apiKey: process.env.GEMINI_API_KEY,
+    baseUrl: process.env.GEMINI_BASE_URL ||
+      'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    models: (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.0-flash')
+      .split(',').map(s => s.trim()).filter(Boolean)
+  },
+  {
+    name: 'deepseek',
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1/chat/completions',
+    models: (process.env.DEEPSEEK_MODELS || 'deepseek-chat')
+      .split(',').map(s => s.trim()).filter(Boolean)
+  }
+];
+
+/** A key that is absent, blank, or still the placeholder is not a key. */
+function _usableKey(key) {
+  return !!key && !key.startsWith('YOUR_') && key !== 'changeme';
+}
 
 // ── Token-bucket rate limiter ────────────────────────────────────
 // Groq free tier ≈ 30 RPM. We cap at 28 to leave headroom.
@@ -145,13 +185,16 @@ function _trimMessages(messages, maxCharsPerMessage) {
 }
 
 /**
- * Make one Groq API call. Separated so the retry logic can call it cleanly.
+ * Make one chat-completions call. Groq, Gemini (via its OpenAI-compatibility
+ * endpoint) and DeepSeek all accept this exact request shape, so the retry,
+ * trim and fallback logic below is written once and reused for all of them —
+ * only the base URL, key and model name differ.
  */
-async function _callGroq({ apiKey, model, messages, temperature, jsonMode }) {
+async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperature, jsonMode }) {
   const response = await axios.post(
-    'https://api.groq.com/openai/v1/chat/completions',
+    baseUrl,
     {
-      model: model || GROQ_PRIMARY_MODEL,
+      model,
       messages,
       temperature,
       response_format: jsonMode ? { type: 'json_object' } : undefined
@@ -168,6 +211,118 @@ async function _callGroq({ apiKey, model, messages, temperature, jsonMode }) {
 }
 
 /**
+ * Work through one provider's model list, handling 429 backoff, 413 payload
+ * trimming and retired-model blacklisting. Returns a completion, or null when
+ * this provider has nothing left to offer and the caller should move on.
+ *
+ * `rateLimited` applies the Groq token bucket; the other providers have their
+ * own server-side limits and no local bucket to respect.
+ */
+async function _runProviderChain({
+  providerName, baseUrl, apiKey, models, messages, temperature, jsonMode,
+  feature, agentId, userId, startedAt, rateLimited = false
+}) {
+  const candidates = models
+    .filter((m, i, arr) => m && arr.indexOf(m) === i)
+    // A model the provider has retired answers 400 forever, not transiently.
+    // Nova sat pinned to deepseek-r1-distill-llama-70b long after it was
+    // withdrawn and paid a doomed round-trip on EVERY reasoning turn before
+    // falling back. Once a model 400s on a decommission, stop offering it.
+    .filter(m => !_deadModels.has(`${providerName}:${m}`));
+
+  // Everything retired: fall through to the configured defaults rather than
+  // making no call to this provider at all.
+  if (candidates.length === 0) candidates.push(...models.filter(Boolean));
+
+  // Trimming persists across models: once a payload proves too large for one
+  // fallback the next is unlikely to accept it either, so the smaller version
+  // carries forward rather than re-failing at full size on every candidate.
+  let payload = messages;
+  const TRIM_STEPS = [12000, 4000];
+  let trimStep = 0;
+
+  for (let mi = 0; mi < candidates.length; mi++) {
+    const gModel = candidates[mi];
+
+    if (rateLimited) {
+      const hasToken = await _acquireToken();
+      if (!hasToken) {
+        // An empty bucket is our own throttle, not this model's quota, so
+        // switching models would not help — leave this provider entirely.
+        console.warn(`⚠️ ${providerName} rate limit: bucket empty after waiting ${MAX_WAIT_MS}ms, trying next provider [${feature}]`);
+        return null;
+      }
+    }
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const response = await _callChatCompletions({
+          baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode
+        });
+        console.log(`⚡ ${providerName} inference successful [Model: ${gModel}]` +
+          (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
+        const gUsage = response.data.usage || {};
+        recordInferenceMetric({
+          provider: providerName, model: gModel, feature,
+          promptTokens: gUsage.prompt_tokens || 0, completionTokens: gUsage.completion_tokens || 0,
+          latencyMs: Date.now() - startedAt, agentId, userId
+        });
+        return {
+          content: response.data.choices[0]?.message?.content || '',
+          provider: providerName,
+          model: gModel,
+          tokens: gUsage.total_tokens || ((gUsage.prompt_tokens || 0) + (gUsage.completion_tokens || 0)),
+          promptTokens: gUsage.prompt_tokens || 0,
+          completionTokens: gUsage.completion_tokens || 0
+        };
+      } catch (err) {
+        const status = err.response?.status;
+        // A 429 carrying a retry-after under a minute is ordinary per-minute
+        // throttling, worth waiting out. A spent DAILY allowance also returns
+        // 429 but with a retry-after measured in hours — waiting is useless
+        // there, so stop retrying and let the next model take over.
+        const retryAfterSec = Number(err.response?.headers?.['retry-after']) || 0;
+        const dailyQuotaSpent = status === 429 && retryAfterSec > 120;
+        // 413 is the request body being too large for this model, not a
+        // transient fault — retrying unchanged always fails. Shrink and retry
+        // before writing the model off, otherwise a long research answer can
+        // never fall back to a smaller model.
+        if (status === 413 && trimStep < TRIM_STEPS.length) {
+          const before = _payloadChars(payload);
+          payload = _trimMessages(payload, TRIM_STEPS[trimStep]);
+          const after = _payloadChars(payload);
+          trimStep++;
+          console.warn(`⚠️ ${providerName} 413 on "${gModel}" — payload ${before} → ${after} chars (cap ${TRIM_STEPS[trimStep - 1]}/msg), retrying [${feature}]`);
+          if (after < before) continue; // retry same model with the smaller payload
+        }
+        if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
+          const delayMs = Math.min((retryAfterSec || (2 * (attempt + 1))) * 1000, 15_000);
+          console.warn(`⚠️ ${providerName} 429 rate-limited on "${gModel}" (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
+          if (rateLimited) _bucket.tokens = 0; // Drain bucket so concurrent calls also wait
+          await _sleep(delayMs);
+          continue; // retry same model
+        }
+        // A 400 is only proof the MODEL is gone when the provider says so. It
+        // also returns 400 for a request this model could not satisfy — a
+        // failed json_object validation, an oversized payload — and
+        // blacklisting on those would retire a perfectly healthy model for the
+        // whole process over one bad turn. Match the not-found shape.
+        if (status === 400 && _isModelNotFound(err)) {
+          _deadModels.add(`${providerName}:${gModel}`);
+          console.warn(`⚠️ ${providerName} model "${gModel}" no longer exists — dropping it for this process`);
+        }
+        const nextModel = candidates[mi + 1];
+        const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');
+        console.warn(`⚠️ ${providerName} model "${gModel}" unavailable (${why}): ${err.message}` +
+          (nextModel ? ` — trying "${nextModel}"` : ` — no ${providerName} models left`));
+        break; // move to the next candidate model
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Execute AI completion using the requested provider.
  * Supports Groq cloud (fast, default for cloud users), Ollama (local execution), or BYOK.
  *
@@ -180,111 +335,58 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
   const hasValidGroqKey = (byokKey && byokKey !== 'YOUR_GROQ_API_KEY_HERE') ||
     (GROQ_API_KEY && GROQ_API_KEY !== 'YOUR_GROQ_API_KEY_HERE' && !GROQ_API_KEY.startsWith('YOUR_'));
 
+  // Providers are tried in order and the first completion wins. `attempted`
+  // exists only so the final error can say WHICH providers were actually
+  // reachable — "unavailable across providers" with no list was the single
+  // least useful line in the logs while this was failing daily.
+  const attempted = [];
+
   if (provider === 'groq' && hasValidGroqKey) {
-    const apiKey = byokKey || GROQ_API_KEY;
-    // An explicit `model` argument still wins, but it is only the first thing
-    // tried — the rest of the chain covers it running out of daily allowance.
-    const candidates = [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS]
-      .filter((m, i, arr) => m && arr.indexOf(m) === i)
-      // A model Groq has retired answers 400 forever, not transiently. Nova sat
-      // pinned to deepseek-r1-distill-llama-70b long after it was withdrawn and
-      // paid a doomed round-trip on EVERY reasoning turn before falling back —
-      // latency and stall time charged to the run for a call that could not
-      // succeed. Once a model 400s on a decommission, stop offering it.
-      .filter(m => !_deadModels.has(m));
-
-    // Everything retired: fall through to the chain's defaults rather than
-    // making no Groq call at all.
-    if (candidates.length === 0) {
-      candidates.push(...[GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS].filter(Boolean));
-    }
-
-    // Trimming persists across models: once a payload proves too large for one
-    // fallback the next is unlikely to accept it either, so the smaller version
-    // carries forward rather than re-failing at full size on every candidate.
-    let payload = messages;
-    const TRIM_STEPS = [12000, 4000];
-    let trimStep = 0;
-
-    for (let mi = 0; mi < candidates.length; mi++) {
-      const gModel = candidates[mi];
-
-      // Rate-limit: wait for a token before calling Groq
-      const hasToken = await _acquireToken();
-      if (!hasToken) {
-        // An empty bucket is our own throttle, not this model's quota, so
-        // switching models would not help — leave Groq entirely.
-        console.warn(`⚠️ Groq rate limit: bucket empty after waiting ${MAX_WAIT_MS}ms, falling back to Ollama [${feature}]`);
-        break;
-      }
-
-      // Attempt this model with 429-retries
-      for (let attempt = 0; attempt < 4; attempt++) {
-        try {
-          const response = await _callGroq({ apiKey, model: gModel, messages: payload, temperature, jsonMode });
-          console.log(`⚡ Groq Cloud Inference Successful [Model: ${gModel}]` +
-            (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
-          const gUsage = response.data.usage || {};
-          recordInferenceMetric({
-            provider: 'groq', model: gModel, feature,
-            promptTokens: gUsage.prompt_tokens || 0, completionTokens: gUsage.completion_tokens || 0,
-            latencyMs: Date.now() - _startedAt, agentId, userId
-          });
-          return {
-            content: response.data.choices[0]?.message?.content || '',
-            provider: 'groq',
-            model: gModel,
-            tokens: gUsage.total_tokens || ((gUsage.prompt_tokens || 0) + (gUsage.completion_tokens || 0)),
-            promptTokens: gUsage.prompt_tokens || 0,
-            completionTokens: gUsage.completion_tokens || 0
-          };
-        } catch (err) {
-          const status = err.response?.status;
-          // A 429 carrying a retry-after under a minute is ordinary per-minute
-          // throttling, worth waiting out. A spent DAILY allowance also returns
-          // 429 but with a retry-after measured in hours — waiting is useless
-          // there, so stop retrying and let the next model take over.
-          const retryAfterSec = Number(err.response?.headers?.['retry-after']) || 0;
-          const dailyQuotaSpent = status === 429 && retryAfterSec > 120;
-          // 413 is the request body being too large for this model, not a
-          // transient fault — retrying unchanged always fails. Shrink and retry
-          // before writing the model off, otherwise a long research answer can
-          // never fall back to a smaller model.
-          if (status === 413 && trimStep < TRIM_STEPS.length) {
-            const before = _payloadChars(payload);
-            payload = _trimMessages(payload, TRIM_STEPS[trimStep]);
-            const after = _payloadChars(payload);
-            trimStep++;
-            console.warn(`⚠️ Groq 413 on "${gModel}" — payload ${before} → ${after} chars (cap ${TRIM_STEPS[trimStep - 1]}/msg), retrying [${feature}]`);
-            if (after < before) continue; // retry same model with the smaller payload
-          }
-          if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
-            const delayMs = Math.min((retryAfterSec || (2 * (attempt + 1))) * 1000, 15_000);
-            console.warn(`⚠️ Groq 429 rate-limited on "${gModel}" (attempt ${attempt + 1}/3) — waiting ${delayMs}ms before retry [${feature}]`);
-            _bucket.tokens = 0; // Drain bucket so other concurrent calls also wait
-            await _sleep(delayMs);
-            continue; // retry same model
-          }
-          // A 400 is only proof the MODEL is gone when Groq says so. It also
-          // returns 400 for a request this model could not satisfy — a failed
-          // json_object validation, an oversized payload — and blacklisting on
-          // those would retire a perfectly healthy model for the whole process
-          // over one bad turn. Match the not-found shape specifically.
-          if (status === 400 && _isModelNotFound(err)) {
-            _deadModels.add(gModel);
-            console.warn(`⚠️ Groq model "${gModel}" no longer exists — dropping it for this process`);
-          }
-          const nextModel = candidates[mi + 1];
-          const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');
-          console.warn(`⚠️ Groq model "${gModel}" unavailable (${why}): ${err.message}` +
-            (nextModel ? ` — trying "${nextModel}"` : ' — no Groq models left, falling back to Ollama'));
-          break; // move to the next candidate model
-        }
-      }
-    }
+    attempted.push('groq');
+    const result = await _runProviderChain({
+      providerName: 'groq',
+      baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: byokKey || GROQ_API_KEY,
+      // An explicit `model` argument still wins, but it is only the first thing
+      // tried — the rest of the chain covers it running out of daily allowance.
+      models: [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS],
+      messages, temperature, jsonMode, feature, agentId, userId,
+      startedAt: _startedAt,
+      rateLimited: true
+    });
+    if (result) return result;
   }
 
-  // Local Ollama fallback or explicit provider
+  // Groq had nothing left. Try the other clouds before giving up — this is the
+  // step that did not exist, and its absence is why a spent Groq allowance was
+  // reported to the user as a total inference outage.
+  //
+  // The explicit `model` argument is deliberately NOT forwarded here: it names a
+  // Groq model, which means nothing to Gemini or DeepSeek and would 400 on
+  // every candidate. Each provider uses its own configured list.
+  for (const cfg of PROVIDER_CHAIN) {
+    if (!_usableKey(cfg.apiKey) || cfg.models.length === 0) continue;
+    attempted.push(cfg.name);
+    const result = await _runProviderChain({
+      providerName: cfg.name,
+      baseUrl: cfg.baseUrl,
+      apiKey: cfg.apiKey,
+      models: cfg.models,
+      messages, temperature, jsonMode, feature, agentId, userId,
+      startedAt: _startedAt
+    });
+    if (result) return result;
+  }
+
+  // Local Ollama fallback or explicit provider.
+  //
+  // Worth being blunt about what this is: OLLAMA_URL defaults to localhost, so
+  // on a cloud host this points at the app's OWN container, not at any machine
+  // running Ollama. It is a real safety net in local development and dead
+  // weight in production — which is why "why doesn't it use the local model?"
+  // has the unsatisfying answer that from Render's point of view there isn't
+  // one. Reaching a desktop Ollama from the cloud needs OLLAMA_URL set to a
+  // publicly reachable tunnel, and that desktop to be awake.
   try {
     const response = await axios.post(
       `${OLLAMA_URL}/api/chat`,
@@ -316,8 +418,14 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
       completionTokens: oCompletion
     };
   } catch (err) {
-    console.error('❌ All AI inference providers failed:', err.message);
-    throw new Error('AI Inference unavailable across providers.');
+    // Name the providers actually tried. The old message claimed "across
+    // providers" while Groq was the only one configured, which sent every
+    // investigation of this failure off in the wrong direction.
+    const tried = attempted.length ? attempted.join(', ') : 'none configured';
+    const unconfigured = PROVIDER_CHAIN.filter(c => !_usableKey(c.apiKey)).map(c => c.name);
+    console.error(`❌ All AI inference providers failed (tried: ${tried}; ollama: ${err.message})` +
+      (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : ''));
+    throw new Error(`AI Inference unavailable across providers (tried: ${tried}).`);
   }
 }
 

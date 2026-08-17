@@ -137,9 +137,14 @@ router.all('/tick', async (req, res) => {
 /**
  * Trigger the morning executive briefing for one user.
  *
- * Briefings are not stored with a next_run_at the way missions are, so there is
- * no due-check to make here — the external cron's own schedule IS the schedule.
- * Point a daily trigger at this endpoint at whatever hour you want the brief.
+ * Briefings are not stored with a next_run_at the way missions are, so the
+ * external cron's schedule is what decides the hour. Point a daily trigger at
+ * this endpoint at whatever time you want the brief.
+ *
+ * It is NOT, however, the only thing standing between the user and a hundred
+ * briefings a day: runMorningBriefing enforces its own minimum interval, so a
+ * trigger accidentally left on a 15-minute schedule answers `skipped: true`
+ * instead of starting another full agent run. See BRIEFING_MIN_INTERVAL_HOURS.
  *
  * Like /tick, this answers as soon as the run starts. A briefing is a full
  * agent execution with a 240s budget, far longer than a cron caller should be
@@ -157,6 +162,9 @@ router.all('/briefing', async (req, res) => {
   if (wait) {
     try {
       const result = await runMorningBriefing({ userId, requestedAt: new Date().toISOString() });
+      if (result.skipped) {
+        return res.json({ ok: true, userId, waited: true, skipped: true, reason: result.reason });
+      }
       return res.json({ ok: true, userId, waited: true, sessionId: result.sessionId, durationMs: result.durationMs });
     } catch (err) {
       console.error('❌ [Cron] Briefing failed:', err.message);
