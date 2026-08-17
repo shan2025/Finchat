@@ -218,6 +218,9 @@ async function runMission(missionId, { manual = false } = {}) {
       userId: mission.user_id,
       conversationId: `mission_${mission.mission_id}`,
       targetAgentId: mission.agent_id,
+      // Scheduled research draws on its own provider pool so a nightly digest
+      // cannot spend the allowance interactive chat needs the next morning.
+      workload: 'mission',
       allowWeb: true,
       budget: {
         maxTokens: Math.max(Number(mission.max_tokens_per_run) || 0, MISSION_MIN_TOKENS),

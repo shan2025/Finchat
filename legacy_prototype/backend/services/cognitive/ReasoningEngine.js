@@ -138,7 +138,7 @@ function parseActionResponse(rawContent) {
  * @param {number} [options.temperature] - LLM temperature
  * @returns {Promise<{ action: object, raw: string, provider: string, model: string, retried: boolean, fallback: boolean }>}
  */
-async function reason({ messages, temperature = 0.7, model = null }) {
+async function reason({ messages, temperature = 0.7, model = null, workload = 'chat' }) {
   // First attempt: call LLM with JSON mode
   let firstResult;
   try {
@@ -146,7 +146,11 @@ async function reason({ messages, temperature = 0.7, model = null }) {
       messages,
       temperature,
       jsonMode: true,
-      model
+      model,
+      // Selects the provider order for this kind of work — scheduled research
+      // and interactive chat draw on different pools. See WORKLOAD_ROUTES.
+      workload,
+      feature: workload
     });
   } catch (err) {
     console.warn(`⚠️ ReasoningEngine: first runInference failed (${err.message}). Attempting non-JSON fallback inference...`);
@@ -155,7 +159,9 @@ async function reason({ messages, temperature = 0.7, model = null }) {
         messages,
         temperature,
         jsonMode: false,
-        model
+        model,
+        workload,
+        feature: workload
       });
     } catch (err2) {
       console.error(`❌ ReasoningEngine: inference failed across providers: ${err2.message}`);
@@ -206,7 +212,9 @@ async function reason({ messages, temperature = 0.7, model = null }) {
       messages: correctionMessages,
       temperature: 0.3, // Lower temperature for correction
       jsonMode: true,
-      model
+      model,
+      workload,
+      feature: workload
     });
 
     const retryParse = parseActionResponse(retryResult.content);

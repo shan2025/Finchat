@@ -46,7 +46,7 @@ ${toolLines}
  * @param {string} options.goal - The user's complex goal
  * @returns {Promise<{ plan: object, stored: boolean }>}
  */
-async function plan({ executionId, goal, agentId = null }) {
+async function plan({ executionId, goal, agentId = null, workload = 'chat' }) {
   const messages = [
     { role: 'system', content: buildPlanningPrompt(agentId) },
     { role: 'user', content: `Goal: "${goal}"` }
@@ -55,7 +55,11 @@ async function plan({ executionId, goal, agentId = null }) {
   const result = await runInference({
     messages,
     temperature: 0.3, // Low temperature for structured planning
-    jsonMode: true
+    jsonMode: true,
+    // Planning belongs to the same pool as the run it is planning, or a
+    // scheduled digest would plan out of the interactive chat allowance.
+    workload,
+    feature: workload
   });
 
   let planData;

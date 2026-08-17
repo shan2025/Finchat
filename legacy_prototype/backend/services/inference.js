@@ -43,11 +43,22 @@ const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
 // Both speak the OpenAI /chat/completions shape, which is why they slot into
 // the same call path — Gemini via its OpenAI-compatibility endpoint.
 //
-// Order is deliberate: Gemini first because its free tier is the largest, then
-// DeepSeek, which is paid and so should only be reached when the free options
-// are genuinely gone. A provider with no key configured is skipped silently,
-// so this file works unchanged whether one key is set or all three.
-const PROVIDER_CHAIN = [
+// A provider with no key configured is skipped silently, so this file works
+// unchanged whether one key is set or all three.
+const PROVIDERS = [
+  {
+    name: 'groq',
+    style: 'openai',
+    apiKey: process.env.GROQ_API_KEY,
+    baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+    models: [GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS],
+    // Only Groq gets the local token bucket — the others have their own
+    // server-side limits and no bucket here to respect.
+    rateLimited: true,
+    // An explicit `model` argument names a GROQ model, so it applies here and
+    // nowhere else; passing it to Gemini or DeepSeek would 400 every candidate.
+    acceptsModelOverride: true
+  },
   {
     name: 'gemini',
     // `style: 'gemini'` because Google's OpenAI-compatibility endpoint is not
@@ -85,6 +96,58 @@ const PROVIDER_CHAIN = [
 /** A key that is absent, blank, or still the placeholder is not a key. */
 function _usableKey(key) {
   return !!key && !key.startsWith('YOUR_') && key !== 'changeme';
+}
+
+// ── Per-workload provider routing ────────────────────────────────
+// Different workloads competed for one pool and starved each other. Groq's free
+// tier is 200,000 tokens per model per DAY; a single research run costs
+// 25k–54k, so three briefings plus a digest can consume the entire allowance
+// and leave interactive chat answering "AI Inference unavailable" — which is
+// exactly what happened on 2026-08-17.
+//
+// Routing by workload gives each its own pool. Chat leads with Gemini: turns
+// are small and latency-tolerant, and Gemini's per-MINUTE limit (~6 requests)
+// is a poor fit for a research burst but perfectly adequate for one person
+// typing. Scheduled research leads with Groq: it is fast, handles the large
+// multi-tool payloads, and its daily budget is better spent on the few runs
+// that actually need that capacity than drained by ad-hoc chatter.
+//
+// These are ORDERS, not exclusives — every route still falls through to the
+// others, so a spent Groq day degrades a briefing to Gemini rather than
+// failing it. Override any of them from the environment.
+const WORKLOAD_ROUTES = {
+  chat: (process.env.INFERENCE_ROUTE_CHAT || 'gemini,groq,deepseek')
+    .split(',').map(s => s.trim()).filter(Boolean),
+  briefing: (process.env.INFERENCE_ROUTE_BRIEFING || 'groq,gemini,deepseek')
+    .split(',').map(s => s.trim()).filter(Boolean),
+  mission: (process.env.INFERENCE_ROUTE_MISSION || 'groq,gemini,deepseek')
+    .split(',').map(s => s.trim()).filter(Boolean)
+};
+
+/** Fallback order for anything not named above (mindmap, report, …). */
+const DEFAULT_ROUTE = (process.env.INFERENCE_ROUTE_DEFAULT || 'groq,gemini,deepseek')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+// Workloads with a human waiting on the answer. These do NOT wait out a rate
+// limit: the 5s/15s/30s ladder that rescues a background research run is a
+// minute of dead air in a chat window, and there is another provider one line
+// down that can answer immediately. Patience is for work nobody is watching.
+const IMPATIENT_WORKLOADS = new Set(
+  (process.env.INFERENCE_IMPATIENT_WORKLOADS || 'chat')
+    .split(',').map(s => s.trim()).filter(Boolean)
+);
+
+/**
+ * Providers to try, in order, for a workload. Unknown names in a route are
+ * ignored, and any configured provider missing from the route is appended —
+ * a typo in an env var should not silently disable a provider that has a key.
+ */
+function _providersFor(workload) {
+  const order = WORKLOAD_ROUTES[workload] || DEFAULT_ROUTE;
+  const byName = new Map(PROVIDERS.map(p => [p.name, p]));
+  const chosen = order.map(n => byName.get(n)).filter(Boolean);
+  for (const p of PROVIDERS) if (!chosen.includes(p)) chosen.push(p);
+  return chosen;
 }
 
 // ── Token-bucket rate limiter ────────────────────────────────────
@@ -306,7 +369,8 @@ async function _callGemini({ baseUrl, apiKey, model, messages, temperature, json
  */
 async function _runProviderChain({
   providerName, baseUrl, apiKey, models, messages, temperature, jsonMode,
-  feature, agentId, userId, startedAt, rateLimited = false, style = 'openai'
+  feature, agentId, userId, startedAt, rateLimited = false, style = 'openai',
+  patient = true
 }) {
   const candidates = models
     .filter((m, i, arr) => m && arr.indexOf(m) === i)
@@ -381,6 +445,13 @@ async function _runProviderChain({
           console.warn(`⚠️ ${providerName} 413 on "${gModel}" — payload ${before} → ${after} chars (cap ${TRIM_STEPS[trimStep - 1]}/msg), retrying [${feature}]`);
           if (after < before) continue; // retry same model with the smaller payload
         }
+        // Someone is waiting: skip straight to the next provider rather than
+        // sitting out a rate limit. Whichever answers first wins, and the point
+        // of having several providers is that one of them usually can.
+        if (status === 429 && !patient) {
+          console.warn(`⚠️ ${providerName} 429 on "${gModel}" — not waiting (interactive ${feature}), trying the next provider`);
+          break;
+        }
         if (status === 429 && attempt < 3 && !dailyQuotaSpent) {
           // A 429 with no retry-after header gives no guidance on how long to
           // wait, and the old ladder (2s/4s/6s — 12s in total) was far too
@@ -441,58 +512,56 @@ async function _runProviderChain({
 }
 
 /**
- * Execute AI completion using the requested provider.
- * Supports Groq cloud (fast, default for cloud users), Ollama (local execution), or BYOK.
+ * Execute AI completion, walking this workload's provider order and returning
+ * the first completion.
  *
- * `feature`/`agentId`/`userId` are optional tags for inference metrics only — they do
- * not affect the call, just how it's attributed in the Knowledge Center.
+ * `workload` selects that order — see WORKLOAD_ROUTES. It exists because one
+ * shared pool let scheduled research drain the daily allowance that interactive
+ * chat needed. It is an ordering, not an exclusive: every route still falls
+ * through to the remaining providers.
+ *
+ * `feature`/`agentId`/`userId` are attribution tags for inference metrics and
+ * do not affect routing. `feature` doubles as the workload when no explicit
+ * `workload` is given, so callers already tagging their calls get routed
+ * sensibly without further changes.
  */
-async function runInference({ messages, provider = 'groq', model, temperature = 0.7, jsonMode = false, byokKey, feature = 'chat', agentId = null, userId = null }) {
+async function runInference({
+  messages, provider = 'groq', model, temperature = 0.7, jsonMode = false,
+  byokKey, feature = 'chat', workload = null, agentId = null, userId = null
+}) {
   const _startedAt = Date.now();
-  // Check if we have a valid non-placeholder Groq key or BYOK key
-  const hasValidGroqKey = (byokKey && byokKey !== 'YOUR_GROQ_API_KEY_HERE') ||
-    (GROQ_API_KEY && GROQ_API_KEY !== 'YOUR_GROQ_API_KEY_HERE' && !GROQ_API_KEY.startsWith('YOUR_'));
 
   // Providers are tried in order and the first completion wins. `attempted`
   // exists only so the final error can say WHICH providers were actually
   // reachable — "unavailable across providers" with no list was the single
   // least useful line in the logs while this was failing daily.
   const attempted = [];
+  const effectiveWorkload = workload || feature;
+  const route = _providersFor(effectiveWorkload);
+  const patient = !IMPATIENT_WORKLOADS.has(effectiveWorkload);
 
-  if (provider === 'groq' && hasValidGroqKey) {
-    attempted.push('groq');
-    const result = await _runProviderChain({
-      providerName: 'groq',
-      baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
-      apiKey: byokKey || GROQ_API_KEY,
-      // An explicit `model` argument still wins, but it is only the first thing
-      // tried — the rest of the chain covers it running out of daily allowance.
-      models: [model || GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS],
-      messages, temperature, jsonMode, feature, agentId, userId,
-      startedAt: _startedAt,
-      rateLimited: true
-    });
-    if (result) return result;
-  }
+  for (const cfg of route) {
+    // BYOK only ever applies to Groq — it is a Groq key the user supplied.
+    const apiKey = (cfg.name === 'groq' && byokKey) ? byokKey : cfg.apiKey;
+    if (!_usableKey(apiKey) || cfg.models.length === 0) continue;
 
-  // Groq had nothing left. Try the other clouds before giving up — this is the
-  // step that did not exist, and its absence is why a spent Groq allowance was
-  // reported to the user as a total inference outage.
-  //
-  // The explicit `model` argument is deliberately NOT forwarded here: it names a
-  // Groq model, which means nothing to Gemini or DeepSeek and would 400 on
-  // every candidate. Each provider uses its own configured list.
-  for (const cfg of PROVIDER_CHAIN) {
-    if (!_usableKey(cfg.apiKey) || cfg.models.length === 0) continue;
+    // An explicit `model` argument names a Groq model, so it leads Groq's list
+    // and is withheld from the others, where it would 400 every candidate.
+    const models = (cfg.acceptsModelOverride && model)
+      ? [model, ...cfg.models]
+      : cfg.models;
+
     attempted.push(cfg.name);
     const result = await _runProviderChain({
       providerName: cfg.name,
       baseUrl: cfg.baseUrl,
-      apiKey: cfg.apiKey,
-      models: cfg.models,
+      apiKey,
+      models,
       style: cfg.style,
       messages, temperature, jsonMode, feature, agentId, userId,
-      startedAt: _startedAt
+      startedAt: _startedAt,
+      rateLimited: !!cfg.rateLimited,
+      patient
     });
     if (result) return result;
   }
@@ -541,11 +610,20 @@ async function runInference({ messages, provider = 'groq', model, temperature = 
     // providers" while Groq was the only one configured, which sent every
     // investigation of this failure off in the wrong direction.
     const tried = attempted.length ? attempted.join(', ') : 'none configured';
-    const unconfigured = PROVIDER_CHAIN.filter(c => !_usableKey(c.apiKey)).map(c => c.name);
+    const unconfigured = PROVIDERS.filter(c => !_usableKey(c.apiKey)).map(c => c.name);
     console.error(`❌ All AI inference providers failed (tried: ${tried}; ollama: ${err.message})` +
       (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : ''));
     throw new Error(`AI Inference unavailable across providers (tried: ${tried}).`);
   }
 }
 
-module.exports = { runInference };
+/**
+ * The provider order a workload will use, as names. Exported for tests and for
+ * answering "why did this go to Gemini?" without reading the routing table by
+ * hand — a question that cost real time while diagnosing quota exhaustion.
+ */
+function providerOrderFor(workload) {
+  return _providersFor(workload).map(p => p.name);
+}
+
+module.exports = { runInference, providerOrderFor, WORKLOAD_ROUTES, IMPATIENT_WORKLOADS };

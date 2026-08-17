@@ -122,6 +122,10 @@ async function _runWithinStallClock({
   userId = 'system',
   conversationId = null,
   agentName = 'plato',
+  // Which provider pool this run should draw on. Scheduled research and
+  // interactive chat are routed differently so they cannot starve each other —
+  // see WORKLOAD_ROUTES in services/inference.js.
+  workload = 'chat',
   conversationHistory = [],
   allowWeb = true,
   studyMode = false,
@@ -308,7 +312,7 @@ async function _runWithinStallClock({
       // 3c. Run reasoning turn (temperature comes from the agent's risk setting;
       //     optional per-agent model override lets specialists pick their own Groq model)
       const thinkStart = new Date();
-      const result = await reason({ messages, temperature: agentTemperature, model: agentModel });
+      const result = await reason({ messages, temperature: agentTemperature, model: agentModel, workload });
       lastProvider = result.provider || lastProvider;
       lastModel = result.model || lastModel;
 
@@ -418,7 +422,7 @@ async function _runWithinStallClock({
         // agentName is the persona key, which doubles as the permission agent_id.
       // Passing it scopes the planner's tool list to what this agent may
       // actually run, so it stops planning steps that can only fail.
-      const planResult = await generatePlan({ executionId: execId, goal, agentId: agentName });
+      const planResult = await generatePlan({ executionId: execId, goal, agentId: agentName, workload });
 
         await logPhase(execId, 'planning', stepNumber, {
           plan: planResult.plan,

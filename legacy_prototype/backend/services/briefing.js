@@ -208,6 +208,11 @@ async function runMorningBriefing({ userId = 'system', requestedAt = null, force
       // executions land with a null conversation_id and a failed attempt is
       // indistinguishable from every other untagged run in the table.
       conversationId: `briefing_${userId}`,
+      // Draw on the scheduled-research pool, not the interactive chat one.
+      // A briefing costs 25k-54k tokens; running it out of the same allowance
+      // as chat is what left the app answering "AI Inference unavailable" to
+      // someone typing a question. See WORKLOAD_ROUTES in services/inference.js.
+      workload: 'briefing',
       targetAgentId: 'plato', // Force Plato to orchestrate
       // The briefing goal requires 4+ tool calls across 3 domains (crypto,
       // stocks, search, paper) plus planning/synthesis reasoning turns — the
