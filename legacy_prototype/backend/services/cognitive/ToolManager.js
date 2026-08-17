@@ -1,7 +1,9 @@
 // services/cognitive/ToolManager.js — Orchestrates tool execution: permission -> cache -> rate limit -> execute -> normalize -> log
 const { query } = require('../../database');
 const { cacheGet, cacheSet, redisCommand } = require('../redis');
-const { getToolMeta } = require('./ToolRegistry');
+const {
+  getToolMeta, ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID
+} = require('./ToolRegistry');
 
 // Tool implementation map — maps tool names to their execute() functions
 const TOOL_IMPLEMENTATIONS = {
@@ -52,20 +54,10 @@ function genId(prefix = 'tc') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
-const ADVANCED_SYSTEM_TOOLS = new Set(['bash', 'file_read', 'file_write', 'file_edit', 'glob']);
-
-/**
- * Tools that reach the host directly — BashTool shells out via child_process.exec,
- * the file tools write to the real filesystem. Holding one of these is equivalent
- * to holding a host shell, so they are DENY-BY-DEFAULT (P0-1): an agent may use
- * them only with an explicit `allowed = 1` row, and every other answer is a denial.
- *
- * The permissive Sprint 1 defaults below still apply to every other tool.
- */
-const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
-
-/** The one agent permitted to hold host-access tools. Must match migration 026. */
-const ADMIN_AGENT_ID = 'plato';
+// Defined in ToolRegistry so prompt building can hide these tools from agents
+// that may not use them, without importing ToolManager (which would be
+// circular). The permissive Sprint 1 defaults below still apply to every other
+// tool. See the notes on listTools().
 
 /**
  * Check if an agent has permission to use a given tool.

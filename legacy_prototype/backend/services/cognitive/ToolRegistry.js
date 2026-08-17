@@ -489,13 +489,53 @@ function getToolMeta(toolName) {
   return TOOLS[toolName] || null;
 }
 
+// ── Host-access restrictions ─────────────────────────────────────
+// These live here rather than in ToolManager because both ToolManager (to
+// enforce them) and this module (to hide them from prompts) need them, and
+// ToolManager already requires ToolRegistry — defining them the other way round
+// would be a circular import.
+
+/** Tools only the admin agent may hold. Enforced in ToolManager.checkPermission. */
+const ADVANCED_SYSTEM_TOOLS = new Set(['bash', 'file_read', 'file_write', 'file_edit', 'glob']);
+
 /**
- * List all registered tools (for injecting into system prompts).
- * Pass { allowWeb: false } to hide open-web tools (composer WEB toggle off).
+ * Tools that reach the host directly — BashTool shells out via child_process.exec,
+ * the file tools write to the real filesystem. Holding one of these is equivalent
+ * to holding a host shell, so they are DENY-BY-DEFAULT (P0-1): an agent may use
+ * them only with an explicit `allowed = 1` row, and every other answer is a denial.
  */
-function listTools({ allowWeb = true } = {}) {
+const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
+
+/** The one agent permitted to hold host-access tools. Must match migration 026. */
+const ADMIN_AGENT_ID = 'plato';
+
+/**
+ * List registered tools for injecting into system prompts.
+ *
+ * `allowWeb: false` hides open-web tools (composer WEB toggle off).
+ *
+ * `agentId` hides tools the agent is not permitted to use. Without it, every
+ * agent's prompt advertised bash/file_write/file_edit/glob even though only
+ * plato may run them — so agents planned steps that could never execute. The
+ * seeded research-digest mission planned `bash "synthesis.sh"` and
+ * `bash "brief.sh"`, invented scripts for work that is reasoning rather than
+ * shell, and burned tool calls discovering it was not allowed.
+ *
+ * Omitting agentId hides the restricted tools rather than showing them: these
+ * are the deny-by-default host-access tools, so a call site that forgets to
+ * identify itself should lose capability, not gain it.
+ *
+ * This mirrors only the STATIC rule (ADVANCED_SYSTEM_TOOLS + ADMIN_AGENT_ID).
+ * The per-agent `tool_permissions` rows are deliberately not consulted — that
+ * would make prompt building async and add a DB round-trip to every turn, and
+ * ToolManager still enforces those rows at call time. A tool shown here can
+ * still be refused; nothing shown here is refused for the admin agent.
+ */
+function listTools({ allowWeb = true, agentId = null } = {}) {
+  const isAdmin = agentId === ADMIN_AGENT_ID;
   return Object.values(TOOLS)
     .filter(t => allowWeb || !t.web)
+    .filter(t => isAdmin || !ADVANCED_SYSTEM_TOOLS.has(t.name))
     .map(t => ({
       name: t.name,
       description: t.description,
@@ -511,4 +551,7 @@ function getToolNames() {
   return Object.keys(TOOLS);
 }
 
-module.exports = { TOOLS, getToolMeta, listTools, getToolNames };
+module.exports = {
+  TOOLS, getToolMeta, listTools, getToolNames,
+  ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID
+};

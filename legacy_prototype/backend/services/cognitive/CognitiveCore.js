@@ -415,7 +415,10 @@ async function _runWithinStallClock({
 
         // --- PHASE 5: Generate a structured plan ---
         const planStart = new Date();
-        const planResult = await generatePlan({ executionId: execId, goal });
+        // agentName is the persona key, which doubles as the permission agent_id.
+      // Passing it scopes the planner's tool list to what this agent may
+      // actually run, so it stops planning steps that can only fail.
+      const planResult = await generatePlan({ executionId: execId, goal, agentId: agentName });
 
         await logPhase(execId, 'planning', stepNumber, {
           plan: planResult.plan,

@@ -1,13 +1,18 @@
 // services/cognitive/PlanningEngine.js — Generates structured multi-step plans for complex goals
 const { runInference } = require('../inference');
 const { query } = require('../../database');
-const { listTools } = require('./ToolRegistry');
+const { listTools, getToolNames } = require('./ToolRegistry');
 
 // The tool list is built from the live ToolRegistry, so new tools are plannable
 // the moment they're registered (this prompt once hardcoded search+stocks only,
 // which silently crippled every multi-tool plan).
-function buildPlanningPrompt() {
-  const toolLines = listTools()
+//
+// It is also scoped to the agent doing the planning. This is the prompt that
+// produced `bash "synthesis.sh"` / `bash "brief.sh"` for nova — steps naming
+// scripts that do not exist, for work that is reasoning rather than shell —
+// purely because bash was listed as available to an agent that may not run it.
+function buildPlanningPrompt(agentId = null) {
+  const toolLines = listTools({ agentId })
     .map(t => `  - "${t.name}": ${t.description.split('.')[0]}.`)
     .join('\n');
 
@@ -41,9 +46,9 @@ ${toolLines}
  * @param {string} options.goal - The user's complex goal
  * @returns {Promise<{ plan: object, stored: boolean }>}
  */
-async function plan({ executionId, goal }) {
+async function plan({ executionId, goal, agentId = null }) {
   const messages = [
-    { role: 'system', content: buildPlanningPrompt() },
+    { role: 'system', content: buildPlanningPrompt(agentId) },
     { role: 'user', content: `Goal: "${goal}"` }
   ];
 
@@ -82,7 +87,13 @@ async function plan({ executionId, goal }) {
   // Normalize malformed steps — smaller models often emit the tool name AS the
   // action ({"action":"watchlist","tool":null}), which would silently execute
   // zero steps. Coerce anything tool-shaped into {action:'tool', tool:<name>}.
-  const toolNames = listTools().map(t => t.name);
+  //
+  // Deliberately the FULL registry, not the agent-scoped list: this is parsing,
+  // not authorisation. If a model names a tool it was not offered, the step
+  // should still be recognised as a tool step so ToolManager can refuse it with
+  // a clear permission error — mis-parsing it into a `respond` step would hide
+  // the mistake and silently drop the work instead.
+  const toolNames = getToolNames();
   planData.steps = planData.steps.map(s => {
     const step = { ...s };
     if (step.action !== 'tool' && step.action !== 'respond') {

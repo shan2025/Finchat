@@ -4,9 +4,14 @@ const { listTools } = require('./ToolRegistry');
 
 /**
  * Build a tool description block for the system prompt.
+ *
+ * `agentId` is the persona key ('plato', 'nova', …), which is the same
+ * namespace as tool_permissions.agent_id. Passing it keeps host-access tools
+ * out of the prompt for agents that may not run them, so they stop planning
+ * steps that can only fail.
  */
-function buildToolDescriptions(allowWeb = true) {
-  const tools = listTools({ allowWeb });
+function buildToolDescriptions(allowWeb = true, agentId = null) {
+  const tools = listTools({ allowWeb, agentId });
   if (tools.length === 0) return '';
 
   const toolLines = tools.map(t => {
@@ -25,8 +30,8 @@ function buildToolDescriptions(allowWeb = true) {
 /**
  * The unified action schema per Phase 3 spec, now with tool descriptions from ToolRegistry.
  */
-function getActionSchema(allowWeb = true, studyMode = false) {
-  const toolBlock = buildToolDescriptions(allowWeb);
+function getActionSchema(allowWeb = true, studyMode = false, agentId = null) {
+  const toolBlock = buildToolDescriptions(allowWeb, agentId);
 
   // Study Mode adds one optional sibling field. It has to be advertised here
   // as well as in the directive — the model follows the shape it is shown.
@@ -212,7 +217,9 @@ function buildContext({
     ? persona.systemPrompt
     : 'You are Plato, the Chief AI Officer of FinChat. Answer the user\'s questions thoughtfully and precisely.';
 
-  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb, studyMode);
+  // agentName is the persona key, which doubles as the permission agent_id —
+  // so the tool block shown to this agent matches what it may actually run.
+  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb, studyMode, agentName);
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
   // Preferences survive a breached budget: "keep it short" matters MORE when
   // the answer is being cut off, and dropping "explain it simply" mid-session
