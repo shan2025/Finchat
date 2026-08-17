@@ -12,8 +12,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 // wait. These are tried in order before giving up on Groq entirely. That last
 // part matters in production: the Ollama fallback further down points at
 // localhost, which does not exist on a cloud host, so Groq running out used to
-// mean no inference at all. Deliberately spans three model families, since a
-// spent quota is scoped to one model.
+// mean no inference at all.
 //
 // llama-3.3-70b-versatile was the primary until Groq announced its
 // decommission (notice dated 2026-08-15). gpt-oss-120b replaces it: verified
@@ -22,12 +21,21 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 // the same turn cost 511 tokens against 70B's 209 — so runs burn roughly twice
 // the budget for the same work.
 //
+// This chain used to end in llama-3.1-8b-instant, for cross-family redundancy
+// against a per-model quota. Groq has since decommissioned that too — a live
+// catalog read on 2026-08-17 returned only gpt-oss (120b/20b/safeguard),
+// qwen3.6-27b, compound, allam and the whisper/prompt-guard utility models, so
+// there is no second family left to fall back to. Listing it cost a wasted
+// round-trip and a 404 on every fresh process before _deadModels retired it.
+// Cross-family redundancy now comes from the PROVIDER chain below (Gemini,
+// DeepSeek) rather than from within Groq.
+//
 // qwen/qwen3.6-27b is available on the key and deliberately NOT listed: it
 // emits a <think> preamble, fails Groq's own json_object validation, and never
 // parses into an action. Do not add it.
 const GROQ_PRIMARY_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
-  'openai/gpt-oss-20b,llama-3.1-8b-instant')
+  'openai/gpt-oss-20b')
   .split(',').map(s => s.trim()).filter(Boolean);
 
 // ── Cross-provider fallback chain ────────────────────────────────

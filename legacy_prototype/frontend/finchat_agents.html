@@ -293,15 +293,20 @@
           <!-- Model Selection -->
           <div class="flex flex-col">
             <h3 class="text-lg font-bold text-[#3a2e23] mb-3">LLM Model</h3>
+            <!-- Only models Groq actually serves on this key. Llama 3.3 70B,
+                 Llama 3.1 8B Instant and DeepSeek R1 Distill were all listed
+                 here after Groq decommissioned them, and the list even named
+                 70B as the default long after services/inference.js had moved
+                 to gpt-oss-120b — so three of the five choices would have
+                 pinned an agent to a model that answers 400. Check a live
+                 catalog read (GET https://api.groq.com/openai/v1/models)
+                 before adding an entry here. -->
             <select id="modelPicker" onchange="onModelChange()" class="border border-border-color rounded-xl bg-[#f3eee3] text-sm text-[#3a2e23] px-4 py-2 w-fit min-w-[280px] focus:outline-none focus:border-[#3a2e23]">
-              <option value="">Default (Llama 3.3 70B — balanced)</option>
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (versatile · default)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (fast, cheap)</option>
+              <option value="">Default (GPT-OSS 120B — deep reasoning)</option>
               <option value="openai/gpt-oss-120b">GPT-OSS 120B (deep reasoning)</option>
-              <option value="openai/gpt-oss-20b">GPT-OSS 20B (balanced reasoning)</option>
-              <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 Distill 70B (reasoning-heavy)</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B (faster, cheaper)</option>
             </select>
-            <p class="text-xs text-[#5c4a38] mt-2 max-w-2xl">Pick a per-agent LLM. Fast models (8B) suit chatty agents; larger reasoning models suit research and finance calls.</p>
+            <p class="text-xs text-[#5c4a38] mt-2 max-w-2xl">Pick a per-agent Groq model. 120B reasons harder but bills its reasoning tokens — roughly twice the budget per turn — so 20B suits chattier agents. Leaving this on Default also lets a spent daily quota fall through to Gemini or DeepSeek; a pinned model does not.</p>
           </div>
 
           <!-- Bottom 2-Column Grid -->
