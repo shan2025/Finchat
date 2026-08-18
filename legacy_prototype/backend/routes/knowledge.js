@@ -486,6 +486,7 @@ router.get('/stats/growth', requireAuth, async (req, res) => {
         SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
                COALESCE(c.created, 0)::int   AS created,
                COALESCE(c.activated, 0)::int AS activated,
+               COALESCE(c.mentioned, 0)::int AS mentioned,
                COALESCE(c.total, 0)::int     AS total
         FROM generate_series(
                (now() - ($1 || ' days')::interval)::date, now()::date, interval '1 day'
@@ -494,6 +495,11 @@ router.get('/stats/growth', requireAuth, async (req, res) => {
           SELECT date_trunc('day', created_at)::date AS day,
                  COUNT(*) FILTER (WHERE event_type = 'created')   AS created,
                  COUNT(*) FILTER (WHERE event_type = 'activated') AS activated,
+                 -- Broken out because created + activated does NOT equal total:
+                 -- 'mentioned' is a third of the event types this table carries,
+                 -- and a tooltip whose parts don't sum to its own total is worse
+                 -- than no tooltip.
+                 COUNT(*) FILTER (WHERE event_type = 'mentioned') AS mentioned,
                  COUNT(*) AS total
           FROM node_events
           WHERE created_at > now() - ($1 || ' days')::interval

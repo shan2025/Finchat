@@ -25,6 +25,14 @@
  .agent-row { cursor:pointer; border-radius:10px; padding:6px 8px; margin:0 -8px; transition:background .12s; }
  .agent-row:hover { background:var(--accent-soft); }
  .abadge { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); white-space:nowrap; }
+ .spark-guide { position:absolute; top:0; bottom:0; width:1px; background:var(--border); display:none; pointer-events:none; }
+ .spark-dot { position:absolute; width:9px; height:9px; border-radius:999px; background:var(--accent); border:2px solid var(--card); display:none; pointer-events:none; transform:translate(-50%,-50%); }
+ .spark-tip { position:absolute; top:-6px; transform:translateY(-100%); display:none; pointer-events:none; z-index:5;
+              background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 11px;
+              font-size:11.5px; line-height:1.5; color:var(--sub); white-space:nowrap; box-shadow:0 8px 22px rgba(0,0,0,.16); }
+ .spark-tip b { color:var(--txt); font-weight:700; }
+ .spark-tip-day { font-weight:700; color:var(--txt); font-size:12px; margin-bottom:2px; }
+ .spark-tip-sum { margin-top:3px; padding-top:3px; border-top:1px solid var(--border); }
  .kbtn { background:var(--accent); color:#fff; border:none; border-radius:999px; font-weight:700; cursor:pointer; transition:filter .12s; }
  .kbtn:hover { filter:brightness(1.07); }
  .kbtn.ghost { background:var(--card); color:var(--txt); border:1px solid var(--border); }
@@ -130,6 +138,11 @@ function vitalCard(label,val,icon,sub){
   <div class="text-xs mt-1" style="color:var(--sub)">${sub||''}</div></div>`;
 }
 
+// The chart line is drawn in a 1000x90 viewBox stretched to the card's width
+// with preserveAspectRatio="none", so SVG x-units are NOT screen pixels. The
+// hover readout therefore works in CSS pixels on the wrapper and positions its
+// own marker, rather than trying to place anything inside the stretched SVG.
+let sparkSeries=[];
 function sparkline(series){
  if(!series||!series.length) return '<div class="text-xs" style="color:var(--sub)">No activity yet.</div>';
  // A flat line at zero reads as "the chart is broken", not "nothing happened".
@@ -142,11 +155,64 @@ function sparkline(series){
  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
  const area=line+` L ${pad+(series.length-1)*step} ${h-pad} L ${pad} ${h-pad} Z`;
  const totalNew=series.reduce((s,d)=>s+d.created,0);
- return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:90px">
-  <path d="${area}" fill="var(--accent)" opacity="0.10"/>
-  <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
- </svg>
- <div class="text-xs mt-1" style="color:var(--sub)"><b style="color:var(--txt)">${totalNew}</b> concepts learned · peak ${max} events/day</div>`;
+ sparkSeries=series;
+ return `<div id="sparkWrap" style="position:relative;height:90px">
+  <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:90px;display:block">
+   <path d="${area}" fill="var(--accent)" opacity="0.10"/>
+   <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+  </svg>
+  <div id="sparkGuide" class="spark-guide"></div>
+  <div id="sparkDot" class="spark-dot"></div>
+  <div id="sparkTip" class="spark-tip"></div>
+ </div>
+ <div class="text-xs mt-1" style="color:var(--sub)"><b style="color:var(--txt)">${totalNew}</b> concepts learned · peak ${max} events/day · hover the line for a day</div>`;
+}
+
+const DAYNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function dayLabel(iso){
+ const p=String(iso||'').split('-'); if(p.length!==3) return iso||'';
+ const d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+ if(isNaN(d)) return iso;
+ return `${DAYNAMES[d.getDay()]} ${d.getDate()} ${d.toLocaleString('en',{month:'short'})}`;
+}
+
+// Attach the hover readout. Called after every redraw, because the wrapper is
+// rebuilt each time the window or agent filter changes.
+function wireSparkline(){
+ const wrap=document.getElementById('sparkWrap'); if(!wrap) return;
+ const tip=document.getElementById('sparkTip'), dot=document.getElementById('sparkDot'), guide=document.getElementById('sparkGuide');
+ const n=sparkSeries.length;
+ const max=Math.max(1,...sparkSeries.map(d=>Number(d.total)));
+ const show=(clientX)=>{
+  const r=wrap.getBoundingClientRect();
+  const frac=Math.min(1,Math.max(0,(clientX-r.left)/r.width));
+  const i=Math.round(frac*(n-1));
+  const d=sparkSeries[i]; if(!d) return;
+  // Same geometry as the path, expressed as a fraction of the box.
+  const x=(4+i*((1000-8)/Math.max(1,n-1)))/1000*r.width;
+  const y=(90-4-(Number(d.total)/max)*(90-8))/90*r.height;
+  guide.style.display='block'; guide.style.left=x+'px';
+  dot.style.display='block'; dot.style.left=x+'px'; dot.style.top=y+'px';
+  // Anything the API hasn't broken out by name still has to appear, or the
+  // lines would not add up to the total printed underneath them.
+  const other=Math.max(0,Number(d.total)-Number(d.created)-Number(d.activated)-Number(d.mentioned||0));
+  tip.innerHTML=`<div class="spark-tip-day">${esc(dayLabel(d.day))}</div>`+
+   `<div><b>${fmt(d.created)}</b> new concept${Number(d.created)===1?'':'s'} learned</div>`+
+   `<div><b>${fmt(d.activated)}</b> existing concept${Number(d.activated)===1?'':'s'} re-used</div>`+
+   (Number(d.mentioned)?`<div><b>${fmt(d.mentioned)}</b> mentioned again</div>`:'')+
+   (other?`<div><b>${fmt(other)}</b> other</div>`:'')+
+   `<div class="spark-tip-sum">${fmt(d.total)} learning events total</div>`;
+  tip.style.display='block';
+  // Keep the card from clipping it at either end.
+  const tw=tip.offsetWidth;
+  tip.style.left=Math.min(Math.max(x-tw/2,0),Math.max(0,r.width-tw))+'px';
+ };
+ const hide=()=>{ tip.style.display='none'; dot.style.display='none'; guide.style.display='none'; };
+ wrap.addEventListener('mousemove',e=>show(e.clientX));
+ wrap.addEventListener('mouseleave',hide);
+ // Touch: a tap reads out the nearest day instead of doing nothing.
+ wrap.addEventListener('touchstart',e=>{ if(e.touches[0]) show(e.touches[0].clientX); },{passive:true});
+ wrap.addEventListener('touchend',hide);
 }
 
 function storeCard(s){
@@ -198,6 +264,7 @@ async function loadGrowth(){
   const who=growthAgent ? ((growthAgents.find(a=>a.agent_id===growthAgent)||{}).agent_name||growthAgent)+' only' : 'all agents';
   document.getElementById('growthLabel').textContent=`last ${g.days} days · ${who}`;
   document.getElementById('growthChart').innerHTML=sparkline(g.series);
+  wireSparkline();
  }
  catch(e){ document.getElementById('growthChart').innerHTML=`<div class="text-xs" style="color:var(--sub)">Growth unavailable.</div>`; }
 }
