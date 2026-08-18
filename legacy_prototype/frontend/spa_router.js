@@ -38,14 +38,18 @@
 // finchat_signup.html are deliberately excluded — an auth boundary should be
 // a real document load.
 //
-// finchat_mindmap.html is the next reasonable candidate.
+// Mind Maps was the first page whose shell did not already match: its rail sat
+// inside a flex row rather than fixed, its body carried the page layout, and it
+// guards unsaved edits with beforeunload — which a client-side navigation never
+// fires. See .mm-body, #mmRoot and fcView.onBeforeLeave there.
 (function () {
   'use strict';
 
   const MIGRATED = new Set([
     'finchat_knowledge.html',
     'finchat_reports.html',
-    'finchat_settings.html'
+    'finchat_settings.html',
+    'finchat_mindmap.html'
   ]);
 
   const pageOf = (url) => {
@@ -63,6 +67,10 @@
   // leaves five copies of every poller running.
   let viewTimers = [];
   let viewTeardown = [];
+  let viewGuards = [];
+  // The URL the live view was rendered for. popstate reports the URL we have
+  // already moved to, so blocking a back/forward needs the old one to restore.
+  let currentUrl = location.href;
 
   const realSetInterval = window.setInterval.bind(window);
   const realSetTimeout = window.setTimeout.bind(window);
@@ -95,12 +103,26 @@
     viewTimers = [];
     viewTeardown.forEach(fn => { try { fn(); } catch (e) { console.warn('teardown failed', e); } });
     viewTeardown = [];
+    viewGuards = [];
   }
 
-  // Views can register their own cleanup: window.fcView.onTeardown(fn)
   window.fcView = {
-    onTeardown(fn) { if (typeof fn === 'function') viewTeardown.push(fn); }
+    // Cleanup for anything that outlives the view: timers created after boot,
+    // animation frames, listeners bound to window/document.
+    onTeardown(fn) { if (typeof fn === 'function') viewTeardown.push(fn); },
+    // A veto on leaving. `beforeunload` does NOT fire for a client-side
+    // navigation, so a page carrying an unsaved-changes guard would have it
+    // silently bypassed — the user would lose work by clicking the sidebar.
+    // Return false to stay put; the view owns whatever prompt it shows first.
+    onBeforeLeave(fn) { if (typeof fn === 'function') viewGuards.push(fn); }
   };
+
+  function mayLeave() {
+    // A throwing guard must not wedge navigation permanently.
+    return viewGuards.every(fn => {
+      try { return fn() !== false; } catch (e) { console.warn('leave guard failed', e); return true; }
+    });
+  }
 
   // ── view script execution ───────────────────────────────────────────────
   // Each block runs inside its own function scope. Two pages both declaring
@@ -156,6 +178,14 @@
   // Assets are only ever ADDED, never removed. These pages share one theme and
   // namespace their own rules, so an accumulated head is harmless — and it means
   // navigating back to a page you have already visited costs nothing.
+  //
+  // The cost of never removing them: a page's rules outlive the page. Rules
+  // keyed to its own ids and classes are inert elsewhere, but a bare `body`,
+  // `html` or element-type selector is not. Mind Maps styled `body` directly
+  // with `overflow:hidden` — adopted once, that would have frozen scrolling on
+  // Knowledge and Reports for the rest of the session. Page-level layout must
+  // therefore hang off a body CLASS (see .mm-body), which the swap below
+  // applies and removes with the page.
   function adoptHeadStyles(doc, page) {
     if (!document.head.querySelector('style[data-spa-page="' + page + '"]')) {
       doc.querySelectorAll('head style').forEach(s => {
@@ -236,6 +266,7 @@
       // extra poller per navigation.
       startTracking();
       try { reinitShellWidgets(); } finally { stopTracking(); }
+      currentUrl = location.href;
       window.scrollTo(0, scroll);
       window.dispatchEvent(new CustomEvent('fc:navigated', { detail: { url } }));
     } catch (e) {
@@ -262,10 +293,13 @@
     if (a.href === location.href) { e.preventDefault(); return; }
 
     e.preventDefault();
+    if (!mayLeave()) return;
     navigate(a.href);
   });
 
   window.addEventListener('popstate', () => {
+    // The URL already moved, so a veto has to put it back.
+    if (!mayLeave()) { history.pushState({ spa: true }, '', currentUrl); return; }
     if (!MIGRATED.has(pageOf(location.href))) { location.reload(); return; }
     navigate(location.href, { push: false });
   });

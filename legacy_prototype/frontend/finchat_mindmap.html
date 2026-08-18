@@ -43,15 +43,23 @@
   --mm-bubble:#2c251c;
 }
 * { box-sizing:border-box; }
-html, body { height:100%; }
-body {
-  margin:0; font-family:var(--sans);
+/* Page-level layout hangs off .mm-body, never off a bare `body` selector.
+   spa_router.js adopts each page's <style> into the shared head and never
+   removes it, so an unscoped `body { overflow:hidden }` here would freeze
+   scrolling on Knowledge and Reports for the rest of the session. The class
+   is applied and removed with the page, so these rules travel with it. */
+body.mm-body {
+  height:100vh; margin:0; font-family:var(--sans);
   background:var(--mm-bg); color:var(--mm-fg); overflow:hidden;
 }
 .mm-serif { font-family:'Caprasimo',Georgia,serif; font-weight:400; }
 
 /* layout ---------------------------------------------------------- */
-#mmShell { display:flex; height:100vh; }
+/* The rail sits outside <main> (the router swaps <main>, so it cannot live
+   inside) and sizes itself — sidebar_nav.js owns its 256px geometry for every
+   page. The shell just reclaims the space, and gives it back on a collapse. */
+#mmShell { display:flex; height:100vh; margin-left:256px; }
+html.nav-collapsed #mmShell { margin-left:0; }
 #mmMain { flex:1; display:flex; flex-direction:column; min-width:0; }
 
 .mm-topbar {
@@ -319,30 +327,47 @@ body {
   #mmList { display:none; }
   #mmList.mobile-open { display:flex; position:absolute; z-index:30; height:100%; }
 }
-/* The shared nav is a fixed 250px column. Left in flow on a phone it starves
-   the canvas (measured: 125px of usable width). sidebar_nav.js already ships
-   the drawer rules (#sideNav.sbn / .sbn.open) — this only takes it out of the
-   flex flow and supplies the #navToggle button that component expects. */
+/* The rail is fixed at every width now that it sits outside <main>; #mmShell
+   holds the 250px back with a margin. On a phone sidebar_nav.js slides it away
+   (#sideNav.sbn / .sbn.open), so the margin has to go or the canvas is starved
+   — measured at 125px of usable width when the rail stayed in flow. */
+/* #navToggle exists on other pages too, so it is scoped to this page's body
+   class — these rules are adopted into the shared head and never removed. */
 @media (max-width:767px) {
-  #sideNav { position:fixed; height:100%; }
-  #navToggle { display:inline-flex !important; }
+  body.mm-body #mmShell { margin-left:0; }
+  body.mm-body #navToggle { display:inline-flex !important; }
   .mm-topbar { padding:10px 12px; gap:7px; }
   .mm-title { font-size:16px; }
   .mm-btn { padding:7px 10px; }
 }
-#navToggle { display:none; }
+body.mm-body #navToggle { display:none; }
 </style>
 </head>
-<body>
+<body class="mm-body">
 
+<!-- The rail is the persistent shell and must sit OUTSIDE <main>, which
+     spa_router.js replaces wholesale on a client-side navigation. Everything
+     else the page owns — the list, the stage and every modal — lives inside. -->
+<nav id="sideNav"></nav>
+
+<!-- Shared shell scripts load ahead of <main> so the view script inside it
+     still runs last, exactly as it did when everything sat at the end of
+     <body>. They stay outside <main> so a swap never re-runs them. -->
+<script src="api_client.js"></script>
+<script src="sidebar_nav.js"></script>
+<script src="sidebar_collapse.js"></script>
+<script src="study_blocks.js"></script>
+<script src="notifications_widget.js"></script>
+<script src="spa_router.js"></script>
+
+<main id="mmRoot">
 <div id="mmShell">
-  <nav id="sideNav" style="width:250px;flex-shrink:0;"></nav>
 
   <aside id="mmList">
     <div class="mm-list-head">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <span class="mm-sub">My mind maps</span>
-        <button class="mm-btn" style="padding:5px 9px;" onclick="openGenerate()" title="New mind map">
+        <button class="mm-btn" style="padding:5px 9px;" data-act="openGenerate" title="New mind map">
           <span class="material-symbols-outlined">add</span>
         </button>
       </div>
@@ -352,30 +377,30 @@ body {
     </div>
   </aside>
 
-  <main id="mmMain">
+  <div id="mmMain">
     <div class="mm-topbar">
-      <button class="mm-btn" id="navToggle" onclick="toggleNav()" title="Menu" style="padding:7px 9px;">
+      <button class="mm-btn" id="navToggle" data-act="toggleNav" title="Menu" style="padding:7px 9px;">
         <span class="material-symbols-outlined">menu</span></button>
       <h1 class="mm-title mm-serif" id="mmTitle">Mind Map Studio</h1>
       <span class="mm-sub" id="mmMeta"></span>
-      <button class="mm-btn" onclick="fitToScreen()" title="Fit to screen (F)">
+      <button class="mm-btn" data-act="fitToScreen" title="Fit to screen (F)">
         <span class="material-symbols-outlined">fit_screen</span></button>
-      <button class="mm-btn" onclick="presentStep(1)" id="mmPresentBtn" title="Present mode — walk the branches">
+      <button class="mm-btn" data-act="presentStep" data-arg="1" id="mmPresentBtn" title="Present mode — walk the branches">
         <span class="material-symbols-outlined">slideshow</span></button>
       <div class="mm-menu-wrap">
-        <button class="mm-btn" onclick="toggleExportMenu(event)" title="Download">
+        <button class="mm-btn" data-act="toggleExportMenu" title="Download">
           <span class="material-symbols-outlined">download</span></button>
         <div class="mm-menu" id="mmExportMenu">
-          <button onclick="exportPng()"><span class="material-symbols-outlined">image</span> PNG image</button>
-          <button onclick="exportMap('markdown')"><span class="material-symbols-outlined">description</span> Markdown</button>
-          <button onclick="exportMap('opml')"><span class="material-symbols-outlined">account_tree</span> OPML outline</button>
+          <button data-act="exportPng"><span class="material-symbols-outlined">image</span> PNG image</button>
+          <button data-act="exportMap" data-arg="markdown"><span class="material-symbols-outlined">description</span> Markdown</button>
+          <button data-act="exportMap" data-arg="opml"><span class="material-symbols-outlined">account_tree</span> OPML outline</button>
         </div>
       </div>
-      <button class="mm-btn" onclick="toggleTheme()" id="mmThemeBtn" title="Theme">
+      <button class="mm-btn" data-act="toggleTheme" id="mmThemeBtn" title="Theme">
         <span class="material-symbols-outlined">dark_mode</span></button>
-      <button class="mm-btn" onclick="findGaps()" id="mmGapsBtn" title="Ask the AI what this map is missing">
+      <button class="mm-btn" data-act="findGaps" id="mmGapsBtn" title="Ask the AI what this map is missing">
         <span class="material-symbols-outlined">troubleshoot</span> Find gaps</button>
-      <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
+      <button class="mm-btn mm-btn-primary" data-act="openGenerate">
         <span class="material-symbols-outlined">auto_awesome</span> Generate</button>
     </div>
 
@@ -398,7 +423,7 @@ body {
           you paste, or from documents you upload. Nodes that match something in your
           knowledge graph link straight to it.
         </div>
-        <button class="mm-btn mm-btn-primary" onclick="openGenerate()">
+        <button class="mm-btn mm-btn-primary" data-act="openGenerate">
           <span class="material-symbols-outlined">auto_awesome</span> Generate a mind map</button>
       </div>
 
@@ -406,21 +431,21 @@ body {
         <div class="mm-panel-head">
           <div class="mm-panel-path">
             <span id="mmPanelPath"></span>
-            <button class="mm-icon-btn" onclick="closePanel()" title="Close (Esc)">
+            <button class="mm-icon-btn" data-act="closePanel" title="Close (Esc)">
               <span class="material-symbols-outlined">close</span></button>
           </div>
           <input class="mm-field mm-serif" id="mmPanelLabel" style="font-size:17px;"
-                 oninput="markDirty()" onkeydown="if(event.key==='Enter'){event.preventDefault();saveNodeEdits();}"
+                 data-act-input="dirty" data-act-keydown="saveOnEnter"
                  aria-label="Node label">
         </div>
 
         <div class="mm-tabs">
-          <button class="mm-tab on" data-tab="details" onclick="showTab('details')">
+          <button class="mm-tab on" data-tab="details" data-act="showTab" data-arg="details">
             <span class="material-symbols-outlined">notes</span> Details</button>
-          <button class="mm-tab" data-tab="docs" onclick="showTab('docs')">
+          <button class="mm-tab" data-tab="docs" data-act="showTab" data-arg="docs">
             <span class="material-symbols-outlined">description</span> Sources
             <span class="mm-tab-count" id="mmDocCount">0</span></button>
-          <button class="mm-tab" data-tab="chat" onclick="showTab('chat')">
+          <button class="mm-tab" data-tab="chat" data-act="showTab" data-arg="chat">
             <span class="material-symbols-outlined">forum</span> Ask AI</button>
         </div>
 
@@ -430,7 +455,7 @@ body {
             <div id="mmMapOverview"></div>
             <div class="mm-label">Summary</div>
             <textarea class="mm-field" id="mmPanelSummary" rows="2"
-                      oninput="markDirty()"></textarea>
+                      data-act-input="dirty"></textarea>
             <div class="mm-label">Detail</div>
             <div class="mm-detail" id="mmPanelDetail">—</div>
             <div id="mmPanelEntity"></div>
@@ -440,7 +465,7 @@ body {
           <div data-pane="docs" style="display:none;">
             <div class="mm-label">Attached to this node</div>
             <div id="mmNodeDocs"></div>
-            <div class="mm-drop" id="mmDrop" onclick="pickNodeFiles()">
+            <div class="mm-drop" id="mmDrop" data-act="pickNodeFiles">
               <span class="material-symbols-outlined" style="font-size:24px;">upload_file</span>
               <div style="margin-top:4px; font-weight:700;">Add documents to this node</div>
               <div style="font-size:11px; margin-top:2px;">PDF, DOCX, TXT, MD, CSV or an image · drop or click</div>
@@ -448,9 +473,9 @@ body {
             <!-- Typed text is a source in its own right, not a file you have to
                  make first. It lands in the same place an upload does. -->
             <div style="display:flex; gap:6px; margin-top:8px;">
-              <button class="mm-btn mm-btn-sm" onclick="openNoteForm()">
+              <button class="mm-btn mm-btn-sm" data-act="openNoteForm">
                 <span class="material-symbols-outlined">edit_note</span> Write a note</button>
-              <button class="mm-btn mm-btn-sm" onclick="openEnrich()">
+              <button class="mm-btn mm-btn-sm" data-act="openEnrich">
                 <span class="material-symbols-outlined">auto_awesome</span> Add detail with AI</button>
             </div>
             <div id="mmInheritedDocs"></div>
@@ -465,20 +490,20 @@ body {
         <div class="mm-composer" id="mmComposer" style="display:none;">
           <div class="mm-chips" id="mmChips"></div>
           <div class="mm-composer-row">
-            <button class="mm-icon-btn" onclick="pickNodeFiles()" title="Attach a document to this node">
+            <button class="mm-icon-btn" data-act="pickNodeFiles" title="Attach a document to this node">
               <span class="material-symbols-outlined">attach_file</span></button>
             <textarea class="mm-field" id="mmChatInput" rows="1"
-                      placeholder="Ask about this node…" oninput="growInput(this)"></textarea>
-            <button class="mm-btn mm-btn-primary" id="mmSendBtn" onclick="sendChat()" title="Send (Enter)">
+                      placeholder="Ask about this node…" data-act-input="grow"></textarea>
+            <button class="mm-btn mm-btn-primary" id="mmSendBtn" data-act="sendChat" title="Send (Enter)">
               <span class="material-symbols-outlined">send</span></button>
           </div>
           <div style="margin-top:7px; display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="mm-btn mm-btn-sm" onclick="seedAsk()">
+            <button class="mm-btn mm-btn-sm" data-act="seedAsk">
               <span class="material-symbols-outlined">bolt</span> Explain this node</button>
-            <button class="mm-btn mm-btn-sm" onclick="composerToMap()"
+            <button class="mm-btn mm-btn-sm" data-act="composerToMap"
                     title="Put what you typed onto the map instead of asking about it">
               <span class="material-symbols-outlined">note_add</span> Add to map</button>
-            <button class="mm-btn mm-btn-sm" id="mmBuildFromDocsBtn" onclick="buildMapFromNodeDocs()" style="display:none;">
+            <button class="mm-btn mm-btn-sm" id="mmBuildFromDocsBtn" data-act="buildMapFromNodeDocs" style="display:none;">
               <span class="material-symbols-outlined">schema</span> New map from these sources</button>
           </div>
         </div>
@@ -488,39 +513,39 @@ body {
              tell whether a change had landed and no way to back one out. -->
         <div id="mmSaveBar">
           <span class="mm-dirty">Unsaved changes</span>
-          <button class="mm-btn mm-btn-sm" onclick="revertNodeEdits()">Revert</button>
-          <button class="mm-btn mm-btn-sm mm-btn-primary" id="mmSaveBtn" onclick="saveNodeEdits()">
+          <button class="mm-btn mm-btn-sm" data-act="revertNodeEdits">Revert</button>
+          <button class="mm-btn mm-btn-sm mm-btn-primary" id="mmSaveBtn" data-act="saveNodeEdits">
             <span class="material-symbols-outlined">check</span> Save</button>
         </div>
 
         <div class="mm-panel-actions">
-          <button class="mm-btn mm-btn-primary" onclick="expandCurrent()" id="mmExpandBtn">
+          <button class="mm-btn mm-btn-primary" data-act="expandCurrent" id="mmExpandBtn">
             <span class="material-symbols-outlined">expand_content</span> Expand</button>
-          <button class="mm-btn" onclick="openEnrich()" id="mmEnrichBtn"
+          <button class="mm-btn" data-act="openEnrich" id="mmEnrichBtn"
                   title="Give this branch your own detail — the node is rewritten and the sub-topics it introduces are added">
             <span class="material-symbols-outlined">note_add</span> Add detail</button>
-          <button class="mm-btn" onclick="openChildForm()">
+          <button class="mm-btn" data-act="openChildForm">
             <span class="material-symbols-outlined">add</span> Add child</button>
-          <button class="mm-btn" onclick="deleteCurrent()" style="margin-left:auto;" title="Delete node">
+          <button class="mm-btn" data-act="deleteCurrent" style="margin-left:auto;" title="Delete node">
             <span class="material-symbols-outlined">delete</span></button>
         </div>
       </aside>
     </div>
-  </main>
+  </div>
 </div>
 
 <!-- generate modal -->
-<div class="mm-modal" id="mmGenModal" onclick="if(event.target===this) closeGenerate()">
+<div class="mm-modal" id="mmGenModal" data-act="closeGenerate" data-self-only>
   <div class="mm-modal-box">
     <div class="mm-serif" style="font-size:21px; margin-bottom:4px;">New mind map</div>
     <div style="font-size:12.5px; color:var(--mm-muted);">
       Generated from your memory graph, so it already knows what you have studied.
     </div>
     <div class="mm-src">
-      <button data-src="topic" class="on" onclick="pickSource('topic')">A topic</button>
-      <button data-src="chat" onclick="pickSource('chat')">A conversation</button>
-      <button data-src="text" onclick="pickSource('text')">Text</button>
-      <button data-src="document" onclick="pickSource('document')">Documents</button>
+      <button data-src="topic" class="on" data-act="pickSource" data-arg="topic">A topic</button>
+      <button data-src="chat" data-act="pickSource" data-arg="chat">A conversation</button>
+      <button data-src="text" data-act="pickSource" data-arg="text">Text</button>
+      <button data-src="document" data-act="pickSource" data-arg="document">Documents</button>
     </div>
     <div id="mmGenTopic">
       <div class="mm-label">Topic</div>
@@ -545,7 +570,7 @@ body {
     </div>
     <div id="mmGenDocs" style="display:none;">
       <div class="mm-label">Sources</div>
-      <div class="mm-drop" id="mmGenDrop" onclick="pickGenFiles()">
+      <div class="mm-drop" id="mmGenDrop" data-act="pickGenFiles">
         <span class="material-symbols-outlined" style="font-size:24px;">upload_file</span>
         <div style="margin-top:4px; font-weight:700;">Upload the documents to build from</div>
         <div style="font-size:11px; margin-top:2px;">PDF, DOCX, TXT, MD, CSV · up to 6 files</div>
@@ -555,15 +580,15 @@ body {
       <input class="mm-field" id="mmGenFocus" placeholder="e.g. only the evaluation methodology">
     </div>
     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
-      <button class="mm-btn" onclick="closeGenerate()">Cancel</button>
-      <button class="mm-btn mm-btn-primary" id="mmGenBtn" onclick="doGenerate()">
+      <button class="mm-btn" data-act="closeGenerate">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmGenBtn" data-act="doGenerate">
         <span class="material-symbols-outlined">auto_awesome</span> Generate</button>
     </div>
   </div>
 </div>
 
 <!-- add child modal -->
-<div class="mm-modal" id="mmChildModal" onclick="if(event.target===this) closeChildForm()">
+<div class="mm-modal" id="mmChildModal" data-act="closeChildForm" data-self-only>
   <div class="mm-modal-box" style="width:min(430px,100%);">
     <div class="mm-serif" style="font-size:20px; margin-bottom:2px;">Add a child node</div>
     <div style="font-size:12.5px; color:var(--mm-muted);" id="mmChildUnder"></div>
@@ -579,15 +604,15 @@ body {
       <option value="task">Task — something to do</option>
     </select>
     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
-      <button class="mm-btn" onclick="closeChildForm()">Cancel</button>
-      <button class="mm-btn mm-btn-primary" id="mmChildAddBtn" onclick="submitChild()">
+      <button class="mm-btn" data-act="closeChildForm">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmChildAddBtn" data-act="submitChild">
         <span class="material-symbols-outlined">add</span> Add node</button>
     </div>
   </div>
 </div>
 
 <!-- text note: write one, or rewrite one already attached -->
-<div class="mm-modal" id="mmNoteModal" onclick="if(event.target===this) closeNoteForm()">
+<div class="mm-modal" id="mmNoteModal" data-act="closeNoteForm" data-self-only>
   <div class="mm-modal-box">
     <div class="mm-serif" style="font-size:20px; margin-bottom:2px;" id="mmNoteTitleText">Write a note</div>
     <div style="font-size:12.5px; color:var(--mm-muted);" id="mmNoteUnder"></div>
@@ -601,15 +626,15 @@ body {
       Kept as a source on this node. Expanding or asking about this branch reads it, and so does anything below it.
     </div>
     <div class="mm-modal-actions">
-      <button class="mm-btn" onclick="closeNoteForm()">Cancel</button>
-      <button class="mm-btn mm-btn-primary" id="mmNoteSaveBtn" onclick="submitNote()">
+      <button class="mm-btn" data-act="closeNoteForm">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmNoteSaveBtn" data-act="submitNote">
         <span class="material-symbols-outlined">check</span> Save note</button>
     </div>
   </div>
 </div>
 
 <!-- add detail: the user's material, folded into the node and grown into children -->
-<div class="mm-modal" id="mmEnrichModal" onclick="if(event.target===this) closeEnrich()">
+<div class="mm-modal" id="mmEnrichModal" data-act="closeEnrich" data-self-only>
   <div class="mm-modal-box">
     <div class="mm-serif" style="font-size:21px; margin-bottom:2px;">Add detail to this node</div>
     <div style="font-size:12.5px; color:var(--mm-muted);" id="mmEnrichUnder"></div>
@@ -625,15 +650,15 @@ body {
       Nothing outside what you write here is invented — the model is only allowed to organise it against what the node already says.
     </div>
     <div class="mm-modal-actions">
-      <button class="mm-btn" onclick="closeEnrich()">Cancel</button>
-      <button class="mm-btn mm-btn-primary" id="mmEnrichBtn2" onclick="submitEnrich()">
+      <button class="mm-btn" data-act="closeEnrich">Cancel</button>
+      <button class="mm-btn mm-btn-primary" id="mmEnrichBtn2" data-act="submitEnrich">
         <span class="material-symbols-outlined">auto_awesome</span> Add to map</button>
     </div>
   </div>
 </div>
 
 <!-- document viewer -->
-<div class="mm-modal" id="mmDocModal" onclick="if(event.target===this) closeDoc()">
+<div class="mm-modal" id="mmDocModal" data-act="closeDoc" data-self-only>
   <div class="mm-modal-box wide">
     <div style="display:flex; align-items:flex-start; gap:12px;">
       <div style="flex:1; min-width:0;">
@@ -643,7 +668,7 @@ body {
       </div>
       <a class="mm-btn" id="mmDocOpen" target="_blank" rel="noopener" style="text-decoration:none;">
         <span class="material-symbols-outlined">open_in_new</span> Open original</a>
-      <button class="mm-icon-btn" onclick="closeDoc()"><span class="material-symbols-outlined">close</span></button>
+      <button class="mm-icon-btn" data-act="closeDoc"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div id="mmDocText">Loading…</div>
   </div>
@@ -651,44 +676,44 @@ body {
 
 <!-- confirm dialog — replaces window.confirm(), which rendered as a bare
      "finchat-6.onrender.com says" browser chrome box outside the app's design -->
-<div class="mm-modal" id="mmConfirmModal" onclick="if(event.target===this) closeConfirm(false)">
+<div class="mm-modal" id="mmConfirmModal" data-act="closeConfirm" data-arg="false" data-self-only>
   <div class="mm-modal-box" style="max-width:430px;">
     <div class="mm-modal-title mm-serif" id="mmConfirmTitle">Are you sure?</div>
     <div id="mmConfirmBody" style="font-size:13.5px; line-height:1.6; color:var(--mm-fg2); margin-bottom:6px;"></div>
     <div id="mmConfirmDetail" style="font-size:12px; line-height:1.55; color:var(--mm-muted);"></div>
     <div class="mm-modal-actions">
-      <button class="mm-btn" onclick="closeConfirm(false)">Cancel</button>
-      <button class="mm-btn" id="mmConfirmOk" onclick="closeConfirm(true)">Delete</button>
+      <button class="mm-btn" data-act="closeConfirm" data-arg="false">Cancel</button>
+      <button class="mm-btn" id="mmConfirmOk" data-act="closeConfirm" data-arg="true">Delete</button>
     </div>
   </div>
 </div>
 
 <!-- gap analysis -->
-<div class="mm-modal" id="mmGapsModal" onclick="if(event.target===this) closeGaps()">
+<div class="mm-modal" id="mmGapsModal" data-act="closeGaps" data-self-only>
   <div class="mm-modal-box" style="max-width:640px;">
     <div class="mm-modal-title mm-serif">What this map is missing</div>
     <div id="mmGapsMeta" style="font-size:12px; color:var(--mm-muted); margin-bottom:12px;"></div>
     <div id="mmGapsList" style="max-height:56vh; overflow-y:auto; display:flex; flex-direction:column; gap:9px;"></div>
     <div class="mm-modal-actions">
-      <button class="mm-btn" onclick="closeGaps()">Close</button>
-      <button class="mm-btn mm-btn-primary" id="mmGapsAddAll" onclick="addAllGaps()">Add all</button>
+      <button class="mm-btn" data-act="closeGaps">Close</button>
+      <button class="mm-btn mm-btn-primary" id="mmGapsAddAll" data-act="addAllGaps">Add all</button>
     </div>
   </div>
 </div>
 
 <!-- node context menu -->
 <div id="mmCtxMenu">
-  <button onclick="ctxAction('ask')"><span class="material-symbols-outlined">forum</span> Ask AI about this</button>
-  <button onclick="ctxAction('expand')"><span class="material-symbols-outlined">expand_content</span> Expand with AI</button>
-  <button onclick="ctxAction('enrich')"><span class="material-symbols-outlined">note_add</span> Add detail with AI</button>
-  <button onclick="ctxAction('child')"><span class="material-symbols-outlined">add</span> Add child node</button>
-  <button onclick="ctxAction('note')"><span class="material-symbols-outlined">edit_note</span> Write a note</button>
-  <button onclick="ctxAction('docs')"><span class="material-symbols-outlined">upload_file</span> Attach a document</button>
+  <button data-act="ctxAction" data-arg="ask"><span class="material-symbols-outlined">forum</span> Ask AI about this</button>
+  <button data-act="ctxAction" data-arg="expand"><span class="material-symbols-outlined">expand_content</span> Expand with AI</button>
+  <button data-act="ctxAction" data-arg="enrich"><span class="material-symbols-outlined">note_add</span> Add detail with AI</button>
+  <button data-act="ctxAction" data-arg="child"><span class="material-symbols-outlined">add</span> Add child node</button>
+  <button data-act="ctxAction" data-arg="note"><span class="material-symbols-outlined">edit_note</span> Write a note</button>
+  <button data-act="ctxAction" data-arg="docs"><span class="material-symbols-outlined">upload_file</span> Attach a document</button>
   <hr>
-  <button onclick="ctxAction('unpin')"><span class="material-symbols-outlined">restart_alt</span> Reset position</button>
-  <button onclick="ctxAction('tidy')"><span class="material-symbols-outlined">auto_awesome_mosaic</span> Re-arrange whole map</button>
+  <button data-act="ctxAction" data-arg="unpin"><span class="material-symbols-outlined">restart_alt</span> Reset position</button>
+  <button data-act="ctxAction" data-arg="tidy"><span class="material-symbols-outlined">auto_awesome_mosaic</span> Re-arrange whole map</button>
   <hr>
-  <button onclick="ctxAction('delete')"><span class="material-symbols-outlined">delete</span> Delete node</button>
+  <button data-act="ctxAction" data-arg="delete"><span class="material-symbols-outlined">delete</span> Delete node</button>
 </div>
 
 <input type="file" id="mmFileInput" multiple style="display:none"
@@ -698,10 +723,6 @@ body {
 
 <div class="mm-toast" id="mmToast"></div>
 
-<script src="api_client.js"></script>
-<script src="sidebar_nav.js"></script>
-<script src="sidebar_collapse.js"></script>
-<script src="study_blocks.js"></script>
 <script>
 // ── session ──────────────────────────────────────────────────────
 const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
@@ -1084,8 +1105,12 @@ async function endNodeDrag(ev) {
 // Safety net: if the pointer is released somewhere that never reaches the
 // node (capture refused, pointer lost, window blurred), finish the drag anyway
 // rather than leaving the node stuck to the cursor.
-window.addEventListener('pointerup', ev => { if (DRAG.id) endNodeDrag(ev); });
-window.addEventListener('blur', () => { if (DRAG.id) endNodeDrag({}); });
+// Named so the view teardown can detach them — they bind to window, which the
+// router never replaces.
+function onWinPointerUp(ev) { if (DRAG.id) endNodeDrag(ev); }
+function onWinBlur() { if (DRAG.id) endNodeDrag({}); }
+window.addEventListener('pointerup', onWinPointerUp);
+window.addEventListener('blur', onWinBlur);
 
 /** Drop every hand-placed position and re-run the layout for the whole map. */
 async function tidyMap() {
@@ -1626,7 +1651,7 @@ function renderMapOverview(n) {
             s.chars ? ' · ' + s.chars.toLocaleString() + ' chars' : ''}</div>
         </div>
         ${s.type === 'document'
-          ? `<div class="mm-doc-acts"><button class="mm-icon-btn" onclick="viewDoc('${esc(s.ref)}')" title="View">
+          ? `<div class="mm-doc-acts"><button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(s.ref)}" title="View">
                <span class="material-symbols-outlined">visibility</span></button></div>` : ''}
       </div>`).join('') || '<div class="mm-empty-note">No sources recorded.</div>'}
     <div class="mm-doc-meta" style="margin-top:8px;">
@@ -1841,14 +1866,14 @@ function renderNodeDocs(n) {
     ? mine.map(d => docRow(d, `
         ${d.kind === 'text'
           // A note is meant to be revised — an upload can only be replaced.
-          ? `<button class="mm-icon-btn" onclick="editNote('${esc(d.docId)}')" title="Edit this note">
+          ? `<button class="mm-icon-btn" data-act="editNote" data-arg="${esc(d.docId)}" title="Edit this note">
                <span class="material-symbols-outlined">edit</span></button>`
-          : `<button class="mm-icon-btn" onclick="viewDoc('${esc(d.docId)}')" title="View extracted text">
+          : `<button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(d.docId)}" title="View extracted text">
                <span class="material-symbols-outlined">visibility</span></button>`}
         ${d.url ? `<a class="mm-icon-btn" href="${esc(d.url)}"
             target="_blank" rel="noopener" title="Open the original file">
           <span class="material-symbols-outlined">open_in_new</span></a>` : ''}
-        <button class="mm-icon-btn" onclick="removeDoc('${esc(d.docId)}')" title="Remove">
+        <button class="mm-icon-btn" data-act="removeDoc" data-arg="${esc(d.docId)}" title="Remove">
           <span class="material-symbols-outlined">close</span></button>`)).join('')
     : '<div class="mm-empty-note">Nothing attached yet. A document you upload or a note you write here becomes the source the AI answers this node from.</div>';
 
@@ -1857,7 +1882,7 @@ function renderNodeDocs(n) {
   const below = document.getElementById('mmInheritedDocs');
   below.innerHTML = inherited.length
     ? '<div class="mm-label">Inherited from above</div>' + inherited.map(d => docRow(d, `
-        <button class="mm-icon-btn" onclick="viewDoc('${esc(d.docId)}')" title="View extracted text">
+        <button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(d.docId)}" title="View extracted text">
           <span class="material-symbols-outlined">visibility</span></button>`)).join('')
     : '';
 
@@ -2159,7 +2184,7 @@ function renderThread(note) {
        <div class="mm-ai-body" data-msg="${i}">${
          isStudy ? '' : DOMPurify.sanitize(marked.parse(t), { ADD_ATTR: ['target'] })}</div>
        <div style="margin-top:7px;">
-         <button class="mm-btn mm-btn-sm" onclick="addAnswerToMap(${i})"
+         <button class="mm-btn mm-btn-sm" data-act="addAnswerToMap" data-arg="${i}"
                  title="Fold this answer into the node and grow the sub-topics it introduces">
            <span class="material-symbols-outlined">note_add</span> Add to map</button>
        </div></div>`;
@@ -2292,7 +2317,7 @@ function renderChips() {
     (focus ? `<span class="mm-chip" style="border-color:var(--mm-accent); color:var(--mm-accent);">
        <span class="material-symbols-outlined" style="font-size:14px;">my_location</span>${esc(focus.label)}</span>` : '') +
     CTX_CHIPS.map(c => `<span class="mm-chip">${esc(c.label)}
-       <button onclick="dropChip('${esc(c.nodeId)}')" title="Remove">
+       <button data-act="dropChip" data-arg="${esc(c.nodeId)}" title="Remove">
          <span class="material-symbols-outlined">close</span></button></span>`).join('');
 }
 function dropChip(nodeId) {
@@ -2380,10 +2405,10 @@ function renderGaps() {
         // Nothing to add for these — the point is that something already in the
         // map is not backed by the sources, so the fix is to review it, not
         // to grow the map further.
-        ? `<button class="mm-btn mm-btn-sm" onclick="revealGapNode(${i})">Show me</button>`
+        ? `<button class="mm-btn mm-btn-sm" data-act="revealGapNode" data-arg="${i}">Show me</button>`
         : g.added
           ? '<span style="font-size:11.5px; color:var(--mm-muted); white-space:nowrap;">added ✓</span>'
-          : `<button class="mm-btn mm-btn-sm mm-btn-primary" onclick="addGap(${i})">Add</button>`}
+          : `<button class="mm-btn mm-btn-sm mm-btn-primary" data-act="addGap" data-arg="${i}">Add</button>`}
     </div>`).join('');
 }
 
@@ -2448,10 +2473,12 @@ function openCtxMenu(ev, nodeId) {
   menu.style.top = Math.min(ev.clientY, window.innerHeight - r.height - 10) + 'px';
 }
 function closeCtxMenu() { document.getElementById('mmCtxMenu').classList.remove('open'); }
-document.addEventListener('click', e => {
+function onDocClick(e) {
   if (!e.target.closest('#mmCtxMenu')) closeCtxMenu();
-  if (!e.target.closest('.mm-menu-wrap')) document.getElementById('mmExportMenu').classList.remove('open');
-});
+  const menu = document.getElementById('mmExportMenu');
+  if (menu && !e.target.closest('.mm-menu-wrap')) menu.classList.remove('open');
+}
+document.addEventListener('click', onDocClick);
 
 function ctxAction(what) {
   const id = ctxNodeId;
@@ -2801,7 +2828,7 @@ function renderGenDocs() {
                   : ' · <span style="color:var(--mm-accent)">no text found — it will be skipped</span>'}</div>
       </div>
       <div class="mm-doc-acts">
-        <button class="mm-icon-btn" onclick="unstage('${esc(d.docId)}')" title="Remove">
+        <button class="mm-icon-btn" data-act="unstage" data-arg="${esc(d.docId)}" title="Remove">
           <span class="material-symbols-outlined">close</span></button>
       </div>
     </div>`).join('');
@@ -2872,7 +2899,7 @@ async function doGenerate() {
 }
 
 // ── keyboard ─────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
+function onDocKeydown(e) {
   if (e.key === 'Escape') {
     closeCtxMenu(); closeGenerate(); closeChildForm(); closeDoc();
     closeNoteForm(); closeEnrich();
@@ -2883,9 +2910,90 @@ document.addEventListener('keydown', e => {
   if (e.key === 'f') fitToScreen();
   if (e.key === 'ArrowRight') presentStep(1);
   if (e.key === 'ArrowLeft') presentStep(-1);
+}
+document.addEventListener('keydown', onDocKeydown);
+
+function onWinResize() { if (ROOT) applyView(); }
+window.addEventListener('resize', onWinResize);
+
+// ── event wiring ─────────────────────────────────────────────────
+// Served through spa_router.js, which runs view scripts inside a function
+// scope — nothing here is reachable from a global `onclick=`. Markup carries
+// data-act (plus data-arg where the old handler passed a literal) and this
+// table is the one place a name becomes a call, so an action that loses its
+// entry fails loudly here rather than silently doing nothing in the markup.
+const MM_ACTIONS = {
+  // topbar / rail
+  toggleNav, toggleTheme, fitToScreen, toggleExportMenu: (el, e) => toggleExportMenu(e),
+  presentStep: (el) => presentStep(Number(el.dataset.arg)),
+  exportPng, exportMap: (el) => exportMap(el.dataset.arg),
+  // list + generate modal
+  openGenerate, closeGenerate, doGenerate, pickGenFiles,
+  pickSource: (el) => pickSource(el.dataset.arg),
+  unstage: (el) => unstage(el.dataset.arg),
+  // panel
+  closePanel, showTab: (el) => showTab(el.dataset.arg),
+  saveNodeEdits, revertNodeEdits, deleteCurrent, expandCurrent,
+  openChildForm, closeChildForm, submitChild,
+  openNoteForm, closeNoteForm, submitNote, editNote: (el) => editNote(el.dataset.arg),
+  openEnrich, closeEnrich, submitEnrich,
+  // documents
+  pickNodeFiles, viewDoc: (el) => viewDoc(el.dataset.arg), closeDoc,
+  removeDoc: (el) => removeDoc(el.dataset.arg), buildMapFromNodeDocs,
+  // chat + gaps
+  seedAsk, sendChat, composerToMap, dropChip: (el) => dropChip(el.dataset.arg),
+  findGaps, closeGaps, addAllGaps,
+  addGap: (el) => addGap(Number(el.dataset.arg)),
+  revealGapNode: (el) => revealGapNode(Number(el.dataset.arg)),
+  addAnswerToMap: (el) => addAnswerToMap(Number(el.dataset.arg)),
+  // confirm dialog
+  closeConfirm: (el) => closeConfirm(el.dataset.arg === 'true'),
+  ctxAction: (el) => ctxAction(el.dataset.arg)
+};
+
+const mmRoot = document.getElementById('mmRoot');
+mmRoot.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  // Modal backdrops close only on a click on the backdrop itself, never on a
+  // click that bubbled up out of the dialog box sitting inside them.
+  if (el.hasAttribute('data-self-only') && e.target !== el) return;
+  const fn = MM_ACTIONS[el.dataset.act];
+  if (!fn) { console.warn('[mindmap] no action registered for', el.dataset.act); return; }
+  fn(el, e);
+});
+mmRoot.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-act-input]');
+  if (!el) return;
+  if (el.dataset.actInput === 'grow') growInput(el);
+  else if (el.dataset.actInput === 'dirty') markDirty();
+});
+mmRoot.addEventListener('keydown', (e) => {
+  const el = e.target.closest('[data-act-keydown]');
+  if (!el || el.dataset.actKeydown !== 'saveOnEnter') return;
+  if (e.key === 'Enter') { e.preventDefault(); saveNodeEdits(); }
 });
 
-window.addEventListener('resize', () => { if (ROOT) applyView(); });
+// ── view lifecycle ───────────────────────────────────────────────
+// Everything below outlives <main>: listeners bound to window/document, and
+// two animation loops. Without this they keep running against a detached DOM
+// after the router swaps this view out.
+if (window.fcView) {
+  window.fcView.onTeardown(() => {
+    window.removeEventListener('pointerup', onWinPointerUp);
+    window.removeEventListener('blur', onWinBlur);
+    window.removeEventListener('resize', onWinResize);
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('keydown', onDocKeydown);
+    if (ANIM) { cancelAnimationFrame(ANIM.raf); clearTimeout(ANIM.fallback); ANIM = null; }
+    if (VIEW_ANIM) { cancelAnimationFrame(VIEW_ANIM); VIEW_ANIM = null; }
+  });
+  // beforeunload does not fire for a client-side navigation, so the unsaved
+  // guard below has to be repeated for the router or edits vanish on a
+  // sidebar click. Same question, same wording as the browser's own prompt.
+  window.fcView.onBeforeLeave(() =>
+    !isDirty() || confirm('This mind map has unsaved changes. Leave without saving?'));
+}
 
 // ── boot ─────────────────────────────────────────────────────────
 (async () => {
@@ -2896,6 +3004,6 @@ window.addEventListener('resize', () => { if (ROOT) applyView(); });
   if (wanted) openMap(wanted);
 })();
 </script>
-<script src="notifications_widget.js"></script>
+</main>
 </body>
 </html>

@@ -60,6 +60,12 @@
     // Cream (light) theme — from the app design system\'s cream family.
     '#sideNav.sbn.sbn-cream { --sbn-bg:#f3eee3; --sbn-fg:#3a2e23; --sbn-muted:#8c7a6b; --sbn-accent:#c67139; --sbn-accent-hover:#b2622d; --sbn-item:#5c4a38; --sbn-hover:rgba(58,46,35,.07); --sbn-soon:#b3a693; --sbn-badge:rgba(58,46,35,.08); --sbn-line:rgba(58,46,35,.12); border-right:1px solid #d6ccbc; }',
     '#sideNav.sbn { background:var(--sbn-bg) !important; color:var(--sbn-fg) !important; overflow-x:hidden; overflow-y:auto; padding:0 !important; display:flex; flex-direction:column; }',
+    // Geometry belongs to the rail, not to each page's markup. Every page
+    // declared the same `fixed left-0 top-0 w-64` utilities, so this changes
+    // nothing for them — but the element is persistent under spa_router.js,
+    // and a page that styled it differently (Mind Maps) used to leave the rail
+    // static and full-width on whatever page you navigated to next.
+    '#sideNav.sbn { position:fixed; left:0; top:0; height:100%; width:256px; z-index:40; }',
     // Only the nav list gives up space when the viewport is short; everything
     // else keeps its natural height so nothing collapses into anything else.
     '#sideNav.sbn > * { flex:0 0 auto; }',
