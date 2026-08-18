@@ -3,6 +3,11 @@
 const axios = require('axios');
 require('dotenv').config();
 
+// Owns credential selection and the memory of exhausted allowances. See
+// services/QuotaManager.js — this file decides ORDER, the QuotaManager decides
+// which key pays and whether an allowance is already gone.
+const quota = require('./QuotaManager');
+
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -52,12 +57,17 @@ const GROQ_FALLBACK_MODELS = (process.env.GROQ_FALLBACK_MODELS ||
 // the same call path — Gemini via its OpenAI-compatibility endpoint.
 //
 // A provider with no key configured is skipped silently, so this file works
-// unchanged whether one key is set or all three.
+// unchanged whether one key is set or all four.
+//
+// Note there is no `apiKey` here. Credentials are resolved per call by
+// QuotaManager.resolveCredentials(), because which key pays depends on the
+// agent and the user, not on the provider alone. Reading the env var here as
+// well would create a second source of truth that looks authoritative and is
+// never consulted.
 const PROVIDERS = [
   {
     name: 'groq',
     style: 'openai',
-    apiKey: process.env.GROQ_API_KEY,
     baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
     models: [GROQ_PRIMARY_MODEL, ...GROQ_FALLBACK_MODELS],
     // Only Groq gets the local token bucket — the others have their own
@@ -76,7 +86,6 @@ const PROVIDERS = [
     // `x-goog-api-key` against the NATIVE endpoint. Talking native works for
     // both key formats, so it is the one that always works.
     style: 'gemini',
-    apiKey: process.env.GEMINI_API_KEY,
     baseUrl: process.env.GEMINI_BASE_URL ||
       'https://generativelanguage.googleapis.com/v1beta/models',
     // gemini-flash-latest leads on measured availability, not on version
@@ -94,7 +103,6 @@ const PROVIDERS = [
   {
     name: 'deepseek',
     style: 'openai',
-    apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1/chat/completions',
     models: (process.env.DEEPSEEK_MODELS || 'deepseek-chat')
       .split(',').map(s => s.trim()).filter(Boolean)
@@ -108,17 +116,14 @@ const PROVIDERS = [
     // Verified against json_object mode on 2026-08-18 before being added.
     name: 'mistral',
     style: 'openai',
-    apiKey: process.env.MISTRAL_API_KEY,
     baseUrl: process.env.MISTRAL_BASE_URL || 'https://api.mistral.ai/v1/chat/completions',
     models: (process.env.MISTRAL_MODELS || 'mistral-small-latest')
       .split(',').map(s => s.trim()).filter(Boolean)
   }
 ];
 
-/** A key that is absent, blank, or still the placeholder is not a key. */
-function _usableKey(key) {
-  return !!key && !key.startsWith('YOUR_') && key !== 'changeme';
-}
+// (Key usability now lives in QuotaManager, which owns credential resolution —
+// a provider with nothing usable configured resolves to an empty pool.)
 
 // ── Per-workload provider routing ────────────────────────────────
 // Different workloads competed for one pool and starved each other. Groq's free
@@ -461,21 +466,45 @@ async function _callGemini({ baseUrl, apiKey, model, messages, temperature, json
  * own server-side limits and no local bucket to respect.
  */
 async function _runProviderChain({
-  providerName, baseUrl, apiKey, models, messages, temperature, jsonMode,
+  providerName, baseUrl, apiKey, credentialId, models, messages, temperature, jsonMode,
   feature, agentId, userId, startedAt, rateLimited = false, style = 'openai',
   patient = true
 }) {
-  const candidates = models
-    .filter((m, i, arr) => m && arr.indexOf(m) === i)
-    // A model the provider has retired answers 400 forever, not transiently.
-    // Nova sat pinned to deepseek-r1-distill-llama-70b long after it was
-    // withdrawn and paid a doomed round-trip on EVERY reasoning turn before
-    // falling back. Once a model 400s on a decommission, stop offering it.
-    .filter(m => !_deadModels.has(`${providerName}:${m}`));
+  const distinct = models.filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-  // Everything retired: fall through to the configured defaults rather than
-  // making no call to this provider at all.
-  if (candidates.length === 0) candidates.push(...models.filter(Boolean));
+  // A model the provider has retired answers 400 forever, not transiently.
+  // Nova sat pinned to deepseek-r1-distill-llama-70b long after it was
+  // withdrawn and paid a doomed round-trip on EVERY reasoning turn before
+  // falling back. Once a model 400s on a decommission, stop offering it.
+  const alive = distinct.filter(m => !_deadModels.has(`${providerName}:${m}`));
+
+  // An allowance this credential has already spent today. The 429 that proved
+  // it was previously used for one log line and forgotten, so every later call
+  // re-tried the exhausted model and paid the round-trip again — on Groq, whose
+  // limit is per model per day, that is every request until UTC midnight.
+  const usable = alive.filter(m => !quota.isSpent(providerName, m, credentialId));
+
+  // These two exhaustion cases need OPPOSITE handling, which is why they are
+  // not one filter with one fallback.
+  //
+  // Everything RETIRED is our own inference from a 400, and it can be wrong —
+  // so fall through to the configured list rather than making no call at all.
+  // One wasted request beats refusing a provider we may have no alternative to.
+  //
+  // Everything SPENT is the provider telling us directly, with a retry-after
+  // measured in hours. Retrying is guaranteed to fail, so the right move is to
+  // leave this provider to the caller's next one. Falling back here instead
+  // would re-offer every exhausted model and undo the entire point of
+  // remembering — which is exactly what the first version of this did.
+  let candidates;
+  if (alive.length === 0) {
+    candidates = distinct;
+  } else if (usable.length === 0) {
+    console.warn(`⚠️ ${providerName} has no model with allowance left on [${credentialId}] — skipping to the next provider [${feature}]`);
+    return null;
+  } else {
+    candidates = usable;
+  }
 
   // Trimming persists across models: once a payload proves too large for one
   // fallback the next is unlikely to accept it either, so the smaller version
@@ -595,6 +624,11 @@ async function _runProviderChain({
           _deadModels.add(`${providerName}:${gModel}`);
           console.warn(`⚠️ ${providerName} model "${gModel}" no longer exists — dropping it for this process`);
         }
+        // Record the exhausted allowance BEFORE moving on, so the next call
+        // today skips this model instead of rediscovering it.
+        if (dailyQuotaSpent) {
+          quota.markSpent(providerName, gModel, credentialId, { retryAfterSec });
+        }
         const nextModel = candidates[mi + 1];
         const why = dailyQuotaSpent ? `daily allowance spent (retry-after ${retryAfterSec}s)` : (status || 'network');
         console.warn(`⚠️ ${providerName} model "${gModel}" unavailable (${why}): ${err.message}` +
@@ -619,10 +653,19 @@ async function _runProviderChain({
  * do not affect routing. `feature` doubles as the workload when no explicit
  * `workload` is given, so callers already tagging their calls get routed
  * sensibly without further changes.
+ *
+ * `agentId` now also selects an agent-specific credential when one is
+ * configured (see QuotaManager.resolveCredentials), so it affects WHICH key
+ * pays for the call even though it still does not affect provider order.
+ *
+ * `byokKey` is a user-supplied key and `byokProvider` says which provider it
+ * belongs to. It defaulted to Groq because that was the only provider BYOK ever
+ * supported; naming the provider is what lets a user bring a key for any of them.
  */
 async function runInference({
   messages, provider = 'groq', model, temperature = 0.7, jsonMode = false,
-  byokKey, feature = 'chat', workload = null, agentId = null, userId = null
+  byokKey, byokProvider = 'groq', feature = 'chat', workload = null,
+  agentId = null, userId = null
 }) {
   const _startedAt = Date.now();
 
@@ -639,9 +682,20 @@ async function runInference({
   const effectiveModel = model || WORKLOAD_MODEL_HINTS[effectiveWorkload] || null;
 
   for (const cfg of route) {
-    // BYOK only ever applies to Groq — it is a Groq key the user supplied.
-    const apiKey = (cfg.name === 'groq' && byokKey) ? byokKey : cfg.apiKey;
-    if (!_usableKey(apiKey) || cfg.models.length === 0) continue;
+    if (cfg.models.length === 0) continue;
+
+    // Credentials are a POOL now, resolved user → agent → system, rather than
+    // one env var plus a Groq-shaped BYOK special case. A provider with nothing
+    // usable configured resolves to an empty pool and is skipped, which is what
+    // the old `_usableKey` guard meant.
+    //
+    // `byokKey` keeps its name for callers but is no longer Groq-only: a user's
+    // key is simply the first credential in that provider's pool.
+    const credentials = quota.resolveCredentials(cfg.name, {
+      agentId,
+      userKey: (byokKey && cfg.name === byokProvider) ? byokKey : null
+    });
+    if (credentials.length === 0) continue;
 
     // An explicit `model` argument names a Groq model, so it leads Groq's list
     // and is withheld from the others, where it would 400 every candidate.
@@ -650,18 +704,26 @@ async function runInference({
       : cfg.models;
 
     attempted.push(cfg.name);
-    const result = await _runProviderChain({
-      providerName: cfg.name,
-      baseUrl: cfg.baseUrl,
-      apiKey,
-      models,
-      style: cfg.style,
-      messages, temperature, jsonMode, feature, agentId, userId,
-      startedAt: _startedAt,
-      rateLimited: !!cfg.rateLimited,
-      patient
-    });
-    if (result) return result;
+
+    // Each credential is a separate allowance, so a spent one is a reason to
+    // try the next KEY before giving up on the provider — the whole point of a
+    // pool. With a single system key this loop runs once and behaves exactly as
+    // it did before.
+    for (const cred of credentials) {
+      const result = await _runProviderChain({
+        providerName: cfg.name,
+        baseUrl: cfg.baseUrl,
+        apiKey: cred.key,
+        credentialId: cred.id,
+        models,
+        style: cfg.style,
+        messages, temperature, jsonMode, feature, agentId, userId,
+        startedAt: _startedAt,
+        rateLimited: !!cfg.rateLimited,
+        patient
+      });
+      if (result) return result;
+    }
   }
 
   // Local Ollama fallback or explicit provider.
@@ -708,9 +770,16 @@ async function runInference({
     // providers" while Groq was the only one configured, which sent every
     // investigation of this failure off in the wrong direction.
     const tried = attempted.length ? attempted.join(', ') : 'none configured';
-    const unconfigured = PROVIDERS.filter(c => !_usableKey(c.apiKey)).map(c => c.name);
+    const unconfigured = PROVIDERS
+      .filter(c => quota.resolveCredentials(c.name, { agentId }).length === 0)
+      .map(c => c.name);
+    // Naming what is currently rate-limited-out matters as much as what has no
+    // key: "tried: groq, gemini" reads like an outage when the real answer is
+    // that both allowances are spent until midnight.
+    const spent = quota.listSpent();
     console.error(`❌ All AI inference providers failed (tried: ${tried}; ollama: ${err.message})` +
-      (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : ''));
+      (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : '') +
+      (spent.length ? ` — allowance spent: ${spent.map(s => `${s.provider}/${s.model}`).join(', ')}` : ''));
     throw new Error(`AI Inference unavailable across providers (tried: ${tried}).`);
   }
 }
