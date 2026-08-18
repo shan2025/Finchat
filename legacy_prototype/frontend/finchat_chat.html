@@ -389,6 +389,59 @@
     #sideNav.open { transform: translateX(0); }
   }
   @media (min-width: 768px) { #sideNav { transform: none !important; } }
+
+  /* ── Short-viewport rail ──────────────────────────────────────────────
+     This page builds its own sidebar rather than loading sidebar_nav.js, so
+     it needs the same treatment: the rail wants ~970px of height and a
+     laptop viewport is ~720px, which pushed the profile footer and the lower
+     nav links below the fold with nothing to say they were there.
+     Only the nav list flexes; header, Recent and the footer keep their
+     natural height so nothing collapses into anything else. */
+  #sideNav > * { flex:0 0 auto; }
+  /* On the rail the sidebar is exactly viewport-height and the nav list is the
+     part that scrolls; letting the rail itself scroll too only ever produced a
+     1-2px hairline from fractional child heights. The drawer keeps its own
+     scrolling as a fallback for very short screens. */
+  #sideNav { overflow-y:auto; }
+  @media (min-width: 768px) { #sideNav { overflow-y:hidden; } }
+  .fcs-head { padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px; }
+  .fcs-brand { font-family:var(--serif); font-size:27px; line-height:1; letter-spacing:-.01em; color:#f3ead9; }
+  .fcs-brandsub { font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--side-muted); margin-top:7px; }
+  .fcs-newwrap { padding:4px 14px 12px; }
+  .fcs-recentwrap { padding:0 14px 12px; }
+  #recentList { max-height:150px; overflow-y:auto; }
+  .fcs-scroll { flex:1 1 0% !important; min-height:132px; overflow-y:auto; padding:8px 14px; }
+  .fcs-foot { padding:12px 14px 16px; border-top:1px solid rgba(239,230,214,.14); }
+  body.nav-cream #sideNav .fcs-foot { border-top-color:rgba(58,46,35,.12); }
+  /* The cream overrides match on inline colours ([style*="#f3ead9"]); the
+     brand's colour now lives in a class, so it needs its own rule. */
+  body.nav-cream #sideNav .fcs-brand { color:#3a2e23; }
+  .fcs-syslabel { padding-top:20px; }
+  .fcs-avatar { width:38px; height:38px; background:linear-gradient(135deg,#d67f48,#8c491a); color:#fff; font-family:var(--serif); font-size:15px; }
+  /* Persistent cue that a region has content past its edge; the custom
+     properties are driven from JS (0px = no fade on that edge). */
+  .fcs-faded { -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fcs-ft,0px), #000 calc(100% - var(--fcs-fb,0px)), transparent 100%);
+                       mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fcs-ft,0px), #000 calc(100% - var(--fcs-fb,0px)), transparent 100%); }
+  @media (max-height: 860px) {
+    .fcs-head { padding:14px 18px 8px; }
+    .fcs-brand { font-size:22px; }
+    .fcs-brandsub { font-size:9.5px; letter-spacing:.18em; margin-top:5px; }
+    .fcs-newwrap { padding:2px 12px 8px; }
+    .fcs-newwrap .fc-newchat { padding:9px !important; font-size:13px !important; }
+    .fcs-recentwrap { padding:0 12px 8px; }
+    #recentList { max-height:108px; }
+    .fcs-scroll { padding:4px 12px; }
+    .side-label { padding:5px 0 3px; }
+    .fcs-syslabel { padding-top:12px !important; }
+    #sideNav .fc-nav { padding:7px 12px !important; }
+    .fcs-foot { padding:8px 12px 10px; }
+    .fcs-avatar { width:32px !important; height:32px !important; font-size:13px !important; }
+  }
+  @media (max-height: 640px) {
+    .fcs-brandsub { display:none; }
+    #recentList { max-height:74px; }
+    #sideNav .fc-nav { padding:6px 12px !important; font-size:13.5px !important; }
+  }
 </style>
 </head>
 
@@ -400,32 +453,34 @@
 <!-- ═══════════════════════════════════ -->
 <!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-    <nav id="sideNav" class="fc-sidescroll flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden; overflow-y:auto;">
+    <!-- overflow-y is set in CSS, not inline: the rail must not scroll (the nav
+         list inside it does), and an inline value would outrank the rule. -->
+    <nav id="sideNav" class="fc-sidescroll flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden;">
         <!-- Brand -->
-        <div style="padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px;">
+        <div class="fcs-head">
             <div style="flex:1; min-width:0;">
-                <div style="font-family:var(--serif); font-size:27px; line-height:1; letter-spacing:-.01em; color:#f3ead9;">FinChat</div>
-                <div style="font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--side-muted); margin-top:7px;">AI Operating System</div>
+                <div class="fcs-brand">FinChat</div>
+                <div class="fcs-brandsub">AI Operating System</div>
             </div>
             <button class="nav-theme-btn" id="navThemeBtn" title="Switch nav theme (espresso / cream)">
                 <span class="material-symbols-outlined" style="font-size:16px;" id="navThemeIcon">light_mode</span>
             </button>
         </div>
         <!-- New chat -->
-        <div style="padding:4px 14px 12px;">
+        <div class="fcs-newwrap">
             <button onclick="newChat()" class="fc-newchat" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;">
                 <span class="material-symbols-outlined text-[18px]">add</span> New chat
             </button>
         </div>
         <!-- Recent Chats — real sessions from /api/ai-chat/sessions (rendered by loadRecentSessions) -->
-        <div style="padding:0 14px 12px;">
+        <div class="fcs-recentwrap">
             <div class="side-label" style="margin-bottom:6px; font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--side-muted);">Recent</div>
-            <div id="recentList" class="flex flex-col gap-0.5">
+            <div id="recentList" class="flex flex-col gap-0.5" data-fcs-scroll>
                 <div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">Loading…</div>
             </div>
         </div>
         <!-- Nav -->
-        <div class="flex-1" style="padding:8px 14px;">
+        <div class="fcs-scroll" data-fcs-scroll>
             <div class="side-label">Navigation</div>
             <div class="flex flex-col gap-0.5">
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_dashboard.html">
@@ -462,7 +517,7 @@
                     <span class="material-symbols-outlined text-[20px]">policy</span> Audit Logs
                 </a>
             </div>
-            <div class="side-label" style="padding-top:20px;">System</div>
+            <div class="side-label fcs-syslabel">System</div>
             <div class="flex flex-col gap-0.5">
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_settings.html">
                     <span class="material-symbols-outlined text-[20px]">settings</span> Settings
@@ -473,9 +528,9 @@
             </div>
         </div>
         <!-- User profile -->
-        <div style="padding:12px 14px 16px; border-top:1px solid rgba(239,230,214,.14);">
+        <div class="fcs-foot">
             <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:14px; cursor:pointer;" onclick="openSettings()">
-                <div id="sidebarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0" style="width:38px; height:38px; background:linear-gradient(135deg,#d67f48,#8c491a); color:#fff; font-family:var(--serif); font-size:15px;">
+                <div id="sidebarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0 fcs-avatar">
                     BT
                 </div>
                 <div class="flex-1 overflow-hidden">
@@ -3491,6 +3546,41 @@
       bd.onclick = () => toggle(false);
       // Close the drawer once a destination is chosen.
       nav.querySelectorAll('a[href]').forEach(a => a.addEventListener('click', () => toggle(false)));
+    })();
+
+    // ── Short-viewport scroll cues in the rail ──────────────────────────
+    // Mirrors sidebar_nav.js, which this page does not load. Where a region
+    // has content past its edge, fade that edge so it is obvious at rest, and
+    // keep it in sync as the rail's boxes resize (Recent loading in, the
+    // window resizing, the drawer opening).
+    (function () {
+      const nav = document.getElementById('sideNav');
+      if (!nav) return;
+      [nav.querySelector('.fcs-scroll'), document.getElementById('recentList')].forEach(el => {
+        if (!el) return;
+        const sync = () => {
+          // Ignore a few px of trailing padding — only fade when a row is cut.
+          const over = el.scrollHeight - el.clientHeight;
+          if (over <= 10) { el.classList.remove('fcs-faded'); return; }
+          el.classList.add('fcs-faded');
+          el.style.setProperty('--fcs-ft', el.scrollTop > 4 ? '16px' : '0px');
+          el.style.setProperty('--fcs-fb', el.scrollTop < over - 4 ? '18px' : '0px');
+        };
+        el.addEventListener('scroll', sync, { passive: true });
+        window.addEventListener('resize', sync);
+        if (window.ResizeObserver) new ResizeObserver(sync).observe(el);
+        sync();
+      });
+
+      // At short heights the current page's own link (Chat) can start below
+      // the fold of the nav list.
+      const sc = nav.querySelector('.fcs-scroll');
+      const act = sc && sc.querySelector('a[href="finchat_chat.html"]');
+      if (sc && act) {
+        const a = act.getBoundingClientRect(), s = sc.getBoundingClientRect();
+        if (a.bottom > s.bottom) sc.scrollTop += (a.bottom - s.bottom) + 8;
+        else if (a.top < s.top) sc.scrollTop -= (s.top - a.top) + 8;
+      }
     })();
 
     // Mark not-yet-built nav destinations as "Coming soon" instead of silently
