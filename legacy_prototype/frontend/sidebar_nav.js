@@ -287,11 +287,13 @@
     };
 
     // Close the drawer when a nav link is tapped (pages bound this to the OLD
-    // links before we rebuilt the sidebar).
-    var bd = document.getElementById('navBackdrop');
+    // links before we rebuilt the sidebar). The backdrop is looked up at click
+    // time, not captured here: it lives inside the page's <main>, so an SPA
+    // navigation replaces it and a reference taken at build time would go stale.
     nav.querySelectorAll('a[href]').forEach(function (a) {
       a.addEventListener('click', function () {
         nav.classList.remove('open');
+        var bd = document.getElementById('navBackdrop');
         if (bd) bd.classList.add('hidden');
       });
     });

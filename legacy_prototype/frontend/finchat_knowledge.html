@@ -117,9 +117,11 @@
   </div>
 
  </div>
-</main>
 
-<div id="toast" class="toast"></div>
+ <!-- Inside <main>: the router swaps only <main>, so a toast left outside it
+      survives every navigation and collides by id with the next page's. -->
+ <div id="toast" class="toast"></div>
+</main>
 
 <script>
 const API = (location.protocol.indexOf('http') === 0) ? location.origin : 'http://localhost:3000';

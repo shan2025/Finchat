@@ -35,10 +35,14 @@
 
 <body class="bg-cream-bg h-screen overflow-hidden ">
 
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
 
-<div class="flex-1 flex flex-col md:ml-64 h-full min-w-0">
+<!-- Everything the view owns lives inside this one <main>: spa_router.js swaps
+     only <main>, so a header, backdrop or toast left outside it would belong to
+     whichever page loaded first and never be replaced. -->
+<main class="flex flex-col md:ml-64 h-full min-w-0">
+
+ <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
  <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
   <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
@@ -48,21 +52,21 @@
   <span class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3);">notifications · channels · account</span>
   <div class="flex-1"></div>
   <div class="relative shrink-0">
-   <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
+   <button id="notifBell" title="Notifications" class="w-9 h-9 flex items-center justify-center rounded-full relative" style="background:var(--surface2); border:1px solid var(--border);">
     <span class="material-symbols-outlined text-[16px]">notifications</span>
     <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#dc2626] text-white text-[10px] font-bold leading-[16px] rounded-full text-center"></span>
    </button>
    <div id="notifDropdown" class="hidden absolute right-0 top-11 w-80 max-h-96 overflow-y-auto rounded-2xl shadow-xl z-[200]" style="background:#fffaf0;border:1px solid #e3d3ba;">
     <div class="flex items-center justify-between px-4 py-3 border-b sticky top-0" style="border-color:#e3d3ba;background:#fffaf0;">
      <span class="text-sm font-bold" style="color:#3a2e23">Notifications</span>
-     <button onclick="markAllNotifsRead()" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
+     <button id="notifMarkAll" class="text-[11px] font-semibold" style="color:#8c7a6b">Mark all read</button>
     </div>
     <div id="notifList"></div>
    </div>
   </div>
  </header>
 
- <main class="flex-1 overflow-y-auto px-6 py-6">
+ <div class="flex-1 overflow-y-auto px-6 py-6">
   <div class="max-w-3xl mx-auto space-y-6">
 
    <!-- Notification channels -->
@@ -76,7 +80,7 @@
        Choose where FinChat reaches you when agents finish tasks, need approval, flag fraud, or post briefings.
       </p>
      </div>
-     <button onclick="sendTest()" id="testBtn" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#8c491a;">
+     <button id="testBtn" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#8c491a;">
       <span class="material-symbols-outlined text-[15px]">send</span> Send test
      </button>
     </div>
@@ -112,15 +116,14 @@
      <div><span class="font-bold" style="color:var(--text);">Email:</span> <span id="accEmail">—</span></div>
      <div><span class="font-bold" style="color:var(--text);">Role:</span> <span id="accRole">—</span></div>
     </div>
-    <button onclick="logout()" class="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold" style="background:#fee2e2; border:1px solid #dc2626; color:#991b1b;">
+    <button id="logoutBtn" class="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold" style="background:#fee2e2; border:1px solid #dc2626; color:#991b1b;">
      <span class="material-symbols-outlined text-[15px]">logout</span> Sign out
     </button>
    </section>
   </div>
- </main>
-</div>
+ </div>
 
-<div class="toast" id="toast"></div>
+ <div class="toast" id="toast"></div>
 
 <script>
  const _session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
@@ -181,10 +184,10 @@
    : waStatus.provider === 'twilio' ? 'Twilio' : null;
   return `
   <div id="waLinkWrap" style="margin-top:8px;">
-   <button onclick="linkWhatsApp(event)" id="waLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#25D366; color:#0b2e13; border:none; cursor:pointer;">
+   <button data-act="wa-link" id="waLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#25D366; color:#0b2e13; border:none; cursor:pointer;">
     ${linked ? '🔗 Re-link WhatsApp' : '🔗 Link WhatsApp automatically'}
    </button>
-   <button onclick="testWhatsApp(event)" id="waTestBtn" class="w-full py-2 rounded-xl text-[12px] font-bold mt-1.5" style="background:transparent; border:1px solid var(--border); color:var(--text2); cursor:pointer;">
+   <button data-act="wa-test" id="waTestBtn" class="w-full py-2 rounded-xl text-[12px] font-bold mt-1.5" style="background:transparent; border:1px solid var(--border); color:var(--text2); cursor:pointer;">
     Send a WhatsApp test
    </button>
    <div id="waLinkStatus" style="font-size:11.5px; color:var(--text3); margin-top:6px; line-height:1.55;">
@@ -210,20 +213,20 @@
       <div class="text-[13.5px] font-bold">${c.label}${badge}</div>
       <div class="text-[11.5px]" style="color:var(--text3);">${c.desc}</div>
      </div>
-     <div class="tgl ${on ? 'on' : ''} ${serverOk ? '' : ''}" data-chan="${c.key}" onclick="toggleChannel('${c.key}')"></div>
+     <div class="tgl ${on ? 'on' : ''} ${serverOk ? '' : ''}" data-act="toggle" data-chan="${c.key}"></div>
     </div>
-    ${c.field ? `<input class="chan-input" id="fld_${c.field}" placeholder="${c.placeholder}" value="${esc(prefs[c.field] || '')}" onchange="markDirty()" style="display:${on ? 'block' : 'none'}">` : ''}
+    ${c.field ? `<input class="chan-input" id="fld_${c.field}" placeholder="${c.placeholder}" value="${esc(prefs[c.field] || '')}" style="display:${on ? 'block' : 'none'}">` : ''}
     ${c.key === 'whatsapp' ? waCardHtml(on) : ''}
     ${c.key === 'telegram' ? `
     <div id="tgLinkWrap" style="display:${on ? 'block' : 'none'}; margin-top:8px;">
-     <button onclick="linkTelegram(event)" id="tgLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#229ED9; color:#fff; border:none; cursor:pointer;">
+     <button data-act="tg-link" id="tgLinkBtn" class="w-full py-2.5 rounded-xl text-[13px] font-bold" style="background:#229ED9; color:#fff; border:none; cursor:pointer;">
       <span style="vertical-align:middle;">${prefs.telegram_chat_id ? '🔗 Re-link Telegram' : '🔗 Link Telegram automatically'}</span>
      </button>
      <div id="tgLinkStatus" style="font-size:11.5px; color:var(--text3); margin-top:6px; line-height:1.5;">${prefs.telegram_chat_id ? 'Linked to chat <b>' + esc(prefs.telegram_chat_id) + '</b>.' : ''}</div>
     </div>` : ''}
    </div>`;
   }).join('') + `
-   <button onclick="savePrefs()" id="saveBtn" class="w-full py-3 rounded-full text-sm font-bold text-white" style="background:#3a2e23;">Save notification settings</button>`;
+   <button data-act="save" id="saveBtn" class="w-full py-3 rounded-full text-sm font-bold text-white" style="background:#3a2e23;">Save notification settings</button>`;
  }
 
  async function toggleChannel(key) {
@@ -234,7 +237,6 @@
   }
   renderChannels();
  }
- function markDirty() { /* fields read on save */ }
 
  async function loadPrefs() {
   try {
@@ -460,24 +462,59 @@
   } catch (e) { showToast('Push setup failed: ' + e.message); return false; }
  }
 
+ // ── Event wiring ──
+ // This page is served through spa_router.js, which runs view scripts inside a
+ // function scope — so nothing here is reachable from a global `onclick=`.
+ // Every handler is bound explicitly instead.
+ const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+
+ bind('notifBell', 'click', (e) => window.toggleNotifications && window.toggleNotifications(e));
+ bind('notifMarkAll', 'click', () => window.markAllNotifsRead && window.markAllNotifsRead());
+ bind('testBtn', 'click', sendTest);
+ bind('logoutBtn', 'click', logout);
+
+ // The channel list is re-rendered on every toggle, so its buttons are bound by
+ // delegation on the container rather than re-bound after each render.
+ bind('channels', 'click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  switch (el.dataset.act) {
+   case 'toggle':  toggleChannel(el.dataset.chan); break;
+   case 'save':    savePrefs(); break;
+   case 'wa-link': linkWhatsApp(e); break;
+   case 'wa-test': testWhatsApp(e); break;
+   case 'tg-link': linkTelegram(e); break;
+  }
+ });
+
  // Drawer
- const navToggle = document.getElementById('navToggle');
- if (navToggle) navToggle.onclick = () => {
+ bind('navToggle', 'click', () => {
   document.getElementById('sideNav').classList.toggle('open');
   document.getElementById('navBackdrop').classList.toggle('hidden');
- };
- document.getElementById('navBackdrop').onclick = () => {
+ });
+ bind('navBackdrop', 'click', () => {
   document.getElementById('sideNav').classList.remove('open');
   document.getElementById('navBackdrop').classList.add('hidden');
- };
+ });
+
+ // The link-confirmation polls are started from a click, long after the router's
+ // boot-time timer tracking has stopped, so they have to be released by hand —
+ // otherwise navigating away mid-link leaves a 2s poll running for good.
+ if (window.fcView) window.fcView.onTeardown(() => {
+  clearInterval(waPollTimer);
+  clearInterval(tgPollTimer);
+ });
 
  loadPrefs();
 </script>
+</main>
+
 <script src="auth_session.js"></script>
 <script src="api_client.js"></script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>
 <script src="sidebar_collapse.js"></script>
+<script src="spa_router.js"></script>
 </body>
 </html>
 

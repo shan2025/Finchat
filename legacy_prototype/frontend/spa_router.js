@@ -16,12 +16,20 @@
 // working exactly as before. To migrate a page it must:
 //
 //   1. have an empty <nav id="sideNav"></nav> (shell is injected, not inline),
-//   2. keep all its markup inside a single <main> element,
-//   3. keep its page logic in inline <script> blocks with no src=, and
+//   2. keep ALL its markup inside a single <main> element — page headers,
+//      backdrops and toasts included. Anything left outside <main> belongs to
+//      whichever page happened to load first and will not be swapped,
+//   3. keep its page logic in inline <script> blocks with no src=,
 //   4. tolerate its script running more than once per document lifetime —
 //      which is why view scripts are executed inside a fresh function scope
 //      (see runViewScripts) rather than at global scope, where a second
-//      `const API_URL` would throw.
+//      `const API_URL` would throw, and
+//   5. carry no inline on*= attributes, since those resolve against the global
+//      scope that the wrapper in (4) hides.
+//
+// Long-lived work a view starts AFTER boot (a link-confirmation poll fired from
+// a click, say) is outside the tracking window and must be released by hand via
+// window.fcView.onTeardown — see finchat_settings.html.
 //
 // Pages NOT migrated, and why: finchat_chat.html, finchat_dashboard.html,
 // finchat_agents.html, finchat_neuralmap.html and finchat_audit.html carry
@@ -29,17 +37,16 @@
 // need their globals scoped before they can join. finchat_login.html and
 // finchat_signup.html are deliberately excluded — an auth boundary should be
 // a real document load.
+//
+// finchat_mindmap.html is the next reasonable candidate.
 (function () {
   'use strict';
 
   const MIGRATED = new Set([
     'finchat_knowledge.html',
-    'finchat_reports.html'
+    'finchat_reports.html',
+    'finchat_settings.html'
   ]);
-  // finchat_settings.html meets conditions 1-3 but not 4: it has 10 inline
-  // on*= attributes whose handlers must be reachable from global scope, and 28
-  // top-level const/let bindings that cannot be re-declared. Migrating it means
-  // converting those handlers to addEventListener first.
 
   const pageOf = (url) => {
     try { return new URL(url, location.origin).pathname.split('/').pop() || ''; }
@@ -209,6 +216,13 @@
 
       // Styles first, so the incoming markup is never painted unstyled.
       adoptHeadStyles(doc, pageOf(url));
+      // <body>'s classes are the page's own layout contract, not the shell's:
+      // Knowledge and Reports scroll the body (`min-h-screen`), while Settings
+      // pins it (`h-screen overflow-hidden`) and scrolls inside its own column.
+      // Keeping the previous page's classes would break whichever model the
+      // incoming view expects. No shared script writes to body.classList, so
+      // taking the incoming set wholesale is safe.
+      if (doc.body) document.body.className = doc.body.className;
       currentMain.replaceWith(nextMain.cloneNode(true));
       document.title = doc.title || document.title;
       if (push) history.pushState({ spa: true }, '', url);
@@ -217,7 +231,11 @@
       if (token !== navToken) return;
 
       runViewScripts(doc);
-      reinitShellWidgets();
+      // Inside the tracking window: re-initialising the bell registers a 30s
+      // poll, which would otherwise survive teardownView() and stack up one
+      // extra poller per navigation.
+      startTracking();
+      try { reinitShellWidgets(); } finally { stopTracking(); }
       window.scrollTo(0, scroll);
       window.dispatchEvent(new CustomEvent('fc:navigated', { detail: { url } }));
     } catch (e) {

@@ -298,10 +298,19 @@
       open = !open; dd.classList.toggle('hidden', !open);
       if (open) loadList();
     };
-    document.addEventListener('click', (e) => {
+    // Close-on-outside-click binds to `document`, which outlives any single
+    // view — so re-running init() after an SPA swap would stack one stale
+    // listener per navigation, each closing over a dead `open` flag. The live
+    // handler is swapped through a slot instead, leaving exactly one listener
+    // for the life of the document.
+    window.__notifCloseOnOutside = (e) => {
       const dd = $('notifDropdown'), bell = $('notifBell');
       if (open && dd && !dd.contains(e.target) && bell && !bell.contains(e.target)) { dd.classList.add('hidden'); open = false; }
-    });
+    };
+    if (!window.__notifDocBound) {
+      window.__notifDocBound = true;
+      document.addEventListener('click', (e) => window.__notifCloseOnOutside(e));
+    }
     function bindSocket() {
       const s = window.socket || (typeof socket !== 'undefined' ? socket : null);
       if (s && !window.__notifSockBound) { s.on('notification:new', () => { refreshBadge(); if (open) loadList(); }); window.__notifSockBound = true; }
