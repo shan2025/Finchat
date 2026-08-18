@@ -1,7 +1,7 @@
 // config/envAudit.js — boot-time report of optional configuration that is absent.
 //
 // This exists because render.yaml does NOT configure the running service: the
-// Finchat-6 service was created through the Render dashboard, so the blueprint
+// finchat-sg service was created through the Render dashboard, so the blueprint
 // is documentation, not configuration. FRONTEND_URL was declared there, was
 // never set on the dashboard, and the only symptom was every same-origin
 // request being answered 403 — a failure nobody could trace back to a missing

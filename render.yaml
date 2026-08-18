@@ -1,7 +1,7 @@
-# Render blueprint for the FinChat backend (service "Finchat-6").
+# Render blueprint for the FinChat backend (service "finchat-sg").
 #
 # NOTE: this file does NOT retroactively take over a service that was created
-# through the Render dashboard. The existing Finchat-6 service keeps using its
+# through the Render dashboard. The existing finchat-sg service keeps using its
 # dashboard settings until you either point a Blueprint at this repo
 # (Render -> New -> Blueprint) or recreate the service from it. Until then treat
 # this as documentation of the intended configuration — and if you change the
@@ -14,7 +14,7 @@
 
 services:
   - type: web
-    name: Finchat-6
+    name: finchat-sg
     runtime: docker
     plan: free
     branch: main
@@ -93,7 +93,7 @@ services:
       # the dashboard for the whole life of the service, and the symptom was
       # every same-origin POST and every Socket.io handshake answered 403.
       - key: FRONTEND_URL
-        value: https://finchat-6.onrender.com
+        value: https://finchat-sg.onrender.com
 
       # Both optional: services/notificationChannels.js defaults to
       # smtp.gmail.com:587. SMTP_USER and SMTP_PASS below are what actually
