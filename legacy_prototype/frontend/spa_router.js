@@ -130,12 +130,61 @@
   function reinitShellWidgets() {
     try { window.fcNotifications && window.fcNotifications.init(); } catch (e) { /* non-fatal */ }
     try { window.fcKnowledgeSearch && window.fcKnowledgeSearch.init(); } catch (e) { /* non-fatal */ }
-    // Reflect the active page in the persistent nav.
-    document.querySelectorAll('#sideNav a[href]').forEach(a => {
-      const isCurrent = pageOf(a.getAttribute('href')) === pageOf(location.href);
-      a.classList.toggle('active', isCurrent);
-      if (isCurrent) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    // Reflect the active page in the persistent nav. sidebar_nav.js owns the
+    // highlight (`sbn-active` plus a filled icon), so ask it to re-sync instead
+    // of setting a class here — a plain `active` class matches nothing in its
+    // stylesheet, which is how the rail ended up highlighting the page you left.
+    try { window.fcSidebarNav && window.fcSidebarNav.syncActive(); } catch (e) { /* non-fatal */ }
+  }
+
+  // ── head assets ─────────────────────────────────────────────────────────
+  // Only <main> is swapped, so everything the target page declares in <head>
+  // is otherwise left behind: its inline <style> block and its <script src>
+  // libraries. Both matter. Reports keeps `.kind-tab`/`.kbtn` in its head style
+  // and loads marked, DOMPurify and study_blocks.js there, so SPA-navigating
+  // into it produced unstyled tab buttons and report bodies rendered as raw
+  // markdown; Knowledge keeps `.fchip`/`.chip`/`.spark-*` in its head style, so
+  // arriving there left the filter chips as bare text.
+  //
+  // Assets are only ever ADDED, never removed. These pages share one theme and
+  // namespace their own rules, so an accumulated head is harmless — and it means
+  // navigating back to a page you have already visited costs nothing.
+  function adoptHeadStyles(doc, page) {
+    if (!document.head.querySelector('style[data-spa-page="' + page + '"]')) {
+      doc.querySelectorAll('head style').forEach(s => {
+        const el = document.createElement('style');
+        el.textContent = s.textContent;
+        el.setAttribute('data-spa-page', page);
+        document.head.appendChild(el);
+      });
+    }
+    const haveCss = new Set([...document.querySelectorAll('link[rel="stylesheet"][href]')].map(l => l.href));
+    doc.querySelectorAll('head link[rel="stylesheet"][href]').forEach(l => {
+      const href = new URL(l.getAttribute('href'), location.href).href;
+      if (haveCss.has(href)) return;
+      haveCss.add(href);
+      const el = document.createElement('link');
+      el.rel = 'stylesheet';
+      el.href = href;
+      document.head.appendChild(el);
     });
+  }
+
+  // Sequential, and awaited before the view scripts run — a view that calls
+  // marked.parse() on boot must not start before marked has loaded.
+  function adoptHeadScripts(doc) {
+    const have = new Set([...document.querySelectorAll('script[src]')].map(s => s.src));
+    const wanted = [...doc.querySelectorAll('script[src]')]
+      .map(s => new URL(s.getAttribute('src'), location.href).href)
+      .filter(src => !have.has(src));
+    return wanted.reduce((chain, src) => chain.then(() => new Promise(resolve => {
+      const el = document.createElement('script');
+      el.src = src;
+      // A failed asset must not strand the navigation: the view still renders,
+      // just without whatever that script provided.
+      el.onload = el.onerror = () => resolve();
+      document.head.appendChild(el);
+    })), Promise.resolve());
   }
 
   let navToken = 0;
@@ -158,9 +207,14 @@
 
       teardownView();
 
+      // Styles first, so the incoming markup is never painted unstyled.
+      adoptHeadStyles(doc, pageOf(url));
       currentMain.replaceWith(nextMain.cloneNode(true));
       document.title = doc.title || document.title;
       if (push) history.pushState({ spa: true }, '', url);
+
+      await adoptHeadScripts(doc);
+      if (token !== navToken) return;
 
       runViewScripts(doc);
       reinitShellWidgets();
@@ -196,6 +250,14 @@
   window.addEventListener('popstate', () => {
     if (!MIGRATED.has(pageOf(location.href))) { location.reload(); return; }
     navigate(location.href, { push: false });
+  });
+
+  // Tag the server-rendered page's own head style as belonging to it, so
+  // navigating away and back doesn't append a second copy. Styles injected by
+  // the shared shell scripts carry an id and are not page-owned; they are also
+  // injected later than this (on DOMContentLoaded), so they are not seen here.
+  document.head.querySelectorAll('style:not([id])').forEach(s => {
+    if (!s.hasAttribute('data-spa-page')) s.setAttribute('data-spa-page', pageOf(location.href));
   });
 
   // The first view was rendered by the server; adopt its timers so leaving

@@ -155,7 +155,8 @@
 
   function navItem(key, href, icon, label) {
     var act = activeKey() === key;
-    return '<a class="sbn-item' + (act ? ' sbn-active' : '') + '" href="' + href + '">' +
+    return '<a class="sbn-item' + (act ? ' sbn-active' : '') + '" href="' + href + '" data-sbn-key="' + key + '"' +
+      (act ? ' aria-current="page"' : '') + '>' +
       '<span class="material-symbols-outlined" style="font-size:20px;' + (act ? "font-variation-settings:'FILL' 1;" : '') + '">' + icon + '</span> ' + label + '</a>';
   }
   function soonItem(icon, label) {
@@ -321,6 +322,25 @@
     });
   }
 
+  // Re-apply the current-page highlight without rebuilding the rail. The SPA
+  // router keeps #sideNav alive across navigations, so the highlight painted at
+  // build() time would otherwise stay stuck on the page you came FROM. Matching
+  // on the nav key (not the href) keeps aliases like Model Lab → Neural Map
+  // pointing at the right row.
+  function syncActive() {
+    var nav = document.getElementById('sideNav');
+    if (!nav) return;
+    var key = activeKey();
+    nav.querySelectorAll('.sbn-item[data-sbn-key]').forEach(function (a) {
+      var act = a.getAttribute('data-sbn-key') === key;
+      a.classList.toggle('sbn-active', act);
+      if (act) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      var icon = a.querySelector('.material-symbols-outlined');
+      if (icon) icon.style.fontVariationSettings = act ? "'FILL' 1" : '';
+    });
+    revealActive(nav);
+  }
+
   // At short heights the current page's own link can start out below the fold.
   var pendingReveal = false;
   function revealActive(nav) {
@@ -417,6 +437,10 @@
         });
       }).catch(function () {});
   }
+
+  // The rail owns its own active-state contract; spa_router.js calls syncActive()
+  // after a view swap rather than guessing at the class names.
+  window.fcSidebarNav = { rebuild: build, syncActive: syncActive };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
   else build();
