@@ -311,7 +311,7 @@ async function createMap({ userId, title, topic, sourceType, sourceRef, meta = {
 // Generation
 // ═══════════════════════════════════════════════════════════
 
-async function generateHierarchy(userContent, { model = null, maxChars = 8000 } = {}) {
+async function generateHierarchy(userContent, { model = null, maxChars = 8000, userId = null } = {}) {
   const res = await runInference({
     messages: [
       { role: 'system', content: GEN_PROMPT },
@@ -320,7 +320,8 @@ async function generateHierarchy(userContent, { model = null, maxChars = 8000 } 
     temperature: 0.4,
     jsonMode: true,
     feature: 'mindmap',
-    model
+    model,
+    userId
   });
   return { raw: parseJsonLoose(res.content), provider: res.provider, model: res.model };
 }
@@ -566,7 +567,8 @@ async function enrichNode(mapId, nodeId, text, opts = {}) {
     temperature: 0.3,
     jsonMode: true,
     feature: 'mindmap',
-    model: opts.model || null
+    model: opts.model || null,
+    userId: opts.userId || null
   });
 
   const raw = parseJsonLoose(res.content);
@@ -681,7 +683,8 @@ async function expandNode(mapId, nodeId, opts = {}) {
     temperature: 0.5,
     jsonMode: true,
     feature: 'mindmap',
-    model: opts.model || null
+    model: opts.model || null,
+    userId: opts.userId || null
   });
 
   const raw = parseJsonLoose(res.content);
@@ -788,7 +791,8 @@ async function analyseGaps(mapId, opts = {}) {
     temperature: 0.4,
     jsonMode: true,
     feature: 'mindmap',
-    model: opts.model || null
+    model: opts.model || null,
+    userId: opts.userId || null
   });
 
   const raw = parseJsonLoose(res.content);

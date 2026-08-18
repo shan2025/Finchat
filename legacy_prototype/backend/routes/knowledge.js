@@ -467,31 +467,59 @@ router.get('/memory/overview', requireAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/knowledge/stats/growth?days=30 ────────────────
+// ── GET /api/knowledge/stats/growth?days=30[&agent=plato] ──
 // Daily new-learning counts from node_events → the growth sparkline.
+//
+// Two things were wrong here. The window was fixed at whatever the page asked
+// for with no way to change it, and — worse — the query had no user filter, so
+// every account was shown the same system-wide curve. A brand-new user saw a
+// month of somebody else's learning. Both are fixed: the series is scoped to
+// req.user.id, the window is caller-chosen, and an optional agent filter answers
+// "how fast is THIS agent learning about me" rather than only the total.
 router.get('/stats/growth', requireAuth, async (req, res) => {
   try {
     const days = Math.max(1, Math.min(180, parseInt(req.query.days) || 30));
-    const q = await query(`
-      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
-             COALESCE(c.created, 0)::int   AS created,
-             COALESCE(c.activated, 0)::int AS activated,
-             COALESCE(c.total, 0)::int     AS total
-      FROM generate_series(
-             (now() - ($1 || ' days')::interval)::date, now()::date, interval '1 day'
-           ) AS d(day)
-      LEFT JOIN (
-        SELECT date_trunc('day', created_at)::date AS day,
-               COUNT(*) FILTER (WHERE event_type = 'created')   AS created,
-               COUNT(*) FILTER (WHERE event_type = 'activated') AS activated,
-               COUNT(*) AS total
-        FROM node_events
-        WHERE created_at > now() - ($1 || ' days')::interval
-        GROUP BY 1
-      ) c ON c.day = d.day
-      ORDER BY d.day
-    `, [String(days)]);
-    res.json({ days, series: q.rows });
+    const agent = String(req.query.agent || '').trim().toLowerCase();
+
+    const [series, roster] = await Promise.all([
+      query(`
+        SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+               COALESCE(c.created, 0)::int   AS created,
+               COALESCE(c.activated, 0)::int AS activated,
+               COALESCE(c.total, 0)::int     AS total
+        FROM generate_series(
+               (now() - ($1 || ' days')::interval)::date, now()::date, interval '1 day'
+             ) AS d(day)
+        LEFT JOIN (
+          SELECT date_trunc('day', created_at)::date AS day,
+                 COUNT(*) FILTER (WHERE event_type = 'created')   AS created,
+                 COUNT(*) FILTER (WHERE event_type = 'activated') AS activated,
+                 COUNT(*) AS total
+          FROM node_events
+          WHERE created_at > now() - ($1 || ' days')::interval
+            AND user_id = $2
+            AND ($3 = '' OR COALESCE(agent_id, 'unattributed') = $3)
+          GROUP BY 1
+        ) c ON c.day = d.day
+        ORDER BY d.day
+      `, [String(days), req.user.id, agent]),
+      // Unfiltered within the window, so choosing one agent never hides the
+      // others from the picker.
+      query(`
+        SELECT COALESCE(ne.agent_id, 'unattributed')                  AS agent_id,
+               COALESCE(a.name, initcap(ne.agent_id), 'Unattributed') AS agent_name,
+               COUNT(*)::int AS events,
+               COUNT(*) FILTER (WHERE ne.event_type = 'created')::int AS created,
+               MAX(ne.created_at) AS last_event_at
+        FROM node_events ne
+        LEFT JOIN agents a ON a.agent_id = ne.agent_id
+        WHERE ne.created_at > now() - ($1 || ' days')::interval AND ne.user_id = $2
+        GROUP BY 1, 2
+        ORDER BY events DESC
+      `, [String(days), req.user.id])
+    ]);
+
+    res.json({ days, agent: agent || null, series: series.rows, agents: roster.rows });
   } catch (err) {
     console.error('Growth stats error:', err);
     res.status(500).json({ error: 'Failed to load growth' });
@@ -509,14 +537,20 @@ router.get('/agents/overview', requireAuth, async (req, res) => {
     // join does the same work in a single trip.
     const q = await query(`
       WITH agg AS (
-        SELECT owner_agent AS agent_id,
-               COUNT(*)::int                          AS node_count,
-               COALESCE(SUM(activation_count), 0)::int AS activations,
-               ROUND(AVG(importance)::numeric, 1)     AS avg_importance,
-               MAX(last_activated_at)                 AS last_active
-        FROM entities
-        WHERE status = 'active' AND owner_agent IS NOT NULL AND user_id = $1
-        GROUP BY owner_agent
+        SELECT e.owner_agent AS agent_id,
+               a.name                                   AS agent_name,
+               COUNT(*)::int                            AS node_count,
+               COALESCE(SUM(e.activation_count), 0)::int AS activations,
+               ROUND(AVG(e.importance)::numeric, 1)     AS avg_importance,
+               MAX(e.last_activated_at)                 AS last_active
+        FROM entities e
+        -- Inner join, deliberately: owner_agent is free text and old test
+        -- scripts stamped domain words on it ('finance', 'research'), which then
+        -- showed up in the cortex as if they were agents. Only ids that resolve
+        -- to a registered agent are agents.
+        JOIN agents a ON a.agent_id = e.owner_agent
+        WHERE e.status = 'active' AND e.user_id = $1
+        GROUP BY e.owner_agent, a.name
         ORDER BY node_count DESC
         LIMIT 20
       )
@@ -553,32 +587,57 @@ router.get('/agents/overview', requireAuth, async (req, res) => {
 router.get('/inference/stats', requireAuth, async (req, res) => {
   try {
     const days = Math.max(1, Math.min(90, parseInt(req.query.days) || 7));
-    const [totals, byFeature, byProvider] = await Promise.all([
+    const [totals, byFeature, byProvider, byAgent, orphans] = await Promise.all([
       query(`
         SELECT COUNT(*)::int AS calls,
                COALESCE(SUM(prompt_tokens), 0)::bigint     AS prompt_tokens,
                COALESCE(SUM(completion_tokens), 0)::bigint AS completion_tokens,
                COALESCE(ROUND(AVG(latency_ms)), 0)::int    AS avg_latency_ms,
                COALESCE(percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0)::int AS p95_latency_ms
-        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
-      `, [String(days)]),
+        FROM inference_metrics
+        WHERE created_at > now() - ($1 || ' days')::interval AND user_id = $2
+      `, [String(days), req.user.id]),
       query(`
         SELECT feature, COUNT(*)::int AS calls,
                COALESCE(SUM(prompt_tokens + completion_tokens), 0)::bigint AS tokens
-        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
+        FROM inference_metrics
+        WHERE created_at > now() - ($1 || ' days')::interval AND user_id = $2
         GROUP BY feature ORDER BY tokens DESC
-      `, [String(days)]),
+      `, [String(days), req.user.id]),
       query(`
         SELECT provider, COUNT(*)::int AS calls
-        FROM inference_metrics WHERE created_at > now() - ($1 || ' days')::interval
+        FROM inference_metrics
+        WHERE created_at > now() - ($1 || ' days')::interval AND user_id = $2
         GROUP BY provider ORDER BY calls DESC
+      `, [String(days), req.user.id]),
+      query(`
+        SELECT COALESCE(m.agent_id, 'unattributed')                  AS agent_id,
+               COALESCE(a.name, initcap(m.agent_id), 'Unattributed') AS agent_name,
+               COUNT(*)::int AS calls,
+               COALESCE(SUM(m.prompt_tokens + m.completion_tokens), 0)::bigint AS tokens
+        FROM inference_metrics m
+        LEFT JOIN agents a ON a.agent_id = m.agent_id
+        WHERE m.created_at > now() - ($1 || ' days')::interval AND m.user_id = $2
+        GROUP BY 1, 2 ORDER BY tokens DESC
+      `, [String(days), req.user.id]),
+      // Calls made before attribution was threaded through the inference path
+      // carry no user_id. They are NOT folded into anyone's totals — reporting
+      // them as "yours" is exactly the bug this fixes — but they are counted
+      // here so the panel can say plainly that they exist.
+      query(`
+        SELECT COUNT(*)::int AS calls,
+               COALESCE(SUM(prompt_tokens + completion_tokens), 0)::bigint AS tokens
+        FROM inference_metrics
+        WHERE created_at > now() - ($1 || ' days')::interval AND user_id IS NULL
       `, [String(days)])
     ]);
     res.json({
       days,
       totals: totals.rows[0],
       byFeature: byFeature.rows,
-      byProvider: byProvider.rows
+      byProvider: byProvider.rows,
+      byAgent: byAgent.rows,
+      unattributed: orphans.rows[0]
     });
   } catch (err) {
     console.error('Inference stats error:', err);
@@ -586,22 +645,59 @@ router.get('/inference/stats', requireAuth, async (req, res) => {
   }
 });
 
-// ── GET /api/knowledge/patterns ────────────────────────────
+// ── GET /api/knowledge/patterns[?agent=plato] ──────────────
 // "What the system thinks you care about" — strongest user-scoped preferences.
+//
+// Every preference already records the agent that learned it: recordPreference
+// passes ctx.agentId down to entity_edges.agent_id. That attribution was being
+// dropped on the way out, so the panel read as one undifferentiated list of
+// things "the system" knew. It is returned per row now, plus a roster of the
+// agents that have learned anything, so the page can slice by agent — that
+// roster is deliberately computed UNFILTERED, otherwise picking one agent would
+// erase the chips needed to pick a different one.
 router.get('/patterns', requireAuth, async (req, res) => {
   try {
-    const q = await query(`
-      SELECT f.canonical_name AS from_name, t.canonical_name AS to_name,
-             t.entity_type AS to_type, e.strength, e.weight, e.reason
-      FROM entity_edges e
-      JOIN entities f ON f.entity_id = e.from_entity_id
-      JOIN entities t ON t.entity_id = e.to_entity_id
-      WHERE e.edge_type = 'prefers' AND e.user_id = $1
-        AND f.status = 'active' AND t.status = 'active'
-      ORDER BY e.strength DESC, e.weight DESC
-      LIMIT 15
-    `, [req.user.id]);
-    res.json({ patterns: q.rows });
+    // '' means "every agent"; the value is only ever compared, never interpolated.
+    const agent = String(req.query.agent || '').trim().toLowerCase();
+
+    const [q, roster] = await Promise.all([
+      query(`
+        SELECT f.canonical_name AS from_name, t.canonical_name AS to_name,
+               t.entity_type AS to_type, e.strength, e.weight, e.reason,
+               e.source, e.updated_at,
+               COALESCE(e.agent_id, 'unattributed')                  AS agent_id,
+               COALESCE(a.name, initcap(e.agent_id), 'Unattributed') AS agent_name
+        FROM entity_edges e
+        JOIN entities f ON f.entity_id = e.from_entity_id
+        JOIN entities t ON t.entity_id = e.to_entity_id
+        LEFT JOIN agents a ON a.agent_id = e.agent_id
+        WHERE e.edge_type = 'prefers' AND e.user_id = $1
+          AND f.status = 'active' AND t.status = 'active'
+          AND ($2 = '' OR COALESCE(e.agent_id, 'unattributed') = $2)
+        ORDER BY e.strength DESC, e.weight DESC
+        LIMIT 50
+      `, [req.user.id, agent]),
+      query(`
+        SELECT COALESCE(e.agent_id, 'unattributed')                  AS agent_id,
+               COALESCE(a.name, initcap(e.agent_id), 'Unattributed') AS agent_name,
+               COUNT(*)::int          AS count,
+               MAX(e.updated_at)      AS last_learned_at,
+               ROUND(AVG(e.strength)::numeric, 2) AS avg_strength
+        FROM entity_edges e
+        JOIN entities t ON t.entity_id = e.to_entity_id
+        LEFT JOIN agents a ON a.agent_id = e.agent_id
+        WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND t.status = 'active'
+        GROUP BY 1, 2
+        ORDER BY count DESC
+      `, [req.user.id])
+    ]);
+
+    res.json({
+      patterns: q.rows,
+      agents: roster.rows,
+      total: roster.rows.reduce((s, a) => s + a.count, 0),
+      agent: agent || null
+    });
   } catch (err) {
     console.error('Patterns error:', err);
     res.status(500).json({ error: 'Failed to load patterns' });

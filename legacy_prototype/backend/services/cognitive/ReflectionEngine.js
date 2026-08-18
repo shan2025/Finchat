@@ -43,7 +43,12 @@ async function reflect(execution) {
     const result = await runInference({
       messages,
       temperature: 0.3,
-      jsonMode: true
+      jsonMode: true,
+      // Reflection is post-processing of one user's execution — bill the tokens
+      // to them, not to nobody.
+      feature: 'reflection',
+      userId: execution.user_id || execution.userId || null,
+      agentId: execution.assigned_agent || null
     });
 
     let reflectionData;

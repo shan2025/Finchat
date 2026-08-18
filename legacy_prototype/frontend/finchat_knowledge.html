@@ -18,6 +18,13 @@
  .chip-instrumented { background:rgba(201,154,58,.16); color:var(--warn); }
  .chip-roadmap { background:rgba(140,122,107,.14); color:var(--sub); }
  .stat-num { font-weight:800; letter-spacing:-.02em; }
+ .fchip { font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--sub); cursor:pointer; transition:.12s; }
+ .fchip:hover { border-color:var(--accent); color:var(--txt); }
+ .fchip[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+ .fchip .n { opacity:.7; font-weight:600; }
+ .agent-row { cursor:pointer; border-radius:10px; padding:6px 8px; margin:0 -8px; transition:background .12s; }
+ .agent-row:hover { background:var(--accent-soft); }
+ .abadge { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); white-space:nowrap; }
  .kbtn { background:var(--accent); color:#fff; border:none; border-radius:999px; font-weight:700; cursor:pointer; transition:filter .12s; }
  .kbtn:hover { filter:brightness(1.07); }
  .kbtn.ghost { background:var(--card); color:var(--txt); border:1px solid var(--border); }
@@ -59,10 +66,11 @@
 
   <!-- Growth -->
   <div class="card p-5 mb-4">
-   <div class="flex items-center justify-between mb-3">
+   <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
     <div class="font-bold text-sm flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">trending_up</span> Memory growth</div>
-    <div class="text-xs" style="color:var(--sub)">last 30 days · learning events</div>
+    <div class="text-xs" id="growthLabel" style="color:var(--sub)">learning events</div>
    </div>
+   <div id="growthFilter" class="flex flex-wrap items-center gap-2 mb-3"></div>
    <div id="growthChart"><div class="skel" style="height:90px"></div></div>
   </div>
 
@@ -93,7 +101,9 @@
    </div>
    <!-- Patterns -->
    <div class="card p-5">
-    <div class="font-bold text-sm flex items-center gap-2 mb-4"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">favorite</span> Your patterns</div>
+    <div class="font-bold text-sm flex items-center gap-2 mb-1"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">favorite</span> Your patterns</div>
+    <p class="text-xs mb-3" style="color:var(--sub)">What each agent has learned about how you want to be answered. Filter by the agent that learned it.</p>
+    <div id="patternFilter" class="flex flex-wrap gap-2 mb-3"></div>
     <div id="patterns"><div class="skel" style="height:100px"></div></div>
    </div>
   </div>
@@ -122,6 +132,8 @@ function vitalCard(label,val,icon,sub){
 
 function sparkline(series){
  if(!series||!series.length) return '<div class="text-xs" style="color:var(--sub)">No activity yet.</div>';
+ // A flat line at zero reads as "the chart is broken", not "nothing happened".
+ if(!series.some(d=>Number(d.total)>0)) return '<div class="text-xs" style="color:var(--sub)">No learning events in this window.</div>';
  const w=1000,h=90,pad=4;
  const vals=series.map(d=>d.total);
  const max=Math.max(1,...vals);
@@ -163,10 +175,39 @@ async function loadVitals(){
    vitalCard('Most active',(s.mostActive[0]?s.mostActive[0].activation_count:0),'local_fire_department',esc(s.mostActive[0]?s.mostActive[0].canonical_name:'—'));
  }catch(e){ document.getElementById('vitals').innerHTML=`<div class="card p-4 text-sm" style="color:var(--sub)">Vitals unavailable.</div>`; }
 }
+// Growth window + agent slice. The chart used to be a fixed, unfilterable
+// 30 days of EVERY user's events; both halves are now the caller's choice.
+let growthDays=30, growthAgent='', growthAgents=[];
+const GROWTH_RANGES=[{d:7,label:'7d'},{d:30,label:'30d'},{d:90,label:'90d'}];
+
+function renderGrowthFilter(){
+ document.getElementById('growthFilter').innerHTML=
+  GROWTH_RANGES.map(r=>`<button type="button" class="fchip" data-days="${r.d}" aria-pressed="${r.d===growthDays}">${r.label}</button>`).join('')+
+  (growthAgents.length>1
+    ? `<span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>`+
+      [{agent_id:'',agent_name:'All agents'}].concat(growthAgents).map(a=>
+        `<button type="button" class="fchip" data-gagent="${esc(a.agent_id)}" aria-pressed="${a.agent_id===growthAgent}">${esc(a.agent_name)}${a.events?` <span class="n">${fmt(a.events)}</span>`:''}</button>`).join('')
+    : '');
+}
+
 async function loadGrowth(){
- try{ const g=await api('/api/knowledge/stats/growth?days=30'); document.getElementById('growthChart').innerHTML=sparkline(g.series); }
+ try{
+  const g=await api(`/api/knowledge/stats/growth?days=${growthDays}`+(growthAgent?`&agent=${encodeURIComponent(growthAgent)}`:''));
+  growthAgents=g.agents||[];
+  renderGrowthFilter();
+  const who=growthAgent ? ((growthAgents.find(a=>a.agent_id===growthAgent)||{}).agent_name||growthAgent)+' only' : 'all agents';
+  document.getElementById('growthLabel').textContent=`last ${g.days} days · ${who}`;
+  document.getElementById('growthChart').innerHTML=sparkline(g.series);
+ }
  catch(e){ document.getElementById('growthChart').innerHTML=`<div class="text-xs" style="color:var(--sub)">Growth unavailable.</div>`; }
 }
+
+document.getElementById('growthFilter').addEventListener('click',e=>{
+ const b=e.target.closest('.fchip'); if(!b) return;
+ if(b.dataset.days) growthDays=Number(b.dataset.days);
+ else growthAgent=b.dataset.gagent||'';
+ loadGrowth();
+});
 async function loadStores(){
  try{ const d=await api('/api/knowledge/memory/overview'); document.getElementById('stores').innerHTML=d.stores.map(storeCard).join(''); }
  catch(e){ document.getElementById('stores').innerHTML=`<div class="card p-4 text-sm" style="color:var(--sub)">Memory overview unavailable.</div>`; }
@@ -175,7 +216,10 @@ async function loadInference(){
  try{
   const d=await api('/api/knowledge/inference/stats?days=7'); const t=d.totals||{};
   const feat=(d.byFeature||[]);
+  const agents=(d.byAgent||[]);
+  const orphan=d.unattributed||{};
   const maxTok=Math.max(1,...feat.map(f=>Number(f.tokens)));
+  const maxAg=Math.max(1,...agents.map(a=>Number(a.tokens)));
   document.getElementById('inference').innerHTML=
    `<div class="grid grid-cols-3 gap-3 mb-4">
     <div><div class="stat-num text-xl">${fmt(t.calls)}</div><div class="text-[11px]" style="color:var(--sub)">calls</div></div>
@@ -183,19 +227,31 @@ async function loadInference(){
     <div><div class="stat-num text-xl">${fmt(t.avg_latency_ms)}<span class="text-xs">ms</span></div><div class="text-[11px]" style="color:var(--sub)">avg latency</div></div>
    </div>`+
    (feat.length? feat.map(f=>`<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>${esc(f.feature)}</span><span style="color:var(--sub)">${fmt(f.tokens)} tok</span></div>${bar(Number(f.tokens)/maxTok*100)}</div>`).join('')
-    : `<div class="text-xs" style="color:var(--sub)">No inference recorded yet — run a chat to populate this.</div>`);
+    : `<div class="text-xs" style="color:var(--sub)">Nothing yet — these are YOUR calls only, so a new account starts empty. Chat once and this fills in.</div>`)+
+   (agents.length?`<div class="text-xs font-semibold mt-4 mb-2">By agent</div>`+
+     agents.map(a=>`<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>${esc(a.agent_name)}</span><span style="color:var(--sub)">${fmt(a.tokens)} tok · ${fmt(a.calls)} calls</span></div>${bar(Number(a.tokens)/maxAg*100)}</div>`).join(''):'')+
+   // Never fold these into the user's own totals — attributing other people's
+   // spend to whoever is looking is the exact bug this panel used to have.
+   (Number(orphan.calls)>0?`<div class="text-[11px] mt-3 pt-2" style="color:var(--sub);border-top:1px solid var(--border)">
+     ${fmt(orphan.calls)} calls (${fmt(orphan.tokens)} tok) in this window were logged before per-user attribution and belong to no account — excluded from the figures above.</div>`:'');
  }catch(e){ document.getElementById('inference').innerHTML=`<div class="text-xs" style="color:var(--sub)">Inference stats unavailable (run migration 020 &amp; restart).</div>`; }
 }
 async function loadAgents(){
  try{
   const d=await api('/api/knowledge/agents/overview'); const a=d.agents||[];
   if(!a.length){ document.getElementById('agents').innerHTML=`<div class="text-xs" style="color:var(--sub)">No agent-owned concepts yet.</div>`; return; }
-  document.getElementById('agents').innerHTML=a.map(x=>
-   `<div class="mb-3">
+  document.getElementById('agents').innerHTML=a.map(x=>{
+   // How many preferences this agent learned about the user — filled in by
+   // loadPatterns, which runs first for exactly this reason.
+   const pf=prefsByAgent[x.agent_id];
+   return `<div class="agent-row mb-2" data-agent="${esc(x.agent_id)}" title="Show what this agent learned about you">
     <div class="flex justify-between text-sm mb-1"><span class="font-semibold capitalize">${esc(x.agent_id)}</span><span style="color:var(--sub)">${fmt(x.node_count)} concepts · ${x.share}%</span></div>
     ${bar(x.share)}
-    <div class="text-[11px] mt-1" style="color:var(--sub)">${(x.topConcepts||[]).map(esc).join(' · ')||'—'}</div>
-   </div>`).join('');
+    <div class="text-[11px] mt-1 flex justify-between items-center gap-3" style="color:var(--sub)">
+     <span>${(x.topConcepts||[]).map(esc).join(' · ')||'—'}</span>
+     ${pf?`<span class="abadge">${pf.count} about you</span>`:''}
+    </div>
+   </div>`;}).join('');
  }catch(e){ document.getElementById('agents').innerHTML=`<div class="text-xs" style="color:var(--sub)">Agent overview unavailable.</div>`; }
 }
 async function loadInsights(){
@@ -209,18 +265,65 @@ async function loadInsights(){
     <div class="text-xs mt-1" style="color:var(--sub)">${esc(i.detail)}</div></div>`).join('');
  }catch(e){ document.getElementById('insights').innerHTML=`<div class="text-xs" style="color:var(--sub)">Insights unavailable.</div>`; }
 }
+// '' = every agent. Kept in a variable rather than the URL so the SPA router
+// does not have to know about it.
+let patternAgent='';
+// agent_id → { count, last_learned_at } for the whole roster, unfiltered.
+// The agent cortex panel reads it to show how much each agent knows about YOU
+// as opposed to about the world.
+let prefsByAgent={};
+
+function ago(ts){
+ if(!ts) return '';
+ const s=(Date.now()-new Date(ts).getTime())/1000;
+ if(s<3600) return Math.max(1,Math.round(s/60))+'m ago';
+ if(s<86400) return Math.round(s/3600)+'h ago';
+ const d=Math.round(s/86400);
+ return d<30 ? d+'d ago' : Math.round(d/30)+'mo ago';
+}
+
+function renderPatternFilter(agents,total){
+ const el=document.getElementById('patternFilter');
+ // One agent means the filter can only ever say "all" — nothing to choose.
+ if(agents.length<2){ el.innerHTML=''; return; }
+ el.innerHTML=[{agent_id:'',agent_name:'All agents',count:total}].concat(agents).map(a=>
+  `<button type="button" class="fchip" data-agent="${esc(a.agent_id)}" aria-pressed="${a.agent_id===patternAgent}">${esc(a.agent_name)} <span class="n">${a.count}</span></button>`
+ ).join('');
+}
+
 async function loadPatterns(){
  try{
-  const d=await api('/api/knowledge/patterns'); const p=d.patterns||[];
-  if(!p.length){ document.getElementById('patterns').innerHTML=`<div class="text-xs" style="color:var(--sub)">The system hasn't learned your preferences yet — chat more and they'll appear here.</div>`; return; }
+  const d=await api('/api/knowledge/patterns'+(patternAgent?('?agent='+encodeURIComponent(patternAgent)):''));
+  const p=d.patterns||[];
+  prefsByAgent={}; (d.agents||[]).forEach(a=>{ prefsByAgent[a.agent_id]=a; });
+  renderPatternFilter(d.agents||[], d.total||0);
+  if(!p.length){ document.getElementById('patterns').innerHTML=patternAgent
+    ? `<div class="text-xs" style="color:var(--sub)">This agent hasn't learned anything about you yet.</div>`
+    : `<div class="text-xs" style="color:var(--sub)">The system hasn't learned your preferences yet — chat more and they'll appear here.</div>`; return; }
   document.getElementById('patterns').innerHTML=p.map(x=>
    `<div class="flex items-center gap-2 mb-2">
     <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">arrow_right</span>
-    <div class="flex-1"><div class="text-sm font-semibold">${esc(x.to_name)} <span class="text-xs font-normal" style="color:var(--sub)">(${esc(x.to_type)})</span></div>
-    <div class="text-[11px]" style="color:var(--sub)">${esc(x.reason||'')}</div></div>
+    <div class="flex-1">
+     <div class="text-sm font-semibold flex items-center gap-2 flex-wrap">${esc(x.to_name)} <span class="text-xs font-normal" style="color:var(--sub)">(${esc(x.to_type)})</span>${patternAgent?'':`<span class="abadge">${esc(x.agent_name)}</span>`}</div>
+     <div class="text-[11px]" style="color:var(--sub)">${esc(x.reason||'')}</div>
+     <div class="text-[11px] mt-0.5" style="color:var(--sub);opacity:.7">learned via ${esc(x.source||'chat')}${x.updated_at?' · '+ago(x.updated_at):''}</div>
+    </div>
     <div style="width:60px">${bar((x.strength||0)*100)}</div></div>`).join('');
  }catch(e){ document.getElementById('patterns').innerHTML=`<div class="text-xs" style="color:var(--sub)">Patterns unavailable.</div>`; }
 }
+
+// Delegated: the chips and agent rows are re-rendered on every load, so the
+// listeners live on the containers, which are not. Inline on* handlers would be
+// killed by the CSP anyway.
+document.getElementById('patternFilter').addEventListener('click',e=>{
+ const b=e.target.closest('.fchip'); if(!b) return;
+ patternAgent=b.dataset.agent||''; loadPatterns();
+});
+document.getElementById('agents').addEventListener('click',e=>{
+ const r=e.target.closest('.agent-row'); if(!r) return;
+ patternAgent=(patternAgent===r.dataset.agent)?'':r.dataset.agent;
+ loadPatterns().then(()=>{ document.getElementById('patternFilter').scrollIntoView({behavior:'smooth',block:'center'}); });
+});
 
 document.getElementById('dreamBtn').addEventListener('click', async ()=>{
  const b=document.getElementById('dreamBtn'); b.disabled=true; b.style.opacity=.6;
@@ -231,7 +334,9 @@ document.getElementById('dreamBtn').addEventListener('click', async ()=>{
  b.disabled=false; b.style.opacity=1;
 });
 
-loadVitals(); loadGrowth(); loadStores(); loadInference(); loadAgents(); loadInsights(); loadPatterns();
+loadVitals(); loadGrowth(); loadStores(); loadInference(); loadInsights();
+// Patterns first: it populates prefsByAgent, which the agent cortex panel reads.
+loadPatterns().then(loadAgents);
 </script>
 <script src="api_client.js"></script>
 <script src="sidebar_nav.js"></script>

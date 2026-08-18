@@ -136,9 +136,14 @@ function parseActionResponse(rawContent) {
  * @param {object} options
  * @param {Array} options.messages - Full message array from ContextBuilder
  * @param {number} [options.temperature] - LLM temperature
+ * @param {string} [options.userId] - Whose request this is. Tagged onto the
+ *   inference metric so the Knowledge Center can show each user their OWN token
+ *   and latency figures; without it every account saw one shared global total.
+ * @param {string} [options.agentId] - Which agent is thinking, for the same reason.
  * @returns {Promise<{ action: object, raw: string, provider: string, model: string, retried: boolean, fallback: boolean }>}
  */
-async function reason({ messages, temperature = 0.7, model = null, workload = 'chat' }) {
+async function reason({ messages, temperature = 0.7, model = null, workload = 'chat',
+                       userId = null, agentId = null }) {
   // First attempt: call LLM with JSON mode
   let firstResult;
   try {
@@ -150,7 +155,9 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
       // Selects the provider order for this kind of work — scheduled research
       // and interactive chat draw on different pools. See WORKLOAD_ROUTES.
       workload,
-      feature: workload
+      feature: workload,
+      userId,
+      agentId
     });
   } catch (err) {
     console.warn(`⚠️ ReasoningEngine: first runInference failed (${err.message}). Attempting non-JSON fallback inference...`);
@@ -161,7 +168,9 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
         jsonMode: false,
         model,
         workload,
-        feature: workload
+        feature: workload,
+        userId,
+        agentId
       });
     } catch (err2) {
       console.error(`❌ ReasoningEngine: inference failed across providers: ${err2.message}`);
@@ -214,7 +223,9 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
       jsonMode: true,
       model,
       workload,
-      feature: workload
+      feature: workload,
+      userId,
+      agentId
     });
 
     const retryParse = parseActionResponse(retryResult.content);

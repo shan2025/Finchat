@@ -46,7 +46,7 @@ ${toolLines}
  * @param {string} options.goal - The user's complex goal
  * @returns {Promise<{ plan: object, stored: boolean }>}
  */
-async function plan({ executionId, goal, agentId = null, workload = 'chat' }) {
+async function plan({ executionId, goal, agentId = null, workload = 'chat', userId = null }) {
   const messages = [
     { role: 'system', content: buildPlanningPrompt(agentId) },
     { role: 'user', content: `Goal: "${goal}"` }
@@ -59,7 +59,10 @@ async function plan({ executionId, goal, agentId = null, workload = 'chat' }) {
     // Planning belongs to the same pool as the run it is planning, or a
     // scheduled digest would plan out of the interactive chat allowance.
     workload,
-    feature: workload
+    feature: workload,
+    // Attribution only — planning tokens are spent on this user's behalf.
+    userId,
+    agentId
   });
 
   let planData;

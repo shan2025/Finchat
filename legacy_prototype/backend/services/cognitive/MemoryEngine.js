@@ -86,7 +86,7 @@ const clamp = (v, lo, hi, fallback) => {
 // ═══════════════════════════════════════════════════════════
 
 /** LLM pass over one exchange. Returns {entities, relations, contradictions}; empty on failure. */
-async function extractFromExchange(userText, aiText) {
+async function extractFromExchange(userText, aiText, { userId = null, agentId = null } = {}) {
   const empty = { entities: [], relations: [], contradictions: [], preferences: [] };
   const text = `USER: ${(userText || '').slice(0, 2500)}\n\nASSISTANT: ${(aiText || '').slice(0, 2500)}`;
   if (text.length < 30) return empty;
@@ -97,7 +97,12 @@ async function extractFromExchange(userText, aiText) {
         { role: 'user', content: text }
       ],
       temperature: 0.1,
-      jsonMode: true
+      jsonMode: true,
+      // Learning about a user is work done for that user — attribute it, or the
+      // Knowledge Center reports it against nobody.
+      feature: 'extraction',
+      userId,
+      agentId
     });
     const parsed = parseJsonLoose(res.content);
     const entities = (Array.isArray(parsed.entities) ? parsed.entities : [])
@@ -389,7 +394,7 @@ async function getUserPreferences(userId, limit = 8) {
 async function ingestChat({ userId, sessionId, agentId, userText, aiText, sourceLabel = '',
                            sourceType = 'chat', learnPreferences = true }) {
   const report = { learned: [], linked: [], contradictions: [], preferences: [] };
-  const extracted = await extractFromExchange(userText, aiText);
+  const extracted = await extractFromExchange(userText, aiText, { userId, agentId });
   // Document ingestion reuses this path with the file's text in the user slot;
   // a sentence inside a PDF is not the user telling us how they want answers.
   if (!learnPreferences) extracted.preferences = [];
@@ -591,7 +596,9 @@ async function detectGaps({ userId = null } = {}) {
         { role: 'user', content: graphText.slice(0, 6000) }
       ],
       temperature: 0.2,
-      jsonMode: true
+      jsonMode: true,
+      feature: 'gap-detection',
+      userId
     });
     const parsed = parseJsonLoose(res.content);
     gaps = (Array.isArray(parsed.gaps) ? parsed.gaps : [])

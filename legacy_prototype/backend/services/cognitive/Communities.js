@@ -58,7 +58,7 @@ function labelPropagation(nodeIds, adjacency, maxIter = 25) {
 
 // Ask the LLM for a 1-3 word name for a cluster from its member names.
 // Best-effort — falls back to the most-important member's name.
-async function nameCluster(memberNames, fallback) {
+async function nameCluster(memberNames, fallback, userId = null) {
   const names = memberNames.slice(0, 15).join(', ');
   try {
     const res = await runInference({
@@ -67,7 +67,9 @@ async function nameCluster(memberNames, fallback) {
         { role: 'user', content: names }
       ],
       temperature: 0.2,
-      feature: 'community_name'
+      feature: 'community_name',
+      // Clustering runs over ONE user's graph, so its tokens belong to them.
+      userId
     });
     const label = (res.content || '').trim().split('\n')[0].replace(/^["']|["']$/g, '').slice(0, 40);
     return label.length >= 2 ? label : fallback;
@@ -196,7 +198,7 @@ async function detectCommunities({ minSize = 3, name = true, userId = null } = {
     const topNames = topIds.map(id => nameById.get(id));
     const fallback = topNames[0] || 'Cluster';
     const label = existingLabels.get(communityId)
-      || (name ? await nameCluster(members.map(id => nameById.get(id)), fallback) : fallback);
+      || (name ? await nameCluster(members.map(id => nameById.get(id)), fallback, userId) : fallback);
 
     await query(`
       INSERT INTO graph_communities (community_id, label, color, size, top_nodes, algo, updated_at)

@@ -20,7 +20,7 @@ Skip generic words. At most 8 entities. Return {"entities": []} if none.`;
 /**
  * Best-effort LLM entity extraction. Returns [] on any failure.
  */
-async function extractEntities(text) {
+async function extractEntities(text, { userId = null, agentId = null } = {}) {
   if (!text || text.length < 10) return [];
   try {
     const res = await runInference({
@@ -29,7 +29,11 @@ async function extractEntities(text) {
         { role: 'user', content: text.slice(0, 4000) }
       ],
       temperature: 0.1,
-      jsonMode: true
+      jsonMode: true,
+      // Attribution for the Knowledge Center's per-user inference panel.
+      feature: 'extraction',
+      userId,
+      agentId
     });
     let cleaned = (res.content || '').trim();
     if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
@@ -129,11 +133,14 @@ async function upsertEdge({ fromId, toId, edgeType, userId = null, executionId =
  */
 async function ingestExecution(execution) {
   const text = `${execution.goal || ''}\n\n${execution.result || ''}`.trim();
-  const raw = await extractEntities(text);
-  if (raw.length === 0) return [];
-
-  // The execution knows who it belongs to; everything it produces is theirs.
+  // The execution knows who it belongs to; everything it produces is theirs —
+  // including the tokens spent extracting it.
   const userId = execution.user_id || execution.userId || null;
+  const raw = await extractEntities(text, {
+    userId,
+    agentId: execution.assigned_agent || execution.agentId || null
+  });
+  if (raw.length === 0) return [];
 
   const ids = [];
   for (const e of raw) {

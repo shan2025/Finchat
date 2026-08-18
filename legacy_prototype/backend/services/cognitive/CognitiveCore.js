@@ -312,7 +312,13 @@ async function _runWithinStallClock({
       // 3c. Run reasoning turn (temperature comes from the agent's risk setting;
       //     optional per-agent model override lets specialists pick their own Groq model)
       const thinkStart = new Date();
-      const result = await reason({ messages, temperature: agentTemperature, model: agentModel, workload });
+      // userId/agentName ride along purely as attribution for inference_metrics:
+      // the Knowledge Center reports tokens and latency PER USER, and an
+      // unattributed row is invisible to the person who actually paid for it.
+      const result = await reason({
+        messages, temperature: agentTemperature, model: agentModel, workload,
+        userId, agentId: agentName
+      });
       lastProvider = result.provider || lastProvider;
       lastModel = result.model || lastModel;
 
@@ -422,7 +428,7 @@ async function _runWithinStallClock({
         // agentName is the persona key, which doubles as the permission agent_id.
       // Passing it scopes the planner's tool list to what this agent may
       // actually run, so it stops planning steps that can only fail.
-      const planResult = await generatePlan({ executionId: execId, goal, agentId: agentName, workload });
+      const planResult = await generatePlan({ executionId: execId, goal, agentId: agentName, workload, userId });
 
         await logPhase(execId, 'planning', stepNumber, {
           plan: planResult.plan,

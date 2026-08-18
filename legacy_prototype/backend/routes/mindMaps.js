@@ -572,7 +572,7 @@ router.post('/:mapId/nodes/:nodeId/expand', requireAuth, async (req, res) => {
     if (!map) return;
     const node = await requireOwnedNode(req, res, map.map_id);
     if (!node) return;
-    const out = await Engine.expandNode(map.map_id, node.node_id);
+    const out = await Engine.expandNode(map.map_id, node.node_id, { userId: req.user.id });
     res.json({ ok: true, ...out });
   } catch (err) {
     console.error('Mind map expand error:', err);
