@@ -489,6 +489,34 @@ special case already demonstrates the cost of.
 **3.2 — Resolution order** stays as designed, but as a pool query:
 `user BYOK key` → `agent-specific credential` → `system credential` → `skip provider`.
 
+### 3.3 — Shipped 2026-08-18 (`b8e47d4`), `services/QuotaManager.js`
+
+- **Credential pools** — `resolveCredentials(provider, {agentId, userKey})`, read from
+  `<PROVIDER>_API_KEY_<AGENT>` then `<PROVIDER>_API_KEY`. Empty pool = skip provider.
+  Replaced the single hard-coded `(cfg.name === 'groq' && byokKey)` line that was
+  the whole of BYOK. `PROVIDERS[].apiKey` and `_usableKey` deleted from
+  `inference.js` — credentials no longer live there.
+- **Spent-allowance markers** — the router *already* distinguished a per-minute
+  throttle from a spent daily allowance, then discarded the verdict, so every
+  later call re-probed the dead model until UTC midnight. Now remembered per
+  model per credential, capped at the UTC reset, expiring on read.
+- **`usageToday()`** — reporting from existing metrics. Deliberately *not* on the
+  inference path: a pre-flight quota check means a database read before every
+  call, and the router already learns of exhaustion from the provider itself.
+
+**Two findings worth keeping.** Retired-model and spent-allowance exhaustion need
+*opposite* handling — all-retired falls back to the configured list (our own
+inference from a 400, may be wrong), all-spent skips the provider (the provider
+told us directly). The first version reused one fallback for both and re-offered
+every exhausted model. And `database` must be required *lazily* inside
+`usageToday()`; a top-level require opens a Postgres pool as an import side
+effect and hangs the test runner on a handle nobody asked for.
+
+**Not built:** the Execution Policy layer is still notional — budgets come from
+`agent_configs` plus callers, which is a proto-policy rather than one. Markers
+live in process memory, so Render's spin-down loses them; the cost is one wasted
+round-trip per cold start, against a database read on every call.
+
 **3.2 — Per-agent route override** in `runtime_settings`:
 
 ```jsonc
@@ -656,8 +684,8 @@ available to a system spending 86% of it re-reading its own prompt.
 | 1 | Budget fix | ✅ **done** |
 | 2 | ContextBuilder efficiency | ✅ **done** (−20%) |
 | 3 | Per-agent tool scoping | ✅ **done** (−37% cumulative) |
-| 4 | Provider isolation + Quota Manager (§6) | next |
-| 5 | Cerebras | after 4 — needs a signup |
+| 4 | Provider isolation + Quota Manager (§6) | ✅ **done** (`b8e47d4`) |
+| 5 | Cerebras | next — needs a signup |
 | 6 | Formal fallback ladder (§7 rows 3, 5, 10) | |
 | 7 | Mission scheduler (§8.5.1) | single blocker on all per-agent briefings |
 | 8 | Per-agent execution policies | |
