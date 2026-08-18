@@ -18,24 +18,57 @@ const {
 
 const systemText = (msgs) => msgs.filter(m => m.role === 'system').map(m => m.content).join('\n');
 
-describe('tool catalogue compaction', () => {
-  test('the full catalogue ships while the model is still choosing a tool', () => {
-    const msgs = buildContext({ goal: 'find me jobs', agentName: 'rasha' });
-    assert.match(systemText(msgs), /Parameters:/,
-      'with no results yet the model may need any tool, so it gets the full schemas');
-  });
+describe('prompt prefix stability', () => {
+  // The property that makes provider-side prefix caching possible at all.
+  // DeepSeek served 1,920 of 1,933 prompt tokens from cache on a repeated
+  // prefix; a prefix that changes between turns can never hit. An earlier
+  // version rendered the catalogue full on turn one and compact once results
+  // arrived, which saved ~366 tokens and forfeited a cache hit worth more.
+  const first = (msgs) => msgs.find(m => m.role === 'system').content;
 
-  test('parameter schemas are dropped once results are in hand', () => {
-    const msgs = buildContext({
+  test('the first system message is byte-identical across turns of a run', () => {
+    const turn1 = buildContext({ goal: 'find me jobs', agentName: 'rasha' });
+    const turn2 = buildContext({
       goal: 'find me jobs', agentName: 'rasha',
       toolResults: [{ tool: 'jobs', result: 'some listings' }]
     });
-    const sys = systemText(msgs);
-    assert.ok(!/Parameters:/.test(sys),
-      'on a synthesis turn the loop is pushing the model to WRITE, not to choose');
-    assert.match(sys, /short form/, 'and it must be told the list was shortened');
+    const turn3 = buildContext({
+      goal: 'find me jobs', agentName: 'rasha',
+      toolResults: [{ tool: 'jobs', result: 'some listings' }, { tool: 'search', result: 'more' }],
+      conversationHistory: [{ role: 'user', content: 'earlier' }, { role: 'assistant', content: 'reply' }],
+      memories: [{ type: 'preference', content: 'remote only' }]
+    });
+
+    assert.equal(first(turn2), first(turn1),
+      'arriving tool results must not perturb the cached prefix');
+    assert.equal(first(turn3), first(turn1),
+      'nor may memories or conversation history');
   });
 
+  test('volatile content sits after the prefix, never inside it', () => {
+    const msgs = buildContext({
+      goal: 'find me jobs', agentName: 'rasha',
+      toolResults: [{ tool: 'jobs', result: 'VOLATILE_RESULT' }],
+      memories: [{ type: 'x', content: 'VOLATILE_MEMORY' }]
+    });
+    assert.ok(!first(msgs).includes('VOLATILE_RESULT'));
+    assert.ok(!first(msgs).includes('VOLATILE_MEMORY'));
+    assert.match(systemText(msgs), /VOLATILE_RESULT/, 'still present, just later');
+  });
+
+  test('the catalogue rendering is a run-level policy, not a per-turn decision', () => {
+    // Whichever mode is configured, every turn must render the same way.
+    const withResults = buildContext({
+      goal: 'g', agentName: 'rasha', toolResults: [{ tool: 'jobs', result: 'x' }]
+    });
+    const without = buildContext({ goal: 'g', agentName: 'rasha' });
+    assert.equal(/Parameters:/.test(systemText(withResults)),
+      /Parameters:/.test(systemText(without)),
+      'schemas must not appear on one turn and vanish on the next');
+  });
+});
+
+describe('tool catalogue compaction', () => {
   test('compaction never hides a tool, only its schema', () => {
     // Dropping a tool entirely would make the one legitimate exception — the
     // goal genuinely needs a tool that has not run yet — unreachable.
@@ -154,22 +187,11 @@ describe('per-agent tool scoping', () => {
 });
 
 describe('the savings KPI', () => {
-  test('reports nothing saved when nothing was compacted', () => {
+  test('reports nothing saved when nothing was trimmed', () => {
     const stats = {};
     buildContext({ goal: 'g', agentName: 'rasha', stats });
     assert.equal(stats.charsSaved, 0);
-    assert.equal(stats.compactTools, false);
     assert.ok(stats.chars > 0);
-  });
-
-  test('counts the catalogue schemas that were not sent', () => {
-    const stats = {};
-    buildContext({
-      goal: 'g', agentName: 'rasha', stats,
-      toolResults: [{ tool: 'jobs', result: 'x' }]
-    });
-    assert.ok(stats.toolCatalogueCharsSaved > 0);
-    assert.ok(stats.compressionRatio > 0 && stats.compressionRatio < 1);
   });
 
   test('counts dropped history separately from the catalogue', () => {

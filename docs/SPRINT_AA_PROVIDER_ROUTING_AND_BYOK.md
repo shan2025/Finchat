@@ -119,18 +119,80 @@ Same replayed Rasha run throughout:
 | turn 2 prompt | 3,873 | 2,545 | **2,228** | −42% |
 | completion_reason | natural | natural | natural | |
 
+§0.4 then trades ~150 of those tokens back for a 78% cache hit rate — final
+figures at the end of that section.
+
 Suite: **271 tests, 0 failures.**
 
 Worth noting: at 5,047 tokens this run would now very nearly fit the *original*
 5,000 ceiling that failed. The budget fix stopped the bleeding; the context work
 removed most of the reason it was bleeding.
 
-**One honest caveat about the KPI.** `context_chars_saved` fell from 5,313 to
-1,464 after scoping, which reads backwards until you see why: it measures
-*compaction and history trimming*, and scoping shrank the baseline those act on.
-Scoping's saving shows up as a smaller prompt, not as a larger `charsSaved`. The
-column is the right KPI for context compression; it is not a total-savings
-figure, and should not be read as one.
+### 0.4 Prefix caching — shipped 2026-08-18, and it reversed part of §0.1
+
+**The per-turn compaction in §0.1 turned out to be measurably wrong. This is the
+correction.**
+
+DeepSeek caches an identical prompt prefix automatically. Verified by experiment
+before changing anything: resending the same 1,933-token prefix returned
+`prompt_cache_hit_tokens: 1920` — **99%**, billed at a fraction of the miss price.
+
+`ContextBuilder` already ordered stable content first (persona + schema +
+catalogue in message 1; memories, tool results, history, goal after). But §0.1
+rendered the catalogue *full* on turn 1 and *compact* once results arrived —
+changing message 1 mid-run and destroying the prefix precisely when it would
+have paid:
+
+| turn 2 | tokens | billed as |
+|---|---|---|
+| per-turn compaction (§0.1) | 2,228 | all cache-miss |
+| stable full catalogue | 2,581 | 1,664 cached |
+
+Saving 366 tokens forfeited a cache hit on the 1,664 before it. **The catalogue
+rendering is now a run-level policy, fixed for every turn**, and per-agent
+scoping (§0.2) is what makes "always full" cheap: nova 533 tok, rasha 575,
+aurelius 701. Full also keeps the parameter schemas, so tool selection carries
+no added risk at all.
+
+`TOOL_CATALOGUE_COMPACT=1` renders compact on every turn instead — still stable,
+still cacheable. That trade is only right if a provider *without* prefix caching
+becomes primary.
+
+**Measured on the same replayed run:**
+
+```
+turn 1   1,664 / 1,695 prompt tokens from cache   (98%)
+turn 2   1,664 / 2,581 prompt tokens from cache   (64%)
+         3,328 / 4,276 overall                     (78%)
+```
+
+Turn 1 hits because the prefix is stable **across runs too** — every
+conversation with the same agent shares it.
+
+`inference_metrics.cached_tokens` (migration 033) records this per call. It is
+the only way to *see* the invariant: anything perturbing the first system
+message — a timestamp, a reordered directive, a per-turn rendering — silently
+drops the hit rate to zero while every other metric looks healthy. **A run whose
+`cached_tokens` is 0 after the first turn has a prefix bug.**
+
+### 0.5 Two KPIs, two different things
+
+`context_chars_saved` now usually reads **0**, and that is correct rather than
+broken. It measures *compaction and history trimming*; with the catalogue stable
+and a short conversation, neither fires. Scoping's saving shows up as a smaller
+prompt, not a larger `charsSaved`.
+
+| question | column |
+|---|---|
+| Is the prompt small? | `executions.prompt_tokens_used` |
+| Did trimming fire? | `executions.context_chars_saved` |
+| Is caching working? | `inference_metrics.cached_tokens` |
+| Did the run fit its ceiling? | `executions.completion_reason` |
+
+Caching lowers **cost**; it does not lower `tokens_used`, because cached tokens
+still count. Compaction and scoping lower `tokens_used`, which is what protects
+the budget ceiling and the Groq/Gemini free tiers — neither of which caches
+automatically. Both matter, for different reasons.
 
 **Still not done:** the rules block (551 tok/turn) is emphatic anti-hallucination
 prose. It is repetitive and could be tightened, but every clause was added

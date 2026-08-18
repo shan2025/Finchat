@@ -30,20 +30,8 @@ function _firstSentence(text, cap = 150) {
  *
  * `compact` renders names and one-line purposes without parameter schemas.
  *
- * Why compact exists: this block is rebuilt and re-sent on EVERY iteration of
- * the reasoning loop, and it is the single largest thing in the request.
- * Measured 2026-08-18 for Rasha: 18 tools, 6,977 chars ≈ 1,744 tokens per turn,
- * of which 4,879 chars are descriptions and 1,972 are parameter schemas. On a
- * first turn with no history it was 99.7% of the whole prompt against a
- * 10-token question, and a verified 2-turn run spent 6,860 prompt tokens to
- * produce 1,133 of output — 86% of the budget re-reading its own instructions.
- *
- * It is applied only once tool results are already in hand. In that state the
- * loop is pushing the model to WRITE, not to choose — the accompanying
- * instruction is "you MUST use action respond now" — so the full parameter
- * schemas have no reader. The names stay so that the one legitimate exception
- * (the goal genuinely needs a different tool that has not run yet) is still
- * reachable, and inputs are simple strings by the schema's own rule.
+ * IMPORTANT: whichever rendering a run uses, it must use it for EVERY turn of
+ * that run. See CATALOGUE_COMPACT below for why.
  */
 function buildToolDescriptions(allowWeb = true, agentId = null, { compact = false, agentTools = null } = {}) {
   const tools = listTools({ allowWeb, agentId, agentTools });
@@ -61,7 +49,7 @@ function buildToolDescriptions(allowWeb = true, agentId = null, { compact = fals
     '\n\nNOTE: The user has turned OFF web access for this conversation, so open-web search/browsing tools are hidden. Your data tools (prices, jobs, papers, resume) still work. If the goal truly needs the open web, say so and ask the user to enable the WEB toggle.';
 
   const compactNote = compact
-    ? '\n(Tool list shown in short form — you already have results below. If you genuinely need a tool that has NOT run yet, name it and pass a simple string input.)'
+    ? '\n(Tool list shown in short form. Pass a simple string input unless the tool obviously needs more.)'
     : '';
 
   return `\n\nAVAILABLE TOOLS:\n${toolLines}${compactNote}${webNote}`;
@@ -193,6 +181,32 @@ const MIN_PER_TOOL = 300;
 // here the end of a conversation is its subject.
 const HISTORY_BUDGET_CHARS = parseInt(process.env.HISTORY_CONTEXT_BUDGET_CHARS || '8000', 10);
 
+// How the tool catalogue is rendered — for the WHOLE run, never per turn.
+//
+// This was briefly decided per turn: full while the model was still choosing a
+// tool, compact once results were in hand. It cut ~366 tokens off the second
+// turn and was measurably wrong, because it changed the first system message
+// mid-run and so destroyed the prompt prefix.
+//
+// DeepSeek caches an identical prefix automatically. Measured 2026-08-18:
+// resending the same 1,933-token prefix returned prompt_cache_hit_tokens 1920
+// — 99% of it, billed at a fraction. A prefix that changes between turns can
+// never hit, so saving 366 tokens on turn two forfeited a cache hit on the
+// ~1,000 tokens before it. The optimisation cost more than it saved.
+//
+// The catalogue is small enough for that to be the obvious trade now that each
+// agent is scoped to its own domain (measured, full rendering): nova 533 tok,
+// rasha 575, aurelius 701. Compacting those saves 326-451 tokens once, against
+// a cache hit worth far more on every subsequent turn — and full keeps the
+// parameter schemas, so tool selection carries no added risk at all.
+//
+// Set TOOL_CATALOGUE_COMPACT=1 to render compact for every turn instead. That
+// is still stable and still cacheable; it trades parameter schemas for a
+// smaller `tokens_used`, which is the right call only if a provider WITHOUT
+// automatic prefix caching becomes the primary. It is a policy switch, not a
+// per-turn decision — flipping it mid-run is the bug this constant documents.
+const CATALOGUE_COMPACT = process.env.TOOL_CATALOGUE_COMPACT === '1';
+
 /**
  * Keep the most recent conversation turns that fit the budget.
  *
@@ -298,9 +312,10 @@ function buildContext({
 }) {
   const messages = [];
 
-  // Compact the tool catalogue once results are in hand — see
-  // buildToolDescriptions for why this is safe only in that state.
-  const compactTools = toolResults.length > 0;
+  // Fixed for the whole run, deliberately NOT derived from toolResults — the
+  // first system message must be byte-identical on every turn or the provider's
+  // prefix cache can never hit. See CATALOGUE_COMPACT.
+  const compactTools = CATALOGUE_COMPACT;
 
   // 1. System prompt: agent persona + runtime style tuning + action schema
   const persona = getPersona(agentName);

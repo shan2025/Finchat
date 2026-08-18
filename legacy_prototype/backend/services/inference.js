@@ -306,16 +306,34 @@ const _sleep = async (ms) => {
  * so failures (incl. before migration 020 runs) are swallowed. Loaded lazily to
  * avoid a hard dependency on the DB at module load.
  */
-function recordInferenceMetric({ provider, model, feature, promptTokens, completionTokens, latencyMs, agentId, userId }) {
+function recordInferenceMetric({ provider, model, feature, promptTokens, completionTokens, latencyMs, agentId, userId, cachedTokens }) {
   try {
     const { query } = require('../database');
     query(`
       INSERT INTO inference_metrics
-        (provider, model, feature, prompt_tokens, completion_tokens, latency_ms, agent_id, user_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (provider, model, feature, prompt_tokens, completion_tokens, latency_ms, agent_id, user_id, cached_tokens)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [provider, model || '', feature || 'chat', promptTokens || 0, completionTokens || 0,
-      latencyMs || 0, agentId || null, userId || null]).catch(() => {});
+      latencyMs || 0, agentId || null, userId || null, cachedTokens || 0]).catch(() => {});
   } catch (err) { /* metrics are best-effort */ }
+}
+
+/**
+ * How many prompt tokens the provider served from its own prefix cache.
+ *
+ * DeepSeek reports this three ways depending on which field you read, and it is
+ * the whole reason the first system message must stay byte-identical across a
+ * run — measured 2026-08-18, a repeated 1,933-token prefix came back with
+ * prompt_cache_hit_tokens 1920. Recording it makes that either visibly working
+ * or visibly broken, rather than an assumption.
+ *
+ * Providers that do not cache simply report nothing, which reads as 0.
+ */
+function _cachedTokensFrom(usage = {}) {
+  return usage.prompt_cache_hit_tokens
+    || usage.prompt_tokens_details?.cached_tokens
+    || usage.cached_tokens
+    || 0;
 }
 
 /** Rough size of a message list, for logging and trim decisions. */
@@ -484,13 +502,15 @@ async function _runProviderChain({
         const response = await _callChatCompletions({
           baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode, style
         });
-        console.log(`⚡ ${providerName} inference successful [Model: ${gModel}]` +
-          (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : ''));
         const gUsage = response.data.usage || {};
+        const cachedTokens = _cachedTokensFrom(gUsage);
+        console.log(`⚡ ${providerName} inference successful [Model: ${gModel}]` +
+          (mi > 0 ? ` (fallback #${mi} — "${candidates[0]}" was unavailable)` : '') +
+          (cachedTokens ? ` (${cachedTokens}/${gUsage.prompt_tokens || 0} prompt tokens from cache)` : ''));
         recordInferenceMetric({
           provider: providerName, model: gModel, feature,
           promptTokens: gUsage.prompt_tokens || 0, completionTokens: gUsage.completion_tokens || 0,
-          latencyMs: Date.now() - startedAt, agentId, userId
+          latencyMs: Date.now() - startedAt, agentId, userId, cachedTokens
         });
         return {
           content: response.data.choices[0]?.message?.content || '',
