@@ -87,16 +87,40 @@ test('incrementUsage increments in SQL, never read-modify-write', async () => {
   const sql = q.calls[0].normalised;
   assert.match(sql, /iterations_used = iterations_used \+ \$1/);
   assert.match(sql, /tool_calls_used = tool_calls_used \+ \$2/);
-  assert.match(sql, /tokens_used = tokens_used \+ \$3/);
-  assert.deepEqual(q.calls[0].params, [1, 2, 300, 'exec_1']);
+  assert.match(sql, /\btokens_used = tokens_used \+ \$3/);
+  assert.match(sql, /prompt_tokens_used = prompt_tokens_used \+ \$4/);
+  assert.match(sql, /completion_tokens_used = completion_tokens_used \+ \$5/);
+  assert.match(sql, /context_chars_saved = context_chars_saved \+ \$6/);
+  assert.deepEqual(q.calls[0].params, [1, 2, 300, 0, 0, 0, 'exec_1']);
   assert.equal(q.calls.length, 1, 'must be a single statement, not a read then a write');
+});
+
+test('incrementUsage records the prompt/completion split alongside the total', async () => {
+  // tokens_used stays the TOTAL — it is what providers meter and what the budget
+  // is enforced against. The split is added detail: it is the only way to see
+  // that a run spent most of its budget re-reading its own context (88% on the
+  // measured Rasha run) rather than producing anything. See migration 031.
+  const q = fakeQuery([ROW]);
+  const repo = createExecutionRepository({ query: q });
+  await repo.incrementUsage('exec_1',
+    { iterations: 1, tokens: 4751, promptTokens: 3873, completionTokens: 878 });
+  assert.deepEqual(q.calls[0].params, [1, 0, 4751, 3873, 878, 0, 'exec_1']);
+});
+
+test('incrementUsage accumulates context savings across turns', async () => {
+  // The saving is per-turn and the loop runs several, so it accumulates in SQL
+  // exactly like the token counters. See migration 032.
+  const q = fakeQuery([ROW]);
+  const repo = createExecutionRepository({ query: q });
+  await repo.incrementUsage('exec_1', { iterations: 1, contextCharsSaved: 4577 });
+  assert.deepEqual(q.calls[0].params, [1, 0, 0, 0, 0, 4577, 'exec_1']);
 });
 
 test('incrementUsage defaults every counter to zero', async () => {
   const q = fakeQuery([ROW]);
   const repo = createExecutionRepository({ query: q });
   await repo.incrementUsage('exec_1');
-  assert.deepEqual(q.calls[0].params, [0, 0, 0, 'exec_1']);
+  assert.deepEqual(q.calls[0].params, [0, 0, 0, 0, 0, 0, 'exec_1']);
 });
 
 test.describe('sweepStale', () => {

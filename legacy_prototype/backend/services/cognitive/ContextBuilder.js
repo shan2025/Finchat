@@ -10,11 +10,47 @@ const { listTools } = require('./ToolRegistry');
  * out of the prompt for agents that may not run them, so they stop planning
  * steps that can only fail.
  */
-function buildToolDescriptions(allowWeb = true, agentId = null) {
-  const tools = listTools({ allowWeb, agentId });
+// First sentence of a tool description — the "what it does", without the
+// "when to use it" coaching that follows. Falls back to a hard character cap
+// for descriptions written without sentence breaks.
+function _firstSentence(text, cap = 150) {
+  const s = String(text || '');
+  const end = s.search(/\.\s/);
+  const first = end > 0 ? s.slice(0, end + 1) : s;
+  return first.length > cap ? `${first.slice(0, cap).trimEnd()}…` : first;
+}
+
+/**
+ * Build a tool description block for the system prompt.
+ *
+ * `agentId` is the persona key ('plato', 'nova', …), which is the same
+ * namespace as tool_permissions.agent_id. Passing it keeps host-access tools
+ * out of the prompt for agents that may not run them, so they stop planning
+ * steps that can only fail.
+ *
+ * `compact` renders names and one-line purposes without parameter schemas.
+ *
+ * Why compact exists: this block is rebuilt and re-sent on EVERY iteration of
+ * the reasoning loop, and it is the single largest thing in the request.
+ * Measured 2026-08-18 for Rasha: 18 tools, 6,977 chars ≈ 1,744 tokens per turn,
+ * of which 4,879 chars are descriptions and 1,972 are parameter schemas. On a
+ * first turn with no history it was 99.7% of the whole prompt against a
+ * 10-token question, and a verified 2-turn run spent 6,860 prompt tokens to
+ * produce 1,133 of output — 86% of the budget re-reading its own instructions.
+ *
+ * It is applied only once tool results are already in hand. In that state the
+ * loop is pushing the model to WRITE, not to choose — the accompanying
+ * instruction is "you MUST use action respond now" — so the full parameter
+ * schemas have no reader. The names stay so that the one legitimate exception
+ * (the goal genuinely needs a different tool that has not run yet) is still
+ * reachable, and inputs are simple strings by the schema's own rule.
+ */
+function buildToolDescriptions(allowWeb = true, agentId = null, { compact = false, agentTools = null } = {}) {
+  const tools = listTools({ allowWeb, agentId, agentTools });
   if (tools.length === 0) return '';
 
   const toolLines = tools.map(t => {
+    if (compact) return `  - "${t.name}": ${_firstSentence(t.description)}`;
     const params = t.inputSchema?.properties
       ? Object.entries(t.inputSchema.properties).map(([k, v]) => `${k} (${v.type}): ${v.description || ''}`).join(', ')
       : 'no parameters';
@@ -24,14 +60,18 @@ function buildToolDescriptions(allowWeb = true, agentId = null) {
   const webNote = allowWeb ? '' :
     '\n\nNOTE: The user has turned OFF web access for this conversation, so open-web search/browsing tools are hidden. Your data tools (prices, jobs, papers, resume) still work. If the goal truly needs the open web, say so and ask the user to enable the WEB toggle.';
 
-  return `\n\nAVAILABLE TOOLS:\n${toolLines}${webNote}`;
+  const compactNote = compact
+    ? '\n(Tool list shown in short form — you already have results below. If you genuinely need a tool that has NOT run yet, name it and pass a simple string input.)'
+    : '';
+
+  return `\n\nAVAILABLE TOOLS:\n${toolLines}${compactNote}${webNote}`;
 }
 
 /**
  * The unified action schema per Phase 3 spec, now with tool descriptions from ToolRegistry.
  */
-function getActionSchema(allowWeb = true, studyMode = false, agentId = null) {
-  const toolBlock = buildToolDescriptions(allowWeb, agentId);
+function getActionSchema(allowWeb = true, studyMode = false, agentId = null, { compactTools = false, agentTools = null } = {}) {
+  const toolBlock = buildToolDescriptions(allowWeb, agentId, { compact: compactTools, agentTools });
 
   // Study Mode adds one optional sibling field. It has to be advertised here
   // as well as in the directive — the model follows the shape it is shown.
@@ -137,6 +177,44 @@ const TOOL_BLOCK_BUDGET = parseInt(process.env.TOOL_CONTEXT_BUDGET_CHARS || '120
 // to prevent.
 const MIN_PER_TOOL = 300;
 
+// Character budget for prior conversation turns.
+//
+// This was previously unbounded: every message of the session was appended in
+// full, on every iteration of the loop, forever. A long-running chat therefore
+// grew its own per-turn cost without limit, and because the prompt is re-sent
+// and re-charged each iteration the growth is paid several times per answer.
+// It had not yet shown up as the dominant cost (the tool catalogue is bigger in
+// a fresh session) which is exactly why it was worth capping before it did.
+//
+// Trimming keeps the MOST RECENT turns: the tail is what the current question
+// refers back to, where the head is usually a topic the user has moved on from.
+// That is the opposite of the tool-result packer above, which keeps heads —
+// deliberately, because there the head of a document is its summary, whereas
+// here the end of a conversation is its subject.
+const HISTORY_BUDGET_CHARS = parseInt(process.env.HISTORY_CONTEXT_BUDGET_CHARS || '8000', 10);
+
+/**
+ * Keep the most recent conversation turns that fit the budget.
+ *
+ * Returns the kept messages plus how many were dropped, so the caller can tell
+ * the model that older turns exist rather than letting it assume the
+ * conversation began where the window starts.
+ */
+function packHistory(history, budget = HISTORY_BUDGET_CHARS) {
+  if (!Array.isArray(history) || history.length === 0) return { kept: [], dropped: 0 };
+  const kept = [];
+  let used = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const size = String(history[i]?.content || '').length;
+    // Always keep at least the latest exchange, however large, so a single long
+    // message cannot leave the model with no conversational context at all.
+    if (used + size > budget && kept.length > 0) break;
+    kept.unshift(history[i]);
+    used += size;
+  }
+  return { kept, dropped: history.length - kept.length };
+}
+
 /**
  * Fit tool results into a fixed character budget.
  *
@@ -207,9 +285,22 @@ function buildContext({
   traits = null,
   userPreferences = [],
   allowWeb = true,
-  studyMode = false
+  studyMode = false,
+  // This agent's configured tool domain, from agent_configs.tools. Passed in
+  // because the caller already holds the config — see listTools.
+  agentTools = null,
+  // Populated in place with what this build cost and what it saved, so the
+  // effect of context work is measurable instead of "the prompt feels smaller".
+  // An out-parameter rather than a changed return type: buildContext returns a
+  // message array to several callers and a test harness, and none of them
+  // should have to change to make a KPI available.
+  stats = null
 }) {
   const messages = [];
+
+  // Compact the tool catalogue once results are in hand — see
+  // buildToolDescriptions for why this is safe only in that state.
+  const compactTools = toolResults.length > 0;
 
   // 1. System prompt: agent persona + runtime style tuning + action schema
   const persona = getPersona(agentName);
@@ -219,7 +310,9 @@ function buildContext({
 
   // agentName is the persona key, which doubles as the permission agent_id —
   // so the tool block shown to this agent matches what it may actually run.
-  const actionSchema = budgetExceeded ? BUDGET_EXCEEDED_SCHEMA : getActionSchema(allowWeb, studyMode, agentName);
+  const actionSchema = budgetExceeded
+    ? BUDGET_EXCEEDED_SCHEMA
+    : getActionSchema(allowWeb, studyMode, agentName, { compactTools, agentTools });
   const traitDirective = budgetExceeded ? '' : buildTraitDirective(traits);
   // Preferences survive a breached budget: "keep it short" matters MORE when
   // the answer is being cut off, and dropping "explain it simply" mid-session
@@ -305,8 +398,19 @@ function buildContext({
     });
   }
 
-  // 4. Conversation history
-  for (const msg of conversationHistory) {
+  // 4. Conversation history, most-recent-first within a fixed budget.
+  const { kept: keptHistory, dropped: droppedTurns } = packHistory(conversationHistory);
+  if (droppedTurns > 0) {
+    // Say that the window was trimmed. Without this the model reads the oldest
+    // kept turn as the start of the conversation and can contradict something
+    // it agreed to earlier, which is worse than admitting the gap.
+    messages.push({
+      role: 'system',
+      content: `--- EARLIER CONVERSATION TRIMMED ---\n${droppedTurns} older message(s) are not shown. ` +
+        `If the user refers to something you cannot see, say so and ask them to restate it rather than guessing.`
+    });
+  }
+  for (const msg of keptHistory) {
     messages.push({ role: msg.role, content: msg.content });
   }
 
@@ -316,13 +420,42 @@ function buildContext({
     content: goal
   });
 
+  if (stats && typeof stats === 'object') {
+    const chars = messages.reduce((n, m) => n + String(m.content || '').length, 0);
+    // What the same request would have cost built the old way. Only the two
+    // reductions are counted, and each is measured rather than assumed: the
+    // catalogue delta is the real difference between the two renderings, and
+    // the history delta is the real size of what was dropped.
+    const fullTools = compactTools && !budgetExceeded
+      ? buildToolDescriptions(allowWeb, agentName, { compact: false, agentTools }).length -
+        buildToolDescriptions(allowWeb, agentName, { compact: true, agentTools }).length
+      : 0;
+    const droppedChars = conversationHistory
+      .slice(0, conversationHistory.length - keptHistory.length)
+      .reduce((n, m) => n + String(m?.content || '').length, 0);
+
+    stats.chars = chars;
+    stats.charsSaved = fullTools + droppedChars;
+    stats.toolCatalogueCharsSaved = fullTools;
+    stats.historyCharsSaved = droppedChars;
+    stats.droppedTurns = droppedTurns;
+    stats.compactTools = compactTools;
+    // Share of what an un-optimised build of this same turn would have cost.
+    stats.compressionRatio = (chars + stats.charsSaved) > 0
+      ? Number((stats.charsSaved / (chars + stats.charsSaved)).toFixed(4))
+      : 0;
+  }
+
   return messages;
 }
 
 module.exports = {
   buildContext,
   packToolResults,
+  packHistory,
+  buildToolDescriptions,
   TOOL_BLOCK_BUDGET,
+  HISTORY_BUDGET_CHARS,
   buildTraitDirective,
   buildPreferenceDirective,
   getActionSchema,

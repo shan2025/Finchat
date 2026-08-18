@@ -14,6 +14,20 @@ const { query } = require('../../database');
 // Community sources whose facts must be treated as unverified opinion.
 const UNVERIFIED_TOOLS = new Set(['reddit', 'quora']);
 
+// Shown when the loop stopped on its own ceiling having produced no prose at
+// all. The old wording — "Budget exceeded. Here is my best response given the
+// constraints." — promised a response that by definition is not there: this
+// string is only ever used when the model wrote nothing. It read to users as
+// the system being out of credit, which sent every report of it toward the
+// provider quota rather than toward the ceiling that actually stopped the run.
+//
+// Say what happened, and say what the user can do about it. "think hard" is a
+// real escape hatch — see the dynamicBudget keywords in services/aiChat.js.
+const BUDGET_EXHAUSTED_MESSAGE =
+  'I hit my per-answer limit for this one before I could finish writing it. ' +
+  'Ask me again and I\'ll pick up where I left off — or start your message with ' +
+  '"think hard" to give me a bigger budget for a heavier question.';
+
 /**
  * Walk the accumulated tool results and pull out the citable sources (title + url)
  * the agent actually consulted, so the chat UI can show "where this came from"
@@ -132,43 +146,74 @@ async function _runWithinStallClock({
   approvedTools = [],
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
-  // 1. Create execution record.
-  // Overrides are applied on "is it a number", not on truthiness: a caller that
-  // asks for 0 of something means 0, and silently swapping that for the default
-  // is how a deliberately tight budget turns into a generous one.
-  const override = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
-  const execution = await createExecution({
-    userId,
-    conversationId,
-    goal,
-    assignedAgent: agentName,
-    ...(override(budget.maxIterations) ? { maxIterations: Number(budget.maxIterations) } : {}),
-    ...(override(budget.maxToolCalls) ? { maxToolCalls: Number(budget.maxToolCalls) } : {}),
-    ...(override(budget.maxTokens) ? { maxTokens: Number(budget.maxTokens) } : {}),
-    ...(override(budget.maxRuntimeSeconds) ? { maxRuntimeSeconds: Number(budget.maxRuntimeSeconds) } : {})
-  });
-  const execId = execution.execution_id;
-  const toolContext = { userId, agentName, conversationId };
-  let pendingApproval = null; // set when a requires_approval tool was attempted
-  let hasPlanned = false;     // one plan per execution (re-plan loop guard)
-
-  // Load this agent's runtime tuning (risk + traits + optional per-agent model) once.
-  // risk → LLM temperature; traits → style directive; model → which Groq model to use.
+  // Load this agent's runtime tuning (risk + traits + optional per-agent model
+  // and budget) once, BEFORE the execution row is created — the budget it may
+  // carry has to be in hand at createExecution time or it cannot apply.
+  // risk → LLM temperature; traits → style directive; model → which Groq model
+  // to use; budget → this agent's ceilings.
   let agentTraits = null;
   let agentTemperature = 0.7;
   let agentModel = null;
+  let agentBudget = {};
+  // This agent's tool domain, so the prompt advertises the tools it is actually
+  // for rather than all 18. Read from the same config load, not a second query.
+  let agentTools = null;
   try {
     const { getAgentConfig } = require('../agents/AgentRegistry');
     const cfg = await getAgentConfig(agentName);
+    if (cfg && Array.isArray(cfg.tools) && cfg.tools.length > 0) agentTools = cfg.tools;
     if (cfg && cfg.runtimeSettings) {
       agentTraits = cfg.runtimeSettings;
       const RISK_TEMP = { Low: 0.3, Medium: 0.7, High: 1.0 };
       if (RISK_TEMP[agentTraits.risk] != null) agentTemperature = RISK_TEMP[agentTraits.risk];
       if (typeof agentTraits.model === 'string' && agentTraits.model.trim()) agentModel = agentTraits.model.trim();
+      if (agentTraits.budget && typeof agentTraits.budget === 'object') agentBudget = agentTraits.budget;
     }
   } catch (cfgErr) {
     console.warn(`⚠️ CognitiveCore: could not load runtime settings for ${agentName}: ${cfgErr.message}`);
   }
+
+  // 1. Create execution record.
+  // Overrides are applied on "is it a number", not on truthiness: a caller that
+  // asks for 0 of something means 0, and silently swapping that for the default
+  // is how a deliberately tight budget turns into a generous one.
+  const override = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
+
+  // Precedence: what the CALLER asked for beats what the AGENT is configured
+  // for, which beats the framework default.
+  //
+  // The caller keeps winning because the callers that set a budget set it for a
+  // reason they know and the agent config does not — briefing.js sizes 40k for a
+  // multi-tool research run, MissionScheduler passes the mission's own
+  // max_tokens_per_run. Slotting the agent config underneath them changes
+  // nothing for those paths.
+  //
+  // What it DOES change is the path with no caller budget at all: interactive
+  // chat. Every specialist ran on the bare framework default there, because
+  // nothing in the chat path had ever set one — which is the whole reason Rasha
+  // and Aurelius were capped at 5,000 while Plato and Nova got 15k-40k from
+  // their callers. An agent can now carry its own working budget.
+  const effectiveBudget = {
+    maxIterations: override(budget.maxIterations) ? budget.maxIterations : agentBudget.maxIterations,
+    maxToolCalls: override(budget.maxToolCalls) ? budget.maxToolCalls : agentBudget.maxToolCalls,
+    maxTokens: override(budget.maxTokens) ? budget.maxTokens : agentBudget.maxTokens,
+    maxRuntimeSeconds: override(budget.maxRuntimeSeconds) ? budget.maxRuntimeSeconds : agentBudget.maxRuntimeSeconds
+  };
+
+  const execution = await createExecution({
+    userId,
+    conversationId,
+    goal,
+    assignedAgent: agentName,
+    ...(override(effectiveBudget.maxIterations) ? { maxIterations: Number(effectiveBudget.maxIterations) } : {}),
+    ...(override(effectiveBudget.maxToolCalls) ? { maxToolCalls: Number(effectiveBudget.maxToolCalls) } : {}),
+    ...(override(effectiveBudget.maxTokens) ? { maxTokens: Number(effectiveBudget.maxTokens) } : {}),
+    ...(override(effectiveBudget.maxRuntimeSeconds) ? { maxRuntimeSeconds: Number(effectiveBudget.maxRuntimeSeconds) } : {})
+  });
+  const execId = execution.execution_id;
+  const toolContext = { userId, agentName, conversationId };
+  let pendingApproval = null; // set when a requires_approval tool was attempted
+  let hasPlanned = false;     // one plan per execution (re-plan loop guard)
 
   // Standing user preferences ("explain it like I'm a child", "keep it short").
   // Loaded ONCE per execution rather than inside the retrieval bundle: unlike
@@ -213,6 +258,7 @@ async function _runWithinStallClock({
     // Sprint X Stage 2 — explainability: which memories/graph nodes fed this answer
     const traceConcepts = new Map();
     let traceMemories = 0, traceRecipes = 0;
+
 
     // 3. Reasoning loop — now supports tool cycling.
     //
@@ -293,6 +339,7 @@ async function _runWithinStallClock({
       traceRecipes = Math.max(traceRecipes, (enriched.recipeHints || []).length);
 
       // 3c. Build context (includes memories + tool results + graph + recipes)
+      const ctxStats = {};
       const messages = buildContext({
         goal,
         agentName,
@@ -306,7 +353,9 @@ async function _runWithinStallClock({
         traits: agentTraits,
         userPreferences,
         allowWeb,
-        studyMode
+        studyMode,
+        agentTools,
+        stats: ctxStats
       });
 
       // 3c. Run reasoning turn (temperature comes from the agent's risk setting;
@@ -341,7 +390,16 @@ async function _runWithinStallClock({
       // turn actually cost. Tokens can only be counted after the call, so a
       // single turn may still land above the token ceiling; what is enforced is
       // that no further turn is started once it has.
-      const usage = await incrementUsage(execId, { iterations: 1, tokens: result.tokens || 0 });
+      const usage = await incrementUsage(execId, {
+        iterations: 1,
+        tokens: result.tokens || 0,
+        promptTokens: result.promptTokens || 0,
+        completionTokens: result.completionTokens || 0,
+        // Accumulates across turns for the same reason the token counters do:
+        // the saving is per-turn and the loop runs several. This is the KPI for
+        // context work — see migration 032.
+        contextCharsSaved: ctxStats.charsSaved || 0
+      });
       const spent = evaluateBudget(usage);
       maxTurnTokens = Math.max(maxTurnTokens, Number(result.tokens) || 0);
 
@@ -361,7 +419,7 @@ async function _runWithinStallClock({
       // us with nothing to deliver.
       if (verdict.breached || spent.breached) {
         const written = withStudyBlocks(result.action);
-        finalResponse = written || 'Budget exceeded. Here is my best response given the constraints.';
+        finalResponse = written || BUDGET_EXHAUSTED_MESSAGE;
         completionReason = (written && !result.fallback) ? 'natural' : 'budget_exceeded';
         break;
       }
@@ -405,7 +463,7 @@ async function _runWithinStallClock({
       // it produced rather than launching a plan or a tool call we cannot pay
       // for — and rather than falling out of the loop with no response at all.
       if (lastTurn) {
-        finalResponse = withStudyBlocks(result.action) || 'Budget exceeded. Here is my best response given the constraints.';
+        finalResponse = withStudyBlocks(result.action) || BUDGET_EXHAUSTED_MESSAGE;
         completionReason = 'budget_exceeded';
         break;
       }

@@ -335,7 +335,12 @@ test.describe('the reasoning loop stops at its ceiling', () => {
     // what must hold is that the row says the run failed, because that is the
     // field MissionScheduler's FAILED_REASONS gate reads before delivering.
     assert.equal(h.repo.only().completion_reason, 'budget_exceeded');
-    assert.match(out.response, /Budget exceeded/);
+    // Any of the three ceiling placeholders is acceptable here, for the reason
+    // given above — the point of the test is the completion_reason, not the
+    // prose. Matching one exact sentence made this fail when the user-facing
+    // wording was corrected, which is a test tracking copy rather than behaviour.
+    assert.match(out.response,
+      /per-answer limit|Budget exceeded during plan|Iteration budget exhausted/);
     assert.equal(h.calls.executeTool.length, 0, 'nothing was gathered to write from');
   });
 

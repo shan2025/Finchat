@@ -68,16 +68,27 @@ function createExecutionRepository({ query } = {}) {
     },
 
     /** Incremented in SQL, not read-modify-write, so concurrent turns cannot lose a count. */
-    async incrementUsage(executionId, { iterations = 0, toolCalls = 0, tokens = 0 } = {}) {
+    // `tokens` stays the TOTAL — it is what the providers meter and what the
+    // budget is enforced against. promptTokens/completionTokens are the same
+    // spend broken down, recorded so it is possible to see how much of a run's
+    // cost was re-reading its own context rather than producing anything. They
+    // default to 0, so a caller that only knows the total still works.
+    async incrementUsage(executionId, {
+      iterations = 0, toolCalls = 0, tokens = 0, promptTokens = 0, completionTokens = 0,
+      contextCharsSaved = 0
+    } = {}) {
       const res = await run(
         `UPDATE executions
             SET iterations_used = iterations_used + $1,
                 tool_calls_used = tool_calls_used + $2,
                 tokens_used = tokens_used + $3,
+                prompt_tokens_used = prompt_tokens_used + $4,
+                completion_tokens_used = completion_tokens_used + $5,
+                context_chars_saved = context_chars_saved + $6,
                 updated_at = now()
-          WHERE execution_id = $4
+          WHERE execution_id = $7
           RETURNING *;`,
-        [iterations, toolCalls, tokens, executionId]);
+        [iterations, toolCalls, tokens, promptTokens, completionTokens, contextCharsSaved, executionId]);
       return res.rows[0] || null;
     },
 

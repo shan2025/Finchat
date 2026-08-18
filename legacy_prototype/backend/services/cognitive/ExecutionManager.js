@@ -53,8 +53,28 @@ function createExecutionManager({ repository = executionRepository } = {}) {
     assignedAgent = null,
     maxIterations = 8,
     maxToolCalls = 5,
-    maxTokens = 5000,
-    maxRuntimeSeconds = 60,
+    // 15000, raised from 5000 on 2026-08-18. The old figure was sized for a
+    // single turn of a model that has since been decommissioned, and it silently
+    // became the ceiling for every agent no caller bothered to budget for.
+    //
+    // What it costs to run one turn now, measured over 397 live chat calls:
+    // 1,947 prompt + 667 completion = 2,614 tokens on the current primary. The
+    // prompt is re-sent and re-charged on EVERY iteration, so the loop's real
+    // cost is roughly 2.6k x iterations. At 5000 the second turn breached before
+    // it could write anything, which is how Rasha spent 5,266 tokens against a
+    // 5,000 ceiling and answered "Budget exceeded" to a two-word question —
+    // over by one tenth of one turn. Aurelius's SUCCESSFUL runs averaged 5,835
+    // against the same ceiling and only survived on the reserved wrap-up turn.
+    //
+    // 15000 is about five honest turns. It cannot run away: maxIterations above
+    // and LOOP_SAFETY_NET in CognitiveCore bound the loop independently of
+    // tokens, so this raises the cost of a pathological run, not of a normal one.
+    maxTokens = 15000,
+    // 60s was the matching too-tight default: a run that makes two tool calls
+    // and three reasoning turns cannot finish inside it once a provider is
+    // anything but instant. Stall time (rate-limit backoff) is already
+    // discounted via StallClock, so this measures working time only.
+    maxRuntimeSeconds = 120,
   }) {
     const id = executionId || `exec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
@@ -133,8 +153,13 @@ function createExecutionManager({ repository = executionRepository } = {}) {
   /**
    * Increment usage counters atomically.
    */
-  async function incrementUsage(executionId, { iterations = 0, toolCalls = 0, tokens = 0 } = {}) {
-    const row = await repository.incrementUsage(executionId, { iterations, toolCalls, tokens });
+  async function incrementUsage(executionId, {
+    iterations = 0, toolCalls = 0, tokens = 0, promptTokens = 0, completionTokens = 0,
+    contextCharsSaved = 0
+  } = {}) {
+    const row = await repository.incrementUsage(executionId, {
+      iterations, toolCalls, tokens, promptTokens, completionTokens, contextCharsSaved
+    });
     if (!row) {
       throw new Error(`Execution not found for usage increment: ${executionId}`);
     }

@@ -16,18 +16,30 @@ const {
   providerOrderFor, WORKLOAD_ROUTES, IMPATIENT_WORKLOADS
 } = require('../services/inference');
 
-const ALL_PROVIDERS = ['groq', 'gemini', 'deepseek'];
+const ALL_PROVIDERS = ['groq', 'gemini', 'deepseek', 'mistral'];
 
 describe('per-workload provider routing', () => {
-  test('interactive chat prefers a different provider than scheduled research', () => {
-    const chat = providerOrderFor('chat')[0];
-    const briefing = providerOrderFor('briefing')[0];
-    const mission = providerOrderFor('mission')[0];
+  test('interactive chat and scheduled research do not share one pool', () => {
+    const chat = providerOrderFor('chat');
+    const briefing = providerOrderFor('briefing');
+    const mission = providerOrderFor('mission');
 
-    assert.notStrictEqual(chat, briefing,
-      'chat and briefing must not lead with the same provider, or they share one pool');
-    assert.strictEqual(briefing, mission,
-      'both scheduled workloads should lead with the same provider');
+    // This used to assert the two must not LEAD with the same provider. That was
+    // the right guard while every provider was a free tier with a hard daily
+    // cliff. DeepSeek is paid and has no daily cliff, so sharing it as the
+    // primary is safe — and it is deliberately shared, because it is the fastest
+    // path for chat and the most reliable one for research.
+    //
+    // The hazard the original test was written for has moved one step down the
+    // chain rather than disappearing: on the day the balance runs out, both
+    // routes fall through at the same instant. If they fell through to the SAME
+    // provider they would starve each other exactly as they did on 2026-08-17.
+    // So the invariant is now about the fallback, which is where it bites.
+    assert.notStrictEqual(chat[1], briefing[1],
+      'chat and briefing must diverge at their first fallback, or they collapse ' +
+      'into one pool the moment the shared primary runs out');
+    assert.deepStrictEqual(briefing, mission,
+      'both scheduled workloads should draw on the same order');
   });
 
   test('every workload can still reach every provider', () => {

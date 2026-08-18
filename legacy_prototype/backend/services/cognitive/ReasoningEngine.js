@@ -184,6 +184,8 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
         provider: 'system',
         model: 'fallback',
         tokens: 0,
+        promptTokens: 0,
+        completionTokens: 0,
         retried: true,
         fallback: true
       };
@@ -199,6 +201,10 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
       provider: firstResult.provider,
       model: firstResult.model,
       tokens: firstResult.tokens || 0,
+      // Carried alongside the total so the execution row can record how much of
+      // a turn was context re-read versus text produced. See migration 031.
+      promptTokens: firstResult.promptTokens || 0,
+      completionTokens: firstResult.completionTokens || 0,
       retried: false,
       fallback: false
     };
@@ -237,6 +243,11 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
         provider: retryResult.provider,
         model: retryResult.model,
         tokens: (firstResult.tokens || 0) + (retryResult.tokens || 0),
+        // A corrective retry re-sends the whole conversation, so BOTH calls'
+        // prompts are charged. Summing them is what makes the re-read cost of a
+        // retry visible instead of hiding inside the total.
+        promptTokens: (firstResult.promptTokens || 0) + (retryResult.promptTokens || 0),
+        completionTokens: (firstResult.completionTokens || 0) + (retryResult.completionTokens || 0),
         retried: true,
         fallback: false
       };
@@ -280,6 +291,8 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
     provider: firstResult.provider,
     model: firstResult.model,
     tokens: firstResult.tokens || 0,
+    promptTokens: firstResult.promptTokens || 0,
+    completionTokens: firstResult.completionTokens || 0,
     retried: true,
     fallback: true
   };

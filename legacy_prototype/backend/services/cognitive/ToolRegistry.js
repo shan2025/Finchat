@@ -509,6 +509,16 @@ const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
 /** The one agent permitted to hold host-access tools. Must match migration 026. */
 const ADMIN_AGENT_ID = 'plato';
 
+// Tools every agent keeps regardless of its configured domain.
+//
+// These are not a convenience: the RULES block in ContextBuilder ORDERS the
+// model to verify any specific named work, person or organisation with
+// `wikipedia` for encyclopedic subjects and `search` otherwise, before stating
+// facts about it. Scoping either of them away from an agent would leave the
+// prompt commanding a tool the same prompt never showed it — which the model
+// resolves by either ignoring the rule or inventing the call.
+const ALWAYS_AVAILABLE_TOOLS = new Set(['search', 'wikipedia']);
+
 /**
  * List registered tools for injecting into system prompts.
  *
@@ -530,12 +540,38 @@ const ADMIN_AGENT_ID = 'plato';
  * would make prompt building async and add a DB round-trip to every turn, and
  * ToolManager still enforces those rows at call time. A tool shown here can
  * still be refused; nothing shown here is refused for the admin agent.
+ *
+ * `agentTools` narrows the catalogue to one agent's domain. It is PASSED IN
+ * rather than read here for the same reason as above: the caller already has
+ * the agent config in hand, and looking it up here would make prompt building
+ * async.
+ *
+ * The lists come from `agent_configs.tools`, which has always held curated
+ * per-agent sets (aurelius: stocks/crypto/commodities/news/watchlist; rasha:
+ * jobs/resume/apply_draft; nova: paper/crawl/news) — nothing ever consulted
+ * them, so every agent was shown all 18 research tools on every turn. Rasha,
+ * a careers agent, carried forex and commodities schemas in every request at
+ * ~1,744 tokens for the block.
+ *
+ * An EMPTY or missing list means "not configured", not "no tools". The two are
+ * indistinguishable in the data, and guessing toward "none" would silently
+ * strip an agent of every capability it has — so an unconfigured agent keeps
+ * the full set and loses nothing.
  */
-function listTools({ allowWeb = true, agentId = null } = {}) {
+function listTools({ allowWeb = true, agentId = null, agentTools = null } = {}) {
   const isAdmin = agentId === ADMIN_AGENT_ID;
+  // The orchestrator is exempt: it is the fallback for every goal no specialist
+  // matched, so it must be able to reach anything. Its own row lists only
+  // ["search"], which as a restriction would break exactly the case it exists
+  // to handle.
+  const scoped = !isAdmin && Array.isArray(agentTools) && agentTools.length > 0
+    ? new Set([...agentTools, ...ALWAYS_AVAILABLE_TOOLS])
+    : null;
+
   return Object.values(TOOLS)
     .filter(t => allowWeb || !t.web)
     .filter(t => isAdmin || !ADVANCED_SYSTEM_TOOLS.has(t.name))
+    .filter(t => !scoped || scoped.has(t.name))
     .map(t => ({
       name: t.name,
       description: t.description,
@@ -553,5 +589,5 @@ function getToolNames() {
 
 module.exports = {
   TOOLS, getToolMeta, listTools, getToolNames,
-  ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID
+  ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID, ALWAYS_AVAILABLE_TOOLS
 };

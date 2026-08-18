@@ -111,8 +111,12 @@ test.describe('lifecycle', () => {
     const [, i] = repo.calls.find(c => c[0] === 'insert');
     assert.equal(i.maxIterations, 8);
     assert.equal(i.maxToolCalls, 5);
-    assert.equal(i.maxTokens, 5000);
-    assert.equal(i.maxRuntimeSeconds, 60);
+    // Raised from 5000/60s on 2026-08-18. One reasoning turn measures ~2,614
+    // tokens against live traffic (the prompt is re-sent and re-charged every
+    // iteration), so 5000 could not fund a second turn and agents with no
+    // caller-supplied budget answered "Budget exceeded" to ordinary questions.
+    assert.equal(i.maxTokens, 15000);
+    assert.equal(i.maxRuntimeSeconds, 120);
   });
 
   test('getExecution throws when the row is missing', async () => {

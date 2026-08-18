@@ -98,6 +98,20 @@ const PROVIDERS = [
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1/chat/completions',
     models: (process.env.DEEPSEEK_MODELS || 'deepseek-chat')
       .split(',').map(s => s.trim()).filter(Boolean)
+  },
+  {
+    // Mistral — free tier, ~1B tokens/month at roughly one request per second.
+    // It earns its place by being a different model FAMILY on different
+    // infrastructure: Groq and Gemini can both be having a bad day at once (106
+    // "unavailable across providers" failures in the 14 days to 2026-08-18),
+    // and a fourth name from the same two vendors would not have helped.
+    // Verified against json_object mode on 2026-08-18 before being added.
+    name: 'mistral',
+    style: 'openai',
+    apiKey: process.env.MISTRAL_API_KEY,
+    baseUrl: process.env.MISTRAL_BASE_URL || 'https://api.mistral.ai/v1/chat/completions',
+    models: (process.env.MISTRAL_MODELS || 'mistral-small-latest')
+      .split(',').map(s => s.trim()).filter(Boolean)
   }
 ];
 
@@ -123,18 +137,71 @@ function _usableKey(key) {
 // These are ORDERS, not exclusives — every route still falls through to the
 // others, so a spent Groq day degrades a briefing to Gemini rather than
 // failing it. Override any of them from the environment.
+//
+// DeepSeek now leads every route. It is the only PAID provider on the bench (a
+// funded $2 balance as of 2026-08-18), which buys two things the free tiers
+// cannot: no daily token cliff, and no shared-quota interference between
+// workloads. Groq and Gemini become what they are good at — free capacity to
+// fall back on. Chat in particular had been leading with Gemini, which measured
+// 16-33s per call against Groq's 6.2s, and that ordering was the single largest
+// contributor to "answers take a long time".
+//
+// The balance is finite where the free tiers are not, so if it starts draining
+// faster than expected the lever is INFERENCE_ROUTE_BRIEFING and
+// INFERENCE_ROUTE_MISSION in .env: put `groq` first there and the token-hungry
+// research runs (25k-54k each) stop spending money while chat keeps the fast path.
+//
+// The TAILS still diverge, and that is deliberate rather than cosmetic. A shared
+// primary is only safe while it is answering; the day the balance runs out, both
+// routes fall through at the same moment, and if they fell through to the same
+// place they would re-create the exact shared-pool starvation of 2026-08-17
+// (three briefings ate 199,393 of Groq's 200,000 daily tokens and chat went
+// dark). So chat falls to Groq — fastest, and chat is the impatient workload —
+// while scheduled research falls to Gemini, which is slow but holds the large
+// multi-source payloads a briefing sends. Each keeps a lane of its own.
 const WORKLOAD_ROUTES = {
-  chat: (process.env.INFERENCE_ROUTE_CHAT || 'gemini,groq,deepseek')
+  chat: (process.env.INFERENCE_ROUTE_CHAT || 'deepseek,groq,gemini,mistral')
     .split(',').map(s => s.trim()).filter(Boolean),
-  briefing: (process.env.INFERENCE_ROUTE_BRIEFING || 'groq,gemini,deepseek')
+  briefing: (process.env.INFERENCE_ROUTE_BRIEFING || 'deepseek,gemini,groq,mistral')
     .split(',').map(s => s.trim()).filter(Boolean),
-  mission: (process.env.INFERENCE_ROUTE_MISSION || 'groq,gemini,deepseek')
+  mission: (process.env.INFERENCE_ROUTE_MISSION || 'deepseek,gemini,groq,mistral')
+    .split(',').map(s => s.trim()).filter(Boolean),
+
+  // Label-sized jobs that do not need a frontier model. `feature` doubles as the
+  // workload when no explicit workload is passed (see runInference), so naming
+  // the feature here is enough — no call site has to change.
+  //
+  // This exists because `community_name` — a task whose entire output is a
+  // four-token label — made 177 calls to the 120B REASONING model at 24.4s
+  // each, billing ~140 reasoning tokens to produce four. The same job on a
+  // small model took 2.9s. Groq's cheap model leads: it is free, fast enough,
+  // and keeps these off the paid balance entirely.
+  community_name: (process.env.INFERENCE_ROUTE_TRIVIAL || 'groq,mistral,deepseek,gemini')
+    .split(',').map(s => s.trim()).filter(Boolean),
+  extraction: (process.env.INFERENCE_ROUTE_TRIVIAL || 'groq,mistral,deepseek,gemini')
+    .split(',').map(s => s.trim()).filter(Boolean),
+  'gap-detection': (process.env.INFERENCE_ROUTE_TRIVIAL || 'groq,mistral,deepseek,gemini')
     .split(',').map(s => s.trim()).filter(Boolean)
 };
 
 /** Fallback order for anything not named above (mindmap, report, …). */
-const DEFAULT_ROUTE = (process.env.INFERENCE_ROUTE_DEFAULT || 'groq,gemini,deepseek')
+const DEFAULT_ROUTE = (process.env.INFERENCE_ROUTE_DEFAULT || 'deepseek,groq,gemini,mistral')
   .split(',').map(s => s.trim()).filter(Boolean);
+
+// Choosing a cheap PROVIDER is only half of the trivial-workload fix: Groq's
+// model list leads with the 120B reasoning model, so routing a four-token
+// labelling job to Groq still bills reasoning tokens for it. This names the
+// model such a job should lead with.
+//
+// It is applied exactly like an explicit `model` argument — it leads the list
+// for providers that accept an override (Groq only) and is withheld from the
+// rest, where a Groq model id would 400 every candidate. A caller passing its
+// own `model` still wins.
+const WORKLOAD_MODEL_HINTS = {
+  community_name: process.env.INFERENCE_TRIVIAL_MODEL || 'openai/gpt-oss-20b',
+  extraction: process.env.INFERENCE_TRIVIAL_MODEL || 'openai/gpt-oss-20b',
+  'gap-detection': process.env.INFERENCE_TRIVIAL_MODEL || 'openai/gpt-oss-20b'
+};
 
 // Workloads with a human waiting on the answer. These do NOT wait out a rate
 // limit: the 5s/15s/30s ladder that rescues a background research run is a
@@ -547,6 +614,9 @@ async function runInference({
   const effectiveWorkload = workload || feature;
   const route = _providersFor(effectiveWorkload);
   const patient = !IMPATIENT_WORKLOADS.has(effectiveWorkload);
+  // A caller that named a model always wins; the hint only fills the gap for
+  // workloads known not to need a frontier model. See WORKLOAD_MODEL_HINTS.
+  const effectiveModel = model || WORKLOAD_MODEL_HINTS[effectiveWorkload] || null;
 
   for (const cfg of route) {
     // BYOK only ever applies to Groq — it is a Groq key the user supplied.
@@ -555,8 +625,8 @@ async function runInference({
 
     // An explicit `model` argument names a Groq model, so it leads Groq's list
     // and is withheld from the others, where it would 400 every candidate.
-    const models = (cfg.acceptsModelOverride && model)
-      ? [model, ...cfg.models]
+    const models = (cfg.acceptsModelOverride && effectiveModel)
+      ? [effectiveModel, ...cfg.models]
       : cfg.models;
 
     attempted.push(cfg.name);
@@ -634,4 +704,6 @@ function providerOrderFor(workload) {
   return _providersFor(workload).map(p => p.name);
 }
 
-module.exports = { runInference, providerOrderFor, WORKLOAD_ROUTES, IMPATIENT_WORKLOADS };
+module.exports = {
+  runInference, providerOrderFor, WORKLOAD_ROUTES, WORKLOAD_MODEL_HINTS, IMPATIENT_WORKLOADS
+};
