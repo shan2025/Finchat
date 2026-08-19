@@ -84,6 +84,7 @@
     <button id="bmMode" class="bm-btn" style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">
       <span style="width:7px; height:7px; border-radius:999px; background:var(--parch-dim);"></span><span id="bmModeLabel">Demo run</span>
     </button>
+    <button id="bmRanksBtn" class="bm-btn" title="Global agent leaderboard — who's actually the better agent" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">🏆 Ranks</button>
     <div style="width:1px; height:20px; background:var(--line);"></div>
     <span id="bmQuestion" style="font-size:13px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--parch);"></span>
 
@@ -193,6 +194,27 @@
     </div>
     <div id="bmPickerBody" class="bm-scroll" style="padding:12px 15px; overflow-y:auto;">
       <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading recent runs…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaderboard overlay — long-term agent performance -->
+<div id="bmLeaderboard" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(12,10,8,.6); align-items:flex-start; justify-content:center; padding:60px 16px;">
+  <div class="bm-scroll" style="width:min(720px,100%); max-height:82vh; background:#262019; border:1px solid rgba(245,234,216,.14); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5); display:flex; flex-direction:column; overflow:hidden; color:#f5ead8; font-family:'Figtree',system-ui,sans-serif;">
+    <div style="display:flex; align-items:center; gap:10px; padding:15px 17px; border-bottom:1px solid rgba(245,234,216,.14);">
+      <span style="font-family:'Caprasimo',serif; font-size:17px;">Agent Leaderboard</span>
+      <span style="font-size:11px; color:rgba(245,234,216,.55);">who's actually the better agent</span>
+      <div style="margin-left:auto; display:flex; gap:3px; padding:3px; border-radius:999px; background:#322a22;">
+        <span id="bmLbGlobal" class="bm-tab" style="padding:5px 11px; border-radius:999px; font-size:11px; font-weight:700;">Global</span>
+        <span id="bmLbMine" class="bm-tab" style="padding:5px 11px; border-radius:999px; font-size:11px; font-weight:700;">Mine</span>
+      </div>
+      <button id="bmLbClose" class="bm-btn" style="width:28px; height:28px; border-radius:999px; background:#322a22; color:#f5ead8; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+    </div>
+    <div id="bmLbBody" class="bm-scroll" style="padding:13px 15px; overflow-y:auto;">
+      <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading…</div>
+    </div>
+    <div style="padding:10px 16px 13px; border-top:1px solid rgba(245,234,216,.14); font-size:10px; color:rgba(245,234,216,.45); line-height:1.6;">
+      Cognitive Score = 60% accuracy + 30% route efficiency + 10% win rate. Quality is weighted over wins by design. Adaptability metrics (recovery, route improvement, per-task-type) come next.
     </div>
   </div>
 </div>
@@ -1319,6 +1341,56 @@
     }
   }
 
+  // ── Leaderboard: long-term agent performance ──────────────────────────────
+  function wireLeaderboard() {
+    var ov = document.getElementById('bmLeaderboard');
+    document.getElementById('bmRanksBtn').addEventListener('click', function () { openLeaderboard('global'); });
+    document.getElementById('bmLbClose').addEventListener('click', function () { ov.style.display = 'none'; });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.style.display = 'none'; });
+    document.getElementById('bmLbGlobal').addEventListener('click', function () { openLeaderboard('global'); });
+    document.getElementById('bmLbMine').addEventListener('click', function () { openLeaderboard('me'); });
+  }
+  function openLeaderboard(scope) {
+    var ov = document.getElementById('bmLeaderboard'), body = document.getElementById('bmLbBody');
+    ov.style.display = 'flex';
+    var g = document.getElementById('bmLbGlobal'), m = document.getElementById('bmLbMine');
+    g.style.background = scope === 'global' ? 'var(--accent)' : 'transparent'; g.style.color = scope === 'global' ? '#fff' : 'var(--parch-dim)';
+    m.style.background = scope === 'me' ? 'var(--accent)' : 'transparent'; m.style.color = scope === 'me' ? '#fff' : 'var(--parch-dim)';
+    var tok = getToken();
+    if (!tok) { body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6);">Sign in to see the leaderboard.</div>'; return; }
+    body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6);">Loading…</div>';
+    fetch(apiBase() + '/api/agents/leaderboard?scope=' + (scope === 'me' ? 'me' : 'global'), { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { renderLeaderboard(body, (d && d.leaderboard) || []); })
+      .catch(function (e) { body.innerHTML = '<div style="font-size:12px; color:#e2a3a3;">Could not load leaderboard: ' + esc(e.message) + '</div>'; });
+  }
+  function lbStat(k, v) {
+    return '<div style="min-width:0;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:rgba(245,234,216,.5);">' + k + '</div>' +
+      '<div style="font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:1px;">' + v + '</div></div>';
+  }
+  function renderLeaderboard(body, rows) {
+    if (!rows.length) { body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6); line-height:1.6;">No completed runs yet. Ask an agent something (or run a race), then check back — the leaderboard builds from real executions.</div>'; return; }
+    body.innerHTML = rows.map(function (r, i) {
+      var av = r.avatar ? "background-image:url('" + r.avatar + "'); background-color:" + r.color + ";" : 'background-color:' + r.color + ';';
+      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      return '<div style="display:flex; flex-direction:column; gap:9px; padding:12px 13px; border-radius:14px; background:#322a22; margin-bottom:8px; border:1px solid ' + (i === 0 ? r.color : 'transparent') + ';">' +
+        '<div style="display:flex; align-items:center; gap:11px;">' +
+          '<span style="font-family:\'Caprasimo\',serif; font-size:17px; width:26px; text-align:center; flex-shrink:0;">' + medal + '</span>' +
+          '<div style="width:34px; height:34px; border-radius:999px; flex-shrink:0; ' + av + ' background-size:cover; background-position:center; border:2px solid ' + r.color + ';"></div>' +
+          '<div style="flex:1; min-width:0;">' +
+            '<div style="font-size:14px; font-weight:700;">' + esc(r.name) + ' <span style="font-size:10px; color:rgba(245,234,216,.5); text-transform:uppercase; letter-spacing:.06em; font-weight:600;">' + esc(r.role) + '</span></div>' +
+            '<div style="height:6px; border-radius:999px; background:rgba(245,234,216,.12); overflow:hidden; margin-top:5px;"><div style="height:100%; border-radius:999px; width:' + r.cognitiveScore + '%; background:' + r.color + ';"></div></div>' +
+          '</div>' +
+          '<div style="text-align:right; flex-shrink:0;"><div style="font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; color:' + r.color + ';">' + r.cognitiveScore + '</div><div style="font-size:9px; color:rgba(245,234,216,.5); text-transform:uppercase; letter-spacing:.08em;">Cognitive</div></div>' +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; padding-left:37px;">' +
+          lbStat('Accuracy', r.accuracy + '%') + lbStat('Route Eff', r.routeEfficiency) + lbStat('Avg Fuel', r.avgFuel + 'k') +
+          lbStat('Avg Time', r.avgSecs + 's') + lbStat('Races · W', r.races + ' · ' + r.wins) + lbStat('Error', r.errorRate + '%') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
   // ── Ask box: trigger a real run from the Brain Model and watch it stream ──
   function wireAsk() {
     var ov = document.getElementById('bmAsk');
@@ -1434,6 +1506,7 @@
   function init() {
     wirePicker();
     wireAsk();
+    wireLeaderboard();
     var params = new URLSearchParams(location.search);
     var execId = params.get('execution') || params.get('exec');
     var start = function () { window.__bm = new BrainModel(); refreshChrome(); wireLiveStream(); };

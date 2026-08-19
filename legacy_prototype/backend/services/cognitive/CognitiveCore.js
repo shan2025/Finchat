@@ -224,6 +224,14 @@ async function _runWithinStallClock({
     executionId: execId, userId, question: goal, agentId: agentName, raceId,
     fuelCap: Math.round((Number(execution.max_tokens) || 15000) / 1000), createdAt: execution.created_at
   });
+  // Stamp the race lane onto the row so the leaderboard can group races and
+  // credit wins later. Stored in the existing metrics jsonb — no schema change.
+  if (raceId) {
+    query(
+      `UPDATE executions SET metrics = COALESCE(metrics, '{}'::jsonb) || jsonb_build_object('raceId', $1::text) WHERE execution_id = $2`,
+      [raceId, execId]
+    ).catch(() => { /* best-effort; the run must not fail on a telemetry write */ });
+  }
   const toolContext = { userId, agentName, conversationId };
   let pendingApproval = null; // set when a requires_approval tool was attempted
   let hasPlanned = false;     // one plan per execution (re-plan loop guard)

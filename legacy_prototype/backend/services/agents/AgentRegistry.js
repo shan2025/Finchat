@@ -150,10 +150,15 @@ async function findBestAgent(goal) {
  * @param {number} [n=3] - clamped to [2,3]
  * @returns {Promise<string[]>} agent ids
  */
+// The competitive racers: domain specialists only. Infrastructure agents
+// (MemoryAgent, Sentinel) can score on capabilities but must never be entered
+// into a race — they are not answering the question, they support the ones who do.
+const RACER_IDS = new Set(['nova', 'aurelius', 'rasha']);
+
 async function findTopAgents(goal, n = 3) {
   const count = Math.max(2, Math.min(3, n));
   const specialists = (await listActiveAgents({ includeMiddleware: false }))
-    .filter(a => a.type !== 'orchestrator');
+    .filter(a => a.type !== 'orchestrator' && RACER_IDS.has(a.agentId));
   const scored = specialists
     .map(a => ({ agentId: a.agentId, score: scoreCapabilities(a, goal) }))
     .sort((x, y) => y.score - x.score);

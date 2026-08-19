@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { listPersonas } = require('../services/personas');
 const { runDebate } = require('../services/agents/DebateOrchestrator');
 const { refreshRegistry, getAgentConfig } = require('../services/agents/AgentRegistry');
+const { getLeaderboard } = require('../services/AgentLeaderboard');
 
 const VALID_RISK = ['Low', 'Medium', 'High'];
 // Optional per-agent model override — any Groq-supported model string, plus '' meaning "use default".
@@ -25,6 +26,23 @@ const VALID_MODELS = [
  * Returns real-time operational state (WORKING, IDLE, WAITING) for Plato, Aurelius, Rasha, and Nova.
  * Also returns recent cognitive activity feed and token budgets.
  */
+/**
+ * GET /api/agents/leaderboard?scope=global|me
+ * Long-term agent performance: Quality (accuracy, error rate), Efficiency
+ * (fuel, latency, tool calls, route efficiency), Wins, and a Cognitive Score.
+ * Computed from existing execution rows — see services/AgentLeaderboard.js.
+ */
+router.get('/leaderboard', requireAuth, async (req, res) => {
+  try {
+    const scopeMe = req.query.scope === 'me';
+    const leaderboard = await getLeaderboard({ userId: scopeMe ? req.user.id : null });
+    res.json({ leaderboard, scope: scopeMe ? 'me' : 'global' });
+  } catch (err) {
+    console.error('Leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to build leaderboard', details: err.message });
+  }
+});
+
 router.get('/status', requireAuth, async (req, res) => {
   try {
     const personas = listPersonas(); // plato, aurelius, rasha, nova
