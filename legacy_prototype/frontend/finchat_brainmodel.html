@@ -910,6 +910,7 @@
         '<div style="display:flex; align-items:center; gap:9px;"><span style="width:10px; height:10px; border-radius:999px; background:' + sel.c + ';"></span>' +
         '<span style="font-family:\'Caprasimo\',serif; font-size:15px;">Why ' + esc(sel.name) + ' went this way</span></div>' +
         '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim); padding:10px 12px; border-radius:13px; background:var(--ink3);">' + esc(sel.chain) + '</div>' +
+        routingBlockHtml() +
         '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' + metrics.map(function (m) {
           return '<div style="background:var(--ink3); border-radius:11px; padding:8px 10px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--parch-dim);">' + m.k + '</div><div style="font-size:14px; font-weight:700; margin-top:1px; color:' + m.tone + ';">' + esc(m.v) + '</div></div>';
         }).join('') + '</div>' +
@@ -1071,6 +1072,9 @@
   // as well as real traces/races (the demo also has non-adjacent hops that would
   // otherwise cut across open ground, e.g. Portfolio → Markets).
   var ROAD_EXPAND = true;
+  // Plato's routing breakdown (capability vs history) for the current run/race,
+  // shown in the "Why this route" panel.
+  var ROUTING = null;
   var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
@@ -1078,6 +1082,7 @@
     DUR = s.DUR; DNAMES = s.DNAMES; BLD = s.BLD; AG = s.AG; PLATO = s.PLATO; EVENTS = s.EVENTS; FOG = s.FOG;
     DEFAULT_Q = s.question; REAL_DUR_MS = s.realDurationMs != null ? s.realDurationMs : null; RUN_ACTIVE = !!s.live;
     ROAD_EXPAND = !!s.roadExpand;
+    ROUTING = s.routing || null;
   }
 
   // Reshape a /trace payload into the scenario shape the engine consumes. Real
@@ -1131,7 +1136,7 @@
 
     return {
       DUR: VDUR, DNAMES: DN, BLD: BL, AG: [A], PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
-      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live, roadExpand: true
+      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live, roadExpand: true, routing: tr.routing || null
     };
   }
 
@@ -1188,7 +1193,7 @@
 
     return {
       DUR: VDUR, DNAMES: DN, BLD: BL, AG: AG, PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
-      EVENTS: EV, FOG: FG, question: race.question || '', realDurationMs: span, live: true, roadExpand: true
+      EVENTS: EV, FOG: FG, question: race.question || '', realDurationMs: span, live: true, roadExpand: true, routing: race.routing || null
     };
   }
 
@@ -1255,7 +1260,7 @@
   // the map grows as the agent routes. On completion we load the persisted trace
   // for an authoritative, replayable version.
   var liveSocket = null, live = null, watchingId = null, liveStarted = false;
-  var currentRace = null, raceFirstRender = true; // multi-agent race accumulator
+  var currentRace = null, raceFirstRender = true, pendingRaceRouting = null; // multi-agent race accumulator
 
   function fmtInput(v) {
     if (v == null) return '';
@@ -1289,6 +1294,26 @@
   }
   function lastRaceBuildingId(ag) { for (var i = ag.waypoints.length - 1; i >= 0; i--) if (ag.waypoints[i].buildingId) return ag.waypoints[i].buildingId; return null; }
   function renderRace() { if (!window.__bm || !currentRace) return; window.__bm.applyLive(buildScenarioFromRace(currentRace), raceFirstRender); raceFirstRender = false; }
+
+  // Compact display of Plato's capability-vs-history routing decision.
+  function routingBlockHtml() {
+    if (!ROUTING || !ROUTING.candidates || !ROUTING.candidates.length) return '';
+    var chosen = ROUTING.chosen || (ROUTING.candidates[0] && ROUTING.candidates[0].agentId);
+    var rows = ROUTING.candidates.slice(0, 4).map(function (c) {
+      var col = AGENT_COLORS[c.agentId] || '#c67139';
+      var isChosen = c.agentId === chosen;
+      var hist = c.hasHistory ? (c.history.accuracy + '% acc · ' + c.history.runs + ' runs') : 'no history · capability only';
+      return '<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:9px; background:' + (isChosen ? 'rgba(224,138,68,.14)' : 'var(--ink3)') + '; border:1px solid ' + (isChosen ? col : 'transparent') + ';">' +
+        '<span style="width:7px; height:7px; border-radius:999px; background:' + col + '; flex-shrink:0;"></span>' +
+        '<span style="font-size:12px; font-weight:700; min-width:54px;">' + esc(cap2(c.agentId)) + '</span>' +
+        '<span style="font-size:10px; color:var(--parch-dim); flex:1; min-width:0;">cap ' + c.cap + ' · ' + esc(hist) + '</span>' +
+        (isChosen ? '<span style="font-size:8px; font-weight:700; letter-spacing:.06em; color:#93a56e;">PICKED</span>' : '') +
+        '<span style="font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; color:' + col + '; min-width:34px; text-align:right;">' + (c.finalScore != null ? Number(c.finalScore).toFixed(2) : '—') + '</span>' +
+        '</div>';
+    }).join('');
+    return '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Why Plato picked ' + esc(cap2(chosen || '')) + ' · ' + esc(ROUTING.taskType || '') + ' · 70% capability / 30% history</div>' +
+      '<div style="display:flex; flex-direction:column; gap:4px;">' + rows + '</div></div>';
+  }
 
   function onRaceStart(p) {
     if (!currentRace || currentRace.raceId !== p.raceId) {
@@ -1355,7 +1380,7 @@
         districts: [], buildings: [],
         waypoints: [{ buildingId: null, reason: 'Task received at the Question Hub', atMs: 0, offRoad: false }],
         events: [{ atMs: 0, title: 'Task issued', body: 'Routed to ' + (a.name || 'agent') + '.', kind: 'plato' }],
-        fog: [], durationMs: 0, live: true
+        fog: [], durationMs: 0, live: true, routing: pendingRaceRouting
       };
       if (document.getElementById('bmQuestion')) document.getElementById('bmQuestion').textContent = live.question;
       renderLive(); refreshChrome();
@@ -1550,7 +1575,7 @@
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
       body: JSON.stringify(body)
     }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (race && d && d.agents) note.textContent = ''; })
+      .then(function (d) { if (race && d) { pendingRaceRouting = d.routing || null; if (currentRace) currentRace.routing = pendingRaceRouting; } })
       .catch(function () { /* the run(s) stream over the socket regardless */ });
     // The 'start' pulse will flip the map to LIVE; close and let it animate.
     document.getElementById('bmAsk').style.display = 'none';

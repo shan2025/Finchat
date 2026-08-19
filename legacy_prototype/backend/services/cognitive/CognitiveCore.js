@@ -149,6 +149,9 @@ async function _runWithinStallClock({
   // on the live start pulse so the Brain Model groups the parallel runs onto one
   // map. Purely a telemetry tag; it changes nothing about how the loop executes.
   raceId = null,
+  // Why Plato selected this agent (capability vs history blend). Stored in the
+  // execution metadata so the Brain Model can explain the routing decision.
+  routing = null,
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
   // Load this agent's runtime tuning (risk + traits + optional per-agent model
@@ -224,12 +227,16 @@ async function _runWithinStallClock({
     executionId: execId, userId, question: goal, agentId: agentName, raceId,
     fuelCap: Math.round((Number(execution.max_tokens) || 15000) / 1000), createdAt: execution.created_at
   });
-  // Stamp the race lane onto the row so the leaderboard can group races and
-  // credit wins later. Stored in the existing metrics jsonb — no schema change.
-  if (raceId) {
+  // Stamp race membership + the routing breakdown onto the row (existing metrics
+  // jsonb — no schema change). raceId lets the leaderboard group races; routing
+  // lets the Brain Model explain why Plato chose this agent.
+  const metaPatch = {};
+  if (raceId) metaPatch.raceId = raceId;
+  if (routing) metaPatch.routing = routing;
+  if (Object.keys(metaPatch).length) {
     query(
-      `UPDATE executions SET metrics = COALESCE(metrics, '{}'::jsonb) || jsonb_build_object('raceId', $1::text) WHERE execution_id = $2`,
-      [raceId, execId]
+      `UPDATE executions SET metrics = COALESCE(metrics, '{}'::jsonb) || $1::jsonb WHERE execution_id = $2`,
+      [JSON.stringify(metaPatch), execId]
     ).catch(() => { /* best-effort; the run must not fail on a telemetry write */ });
   }
   const toolContext = { userId, agentName, conversationId };

@@ -254,10 +254,16 @@ async function buildExecutionTrace({ executionId, userId = null }) {
     chain, finishAt: endMs
   };
 
+  // Why Plato selected this agent (capability vs history), stamped into metrics
+  // by CognitiveCore at routing time.
+  let metrics = e.metrics;
+  if (typeof metrics === 'string') { try { metrics = JSON.parse(metrics); } catch (_) { metrics = null; } }
+  const routing = (metrics && metrics.routing) || null;
+
   return {
     executionId, question: e.goal, createdAt: e.created_at, updatedAt: e.updated_at,
     durationMs: endMs, live: !isDone,
-    agent, districts: [...districts.values()], buildings, waypoints, events, fog, sources,
+    agent, districts: [...districts.values()], buildings, waypoints, events, fog, sources, routing,
     verification: { verified, summary: reflection?.summary || null, reason: okReason }
   };
 }

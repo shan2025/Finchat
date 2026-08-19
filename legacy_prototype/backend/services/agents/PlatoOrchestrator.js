@@ -44,6 +44,7 @@ async function route({ goal, userId = 'system', conversationId = null, conversat
   let selectedAgent = null;
   let delegationScore = 0;
   let isDirect = false;
+  let routingBreakdown = null; // capability-vs-history blend that chose the agent
 
   // If a targetAgentId is explicitly passed (Dual-Entry direct addressing), bypass Plato's matching
   if (targetAgentId) {
@@ -55,10 +56,11 @@ async function route({ goal, userId = 'system', conversationId = null, conversat
 
   // Otherwise, run capability scoring against the active specialists in AgentRegistry
   if (!selectedAgent) {
-    const match = await registryFindBest(goal);
+    const match = await registryFindBest(goal, { userId });
     if (match) {
       selectedAgent = new BaseAgent(match.agentConfig);
       delegationScore = match.score;
+      routingBreakdown = match.breakdown || null;
     }
   }
 
@@ -98,7 +100,8 @@ async function route({ goal, userId = 'system', conversationId = null, conversat
     studyMode,
     budget,
     approvedTools,
-    workload
+    workload,
+    routing: routingBreakdown
   });
 
   const enrichedResult = {

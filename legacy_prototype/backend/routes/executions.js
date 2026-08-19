@@ -92,7 +92,13 @@ router.post('/race', requireAuth, async (req, res) => {
     const { run } = require('../services/cognitive/CognitiveCore');
     const { findTopAgents } = require('../services/agents/AgentRegistry');
 
-    let field = (requested && requested.length) ? requested : await findTopAgents(question, 3);
+    let field, routing = null;
+    if (requested && requested.length) {
+      field = requested;
+    } else {
+      const top = await findTopAgents(question, 3, { userId }); // history-aware pick
+      field = top.agents; routing = top.breakdown;
+    }
     if (!field || field.length < 2) field = ['nova', 'aurelius', 'rasha'];
 
     // A race costs one run per agent — guard the wallet before firing them.
@@ -107,11 +113,11 @@ router.post('/race', requireAuth, async (req, res) => {
     // Fire the lanes in parallel; do NOT await — they stream over the socket and
     // can take tens of seconds each. Failures are logged, never surfaced as a 500.
     for (const agentName of field) {
-      run({ goal: question, userId, agentName, workload: 'chat', raceId })
+      run({ goal: question, userId, agentName, workload: 'chat', raceId, routing })
         .catch(err => console.warn(`⚠️ Race ${raceId} lane "${agentName}" failed: ${err.message}`));
     }
 
-    res.json({ raceId, agents: field, question });
+    res.json({ raceId, agents: field, question, routing });
   } catch (err) {
     console.error('Race dispatch error:', err);
     res.status(500).json({ error: 'Failed to start race', details: err.message });

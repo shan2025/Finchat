@@ -5,6 +5,7 @@
 // which agent is actually better — the substrate for Plato eventually selecting
 // agents on history, not just capability matching.
 const db = require('../database');
+const microCache = require('./microCache');
 const { agentMeta } = require('./cognitive/ExecutionTrace');
 
 // The competitive roster. Other assigned_agents (system MemoryAgent, Sentinel)
@@ -118,7 +119,7 @@ const TASK_MATCHERS = [
   ['research', /\b(research|paper|papers|arxiv|study|studies|academic|literature|whitepaper|deep dive|explain|how does|what is)\b/i],
   ['news', /\b(news|headline|latest|today|announce|update|recent|breaking|happening|this week)\b/i],
   ['compliance', /\b(complian|regulat|\brule|legal|\blaw\b|audit|disclosure|suitab|govern|policy)\b/i],
-  ['risk', /\b(risk|exposure|drawdown|volatil|hedge|downside|stress|default|credit)\b/i],
+  ['risk', /\b(risks?|exposure|drawdown|volatil|hedge|downside|stress|defaults?|credit)\b/i],
   ['portfolio', /\b(portfolio|holding|allocation|watchlist|position|rebalanc|diversif|client)\b/i]
 ];
 function classifyTask(goal) {
@@ -146,12 +147,14 @@ async function getAgentProfiles({ userId = null } = {}) {
     ORDER BY e.created_at DESC LIMIT 4000
   `, [...params, [...ROSTER]]);
 
-  const cells = {}; // agent -> task -> {runs, natural, fuel, secs}
+  const cells = {}; // agent -> task -> {runs, natural, errored, fuel, secs}
   for (const r of res.rows) {
     const t = classifyTask(r.goal);
     const A = cells[r.agent] || (cells[r.agent] = {});
-    const c = A[t] || (A[t] = { runs: 0, natural: 0, fuel: 0, secs: 0 });
-    c.runs++; if (r.completion_reason === 'natural') c.natural++;
+    const c = A[t] || (A[t] = { runs: 0, natural: 0, errored: 0, fuel: 0, secs: 0 });
+    c.runs++;
+    if (r.completion_reason === 'natural') c.natural++;
+    if (r.completion_reason === 'error') c.errored++;
     c.fuel += Number(r.tokens_used) || 0; c.secs += Number(r.secs) || 0;
   }
 
@@ -159,7 +162,13 @@ async function getAgentProfiles({ userId = null } = {}) {
     const m = agentMeta(id), A = cells[id], out = {};
     for (const t of Object.keys(A)) {
       const c = A[t];
-      out[t] = { runs: c.runs, accuracy: round(100 * c.natural / c.runs, 0), avgFuel: round(c.fuel / c.runs / 1000, 1), avgSecs: round(c.secs / c.runs, 1) };
+      out[t] = {
+        runs: c.runs,
+        accuracy: round(100 * c.natural / c.runs, 0),
+        errorRate: round(100 * c.errored / c.runs, 0),
+        avgFuel: round(c.fuel / c.runs / 1000, 1),
+        avgSecs: round(c.secs / c.runs, 1)
+      };
     }
     return { agent: id, name: m.name, role: m.role, color: m.color, avatar: m.avatar, cells: out };
   });
@@ -181,4 +190,66 @@ async function getAgentProfiles({ userId = null } = {}) {
   return { taskTypes: TASK_TYPES, agents, bestPerTask };
 }
 
-module.exports = { getLeaderboard, getAgentProfiles, classifyTask };
+// Routing reads profiles on every decision — cache briefly so a chat turn does
+// not re-run the aggregate each time. Keyed by scope.
+function getProfilesCached({ userId = null } = {}) {
+  return microCache.cached('agent_profiles:' + (userId || 'global'), 60000, () => getAgentProfiles({ userId }));
+}
+
+// ── History-aware routing score (PURE — no DB, unit-tested) ──────────────────
+// Blend capability with task-conditioned historical performance:
+//   final = capWeight·capNorm + histWeight·histNorm   (when the agent has ≥ minRuns
+//   completed runs for this task type), otherwise final = capNorm so agents
+//   without enough history route exactly as before (capability only).
+//
+// histNorm = 0.5·accuracy + 0.25·reliability + 0.25·efficiency, each 0..1.
+// Efficiency is normalised across the candidates that HAVE history (lower fuel/
+// time is better), so it is comparative rather than absolute.
+//
+// @param {object} opts
+// @param {Array<{agentId:string, cap:number}>} opts.candidates
+// @param {Object<string,{cells:Object}>} opts.profilesByAgent - keyed by agentId
+// @param {string} opts.taskType
+// @param {number} [opts.minRuns=5]
+// @param {number} [opts.capWeight=0.7]
+// @param {number} [opts.histWeight=0.3]
+// @returns {Array} ranked candidates with the routing breakdown, best first
+function blendAgentScores({ candidates, profilesByAgent = {}, taskType, minRuns = 5, capWeight = 0.7, histWeight = 0.3 }) {
+  const list = candidates || [];
+  const maxCap = Math.max(1, ...list.map(c => Number(c.cap) || 0));
+  const cellFor = id => {
+    const p = profilesByAgent[id];
+    const cell = p && p.cells && p.cells[taskType];
+    return (cell && cell.runs >= minRuns) ? cell : null;
+  };
+  const withHist = list.map(c => c.agentId).filter(id => cellFor(id));
+  const fuels = withHist.map(id => cellFor(id).avgFuel);
+  const secs = withHist.map(id => cellFor(id).avgSecs);
+  const normLowerBetter = (v, arr) => {
+    if (!arr.length) return 1;
+    const lo = Math.min.apply(null, arr), hi = Math.max.apply(null, arr);
+    return hi > lo ? 1 - (v - lo) / (hi - lo) : 1;
+  };
+
+  const rows = list.map(c => {
+    const cap = Number(c.cap) || 0;
+    const capNorm = maxCap > 0 ? cap / maxCap : 0;
+    const cell = cellFor(c.agentId);
+    let histNorm = null, history = null;
+    if (cell) {
+      const accuracy = clamp((cell.accuracy || 0) / 100, 0, 1);
+      const reliability = clamp((100 - (cell.errorRate || 0)) / 100, 0, 1);
+      const efficiency = clamp((normLowerBetter(cell.avgFuel || 0, fuels) + normLowerBetter(cell.avgSecs || 0, secs)) / 2, 0, 1);
+      histNorm = clamp(0.5 * accuracy + 0.25 * reliability + 0.25 * efficiency, 0, 1);
+      history = { runs: cell.runs, accuracy: cell.accuracy, reliability: round(100 - (cell.errorRate || 0)), efficiency: round(efficiency * 100), score: round(histNorm, 3) };
+    }
+    const finalScore = cell ? (capWeight * capNorm + histWeight * histNorm) : capNorm;
+    return { agentId: c.agentId, cap, capNorm: round(capNorm, 3), hasHistory: !!cell, history, finalScore: round(finalScore, 4) };
+  });
+
+  // Deterministic order: final score, then raw capability, then id (stable ties).
+  rows.sort((a, b) => b.finalScore - a.finalScore || b.cap - a.cap || String(a.agentId).localeCompare(String(b.agentId)));
+  return rows;
+}
+
+module.exports = { getLeaderboard, getAgentProfiles, getProfilesCached, classifyTask, blendAgentScores };

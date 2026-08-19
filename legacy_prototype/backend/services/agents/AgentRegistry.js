@@ -118,27 +118,55 @@ function scoreCapabilities(agentConfig, goal) {
   return score;
 }
 
+// The competitive racers: domain specialists only (see findTopAgents).
+const RACER_IDS = new Set(['nova', 'aurelius', 'rasha']);
+
 /**
- * Find the best matching specialist agent for a goal.
- * Excludes orchestrators (Plato) and middleware (Sentinel).
+ * Rank candidate agents for a goal by blending capability (70%) with
+ * task-conditioned historical performance (30%). History only counts once an
+ * agent has ≥ 5 completed runs of that task type; below that it routes on
+ * capability alone, preserving prior behavior. Returns the ranked breakdown.
  * @param {string} goal
+ * @param {Array} candidateConfigs - agent configs to consider
+ * @param {object} [opts] - { userId } scopes history to one user; default global
  */
-async function findBestAgent(goal) {
-  const specialists = await listActiveAgents({ includeMiddleware: false });
-  let bestAgent = null;
-  let bestScore = 0;
-
-  for (const agent of specialists) {
-    if (agent.type === 'orchestrator') continue; // Skip Plato when finding specialists
-    const score = scoreCapabilities(agent, goal);
-    if (score > bestScore) {
-      bestScore = score;
-      bestAgent = agent;
-    }
+async function rankForGoal(goal, candidateConfigs, opts = {}) {
+  // Deferred require avoids any load-order coupling — AgentRegistry is imported
+  // very early, and the leaderboard pulls in the DB + trace helpers lazily.
+  const { classifyTask, getProfilesCached, blendAgentScores } = require('../AgentLeaderboard');
+  const candidates = candidateConfigs.map(a => ({ agentId: a.agentId, cap: scoreCapabilities(a, goal) }));
+  const taskType = classifyTask(goal);
+  const profilesByAgent = {};
+  try {
+    const prof = await getProfilesCached(opts);
+    (prof.agents || []).forEach(a => { profilesByAgent[a.agent] = a; });
+  } catch (e) {
+    // History unavailable → capability-only routing (prior behavior).
   }
+  const ranked = blendAgentScores({ candidates, profilesByAgent, taskType });
+  return { taskType, ranked, weights: { capability: 0.7, history: 0.3 }, minRuns: 5 };
+}
 
-  if (bestScore === 0) return null;
-  return { agentConfig: bestAgent, score: bestScore };
+/**
+ * Find the best matching specialist agent for a goal, history-aware.
+ * Excludes orchestrators (Plato) and middleware (Sentinel). Capability remains a
+ * gate: with no capability match at all it returns null (→ Plato), exactly as
+ * before — history re-ranks capability-matched agents, it never invents a match.
+ * @param {string} goal
+ * @param {object} [opts] - { userId }
+ * @returns {Promise<{agentConfig, score, finalScore, taskType, breakdown}|null>}
+ */
+async function findBestAgent(goal, opts = {}) {
+  const specialists = (await listActiveAgents({ includeMiddleware: false })).filter(a => a.type !== 'orchestrator');
+  const { taskType, ranked, weights, minRuns } = await rankForGoal(goal, specialists, opts);
+  const matched = ranked.filter(r => r.cap > 0);
+  if (matched.length === 0) return null;
+  const winner = matched[0]; // ranked is sorted best-first
+  const agentConfig = specialists.find(a => a.agentId === winner.agentId);
+  return {
+    agentConfig, score: winner.cap, finalScore: winner.finalScore, taskType,
+    breakdown: { taskType, weights, minRuns, chosen: winner.agentId, candidates: ranked }
+  };
 }
 
 /**
@@ -150,21 +178,27 @@ async function findBestAgent(goal) {
  * @param {number} [n=3] - clamped to [2,3]
  * @returns {Promise<string[]>} agent ids
  */
-// The competitive racers: domain specialists only. Infrastructure agents
-// (MemoryAgent, Sentinel) can score on capabilities but must never be entered
-// into a race — they are not answering the question, they support the ones who do.
-const RACER_IDS = new Set(['nova', 'aurelius', 'rasha']);
-
-async function findTopAgents(goal, n = 3) {
+/**
+ * Pick the top N racers for a goal — Plato's field for a multi-agent race —
+ * history-aware. Restricted to real specialists (never infrastructure agents
+ * like MemoryAgent). A race always has a field: all racers are ranked by the
+ * blended score and the top N taken. Returns the field plus the breakdown.
+ * @param {string} goal
+ * @param {number} [n=3] - clamped to [2,3]
+ * @param {object} [opts] - { userId }
+ * @returns {Promise<{agents:string[], taskType:string, breakdown:object}>}
+ */
+async function findTopAgents(goal, n = 3, opts = {}) {
   const count = Math.max(2, Math.min(3, n));
-  const specialists = (await listActiveAgents({ includeMiddleware: false }))
+  const racers = (await listActiveAgents({ includeMiddleware: false }))
     .filter(a => a.type !== 'orchestrator' && RACER_IDS.has(a.agentId));
-  const scored = specialists
-    .map(a => ({ agentId: a.agentId, score: scoreCapabilities(a, goal) }))
-    .sort((x, y) => y.score - x.score);
-  const matched = scored.filter(s => s.score > 0);
-  const chosen = (matched.length >= 2 ? matched : scored).slice(0, count);
-  return chosen.map(s => s.agentId);
+  const { taskType, ranked, weights, minRuns } = await rankForGoal(goal, racers, opts);
+  const chosen = ranked.slice(0, count);
+  return {
+    agents: chosen.map(r => r.agentId),
+    taskType,
+    breakdown: { taskType, weights, minRuns, candidates: ranked }
+  };
 }
 
 module.exports = {
@@ -175,5 +209,7 @@ module.exports = {
   scoreCapabilities,
   findBestAgent,
   findTopAgents,
+  rankForGoal,
+  RACER_IDS,
   REGISTRY_CACHE_KEY
 };
