@@ -262,4 +262,15 @@ async function buildExecutionTrace({ executionId, userId = null }) {
   };
 }
 
-module.exports = { buildExecutionTrace };
+// Shared map-location helpers — reused by the live stream (BrainStream.js) so a
+// tool/entity lands on exactly the same building live as it does on replay.
+function toolLocation(tool) {
+  const d = TOOL_DISTRICT[tool] || DEFAULT_DISTRICT;
+  return { buildingId: 'tool:' + tool, label: toolLabel(tool), district: d[0], districtName: d[1], tone: d[2], kind: 'tool' };
+}
+function entityLocation(entityType, entityId, name) {
+  const dt = (entityType || 'concept').toLowerCase();
+  return { buildingId: 'ent:' + entityId, label: name, district: 'kd:' + dt, districtName: cap(dt), tone: 'a', kind: DOC_TYPES.has(dt) ? 'doc' : 'concept' };
+}
+
+module.exports = { buildExecutionTrace, toolLocation, entityLocation, agentMeta };

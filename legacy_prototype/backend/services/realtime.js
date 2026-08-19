@@ -53,7 +53,13 @@ const BRIDGES = [
 
   // Live notification bell push. `user_id` is set by createNotification on
   // every row it writes.
-  ['bus', 'notification:new', 'notification:new', null]
+  ['bus', 'notification:new', 'notification:new', null],
+
+  // Brain Model fine-grained live telemetry — one consolidated pulse carrying
+  // its own `type` (start | step | knowledge | tool_start | tool_end |
+  // verified | done | error) and `userId`. Emitted by BrainStream at the
+  // CognitiveCore phase points; forwarded unchanged to the owning user only.
+  ['bus', 'brain:pulse', 'brain:pulse', null]
 ];
 
 /**

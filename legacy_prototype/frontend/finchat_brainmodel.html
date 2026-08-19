@@ -7,6 +7,8 @@
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Socket.io client (served by the backend) — powers live execution streaming -->
+<script src="/socket.io/socket.io.js"></script>
 <style>
   /* ── Brain Model — a live map of how the agents route through the knowledge
      graph to answer one question. Espresso palette, matching the Neural Map's
@@ -1033,6 +1035,24 @@
     };
   }
 
+  // Live update: rebuild the graph from the growing scenario and pin the agent
+  // at the newest node (no race playback while a run is still forming).
+  BrainModel.prototype.applyLive = function (scn, doFit) {
+    applyScenario(scn);
+    this.build();
+    if (doFit) this.fit();
+    this.t = 1; this.state.playing = false;
+    this.render();
+  };
+  // Once the run finishes, swap in the authoritative persisted trace and rewind
+  // so the completed race can be replayed on the timeline.
+  BrainModel.prototype.applyReplay = function (scn) {
+    applyScenario(scn);
+    this.build();
+    this.t = 0; this.state.playing = false;
+    this.render();
+  };
+
   // ── API plumbing ─────────────────────────────────────────────────────────
   function apiBase() { return location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000'; }
   function getToken() {
@@ -1046,6 +1066,113 @@
       .then(function (d) { if (!d.trace) throw new Error('empty trace'); return d.trace; });
   }
   function gotoExec(id) { var p = new URLSearchParams(location.search); p.set('execution', id); location.search = p.toString(); }
+
+  // ── Live streaming ─────────────────────────────────────────────────────────
+  // Connect to the EventBus→Socket.IO bridge and follow whichever real execution
+  // is running for this user. Pulses accumulate into a trace-shaped object (the
+  // SAME contract as /trace) that we re-derive into a scenario on every pulse, so
+  // the map grows as the agent routes. On completion we load the persisted trace
+  // for an authoritative, replayable version.
+  var liveSocket = null, live = null, watchingId = null, liveStarted = false;
+
+  function fmtInput(v) {
+    if (v == null) return '';
+    if (typeof v === 'string') return v.length > 120 ? v.slice(0, 119) + '…' : v;
+    try { var s = JSON.stringify(v); return s === '{}' ? '' : (s.length > 120 ? s.slice(0, 119) + '…' : s); } catch (e) { return ''; }
+  }
+  function ensureLiveBuilding(b) {
+    if (!b || !b.buildingId) return;
+    if (!live.districts.some(function (d) { return d.id === b.district; })) live.districts.push({ id: b.district, name: b.districtName || b.district, tone: b.tone || 'n' });
+    var ex = live.buildings.filter(function (x) { return x.id === b.buildingId; })[0];
+    if (ex) { ex.uses++; return; }
+    live.buildings.push({ id: b.buildingId, label: b.label, district: b.district, kind: b.kind || 'concept', uses: 1, storeys: b.kind === 'tool' ? 3 : 2 });
+  }
+  function lastLiveBuildingId() {
+    for (var i = live.waypoints.length - 1; i >= 0; i--) if (live.waypoints[i].buildingId) return live.waypoints[i].buildingId;
+    return null;
+  }
+  function renderLive() {
+    if (!window.__bm || !live) return;
+    window.__bm.applyLive(buildScenarioFromTrace(live), !liveStarted);
+    liveStarted = true;
+  }
+
+  function onPulse(p) {
+    if (!p || !p.type) return;
+    if (p.type === 'start') {
+      // Latest run wins — begin following it from the Question Hub.
+      watchingId = p.executionId; liveStarted = false; IS_LIVE = true; RUN_ACTIVE = true;
+      execShort = shortId(p.executionId);
+      var a = p.agent || {};
+      live = {
+        executionId: p.executionId, question: p.question || '',
+        agent: { id: a.id, name: a.name || 'Agent', role: a.role || '', color: a.color || '#c67139', avatar: a.avatar || '', fuel: 0, fuelCap: a.fuelCap || 15, confidence: 70, risk: 0, rate: 60, bio: 'Live run in progress…', chain: '' },
+        districts: [], buildings: [],
+        waypoints: [{ buildingId: null, reason: 'Task received at the Question Hub', atMs: 0, offRoad: false }],
+        events: [{ atMs: 0, title: 'Task issued', body: 'Routed to ' + (a.name || 'agent') + '.', kind: 'plato' }],
+        fog: [], durationMs: 0, live: true
+      };
+      if (document.getElementById('bmQuestion')) document.getElementById('bmQuestion').textContent = live.question;
+      renderLive(); refreshChrome();
+      return;
+    }
+    if (!live || p.executionId !== watchingId) return; // only follow the current run
+
+    if (p.type === 'knowledge') {
+      (p.buildings || []).forEach(ensureLiveBuilding);
+      renderLive();
+    } else if (p.type === 'tool_start') {
+      ensureLiveBuilding(p.building);
+      live.events.push({ atMs: p.atMs, title: live.agent.name + ' → ' + (p.building ? p.building.label : p.tool), body: fmtInput(p.input), kind: live.agent.id || 'plato' });
+      renderLive();
+    } else if (p.type === 'tool_end') {
+      ensureLiveBuilding(p.building);
+      var bId = p.building && p.building.buildingId;
+      live.waypoints.push({ buildingId: bId, reason: p.error ? ('Failed: ' + p.error) : (fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), atMs: p.atMs, offRoad: !!p.error });
+      live.events.push({ atMs: p.atMs, title: live.agent.name + ' used ' + (p.building ? p.building.label : p.tool), body: p.error ? ('Failed: ' + p.error) : fmtInput(p.input), kind: p.error ? 'fog' : (live.agent.id || 'plato') });
+      if (p.error) live.fog.push({ name: (p.building ? p.building.label : p.tool) + ' returned no ground', state: 'unknown', body: 'The ' + (p.building ? p.building.label : p.tool) + ' call failed (' + p.error + '). Anything downstream was asserted without that source.' });
+      if (p.fuel != null) live.agent.fuel = p.fuel;
+      renderLive();
+    } else if (p.type === 'step') {
+      live.waypoints.push({ buildingId: lastLiveBuildingId(), reason: p.reason || 'Reasoning', atMs: p.atMs, offRoad: false });
+      if (p.fuel != null) live.agent.fuel = p.fuel;
+      renderLive();
+    } else if (p.type === 'error') {
+      live.fog.push({ name: 'Run error', state: 'unknown', body: p.message || 'The run failed.' });
+      live.events.push({ atMs: p.atMs, title: 'Error', body: p.message || '', kind: 'fog' });
+      renderLive();
+    } else if (p.type === 'verified') {
+      live.verification = { verified: true, summary: p.summary || null };
+      live.events.push({ atMs: live.durationMs || 0, title: 'Verified by reflection', body: p.summary || '', kind: 'clear' });
+      if (RUN_ACTIVE) renderLive();
+    } else if (p.type === 'done') {
+      if (p.fuel != null) live.agent.fuel = p.fuel;
+      live.durationMs = p.atMs || live.durationMs;
+      live.events.push({ atMs: p.atMs, title: p.completionReason === 'natural' ? 'Answer produced' : 'Stopped — ' + (p.completionReason || 'done'), body: '', kind: p.completionReason === 'natural' ? 'done' : 'fog' });
+      live.live = false; RUN_ACTIVE = false;
+      renderLive(); refreshChrome();
+      // Swap to the authoritative persisted trace so the finished race is replayable.
+      var finishedId = watchingId;
+      setTimeout(function () {
+        loadTrace(finishedId).then(function (tr) {
+          if (watchingId !== finishedId) return; // a newer run started meanwhile
+          applyScenario(buildScenarioFromTrace(tr)); IS_LIVE = true;
+          if (window.__bm) window.__bm.applyReplay(buildScenarioFromTrace(tr));
+          refreshChrome();
+        }).catch(function () { /* keep the live-assembled view */ });
+      }, 1200);
+    }
+  }
+
+  function wireLiveStream() {
+    if (typeof io === 'undefined') return; // socket.io client failed to load
+    var tok = getToken(); if (!tok) return;
+    try {
+      liveSocket = io(apiBase(), { auth: { token: tok }, transports: ['websocket', 'polling'] });
+      liveSocket.on('brain:pulse', onPulse);
+      liveSocket.on('connect_error', function (err) { console.warn('Brain Model live: socket error ' + (err && err.message)); });
+    } catch (e) { console.warn('Brain Model live: could not connect — ' + e.message); }
+  }
 
   // ── Recent-runs picker ───────────────────────────────────────────────────
   function wirePicker() {
@@ -1092,7 +1219,12 @@
 
   function refreshChrome() {
     var lbl = document.getElementById('bmModeLabel'), kicker = document.getElementById('bmKicker'), dot = document.querySelector('#bmMode span');
-    if (IS_LIVE) {
+    if (dot) dot.classList.toggle('bm-live', !!RUN_ACTIVE);
+    if (RUN_ACTIVE) {
+      lbl.textContent = 'LIVE · ' + execShort;
+      if (kicker) kicker.textContent = 'streaming…';
+      if (dot) dot.style.background = '#e08a44';
+    } else if (IS_LIVE) {
       lbl.textContent = 'Live · ' + execShort;
       if (kicker) kicker.textContent = REAL_DUR_MS != null ? ('real ' + (REAL_DUR_MS / 1000).toFixed(1) + 's') : 'live run';
       if (dot) dot.style.background = '#93a56e';
@@ -1109,7 +1241,7 @@
     wirePicker();
     var params = new URLSearchParams(location.search);
     var execId = params.get('execution') || params.get('exec');
-    var start = function () { window.__bm = new BrainModel(); refreshChrome(); };
+    var start = function () { window.__bm = new BrainModel(); refreshChrome(); wireLiveStream(); };
 
     if (execId) {
       execShort = shortId(execId);

@@ -9,6 +9,7 @@ const { eventBus } = require('./EventBus');
 const { runWithStallClock, stalledMs } = require('./StallClock');
 const { createExecution, updateState, completeExecution, failExecution, checkBudget, incrementUsage, evaluateBudget } = require('./ExecutionManager');
 const { STATES, WAIT_REASONS } = require('./StateMachine');
+const brainStream = require('./BrainStream');
 const { query } = require('../../database');
 
 // Community sources whose facts must be treated as unverified opinion.
@@ -211,6 +212,14 @@ async function _runWithinStallClock({
     ...(override(effectiveBudget.maxRuntimeSeconds) ? { maxRuntimeSeconds: Number(effectiveBudget.maxRuntimeSeconds) } : {})
   });
   const execId = execution.execution_id;
+  // Live telemetry clock — atMs on every pulse is measured from here so the
+  // Brain Model can lay the route out on one timeline without parsing timestamps.
+  const t0 = Date.now();
+  let liveTokens = 0; // last-known cumulative token spend, carried onto tool pulses
+  brainStream.start({
+    executionId: execId, userId, question: goal, agentId: agentName,
+    fuelCap: Math.round((Number(execution.max_tokens) || 15000) / 1000), createdAt: execution.created_at
+  });
   const toolContext = { userId, agentName, conversationId };
   let pendingApproval = null; // set when a requires_approval tool was attempted
   let hasPlanned = false;     // one plan per execution (re-plan loop guard)
@@ -337,6 +346,12 @@ async function _runWithinStallClock({
       }
       traceMemories = Math.max(traceMemories, (enriched.memories || []).length);
       traceRecipes = Math.max(traceRecipes, (enriched.recipeHints || []).length);
+      if ((enriched.graphContext || []).length) {
+        brainStream.knowledge({
+          executionId: execId, userId, atMs: Date.now() - t0,
+          entities: (enriched.graphContext || []).map(g => ({ entityId: g.entity_id, name: g.name, type: g.type }))
+        });
+      }
 
       // 3c. Build context (includes memories + tool results + graph + recipes)
       const ctxStats = {};
@@ -402,6 +417,8 @@ async function _runWithinStallClock({
       });
       const spent = evaluateBudget(usage);
       maxTurnTokens = Math.max(maxTurnTokens, Number(result.tokens) || 0);
+      liveTokens = Number(usage.tokens_used) || liveTokens;
+      brainStream.step({ executionId: execId, userId, reason: result.action.thought, atMs: Date.now() - t0, tokensUsed: liveTokens });
 
       // This turn ran on the reserve, so the run has now had its one funded
       // chance to write. Anything after this falls through to the ordinary
@@ -522,6 +539,7 @@ async function _runWithinStallClock({
             // Execute the tool from the plan
             await updateState(execId, STATES.WAITING, { waitReason: WAIT_REASONS.TOOL_RESPONSE });
             const toolStart = new Date();
+            brainStream.toolStart({ executionId: execId, userId, tool: step.tool, input: step.input || goal, atMs: Date.now() - t0 });
             try {
               const toolOut = await executeTool({
                 executionId: execId,
@@ -533,6 +551,11 @@ async function _runWithinStallClock({
                 context: toolContext
               });
               await incrementUsage(execId, { toolCalls: 1 });
+              brainStream.toolEnd({
+                executionId: execId, userId, tool: step.tool, input: step.input || goal,
+                error: toolOut.output && toolOut.output.error, durationMs: toolOut.durationMs,
+                atMs: Date.now() - t0, tokensUsed: liveTokens
+              });
               await logPhase(execId, 'using_tool', stepNumber, {
                 tool: step.tool,
                 input: step.input,
@@ -545,6 +568,7 @@ async function _runWithinStallClock({
               if (toolErr.name === 'ApprovalRequiredError') {
                 pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput, planStep: step.step };
               }
+              brainStream.toolEnd({ executionId: execId, userId, tool: step.tool, input: step.input || goal, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
               await logPhase(execId, 'using_tool', stepNumber, {
                 tool: step.tool,
                 input: step.input,
@@ -599,6 +623,7 @@ async function _runWithinStallClock({
         // Log the using_tool phase
         const toolStart = new Date();
         let toolOutput;
+        brainStream.toolStart({ executionId: execId, userId, tool: toolName, input: toolInput, atMs: Date.now() - t0 });
 
         try {
           toolOutput = await executeTool({
@@ -613,6 +638,11 @@ async function _runWithinStallClock({
 
           // Increment tool call usage
           await incrementUsage(execId, { toolCalls: 1 });
+          brainStream.toolEnd({
+            executionId: execId, userId, tool: toolName, input: toolInput,
+            error: toolOutput.output && toolOutput.output.error, durationMs: toolOutput.durationMs,
+            atMs: Date.now() - t0, tokensUsed: liveTokens
+          });
 
           // Log tool phase
           await logPhase(execId, 'using_tool', stepNumber, {
@@ -637,6 +667,7 @@ async function _runWithinStallClock({
           if (toolErr.name === 'ApprovalRequiredError') {
             pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput };
           }
+          brainStream.toolEnd({ executionId: execId, userId, tool: toolName, input: toolInput, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
 
           await logPhase(execId, 'using_tool', stepNumber, {
             tool: toolName,
@@ -700,6 +731,10 @@ async function _runWithinStallClock({
       result: finalResponse,
       completionReason
     });
+    brainStream.done({
+      executionId: execId, userId, completionReason,
+      tokensUsed: (completed && completed.tokens_used) || liveTokens, atMs: Date.now() - t0
+    });
 
     // Record the timestamp the user-visible response is ready
     const responseReadyAt = new Date().toISOString();
@@ -738,6 +773,7 @@ async function _runWithinStallClock({
 
   } catch (err) {
     console.error(`❌ CognitiveCore.run() error for ${execId}:`, err.message);
+    brainStream.error({ executionId: execId, userId, message: err.message, atMs: Date.now() - t0 });
     try {
       await failExecution(execId, { error: err });
     } catch (failErr) {

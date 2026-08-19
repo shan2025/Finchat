@@ -77,6 +77,15 @@ async function reflect(execution) {
       JSON.stringify(reflectionData.learnings || [])
     ]);
 
+    // Live: tell the Brain Model this run is now verified (best-effort).
+    try {
+      require('./BrainStream').verified({
+        executionId: execution.execution_id,
+        userId: execution.user_id || execution.userId,
+        summary: reflectionData.summary
+      });
+    } catch (_) { /* telemetry must never break reflection */ }
+
     // ─── Sprint 3: Auto-Embed into pgvector Knowledge Base ───
     try {
       const embeddingContent = `${reflectionData.summary || ''} | Insights: ${(reflectionData.learnings || []).join('; ')}`;
