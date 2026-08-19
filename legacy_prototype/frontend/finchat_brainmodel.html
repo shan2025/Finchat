@@ -218,6 +218,9 @@
           <input id="bmAskWeb" type="checkbox" checked style="accent-color:#c67139;"> Web
         </label>
       </div>
+      <label style="display:inline-flex; align-items:center; gap:8px; font-size:12px; color:#f5ead8; cursor:pointer; padding:2px 0;">
+        <input id="bmAskRace" type="checkbox" style="accent-color:#c67139;"> <span><b>Race mode</b> — Plato picks 2–3 agents to compete on this question</span>
+      </label>
       <textarea id="bmAskText" rows="3" placeholder="e.g. What's the latest on AI chip demand?" style="width:100%; padding:11px 13px; border-radius:12px; background:#322a22; color:#f5ead8; border:1px solid rgba(245,234,216,.14); font-family:inherit; font-size:13px; resize:vertical; outline:none;"></textarea>
       <div id="bmAskNote" style="font-size:11px; color:rgba(245,234,216,.5);"></div>
       <button id="bmAskSend" class="bm-btn" style="align-self:flex-end; padding:9px 20px; border-radius:999px; background:#c67139; color:#fff; font-family:inherit; font-weight:700; font-size:13px;">Ask &amp; watch →</button>
@@ -1066,6 +1069,63 @@
     };
   }
 
+  // Multi-agent race → scenario. Same map contract, but N racers sharing one
+  // pooled set of districts/buildings so overlapping routes (two agents at the
+  // same building) read as collaboration. Times are normalised on ONE shared
+  // span so the agents race on the same clock.
+  function buildScenarioFromRace(race) {
+    var VDUR = 11;
+    var dmap = {}, order = [];
+    (race.districts || []).forEach(function (d) { if (!dmap[d.id]) { dmap[d.id] = { name: d.name, tone: d.tone, items: [] }; order.push(d.id); } });
+    (race.buildings || []).forEach(function (b) { if (!dmap[b.district]) { dmap[b.district] = { name: cap2(b.district), tone: 'n', items: [] }; order.push(b.district); } });
+    (race.buildings || []).forEach(function (b) { dmap[b.district].items.push(b); });
+    var DN = [], BL = {}, keyOf = {};
+    order.forEach(function (did) {
+      var d = dmap[did]; if (!d) return;
+      DN.push([did, d.name, d.tone]);
+      BL[did] = d.items.map(function (b, j) { keyOf[b.id] = did + '-' + j; return [b.label, b.kind === 'doc' ? 'd' : 'c', b.storeys || 2, b.uses || 1]; });
+    });
+
+    var agentsArr = Object.keys(race.agents).map(function (k) { return race.agents[k]; });
+    var span = 0;
+    agentsArr.forEach(function (a) { a.waypoints.forEach(function (w) { span = Math.max(span, w.atMs || 0); }); });
+    (race.events || []).forEach(function (e) { span = Math.max(span, e.atMs || 0); });
+    span = span || 1;
+    var tiny = span < 300;
+    var vt = function (ms, idx, count) { return tiny ? (count > 1 ? idx / (count - 1) * VDUR * 0.92 : 0) : (ms / span) * VDUR; };
+
+    var AG = agentsArr.map(function (a) {
+      var n = a.waypoints.length;
+      var wp = a.waypoints.map(function (w, i) {
+        var loc = (w.buildingId && keyOf[w.buildingId]) ? keyOf[w.buildingId] : 'hub';
+        var at = vt(w.atMs, i, n);
+        return w.offRoad ? [loc, w.reason || '', at, 1] : [loc, w.reason || '', at];
+      });
+      if (!wp.length || wp[0][0] !== 'hub') wp.unshift(['hub', 'Task received', 0]);
+      var lastAt = wp.length ? wp[wp.length - 1][2] : VDUR;
+      return {
+        id: a.agent.id, name: a.agent.name, role: a.agent.role, avatar: a.agent.avatar || '', c: a.agent.color || '#c67139',
+        fuel: a.agent.fuel || 0, conf: a.agent.confidence || 70, risk: a.agent.risk || 0, rate: a.agent.rate || 60,
+        finish: Math.max(0.08, (lastAt / VDUR) || 1), bio: a.agent.bio || (a.done ? 'Finished.' : 'Racing…'), chain: a.agent.chain || '', wp: wp
+      };
+    });
+    if (!AG.length) AG = [{ id: 'plato', name: 'Plato', role: '', avatar: 'plato_avatar.png', c: '#9a5c8a', fuel: 0, conf: 70, risk: 0, rate: 60, finish: 1, bio: '', chain: '', wp: [['hub', '', 0]] }];
+
+    var evSorted = (race.events || []).slice().sort(function (x, y) { return (x.atMs || 0) - (y.atMs || 0); });
+    var evn = evSorted.length;
+    var EV = evSorted.map(function (e, i) { return [vt(e.atMs, i, evn), e.title || '', e.body || '', e.kind || 'plato']; });
+    if (!EV.length) EV = [[0, 'Race started', race.question || '', 'plato']];
+    var FG = (race.fog || []).map(function (f, i) {
+      var ang = -Math.PI / 2 + i * 1.25;
+      return { id: 'f' + i, name: f.name, x: Math.round(Math.cos(ang) * 11), y: Math.round(Math.sin(ang) * 8) - 6, r: 3.6, clearsAt: f.state === 'lifted' ? 0.1 : null, body: f.body };
+    });
+
+    return {
+      DUR: VDUR, DNAMES: DN, BLD: BL, AG: AG, PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
+      EVENTS: EV, FOG: FG, question: race.question || '', realDurationMs: span, live: true
+    };
+  }
+
   // Live update: rebuild the graph from the growing scenario and pin the agent
   // at the newest node (no race playback while a run is still forming).
   BrainModel.prototype.applyLive = function (scn, doFit) {
@@ -1105,6 +1165,7 @@
   // the map grows as the agent routes. On completion we load the persisted trace
   // for an authoritative, replayable version.
   var liveSocket = null, live = null, watchingId = null, liveStarted = false;
+  var currentRace = null, raceFirstRender = true; // multi-agent race accumulator
 
   function fmtInput(v) {
     if (v == null) return '';
@@ -1128,9 +1189,72 @@
     liveStarted = true;
   }
 
+  // ── Multi-agent race ───────────────────────────────────────────────────────
+  function ensureRaceBuilding(b) {
+    if (!b || !b.buildingId) return;
+    if (!currentRace.districts.some(function (d) { return d.id === b.district; })) currentRace.districts.push({ id: b.district, name: b.districtName || b.district, tone: b.tone || 'n' });
+    var ex = currentRace.buildings.filter(function (x) { return x.id === b.buildingId; })[0];
+    if (ex) { ex.uses++; return; }
+    currentRace.buildings.push({ id: b.buildingId, label: b.label, district: b.district, kind: b.kind || 'concept', uses: 1, storeys: b.kind === 'tool' ? 3 : 2 });
+  }
+  function lastRaceBuildingId(ag) { for (var i = ag.waypoints.length - 1; i >= 0; i--) if (ag.waypoints[i].buildingId) return ag.waypoints[i].buildingId; return null; }
+  function renderRace() { if (!window.__bm || !currentRace) return; window.__bm.applyLive(buildScenarioFromRace(currentRace), raceFirstRender); raceFirstRender = false; }
+
+  function onRaceStart(p) {
+    if (!currentRace || currentRace.raceId !== p.raceId) {
+      currentRace = { raceId: p.raceId, question: p.question || '', districts: [], buildings: [], agents: {}, events: [{ atMs: 0, title: 'Race issued', body: 'Plato dispatched the field.', kind: 'plato' }], fog: [] };
+      watchingId = null; live = null; IS_LIVE = true; RUN_ACTIVE = true; raceFirstRender = true;
+      if (document.getElementById('bmQuestion')) document.getElementById('bmQuestion').textContent = currentRace.question;
+    }
+    var a = p.agent || {};
+    currentRace.agents[p.executionId] = {
+      agent: { id: a.id, name: a.name || 'Agent', role: a.role || '', color: a.color || '#c67139', avatar: a.avatar || '', fuel: 0, fuelCap: a.fuelCap || 15, confidence: 70, risk: 0, rate: 60, bio: 'Racing…', chain: '' },
+      waypoints: [{ buildingId: null, reason: 'Task received at the Question Hub', atMs: 0, offRoad: false }], done: false, verified: false, errored: 0
+    };
+    currentRace.events.push({ atMs: 0, title: (a.name || 'Agent') + ' dispatched', body: '', kind: a.id || 'plato' });
+    renderRace(); refreshChrome();
+  }
+  function onRacePulse(p) {
+    var ag = currentRace.agents[p.executionId]; if (!ag) return;
+    var nm = ag.agent.name, aid = ag.agent.id, lbl = p.building ? p.building.label : p.tool;
+    if (p.type === 'knowledge') {
+      (p.buildings || []).forEach(ensureRaceBuilding);
+    } else if (p.type === 'tool_start') {
+      ensureRaceBuilding(p.building);
+      currentRace.events.push({ atMs: p.atMs, title: nm + ' → ' + lbl, body: fmtInput(p.input), kind: aid });
+    } else if (p.type === 'tool_end') {
+      ensureRaceBuilding(p.building);
+      ag.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (fmtInput(p.input) || ('Used ' + lbl)), atMs: p.atMs, offRoad: !!p.error });
+      currentRace.events.push({ atMs: p.atMs, title: nm + ' used ' + lbl, body: p.error ? ('Failed: ' + p.error) : fmtInput(p.input), kind: p.error ? 'fog' : aid });
+      if (p.error) { ag.errored++; currentRace.fog.push({ name: lbl + ' returned no ground', state: 'unknown', body: 'The ' + lbl + ' call failed for ' + nm + ' (' + p.error + ').' }); }
+      if (p.fuel != null) ag.agent.fuel = p.fuel;
+    } else if (p.type === 'step') {
+      ag.waypoints.push({ buildingId: lastRaceBuildingId(ag), reason: p.reason || 'Reasoning', atMs: p.atMs, offRoad: false });
+      if (p.fuel != null) ag.agent.fuel = p.fuel;
+    } else if (p.type === 'error') {
+      ag.errored++; currentRace.fog.push({ name: nm + ' error', state: 'unknown', body: p.message || '' });
+    } else if (p.type === 'verified') {
+      ag.verified = true; ag.agent.confidence = Math.max(ag.agent.confidence, 90); if (p.summary) ag.agent.bio = p.summary;
+    } else if (p.type === 'done') {
+      ag.done = true; if (p.fuel != null) ag.agent.fuel = p.fuel;
+      ag.agent.confidence = p.completionReason === 'natural' ? 88 : p.completionReason === 'budget_exceeded' ? 52 : 34;
+      ag.agent.risk = Math.min(95, ag.errored * 22);
+      ag.agent.chain = nm + ' ran ' + ag.waypoints.filter(function (w) { return w.buildingId; }).length + ' legs.';
+      currentRace.events.push({ atMs: p.atMs, title: nm + (p.completionReason === 'natural' ? ' finished' : ' stopped'), body: '', kind: p.completionReason === 'natural' ? aid : 'fog' });
+      var all = Object.keys(currentRace.agents).map(function (k) { return currentRace.agents[k]; });
+      if (all.length && all.every(function (x) { return x.done; })) { RUN_ACTIVE = false; refreshChrome(); }
+    }
+    renderRace();
+  }
+
   function onPulse(p) {
     if (!p || !p.type) return;
+    // Multi-agent race pulses group by raceId onto one shared map.
+    if (p.type === 'start' && p.raceId) { onRaceStart(p); return; }
+    if (currentRace && currentRace.agents[p.executionId]) { onRacePulse(p); return; }
     if (p.type === 'start') {
+      // A non-race run starts — leave any finished race view and follow it.
+      currentRace = null;
       // Latest run wins — begin following it from the Question Hub.
       watchingId = p.executionId; liveStarted = false; IS_LIVE = true; RUN_ACTIVE = true;
       execShort = shortId(p.executionId);
@@ -1218,11 +1342,16 @@
     var msg = document.getElementById('bmAskText').value.trim();
     if (!msg) { note.textContent = 'Type a question first.'; return; }
     var web = document.getElementById('bmAskWeb').checked;
+    var race = document.getElementById('bmAskRace').checked;
     note.textContent = 'Dispatching…';
-    fetch(apiBase() + '/api/ai-chat/send', {
+    var url = race ? '/api/executions/race' : '/api/ai-chat/send';
+    var body = race ? { question: msg } : { persona: persona, message: msg, web: web };
+    fetch(apiBase() + url, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-      body: JSON.stringify({ persona: persona, message: msg, web: web })
-    }).catch(function () { /* the run streams over the socket regardless */ });
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (race && d && d.agents) note.textContent = ''; })
+      .catch(function () { /* the run(s) stream over the socket regardless */ });
     // The 'start' pulse will flip the map to LIVE; close and let it animate.
     document.getElementById('bmAsk').style.display = 'none';
     document.getElementById('bmAskText').value = '';

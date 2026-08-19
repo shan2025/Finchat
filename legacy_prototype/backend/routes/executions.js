@@ -76,6 +76,48 @@ router.get('/list/recent', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/executions/race ────────────────────────────────
+// Multi-agent race: Plato picks 2–3 relevant specialists and dispatches the
+// SAME question to each in parallel (each its own execution). Every run streams
+// its own brain:pulse events tagged with the shared raceId, so the Brain Model
+// groups them onto one map and shows them racing. Returns immediately — the
+// runs stream live over the socket. Reuses CognitiveCore.run; no new tables.
+router.post('/race', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const question = (req.body && req.body.question || '').trim();
+  const requested = Array.isArray(req.body && req.body.agents) ? req.body.agents.slice(0, 3) : null;
+  if (!question) return res.status(400).json({ error: 'question required' });
+
+  try {
+    const { run } = require('../services/cognitive/CognitiveCore');
+    const { findTopAgents } = require('../services/agents/AgentRegistry');
+
+    let field = (requested && requested.length) ? requested : await findTopAgents(question, 3);
+    if (!field || field.length < 2) field = ['nova', 'aurelius', 'rasha'];
+
+    // A race costs one run per agent — guard the wallet before firing them.
+    const ur = await query('SELECT token_balance, is_frozen FROM users WHERE user_id = $1', [userId]);
+    const u = ur.rows[0];
+    if (u && u.is_frozen) return res.status(403).json({ error: 'Account frozen' });
+    if (u && u.token_balance < field.length * 5) {
+      return res.status(402).json({ error: 'Insufficient tokens for a race', need: field.length * 5, balance: u.token_balance });
+    }
+
+    const raceId = 'race_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    // Fire the lanes in parallel; do NOT await — they stream over the socket and
+    // can take tens of seconds each. Failures are logged, never surfaced as a 500.
+    for (const agentName of field) {
+      run({ goal: question, userId, agentName, workload: 'chat', raceId })
+        .catch(err => console.warn(`⚠️ Race ${raceId} lane "${agentName}" failed: ${err.message}`));
+    }
+
+    res.json({ raceId, agents: field, question });
+  } catch (err) {
+    console.error('Race dispatch error:', err);
+    res.status(500).json({ error: 'Failed to start race', details: err.message });
+  }
+});
+
 // ── GET /api/executions/:id/trace ────────────────────────────
 // Read-only: reshape one real execution into the Brain Model's ExecutionTrace.
 // Adds no tables and writes nothing — see services/cognitive/ExecutionTrace.js.

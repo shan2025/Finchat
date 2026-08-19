@@ -141,6 +141,27 @@ async function findBestAgent(goal) {
   return { agentConfig: bestAgent, score: bestScore };
 }
 
+/**
+ * Pick the top N specialists for a goal — Plato's field for a multi-agent race.
+ * Scores every specialist (excluding orchestrators/middleware) and returns the
+ * best-matching agent ids. When nothing matches on capabilities, falls back to
+ * the top N specialists so a race still has a field.
+ * @param {string} goal
+ * @param {number} [n=3] - clamped to [2,3]
+ * @returns {Promise<string[]>} agent ids
+ */
+async function findTopAgents(goal, n = 3) {
+  const count = Math.max(2, Math.min(3, n));
+  const specialists = (await listActiveAgents({ includeMiddleware: false }))
+    .filter(a => a.type !== 'orchestrator');
+  const scored = specialists
+    .map(a => ({ agentId: a.agentId, score: scoreCapabilities(a, goal) }))
+    .sort((x, y) => y.score - x.score);
+  const matched = scored.filter(s => s.score > 0);
+  const chosen = (matched.length >= 2 ? matched : scored).slice(0, count);
+  return chosen.map(s => s.agentId);
+}
+
 module.exports = {
   getAllAgentConfigs,
   getAgentConfig,
@@ -148,5 +169,6 @@ module.exports = {
   refreshRegistry,
   scoreCapabilities,
   findBestAgent,
+  findTopAgents,
   REGISTRY_CACHE_KEY
 };

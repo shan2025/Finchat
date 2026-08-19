@@ -18,10 +18,10 @@ function pulse(type, data) {
 
 module.exports = {
   // Run opened: the routed agent leaves the Question Hub.
-  start: ({ executionId, userId, question, agentId, fuelCap, createdAt }) => {
+  start: ({ executionId, userId, question, agentId, fuelCap, createdAt, raceId }) => {
     const m = agentMeta(agentId);
     pulse('start', {
-      executionId, userId, question, createdAt: createdAt || new Date().toISOString(),
+      executionId, userId, question, raceId: raceId || null, createdAt: createdAt || new Date().toISOString(),
       agent: { id: agentId, name: m.name, role: m.role, color: m.color, avatar: m.avatar, fuelCap: fuelCap || 15 }
     });
   },

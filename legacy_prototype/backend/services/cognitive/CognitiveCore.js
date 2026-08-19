@@ -145,6 +145,10 @@ async function _runWithinStallClock({
   allowWeb = true,
   studyMode = false,
   approvedTools = [],
+  // When set, this run is one lane of a multi-agent race — the id is forwarded
+  // on the live start pulse so the Brain Model groups the parallel runs onto one
+  // map. Purely a telemetry tag; it changes nothing about how the loop executes.
+  raceId = null,
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
   // Load this agent's runtime tuning (risk + traits + optional per-agent model
@@ -217,7 +221,7 @@ async function _runWithinStallClock({
   const t0 = Date.now();
   let liveTokens = 0; // last-known cumulative token spend, carried onto tool pulses
   brainStream.start({
-    executionId: execId, userId, question: goal, agentId: agentName,
+    executionId: execId, userId, question: goal, agentId: agentName, raceId,
     fuelCap: Math.round((Number(execution.max_tokens) || 15000) / 1000), createdAt: execution.created_at
   });
   const toolContext = { userId, agentName, conversationId };
