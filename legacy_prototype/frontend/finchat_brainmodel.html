@@ -1064,12 +1064,13 @@
   // AG, PLATO, EVENTS, FOG, DEFAULT_Q). applyScenario swaps them, so the exact
   // same engine replays a real run. The demo is captured first so "back to
   // demo" is lossless.
-  var DEMO = { DUR: DUR, DNAMES: DNAMES, BLD: BLD, AG: AG, PLATO: PLATO, EVENTS: EVENTS, FOG: FOG, question: DEFAULT_Q, realDurationMs: null, live: false };
+  var DEMO = { DUR: DUR, DNAMES: DNAMES, BLD: BLD, AG: AG, PLATO: PLATO, EVENTS: EVENTS, FOG: FOG, question: DEFAULT_Q, realDurationMs: null, live: false, roadExpand: true };
   var REAL_DUR_MS = null, IS_LIVE = false, RUN_ACTIVE = false, execShort = '', loadFailed = false;
-  // Real traces/races jump hub→building directly; expanding each hop through the
-  // road graph (district junctions + hub) makes the trail follow roads and lights
-  // the roads travelled. The demo already routes through junctions, so it opts out.
-  var ROAD_EXPAND = false;
+  // Route every hop through the road graph (district junctions + hub) so the
+  // trail follows streets/highways and lights the roads travelled — for the demo
+  // as well as real traces/races (the demo also has non-adjacent hops that would
+  // otherwise cut across open ground, e.g. Portfolio → Markets).
+  var ROAD_EXPAND = true;
   var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
