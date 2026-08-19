@@ -85,6 +85,7 @@
       <span style="width:7px; height:7px; border-radius:999px; background:var(--parch-dim);"></span><span id="bmModeLabel">Demo run</span>
     </button>
     <button id="bmRanksBtn" class="bm-btn" title="Global agent leaderboard — who's actually the better agent" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">🏆 Ranks</button>
+    <button id="bmProfBtn" class="bm-btn" title="Agent performance by task type — who's best at what" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">📊 Profiles</button>
     <div style="width:1px; height:20px; background:var(--line);"></div>
     <span id="bmQuestion" style="font-size:13px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--parch);"></span>
 
@@ -194,6 +195,27 @@
     </div>
     <div id="bmPickerBody" class="bm-scroll" style="padding:12px 15px; overflow-y:auto;">
       <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading recent runs…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Profiles overlay — agent performance by task type -->
+<div id="bmProfiles" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(12,10,8,.6); align-items:flex-start; justify-content:center; padding:60px 16px;">
+  <div class="bm-scroll" style="width:min(760px,100%); max-height:82vh; background:#262019; border:1px solid rgba(245,234,216,.14); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5); display:flex; flex-direction:column; overflow:hidden; color:#f5ead8; font-family:'Figtree',system-ui,sans-serif;">
+    <div style="display:flex; align-items:center; gap:10px; padding:15px 17px; border-bottom:1px solid rgba(245,234,216,.14);">
+      <span style="font-family:'Caprasimo',serif; font-size:17px;">Performance Profiles</span>
+      <span style="font-size:11px; color:rgba(245,234,216,.55);">who's best at what</span>
+      <div style="margin-left:auto; display:flex; gap:3px; padding:3px; border-radius:999px; background:#322a22;">
+        <span id="bmProfGlobal" class="bm-tab" style="padding:5px 11px; border-radius:999px; font-size:11px; font-weight:700;">Global</span>
+        <span id="bmProfMine" class="bm-tab" style="padding:5px 11px; border-radius:999px; font-size:11px; font-weight:700;">Mine</span>
+      </div>
+      <button id="bmProfClose" class="bm-btn" style="width:28px; height:28px; border-radius:999px; background:#322a22; color:#f5ead8; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+    </div>
+    <div id="bmProfBody" class="bm-scroll" style="padding:13px 15px; overflow-y:auto;">
+      <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading…</div>
+    </div>
+    <div style="padding:10px 16px 13px; border-top:1px solid rgba(245,234,216,.14); font-size:10px; color:rgba(245,234,216,.45); line-height:1.6;">
+      Accuracy = share of runs that finished cleanly, by task type (questions classified by keywords). This is what Plato will eventually route on — send research questions to whoever is most accurate at research, not just whoever matches on capability.
     </div>
   </div>
 </div>
@@ -1436,6 +1458,66 @@
     }).join('');
   }
 
+  // ── Profiles: per-agent performance by task type ──────────────────────────
+  function wireProfiles() {
+    var ov = document.getElementById('bmProfiles');
+    document.getElementById('bmProfBtn').addEventListener('click', function () { openProfiles('global'); });
+    document.getElementById('bmProfClose').addEventListener('click', function () { ov.style.display = 'none'; });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.style.display = 'none'; });
+    document.getElementById('bmProfGlobal').addEventListener('click', function () { openProfiles('global'); });
+    document.getElementById('bmProfMine').addEventListener('click', function () { openProfiles('me'); });
+  }
+  function openProfiles(scope) {
+    var ov = document.getElementById('bmProfiles'), body = document.getElementById('bmProfBody');
+    ov.style.display = 'flex';
+    var g = document.getElementById('bmProfGlobal'), m = document.getElementById('bmProfMine');
+    g.style.background = scope === 'global' ? 'var(--accent)' : 'transparent'; g.style.color = scope === 'global' ? '#fff' : 'var(--parch-dim)';
+    m.style.background = scope === 'me' ? 'var(--accent)' : 'transparent'; m.style.color = scope === 'me' ? '#fff' : 'var(--parch-dim)';
+    var tok = getToken();
+    if (!tok) { body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6);">Sign in to see profiles.</div>'; return; }
+    body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6);">Loading…</div>';
+    fetch(apiBase() + '/api/agents/profiles?scope=' + (scope === 'me' ? 'me' : 'global'), { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { renderProfiles(body, d && d.profiles); })
+      .catch(function (e) { body.innerHTML = '<div style="font-size:12px; color:#e2a3a3;">Could not load profiles: ' + esc(e.message) + '</div>'; });
+  }
+  function accColor(a) { return a >= 75 ? '#93a56e' : a >= 50 ? '#e0ac86' : a >= 30 ? '#e08a44' : '#c76b6b'; }
+  function renderProfiles(body, data) {
+    if (!data || !data.agents || !data.agents.length) { body.innerHTML = '<div style="font-size:12px; color:rgba(245,234,216,.6); line-height:1.6;">Not enough runs yet to profile the agents. Ask a mix of questions (or run some races) and check back.</div>'; return; }
+    var active = data.taskTypes.filter(function (t) { return data.agents.some(function (a) { return a.cells[t]; }); });
+
+    // "Best agent per task type" summary
+    var best = active.map(function (t) {
+      var b = data.bestPerTask[t];
+      var who = b ? '<span style="color:' + b.color + '; font-weight:700;">' + esc(b.name) + '</span> · ' + b.accuracy + '%' : '<span style="color:rgba(245,234,216,.4);">—</span>';
+      return '<div style="background:#322a22; border-radius:11px; padding:8px 11px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(245,234,216,.5);">' + esc(t) + '</div><div style="font-size:12px; margin-top:2px;">' + who + '</div></div>';
+    }).join('');
+
+    // Matrix: agents × task types (accuracy, runs; best cell per column ringed)
+    var head = '<th style="text-align:left; padding:6px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:rgba(245,234,216,.5); position:sticky; left:0; background:#262019;">Agent</th>' +
+      active.map(function (t) { return '<th style="padding:6px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:rgba(245,234,216,.5);">' + esc(t) + '</th>'; }).join('');
+    var rows = data.agents.map(function (a) {
+      var tds = active.map(function (t) {
+        var c = a.cells[t];
+        if (!c) return '<td style="padding:6px 8px; text-align:center; color:rgba(245,234,216,.25);">–</td>';
+        var isBest = data.bestPerTask[t] && data.bestPerTask[t].agent === a.agent;
+        return '<td style="padding:5px 6px; text-align:center;"><div style="display:inline-block; min-width:52px; border-radius:9px; padding:4px 6px; background:rgba(245,234,216,.05); border:1.5px solid ' + (isBest ? accColor(c.accuracy) : 'transparent') + ';">' +
+          '<div style="font-size:13px; font-weight:700; color:' + accColor(c.accuracy) + ';">' + c.accuracy + '%</div>' +
+          '<div style="font-size:9px; color:rgba(245,234,216,.4);">' + c.runs + ' run' + (c.runs === 1 ? '' : 's') + '</div></div></td>';
+      }).join('');
+      var av = a.avatar ? "background-image:url('" + a.avatar + "');" : '';
+      return '<tr>' +
+        '<td style="padding:6px 8px; position:sticky; left:0; background:#262019;"><div style="display:flex; align-items:center; gap:8px;"><div style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background-color:' + a.color + '; ' + av + ' background-size:cover; background-position:center; border:2px solid ' + a.color + ';"></div><div><div style="font-size:12px; font-weight:700;">' + esc(a.name) + '</div>' + (a.bestAt && a.bestAt.length ? '<div style="font-size:9px; color:rgba(245,234,216,.45);">best at ' + a.bestAt.slice(0, 3).join(', ') + '</div>' : '') + '</div></div></td>' +
+        tds + '</tr>';
+    }).join('');
+
+    body.innerHTML =
+      '<div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(245,234,216,.5); margin-bottom:7px;">Best agent per task type</div>' +
+      '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; margin-bottom:16px;">' + best + '</div>' +
+      '<div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(245,234,216,.5); margin-bottom:7px;">Accuracy by task type</div>' +
+      '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;"><thead><tr>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
   // ── Ask box: trigger a real run from the Brain Model and watch it stream ──
   function wireAsk() {
     var ov = document.getElementById('bmAsk');
@@ -1552,6 +1634,7 @@
     wirePicker();
     wireAsk();
     wireLeaderboard();
+    wireProfiles();
     var params = new URLSearchParams(location.search);
     var execId = params.get('execution') || params.get('exec');
     var start = function () { window.__bm = new BrainModel(); refreshChrome(); wireLiveStream(); };

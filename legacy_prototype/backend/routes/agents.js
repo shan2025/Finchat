@@ -6,7 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { listPersonas } = require('../services/personas');
 const { runDebate } = require('../services/agents/DebateOrchestrator');
 const { refreshRegistry, getAgentConfig } = require('../services/agents/AgentRegistry');
-const { getLeaderboard } = require('../services/AgentLeaderboard');
+const { getLeaderboard, getAgentProfiles } = require('../services/AgentLeaderboard');
 
 const VALID_RISK = ['Low', 'Medium', 'High'];
 // Optional per-agent model override — any Groq-supported model string, plus '' meaning "use default".
@@ -40,6 +40,22 @@ router.get('/leaderboard', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Leaderboard error:', err);
     res.status(500).json({ error: 'Failed to build leaderboard', details: err.message });
+  }
+});
+
+/**
+ * GET /api/agents/profiles?scope=global|me
+ * Per-agent performance by task type (markets/research/news/…): where each
+ * agent is strongest, and the best agent for each task type.
+ */
+router.get('/profiles', requireAuth, async (req, res) => {
+  try {
+    const scopeMe = req.query.scope === 'me';
+    const profiles = await getAgentProfiles({ userId: scopeMe ? req.user.id : null });
+    res.json({ profiles, scope: scopeMe ? 'me' : 'global' });
+  } catch (err) {
+    console.error('Profiles error:', err);
+    res.status(500).json({ error: 'Failed to build profiles', details: err.message });
   }
 });
 

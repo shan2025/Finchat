@@ -106,4 +106,79 @@ async function getLeaderboard({ userId = null } = {}) {
   return rows;
 }
 
-module.exports = { getLeaderboard };
+// ── Agent performance profiles by task type ─────────────────────────────────
+// Classify each question into a domain so we can see WHERE each agent is strong
+// ("Aurelius is more accurate on research; Nova is faster on markets"). This is
+// the substrate for Plato eventually selecting agents on history, not just
+// capability matching. Keyword classification on the goal — first match wins,
+// ordered most-specific first.
+const TASK_TYPES = ['markets', 'research', 'news', 'compliance', 'risk', 'portfolio', 'general'];
+const TASK_MATCHERS = [
+  ['markets', /\b(stock|stocks|price|prices|ticker|crypto|bitcoin|ethereum|solana|forex|currency|commodit|gold|oil|equit|trading|shares?|valuation|earnings|market)\b/i],
+  ['research', /\b(research|paper|papers|arxiv|study|studies|academic|literature|whitepaper|deep dive|explain|how does|what is)\b/i],
+  ['news', /\b(news|headline|latest|today|announce|update|recent|breaking|happening|this week)\b/i],
+  ['compliance', /\b(complian|regulat|\brule|legal|\blaw\b|audit|disclosure|suitab|govern|policy)\b/i],
+  ['risk', /\b(risk|exposure|drawdown|volatil|hedge|downside|stress|default|credit)\b/i],
+  ['portfolio', /\b(portfolio|holding|allocation|watchlist|position|rebalanc|diversif|client)\b/i]
+];
+function classifyTask(goal) {
+  const g = String(goal || '');
+  for (const [t, re] of TASK_MATCHERS) if (re.test(g)) return t;
+  return 'general';
+}
+
+/**
+ * Per-agent, per-task-type performance. Returns each agent's accuracy/fuel/time
+ * per domain, the best agent for each task type (min sample), and which task
+ * types each agent leads.
+ * @param {object} [opts]
+ * @param {string|null} [opts.userId]
+ */
+async function getAgentProfiles({ userId = null } = {}) {
+  const scope = userId ? 'AND e.user_id = $1' : '';
+  const params = userId ? [userId] : [];
+  const res = await db.query(`
+    SELECT e.assigned_agent AS agent, e.goal, e.tokens_used, e.completion_reason,
+      LEAST(EXTRACT(EPOCH FROM (e.updated_at - e.created_at)), ${MAX_RUN_SECS}) AS secs
+    FROM executions e
+    WHERE e.assigned_agent = ANY($${params.length + 1})
+      AND e.current_state IN ('completed', 'failed') ${scope}
+    ORDER BY e.created_at DESC LIMIT 4000
+  `, [...params, [...ROSTER]]);
+
+  const cells = {}; // agent -> task -> {runs, natural, fuel, secs}
+  for (const r of res.rows) {
+    const t = classifyTask(r.goal);
+    const A = cells[r.agent] || (cells[r.agent] = {});
+    const c = A[t] || (A[t] = { runs: 0, natural: 0, fuel: 0, secs: 0 });
+    c.runs++; if (r.completion_reason === 'natural') c.natural++;
+    c.fuel += Number(r.tokens_used) || 0; c.secs += Number(r.secs) || 0;
+  }
+
+  const agents = Object.keys(cells).map(id => {
+    const m = agentMeta(id), A = cells[id], out = {};
+    for (const t of Object.keys(A)) {
+      const c = A[t];
+      out[t] = { runs: c.runs, accuracy: round(100 * c.natural / c.runs, 0), avgFuel: round(c.fuel / c.runs / 1000, 1), avgSecs: round(c.secs / c.runs, 1) };
+    }
+    return { agent: id, name: m.name, role: m.role, color: m.color, avatar: m.avatar, cells: out };
+  });
+
+  const MIN = 3; // don't crown an agent on a single lucky run
+  const bestPerTask = {};
+  for (const t of TASK_TYPES) {
+    let best = null;
+    for (const a of agents) {
+      const c = a.cells[t];
+      if (c && c.runs >= MIN && (!best || c.accuracy > best.accuracy || (c.accuracy === best.accuracy && c.avgFuel < best.avgFuel))) {
+        best = { agent: a.agent, name: a.name, color: a.color, accuracy: c.accuracy, runs: c.runs };
+      }
+    }
+    if (best) bestPerTask[t] = best;
+  }
+  for (const a of agents) a.bestAt = TASK_TYPES.filter(t => bestPerTask[t] && bestPerTask[t].agent === a.agent);
+
+  return { taskTypes: TASK_TYPES, agents, bestPerTask };
+}
+
+module.exports = { getLeaderboard, getAgentProfiles, classifyTask };
