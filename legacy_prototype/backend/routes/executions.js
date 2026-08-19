@@ -4,6 +4,7 @@ const router = express.Router();
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { resumeExecution } = require('../services/cognitive/CognitiveCore');
+const { buildExecutionTrace } = require('../services/cognitive/ExecutionTrace');
 
 // ── GET /api/executions?state=waiting ────────────────────────
 // List the user's executions, defaulting to those awaiting human approval
@@ -50,6 +51,43 @@ router.get('/:id', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Fetch execution error:', err);
     res.status(500).json({ error: 'Failed to fetch execution details', details: err.message });
+  }
+});
+
+// ── GET /api/executions/list/recent ──────────────────────────
+// Recent executions for the signed-in user, newest first — feeds the Brain
+// Model's "load a real run" picker. Two path segments so it never collides
+// with GET /:id.
+router.get('/list/recent', requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const rows = await query(`
+      SELECT execution_id, assigned_agent, current_state, completion_reason, goal,
+             tokens_used, tool_calls_used, created_at, updated_at
+      FROM executions
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT $2
+    `, [req.user.id, limit]);
+    res.json({ executions: rows.rows });
+  } catch (err) {
+    console.error('Recent executions error:', err);
+    res.status(500).json({ error: 'Failed to list recent executions', details: err.message });
+  }
+});
+
+// ── GET /api/executions/:id/trace ────────────────────────────
+// Read-only: reshape one real execution into the Brain Model's ExecutionTrace.
+// Adds no tables and writes nothing — see services/cognitive/ExecutionTrace.js.
+router.get('/:id/trace', requireAuth, async (req, res) => {
+  try {
+    const trace = await buildExecutionTrace({ executionId: req.params.id, userId: req.user.id });
+    if (!trace) return res.status(404).json({ error: 'Execution not found' });
+    if (trace.forbidden) return res.status(403).json({ error: 'Not your execution' });
+    res.json({ trace });
+  } catch (err) {
+    console.error('Build execution trace error:', err);
+    res.status(500).json({ error: 'Failed to build execution trace', details: err.message });
   }
 });
 

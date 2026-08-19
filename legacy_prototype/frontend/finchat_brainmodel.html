@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Brain Model</title>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Brain Model — a live map of how the agents route through the knowledge
+     graph to answer one question. Espresso palette, matching the Neural Map's
+     dark mode so this reads as the same product. All tokens are scoped to
+     .bm-app so nothing here leaks into the shared sidebar. ────────────────── */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { font-family: 'Figtree', system-ui, sans-serif; background: #1c1815; color: #f5ead8; overflow: hidden; }
+
+  .bm-app {
+    --ink: #1c1815; --ink2: #262019; --ink3: #322a22;
+    --line: rgba(245,234,216,.14); --parch: #f5ead8; --parch-dim: rgba(245,234,216,.62);
+    --accent: #c67139; --accent-300: #ffc6a5; --accent-200: #ffe1d0;
+    position: fixed; inset: 0 0 0 0; display: flex; flex-direction: column;
+    background: var(--ink); color: var(--parch); overflow: hidden;
+  }
+  @media (min-width: 768px) { .bm-app { left: 256px; } }
+
+  .bm-app a { color: var(--accent-300); text-decoration: none; }
+  .bm-app a:hover { color: var(--accent-200); text-decoration: underline; }
+  .bm-canvas { display: block; touch-action: none; cursor: crosshair; }
+  .bm-scroll { overflow-y: auto; scrollbar-width: thin; }
+  .bm-scroll::-webkit-scrollbar { width: 8px; }
+  .bm-scroll::-webkit-scrollbar-thumb { background: rgba(245,234,216,.18); border-radius: 999px; }
+  @keyframes bmpop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes bmflash { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .bm-pop { animation: bmpop .2s cubic-bezier(.2,.8,.2,1); }
+  .bm-row { cursor: pointer; transition: background .14s ease, transform .14s ease; }
+  .bm-row:hover { transform: translateX(2px); }
+  .bm-tab { cursor: pointer; transition: background .14s ease, color .14s ease; user-select: none; }
+  .bm-ico { cursor: pointer; transition: background .14s ease; }
+  .bm-ico:hover { background: rgba(245,234,216,.1); }
+  .bm-live { animation: bmflash 1.6s ease-in-out infinite; }
+  .bm-app input::placeholder { color: rgba(245,234,216,.4); }
+  .bm-app input[type=range] { accent-color: var(--accent); }
+  .bm-app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .bm-btn { border: none; cursor: pointer; font-family: inherit; }
+
+  /* Mobile drawer plumbing for the shared rail. */
+  #sideNav { transition: transform .25s ease; }
+  @media (max-width: 767px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    #sideNav.open { transform: translateX(0); }
+  }
+</style>
+<script>
+/* file:// fallback — route root-relative "/api/…" fetches to the local backend
+   when this page is opened directly from disk. No-op when served over http. */
+(function(){ if(location.protocol==='file:'){ var _f=window.fetch.bind(window);
+ window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
+</script>
+</head>
+
+<body>
+
+<!-- Backdrop behind the drawer nav on narrow screens -->
+<div id="navBackdrop" class="hidden" style="display:none; position:fixed; inset:0; z-index:55; background: rgba(0,0,0,.45);"></div>
+
+<!-- Shared FinChat rail — sidebar_nav.js rebuilds this in place. -->
+<nav id="sideNav" style="position:fixed; left:0; top:0; height:100%; width:256px; z-index:40;"></nav>
+
+<div class="bm-app" id="bmApp">
+
+  <!-- ── Top bar: the question, search, playback ─────────────────────────── -->
+  <div style="display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--ink2); border-bottom:1px solid var(--line); flex-shrink:0; z-index:20;">
+    <button id="navToggle" title="Menu" class="bm-btn bm-ico" style="display:none; align-items:center; justify-content:center; width:34px; height:34px; border-radius:999px; background:var(--ink3); color:var(--parch); flex-shrink:0;">
+      <span class="material-symbols-outlined" style="font-size:18px;">menu</span>
+    </button>
+    <div style="display:flex; align-items:baseline; gap:9px;">
+      <span style="font-family:'Caprasimo',serif; font-size:20px; color:var(--accent-300);">Brain Model</span>
+      <span id="bmKicker" style="font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--parch-dim); font-weight:600;">agent routes</span>
+    </div>
+    <button id="bmMode" class="bm-btn" style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">
+      <span style="width:7px; height:7px; border-radius:999px; background:var(--parch-dim);"></span><span id="bmModeLabel">Demo run</span>
+    </button>
+    <div style="width:1px; height:20px; background:var(--line);"></div>
+    <span id="bmQuestion" style="font-size:13px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--parch);"></span>
+
+    <div style="position:relative; flex:0 1 200px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(245,234,216,.5)" stroke-width="2.75" stroke-linecap="round" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input id="bmSearch" placeholder="Find a place…" style="width:100%; padding:8px 12px 8px 34px; border-radius:999px; border:1px solid var(--line); background:var(--ink3); color:var(--parch); font-family:inherit; font-size:12px; outline:none;">
+    </div>
+
+    <div id="bmSpeeds" style="display:flex; align-items:center; gap:3px; padding:3px; border-radius:999px; background:var(--ink3);"></div>
+    <button id="bmPlay" class="bm-btn" style="display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:999px; background:var(--accent); color:#fff; font-family:inherit; font-weight:700; font-size:12px;">Play</button>
+  </div>
+
+  <!-- ── Controller directive bar ─────────────────────────────────────────── -->
+  <div style="display:flex; align-items:center; gap:13px; padding:9px 18px; background:var(--ink); border-bottom:1px solid var(--line); flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      <div id="bmPlatoAv" style="width:34px; height:34px; border-radius:999px; background-color:#9a5c8a; background-size:cover; background-position:center; border:2px solid #9a5c8a;"></div>
+      <div>
+        <div style="font-size:13px; font-weight:700; line-height:1.2;">Plato</div>
+        <div style="font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim);">Race controller</div>
+      </div>
+    </div>
+    <div style="width:1px; height:26px; background:var(--line);"></div>
+    <div class="bm-live" style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+      <span style="width:7px; height:7px; border-radius:999px; background:var(--accent); flex-shrink:0;"></span>
+      <span id="bmDirective" style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span>
+    </div>
+    <div id="bmAssign" style="display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;"></div>
+  </div>
+
+  <!-- ── Map + inspector ──────────────────────────────────────────────────── -->
+  <div style="display:flex; flex:1; min-height:0;">
+    <div style="position:relative; flex:1; min-width:0;">
+      <canvas id="bmCanvas" class="bm-canvas" style="width:100%; height:100%;"></canvas>
+
+      <div style="position:absolute; top:13px; left:13px; display:flex; flex-direction:column; gap:7px;">
+        <div style="display:flex; align-items:center; gap:7px; padding:6px 7px; border-radius:999px; background:var(--ink2); border:1px solid var(--line);">
+          <span id="bmZoomOut" class="bm-ico" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:999px; color:var(--parch);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+          </span>
+          <span id="bmLod" style="font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--parch-dim); min-width:62px; text-align:center;">Buildings</span>
+          <span id="bmZoomIn" class="bm-ico" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:999px; color:var(--parch);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M5 12h14M12 5v14"></path></svg>
+          </span>
+          <span id="bmReset" class="bm-ico" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:999px; color:var(--parch-dim);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"></path></svg>
+          </span>
+        </div>
+        <div id="bmLegend" style="display:flex; flex-wrap:wrap; gap:5px; max-width:236px;"></div>
+      </div>
+
+      <div id="bmLiveTags" style="position:absolute; top:13px; right:13px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:none;"></div>
+
+      <div style="position:absolute; left:13px; bottom:11px; font-size:10px; color:var(--parch-dim); pointer-events:none;">click a road to see the decision that chose it · click a building to inspect · drag to pan</div>
+    </div>
+
+    <div class="bm-scroll" style="width:372px; flex-shrink:0; border-left:1px solid var(--line); background:var(--ink2); display:flex; flex-direction:column;">
+      <div style="padding:14px 15px 12px; border-bottom:1px solid var(--line);">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;">
+          <span style="font-family:'Caprasimo',serif; font-size:15px;">Standings</span>
+          <span id="bmCapLabel" style="font-size:10px; color:var(--parch-dim);"></span>
+        </div>
+        <div id="bmBoard" style="display:flex; flex-direction:column; gap:5px;"></div>
+      </div>
+
+      <div id="bmTabs" style="display:flex; gap:4px; padding:10px 13px 0; flex-wrap:wrap;"></div>
+
+      <div id="bmPanel" style="padding:13px; flex:1;"></div>
+
+      <div style="padding:12px 14px 15px; border-top:1px solid var(--line);">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim);">Fuel budget · Plato enforces</span>
+          <span id="bmBudgetLabel" style="font-size:12px; font-weight:700; font-variant-numeric:tabular-nums;"></span>
+        </div>
+        <input id="bmBudget" type="range" min="4" max="30" step="1" value="14" style="width:100%;">
+        <div id="bmBudgetNote" style="font-size:10px; color:var(--parch-dim); margin-top:4px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Race timeline ────────────────────────────────────────────────────── -->
+  <div style="flex-shrink:0; border-top:1px solid var(--line); background:var(--ink2); padding:10px 18px 12px;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+      <span style="font-family:'Caprasimo',serif; font-size:14px;">Race timeline</span>
+      <span id="bmClock" style="font-size:11px; font-variant-numeric:tabular-nums; color:var(--parch); padding:3px 10px; border-radius:999px; background:var(--ink3);"></span>
+      <span id="bmNowEvent" style="font-size:11px; font-weight:600;"></span>
+      <span style="margin-left:auto; font-size:10px; color:var(--parch-dim);">drag to scrub · markers are decisions</span>
+    </div>
+    <div id="bmTrack" style="position:relative; display:flex; flex-direction:column; gap:4px; cursor:ew-resize;">
+      <div id="bmLanes" style="display:flex; flex-direction:column; gap:4px;"></div>
+      <div id="bmHead" style="position:absolute; top:-3px; bottom:-3px; left:72px; width:2px; background:var(--parch); pointer-events:none;">
+        <span style="position:absolute; top:-5px; left:-4px; width:10px; height:10px; border-radius:999px; background:var(--parch);"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Real-run picker overlay -->
+<div id="bmPicker" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(12,10,8,.6); align-items:flex-start; justify-content:center; padding:70px 16px;">
+  <div class="bm-scroll" style="width:min(560px,100%); max-height:78vh; background:#262019; border:1px solid rgba(245,234,216,.14); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5); display:flex; flex-direction:column; overflow:hidden; color:#f5ead8; font-family:'Figtree',system-ui,sans-serif;">
+    <div style="display:flex; align-items:center; gap:10px; padding:15px 17px; border-bottom:1px solid rgba(245,234,216,.14);">
+      <span style="font-family:'Caprasimo',serif; font-size:16px;">Load a real execution</span>
+      <span style="font-size:11px; color:rgba(245,234,216,.55);">stream one real question onto the map</span>
+      <button id="bmPickerClose" class="bm-btn" style="margin-left:auto; width:28px; height:28px; border-radius:999px; background:#322a22; color:#f5ead8; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+    </div>
+    <div id="bmPickerBody" class="bm-scroll" style="padding:12px 15px; overflow-y:auto;">
+      <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading recent runs…</div>
+    </div>
+  </div>
+</div>
+
+<script src="sidebar_nav.js"></script>
+<script>
+(function () {
+  'use strict';
+  // Wire the mobile drawer toggle for the shared rail.
+  var navToggle = document.getElementById('navToggle');
+  var backdrop = document.getElementById('navBackdrop');
+  function showToggle() { if (window.innerWidth < 768) navToggle.style.display = 'inline-flex'; else navToggle.style.display = 'none'; }
+  window.addEventListener('resize', showToggle); showToggle();
+  navToggle.addEventListener('click', function () {
+    var nav = document.getElementById('sideNav');
+    nav.classList.add('open'); backdrop.style.display = 'block';
+  });
+  backdrop.addEventListener('click', function () {
+    document.getElementById('sideNav').classList.remove('open'); backdrop.style.display = 'none';
+  });
+
+  // ── Race definition — the same scenario the Brain Model design shipped:
+  // a durability question routed by four agents under Plato's control. This is
+  // the seam where live agent-run telemetry would plug in later. ────────────
+  var DUR = 11;
+  var DNAMES = [
+    ['markets', 'Markets', 'a'], ['filings', 'Filings & Reports', 's'], ['models', 'Valuation Models', 'a'],
+    ['compliance', 'Compliance', 'n'], ['risk', 'Risk', 'a'], ['portfolio', 'Portfolio', 's'],
+    ['clients', 'Client History', 'a'], ['macro', 'Macro', 'n'], ['news', 'News & Sentiment', 's']
+  ];
+  var BLD = {
+    markets: [['Order Flow', 'c', 3, 337], ['Liquidity Depth', 'c', 2, 244], ['NYSE Tick Feed', 'd', 2, 401]],
+    filings: [['10-K Vault', 'd', 4, 486], ['Segment Revenue', 'c', 3, 302], ['Auditor Notes', 'd', 2, 88]],
+    models: [['DCF Works', 'c', 4, 205], ['Comps Table', 'c', 3, 167]],
+    compliance: [['Suitability Rules', 'c', 3, 226], ['Disclosure Bank', 'd', 2, 174]],
+    risk: [['Drawdown Ridge', 'c', 4, 377], ['Concentration', 'c', 3, 261], ['Stress Library', 'd', 2, 72]],
+    portfolio: [['Client Holdings', 'c', 4, 501], ['Cost Basis', 'c', 2, 233]],
+    clients: [['Mandate & Limits', 'c', 3, 318], ['Meeting Notes', 'd', 2, 279]],
+    macro: [['Rate Path', 'c', 3, 356], ['CPI Series', 'd', 2, 244]],
+    news: [['Earnings Calls', 'd', 3, 268], ['Sentiment Flats', 'c', 2, 91]]
+  };
+  var AG = [
+    {
+      id: 'nova', name: 'Nova', role: 'Finance', avatar: 'nova_avatar.png', c: '#e08a44', fuel: 9.2, conf: 91, risk: 4, rate: 78, finish: 6 / DUR,
+      bio: 'Retrieval-first. Reads the holding, then the filing, then answers. Cheapest fuel per tile of anyone in the field.',
+      chain: 'Nova selected Portfolio → Markets → Risk → Filings → Valuation.',
+      wp: [['hub', 'Task received at the Question Hub', 0], ['d:portfolio', 'Went to Portfolio first — the question is about client suitability', .5], ['portfolio-0', 'Read Client Holdings to know the current exposure', 1.0], ['d:portfolio', 'Back to the interchange', 1.4], ['d:markets', 'Took the ring road to Markets to confirm the move was real', 2.0], ['markets-0', 'Order Flow confirmed a genuine bid, not a print', 2.5], ['d:markets', 'Rejoined the highway', 2.9], ['d:risk', 'Risk before recommendation — a rule it never skips', 3.5], ['risk-1', 'Concentration check against the mandate', 4.1], ['d:risk', 'Left Risk with a number it could defend', 4.5], ['d:filings', 'Straight to the source rather than inferring', 5.0], ['filings-1', 'Segment Revenue — the actual answer', 5.5], ['d:models', 'Carried it to Valuation to price the durability', 5.8], ['models-0', 'Arrived at DCF Works with evidence in hand', 6.0]]
+    },
+    {
+      id: 'aurelius', name: 'Aurelius', role: 'Research', avatar: 'aurelius_avatar.png', c: '#93a56e', fuel: 13.4, conf: 96, risk: 2, rate: 71, finish: 8 / DUR,
+      bio: 'Will not pass a claim it cannot cite. Pays a fuel premium to route through Compliance every single race — and lifted the fog this run.',
+      chain: 'Aurelius selected News → Filings → Compliance → Valuation, adding a verification leg Plato requested.',
+      wp: [['hub', 'Task received', 0], ['d:news', 'Started with what the market was told', .7], ['news-0', 'Read the earnings call transcript in full', 1.6], ['d:news', 'Left News', 2.1], ['d:filings', 'Went to the primary source next', 3.2], ['filings-0', 'Pulled the 10-K — this is the evidence that lifted the fog', 4.4], ['filings-2', 'Read Auditor Notes, an unusual but decisive stop', 5.3], ['d:compliance', 'Took Plato’s verification road', 6.2], ['compliance-0', 'Suitability confirmed before any recommendation', 6.9], ['d:models', 'Carried citations to Valuation', 7.5], ['models-0', 'Arrived second, with every claim sourced', 8.0]]
+    },
+    {
+      id: 'rasha', name: 'Rasha', role: 'Analyst', avatar: 'rasha_avatar.png', c: '#c76b6b', fuel: 6.4, conf: 62, risk: 47, rate: 44, finish: 10.5 / DUR,
+      bio: 'Fastest to a confident-sounding answer. Left the road network entirely between News and Valuation — for that stretch nothing on the map supported it.',
+      chain: 'Rasha selected News → open ground → Valuation, skipping every source.',
+      wp: [['hub', 'Task received', 0], ['d:news', 'Went to News for the quickest read', .6], ['news-1', 'Sentiment Flats — already soft ground', 1.8], ['@5,-17', 'Left the road: asserted a guidance figure with no source', 3.4, 1], ['@10,-15', 'Still in fog, compounding the assumption', 5.6, 1], ['@13,-9', 'Navigating by inference alone', 7.4, 1], ['d:models', 'Rejoined the network at Valuation', 9.4], ['models-1', 'Arrived third with the weakest answer', 10.5]]
+    }
+  ];
+  var PLATO = { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' };
+  var EVENTS = [
+    [0, 'Task issued', 'Four agents dispatched from the Question Hub. Fuel cap 14k each, verification required before any recommendation.', 'plato'],
+    [1.0, 'Nova opens Portfolio road', 'First road of the race lights up: Question Hub → Portfolio.', 'nova'],
+    [1.6, 'Aurelius opens News road', 'A second highway lights up towards News & Sentiment.', 'aurelius'],
+    [3.0, 'Contradiction found', 'Concentration disagrees with Mandate & Limits — the Risk district flags it on the map.', 'contradiction'],
+    [3.4, 'Rasha left the network', 'Route entered fog north of Sentiment Flats. No source under the ground it is crossing.', 'fog'],
+    [4.0, 'Verification route opened', 'Plato paves a new road: 10-K Vault → Compliance. Aurelius is reassigned to walk it.', 'plato'],
+    [6.0, 'Nova reaches Valuation', 'First arrival. 9.2k fuel, every claim sourced except the durability estimate.', 'nova'],
+    [7.0, 'Fog lifted', 'Aurelius produced the 10-K figure Rasha had guessed. The unknown region north of News is now paved ground.', 'clear'],
+    [8.0, 'Aurelius reaches Valuation', 'Second arrival, highest confidence on the board, 34% more fuel than Nova.', 'aurelius'],
+    [9.5, 'Contradiction resolved', 'The mandate governs — position size is capped and the Risk flag clears.', 'clear'],
+    [10.5, 'Rasha arrives', 'Fastest route, weakest support. Flagged for review, not included in the answer.', 'fog'],
+    [11, 'Answer verified', 'Plato validates: Nova’s answer and Aurelius’ citations. Rasha’s unsourced claim is discarded.', 'done']
+  ];
+  var FOG = [
+    { id: 'f1', name: 'Guidance north of Sentiment Flats', x: 7.5, y: -16, r: 5.2, clearsAt: 7, body: 'Rasha asserted forward guidance here. Nothing on the map supported it until Aurelius returned with the 10-K figure at 7.0s — the fog then lifted and the ground was paved.' },
+    { id: 'f2', name: 'Private-credit exposure', x: 15, y: -13, r: 4.2, clearsAt: null, body: 'No source in the atlas covers the fund’s private-credit sleeve. Still unknown at the end of the race — the system says so rather than guessing.' },
+    { id: 'f3', name: 'Post-quarter freight rates', x: -13, y: -13, r: 3.6, clearsAt: null, body: 'Data ends at the quarter close. Any claim about current rates would be made inside this fog.' }
+  ];
+  var DEFAULT_Q = 'Is the Q3 beat at Meridian Logistics durable enough to add to client portfolios?';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ── The engine. Plain 2D canvas + imperative DOM; no framework. ──────────
+  function BrainModel() {
+    this.state = { playing: true, speed: 1, tab: 'route', sel: 'nova', budget: 14, search: '', pop: null, road: null, matches: 0 };
+    this.canvas = document.getElementById('bmCanvas');
+    this.track = document.getElementById('bmTrack');
+    this.t = 0; this.z = 0.72; this.px = 0; this.py = 0; this.frame = 0;
+    this.w = 1000; this.h = 600; this.dpr = 1;
+    this.build();
+    this.mount();
+  }
+  BrainModel.prototype.setState = function (patch) { Object.assign(this.state, patch); this.render(); };
+
+  BrainModel.prototype.build = function () {
+    this.N = { hub: { x: 0, y: 0, label: 'Question Hub', hub: true } };
+    this.D = {}; this.B = {}; this.order = [];
+    var self = this;
+    DNAMES.forEach(function (row, i) {
+      var id = row[0], name = row[1], tone = row[2];
+      var a = (i / DNAMES.length) * Math.PI * 2 - Math.PI / 2;
+      var cx = Math.round(Math.cos(a) * 18), cy = Math.round(Math.sin(a) * 15);
+      self.D[id] = { id: id, name: name, cx: cx, cy: cy, tone: tone, keys: [] };
+      self.N['d:' + id] = { x: cx, y: cy, label: name, junction: true };
+      (BLD[id] || []).forEach(function (b, j) {
+        var ba = a + (j - 1) * 0.55, r = 5.2;
+        var x = Math.round(cx + Math.cos(ba) * r), y = Math.round(cy + Math.sin(ba) * r * 0.85);
+        var key = id + '-' + j;
+        self.B[key] = { id: key, label: b[0], kind: b[1], h: b[2], uses: b[3], x: x, y: y, dist: id, distName: name, tone: tone };
+        self.N[key] = { x: x, y: y, label: b[0] };
+        self.order.push(key); self.D[id].keys.push(key);
+      });
+    });
+
+    this.roads = {};
+    var add = function (a, b, kind, name) {
+      if (!self.N[a] || !self.N[b]) return;
+      var k = [a, b].sort().join('|');
+      if (!self.roads[k]) self.roads[k] = { k: k, a: a, b: b, kind: kind, name: name, uses: [], appearsAt: 0 };
+    };
+    Object.keys(this.D).forEach(function (id) {
+      add('hub', 'd:' + id, 'highway', 'Hub Highway → ' + self.D[id].name);
+      self.D[id].keys.forEach(function (k) { add('d:' + id, k, 'street', self.D[id].name + ' Street → ' + self.B[k].label); });
+    });
+    DNAMES.forEach(function (row, i) {
+      var id = row[0], nx = DNAMES[(i + 1) % DNAMES.length][0];
+      add('d:' + id, 'd:' + nx, 'ring', 'Ring Road · ' + self.D[id].name + ' ↔ ' + self.D[nx].name);
+    });
+    add('filings-0', 'd:compliance', 'verify', 'Verification Route · 10-K Vault → Compliance');
+    var vk = ['filings-0', 'd:compliance'].sort().join('|');
+    // Demo-only: the verification route reveals at 4s. Absent on real traces,
+    // whose nodes differ — guard so build() never touches an undefined road.
+    if (this.roads[vk]) this.roads[vk].appearsAt = 4;
+
+    this.paths = {};
+    AG.forEach(function (a) {
+      var pts = [];
+      a.wp.forEach(function (w, i) {
+        var id = w[0], p;
+        if (id[0] === '@') { var parts = id.slice(1).split(',').map(Number); p = { x: parts[0], y: parts[1], raw: true }; }
+        else { var n = self.N[id]; p = { x: n.x, y: n.y, id: id }; }
+        p.off = !!w[3]; p.at = w[2]; p.reason = w[1]; p.label = p.raw ? 'Open ground' : self.N[id].label;
+        pts.push(p);
+        if (i > 0 && !p.raw && !pts[i - 1].raw) {
+          var k = [a.wp[i - 1][0], id].sort().join('|');
+          if (self.roads[k]) self.roads[k].uses.push({ agent: a.id, why: w[1], at: w[2] });
+        }
+      });
+      self.paths[a.id] = pts;
+    });
+    this.roadKeys = Object.keys(this.roads);
+  };
+
+  BrainModel.prototype.mount = function () {
+    var self = this, c = this.canvas;
+    this.ro = new ResizeObserver(function () { self.resize(); }); this.ro.observe(c.parentElement);
+    this.resize(); this.fit();
+    c.addEventListener('wheel', function (e) { self.onWheel(e); }, { passive: false });
+    c.addEventListener('pointerdown', function (e) { self.onDown(e); });
+    c.addEventListener('pointermove', function (e) { self.onMove(e); });
+    window.addEventListener('pointerup', function () { self.onUp(); });
+    window.addEventListener('pointermove', function (e) { self.onScrubMove(e); });
+    this.track.addEventListener('pointerdown', function (e) { self.onScrubDown(e); });
+
+    // Static controls.
+    document.getElementById('bmPlay').addEventListener('click', function () {
+      if (self.t >= 1 && !self.state.playing) self.t = 0;
+      self.setState({ playing: !self.state.playing });
+    });
+    document.getElementById('bmZoomIn').addEventListener('click', function () { self.z = Math.min(2.6, self.z * 1.25); });
+    document.getElementById('bmZoomOut').addEventListener('click', function () { self.z = Math.max(0.36, self.z / 1.25); });
+    document.getElementById('bmReset').addEventListener('click', function () { self.fit(); });
+    var search = document.getElementById('bmSearch');
+    search.addEventListener('input', function (e) { self.setState({ search: e.target.value }); });
+    search.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var qq = e.target.value.trim().toLowerCase(); if (!qq) return;
+      var hit = self.order.map(function (k) { return self.B[k]; }).find(function (b) { return b.label.toLowerCase().indexOf(qq) >= 0; });
+      if (hit) { self.z = 1.25; self.focus(hit.x, hit.y); self.setState({ pop: hit.id }); }
+    });
+    document.getElementById('bmBudget').addEventListener('input', function (e) { self.setState({ budget: +e.target.value }); });
+
+    // One delegated click handler for every generated row/tab/chip.
+    document.getElementById('bmApp').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-act]'); if (!el) return;
+      var act = el.getAttribute('data-act');
+      if (act === 'speed') self.setState({ speed: +el.getAttribute('data-v') });
+      else if (act === 'sel') self.setState({ sel: el.getAttribute('data-id'), tab: 'route', road: null });
+      else if (act === 'tab') self.setState({ tab: el.getAttribute('data-k') });
+      else if (act === 'leg') self.onLeg(+el.getAttribute('data-i'));
+      else if (act === 'log') { var at = +el.getAttribute('data-at'); self.t = at / DUR; self.setState({ playing: false }); }
+      else if (act === 'fog') self.onFog(+el.getAttribute('data-i'));
+    });
+
+    document.getElementById('bmQuestion').textContent = (window.BM_QUESTION || DEFAULT_Q);
+    document.getElementById('bmPlatoAv').style.backgroundImage = "url('" + PLATO.avatar + "')";
+    this.renderLegend();
+    this.render();
+    this.last = performance.now();
+    this.loop();
+  };
+
+  // ── Geometry ─────────────────────────────────────────────────────────────
+  BrainModel.prototype.resize = function () {
+    var c = this.canvas; if (!c) return;
+    var r = c.parentElement.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+    c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d);
+    this.w = r.width; this.h = r.height; this.dpr = d;
+  };
+  BrainModel.prototype.fit = function () { this.z = 0.74; this.px = this.w / 2; this.py = this.h / 2 + 10; };
+  BrainModel.prototype.proj = function (x, y) { return [(x - y) * 30 * this.z + this.px, (x + y) * 15 * this.z + this.py]; };
+  BrainModel.prototype.focus = function (x, y) { this.px = this.w / 2 - (x - y) * 30 * this.z; this.py = this.h / 2 - (x + y) * 15 * this.z; };
+
+  BrainModel.prototype.onWheel = function (e) {
+    e.preventDefault();
+    var r = this.canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    var nz = Math.min(2.6, Math.max(0.36, this.z * (e.deltaY < 0 ? 1.12 : 0.89))), k = nz / this.z;
+    this.px = mx - (mx - this.px) * k; this.py = my - (my - this.py) * k; this.z = nz;
+  };
+  BrainModel.prototype.onDown = function (e) { this.drag = { x: e.clientX, y: e.clientY, px: this.px, py: this.py, moved: 0 }; };
+  BrainModel.prototype.onMove = function (e) {
+    var r = this.canvas.getBoundingClientRect();
+    this.mouse = [e.clientX - r.left, e.clientY - r.top];
+    if (!this.drag) return;
+    var dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
+    this.drag.moved = Math.max(this.drag.moved, Math.abs(dx) + Math.abs(dy));
+    this.px = this.drag.px + dx; this.py = this.drag.py + dy;
+  };
+  BrainModel.prototype.onUp = function () {
+    if (this.drag && this.drag.moved < 4 && this.mouse) this.pick(this.mouse[0], this.mouse[1]);
+    this.drag = null; this.scrubbing = false;
+  };
+  BrainModel.prototype.pick = function (mx, my) {
+    var self = this, bb = null, bd = 24;
+    this.order.forEach(function (k) {
+      var b = self.B[k], p = self.proj(b.x, b.y), ty = p[1] - b.h * 13 * self.z;
+      var d = Math.hypot(mx - p[0], my - ty); if (d < bd) { bd = d; bb = k; }
+    });
+    if (bb) { this.setState({ pop: bb, road: null, tab: 'place' }); return; }
+    var br = null, brd = 11;
+    this.roadKeys.forEach(function (k) {
+      var r = self.roads[k];
+      if (r.appearsAt > self.t * DUR) return;
+      var p1 = self.proj(self.N[r.a].x, self.N[r.a].y), p2 = self.proj(self.N[r.b].x, self.N[r.b].y);
+      var d = self.segDist(mx, my, p1[0], p1[1], p2[0], p2[1]); if (d < brd) { brd = d; br = k; }
+    });
+    this.setState({ road: br, pop: null, tab: br ? 'road' : this.state.tab });
+  };
+  BrainModel.prototype.segDist = function (px, py, x1, y1, x2, y2) {
+    var dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy;
+    var t = l ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l)) : 0;
+    return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+  };
+
+  BrainModel.prototype.onLeg = function (i) {
+    var sel = AG.find(function (a) { return a.id === this.state.sel; }, this) || AG.find(function (a) { return a.id === this.state.sel; });
+    sel = AG.filter(function (a) { return a.id === this.state.sel; })[0] || AG[0];
+    var pts = this.paths[sel.id], p = pts[i], prev = pts[Math.max(0, i - 1)];
+    if (!p.raw && !prev.raw && p.id && prev.id) {
+      var k = [prev.id, p.id].sort().join('|');
+      if (this.roads[k]) { this.z = Math.max(this.z, .9); this.focus((p.x + prev.x) / 2, (p.y + prev.y) / 2); this.setState({ tab: 'road', road: k, pop: null }); return; }
+    }
+    this.z = Math.max(this.z, 1); this.focus(p.x, p.y); this.setState({ tab: 'fog' });
+  };
+  BrainModel.prototype.onFog = function (i) { var f = FOG[i]; this.z = Math.max(this.z, .95); this.focus(f.x, f.y); this.render(); };
+
+  // ── Animation ──────────────────────────────────────────────────────────
+  BrainModel.prototype.loop = function () {
+    var self = this, now = performance.now(), dt = Math.min(70, now - this.last); this.last = now;
+    if (this.state.playing) {
+      this.t += (dt / 1000) / DUR * this.state.speed;
+      if (this.t >= 1) { this.t = 1; this.state.playing = false; this.render(); }
+    }
+    this.draw();
+    // The map redraws every frame; the DOM inspector re-renders ~10/s while
+    // playing or scrubbing, which is plenty for the readouts and much cheaper.
+    if ((this.state.playing || this.scrubbing) && ++this.frame % 6 === 0) this.render();
+    this.raf = requestAnimationFrame(function () { self.loop(); });
+  };
+  BrainModel.prototype.posAt = function (a, secs) {
+    var pts = this.paths && this.paths[a.id];
+    if (!pts || !pts.length) return { pt: { x: 0, y: 0 }, idx: 0, f: 0 };
+    if (secs <= pts[0].at) return { pt: pts[0], idx: 0 };
+    for (var i = 1; i < pts.length; i++) {
+      if (secs <= pts[i].at || i === pts.length - 1) {
+        var p0 = pts[i - 1], p1 = pts[i], span = Math.max(.001, p1.at - p0.at);
+        var f = Math.max(0, Math.min(1, (secs - p0.at) / span));
+        return { pt: { x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f, off: p1.off && f > 0 }, idx: i, f: f };
+      }
+    }
+    return { pt: pts[pts.length - 1], idx: pts.length - 1, f: 1 };
+  };
+  BrainModel.prototype.fogAlpha = function (f, secs) {
+    if (!f) return 0; // real traces may carry no fog — treat "no fog" as clear
+    if (f.clearsAt == null) return 1;
+    if (secs < f.clearsAt) return 1;
+    return Math.max(0, 1 - (secs - f.clearsAt) / 1.6);
+  };
+
+  BrainModel.prototype.draw = function () {
+    var c = this.canvas; if (!c) return;
+    var g = c.getContext('2d'), z = this.z, secs = this.t * DUR, self = this;
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.fillStyle = '#1c1815'; g.fillRect(0, 0, this.w, this.h);
+    var q = (this.state.search || '').trim().toLowerCase();
+
+    // graticule
+    g.strokeStyle = 'rgba(245,234,216,.05)'; g.lineWidth = 1;
+    for (var i = -32; i <= 32; i += 8) {
+      var p1 = this.proj(i, -32), p2 = this.proj(i, 32);
+      g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
+      p1 = this.proj(-32, i); p2 = this.proj(32, i);
+      g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
+    }
+
+    // district ground
+    Object.keys(this.D).forEach(function (id) {
+      var d = self.D[id], p = self.proj(d.cx, d.cy);
+      var fill = d.tone === 'a' ? 'rgba(198,113,57,.10)' : d.tone === 's' ? 'rgba(122,138,94,.10)' : 'rgba(245,234,216,.05)';
+      g.beginPath(); g.ellipse(p[0], p[1], 168 * z, 84 * z, 0, 0, 6.283);
+      g.fillStyle = fill; g.fill();
+      g.strokeStyle = 'rgba(245,234,216,.09)'; g.lineWidth = 1; g.stroke();
+    });
+
+    // roads: casing then surface, lit by traversal
+    var drawRoad = function (r) {
+      if (r.appearsAt > secs) return;
+      var pa = self.proj(self.N[r.a].x, self.N[r.a].y), pb = self.proj(self.N[r.b].x, self.N[r.b].y);
+      var x1 = pa[0], y1 = pa[1], x2 = pb[0], y2 = pb[1];
+      var isVerify = r.kind === 'verify';
+      var base = r.kind === 'highway' ? 13 : r.kind === 'ring' ? 10 : 7;
+      var first = r.uses.length ? Math.min.apply(null, r.uses.map(function (u) { return u.at; })) : null;
+      var lit = first != null && secs >= first;
+      var litAge = lit ? secs - first : 99;
+      var litAgent = lit ? AG.find(function (a) { return a.id === r.uses.find(function (u) { return u.at === first; }).agent; }) : null;
+      var glow = lit ? Math.max(.28, 1 - litAge / 2.2) : 0;
+      var selHit = self.state.road === r.k;
+      g.lineCap = 'round';
+      g.strokeStyle = '#100e0c'; g.lineWidth = base * z + 3.5 * z;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      g.strokeStyle = isVerify ? 'rgba(154,92,138,.85)' : 'rgba(245,234,216,.20)';
+      g.lineWidth = base * z;
+      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      if (lit && litAgent) {
+        g.save(); g.globalAlpha = glow; g.strokeStyle = litAgent.c; g.lineWidth = base * z;
+        g.shadowColor = litAgent.c; g.shadowBlur = 16 * z;
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
+      }
+      if (selHit) {
+        g.save(); g.strokeStyle = '#f5ead8'; g.lineWidth = 1.6 * z; g.setLineDash([6 * z, 5 * z]);
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
+      }
+      if (r.kind !== 'street' && z > 0.55) {
+        g.save(); g.setLineDash([9 * z, 9 * z]); g.strokeStyle = 'rgba(28,24,21,.75)'; g.lineWidth = Math.max(1, 1.6 * z);
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
+      }
+    };
+    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'street'; }).forEach(function (k) { drawRoad(self.roads[k]); });
+    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'ring'; }).forEach(function (k) { drawRoad(self.roads[k]); });
+    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'highway'; }).forEach(function (k) { drawRoad(self.roads[k]); });
+    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'verify'; }).forEach(function (k) { drawRoad(self.roads[k]); });
+
+    // hub
+    (function () {
+      var p = self.proj(0, 0), hx = p[0], hy = p[1], rr = 26 * z;
+      g.beginPath(); g.ellipse(hx, hy, rr * 1.55, rr * 0.86, 0, 0, 6.283);
+      g.fillStyle = 'rgba(245,234,216,.10)'; g.fill();
+      g.strokeStyle = 'rgba(245,234,216,.45)'; g.lineWidth = 1.5 * z; g.stroke();
+      g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif';
+      g.textAlign = 'center'; g.fillStyle = '#f5ead8';
+      g.fillText('QUESTION HUB', hx, hy + 4 * z);
+    })();
+
+    // fog — the signature behaviour
+    FOG.forEach(function (f) {
+      var al = self.fogAlpha(f, secs);
+      if (al <= 0.001) return;
+      var p = self.proj(f.x, f.y), sx = p[0], sy = p[1], rx = f.r * 34 * z, ry = f.r * 20 * z;
+      g.save();
+      g.globalAlpha = al;
+      var grd = g.createRadialGradient(sx, sy, rx * .1, sx, sy, rx);
+      grd.addColorStop(0, 'rgba(233,224,208,.60)'); grd.addColorStop(.6, 'rgba(210,199,182,.34)'); grd.addColorStop(1, 'rgba(190,180,164,0)');
+      g.fillStyle = grd;
+      g.beginPath();
+      for (var i = 0; i <= 46; i++) {
+        var th = i / 46 * 6.283;
+        var wob = 1 + Math.sin(th * 3 + f.x) * .12 + Math.cos(th * 5 - f.y) * .08;
+        var x = sx + Math.cos(th) * rx * wob, y = sy + Math.sin(th) * ry * wob;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.closePath(); g.fill();
+      g.setLineDash([7 * z, 6 * z]); g.strokeStyle = 'rgba(245,234,216,.5)'; g.lineWidth = 1.4 * z; g.stroke();
+      if (z > 0.5) {
+        g.setLineDash([]);
+        g.font = '700 ' + Math.max(10, 13 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif';
+        g.textAlign = 'center'; g.fillStyle = 'rgba(40,34,28,.72)';
+        g.fillText('UNKNOWN', sx, sy - 2 * z);
+        g.font = '600 ' + Math.max(8, 10 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif';
+        g.fillText('we don’t know enough here', sx, sy + 13 * z);
+      }
+      g.restore();
+    });
+
+    // buildings
+    var matches = 0;
+    var sorted = this.order.slice().sort(function (a, b) { return (self.B[a].x + self.B[a].y) - (self.B[b].x + self.B[b].y); });
+    sorted.forEach(function (k) {
+      var b = self.B[k], p = self.proj(b.x, b.y), sx = p[0], sy = p[1];
+      if (sx < -140 || sx > self.w + 140 || sy < -180 || sy > self.h + 140) return;
+      var bw = 24 * z, bh = 12 * z, up = b.h * 13 * z;
+      var hit = q && b.label.toLowerCase().indexOf(q) >= 0; if (hit) matches++;
+      var isSel = self.state.pop === k;
+      var contradiction = k === 'risk-1' && secs >= 3 && secs < 9.5;
+      var con = b.kind === 'c';
+      var left = con ? '#8f4c1e' : '#4f5c3a', right = con ? '#c67139' : '#7a8a5e', top = con ? '#e0ac86' : '#b6c69b';
+      g.fillStyle = left;
+      g.beginPath(); g.moveTo(sx - bw, sy - bh); g.lineTo(sx, sy); g.lineTo(sx, sy - up); g.lineTo(sx - bw, sy - bh - up); g.closePath(); g.fill();
+      g.fillStyle = right;
+      g.beginPath(); g.moveTo(sx + bw, sy - bh); g.lineTo(sx, sy); g.lineTo(sx, sy - up); g.lineTo(sx + bw, sy - bh - up); g.closePath(); g.fill();
+      g.fillStyle = top;
+      g.beginPath(); g.moveTo(sx, sy - up - bh * 2); g.lineTo(sx + bw, sy - up - bh); g.lineTo(sx, sy - up); g.lineTo(sx - bw, sy - up - bh); g.closePath(); g.fill();
+      g.strokeStyle = isSel || hit ? '#f5ead8' : 'rgba(28,24,21,.6)'; g.lineWidth = isSel || hit ? 2.2 * z : 1 * z; g.stroke();
+      if (b.kind === 'd' && z > 0.7) {
+        g.strokeStyle = '#b6c69b'; g.lineWidth = 1.6 * z;
+        g.beginPath(); g.moveTo(sx, sy - up - bh * 2); g.lineTo(sx, sy - up - bh * 2 - 12 * z); g.stroke();
+      }
+      if (contradiction) {
+        var pul = .45 + .55 * Math.abs(Math.sin(secs * 3.4));
+        g.save(); g.globalAlpha = pul;
+        g.strokeStyle = '#e08a44'; g.lineWidth = 2.4 * z;
+        g.beginPath(); g.moveTo(sx, sy - up - bh * 2 - 4 * z); g.lineTo(sx + bw + 4 * z, sy - up - bh); g.lineTo(sx, sy - up + 4 * z); g.lineTo(sx - bw - 4 * z, sy - up - bh); g.closePath(); g.stroke();
+        g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#e08a44';
+        g.fillText('⚠ CONTRADICTION', sx, sy - up - bh * 2 - 14 * z);
+        g.restore();
+      }
+      if (z > 0.92) {
+        g.font = '600 ' + Math.max(10, 11 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center';
+        var w = g.measureText(b.label).width + 13 * z, ly = sy - up - bh * 2 - (contradiction ? 30 : b.kind === 'd' ? 22 : 11) * z;
+        g.fillStyle = 'rgba(18,16,14,.85)';
+        g.beginPath(); g.roundRect(sx - w / 2, ly - 14 * z, w, 19 * z, 9 * z); g.fill();
+        g.fillStyle = '#f5ead8'; g.fillText(b.label, sx, ly);
+      }
+    });
+    if (matches !== this.state.matches) { this.state.matches = matches; }
+
+    // district names
+    if (z < 1.5) {
+      Object.keys(this.D).forEach(function (id) {
+        var d = self.D[id], p = self.proj(d.cx, d.cy);
+        g.font = Math.max(13, Math.min(24, 19 * z)).toFixed(0) + 'px Caprasimo, serif';
+        g.textAlign = 'center'; g.fillStyle = d.tone === 's' ? 'rgba(182,198,155,.85)' : d.tone === 'a' ? 'rgba(224,172,134,.85)' : 'rgba(245,234,216,.6)';
+        g.fillText(d.name.toUpperCase(), p[0], p[1] + 74 * z);
+      });
+    }
+
+    // travelled trails + agents
+    AG.forEach(function (a) {
+      var pts = self.paths[a.id], cur = self.posAt(a, secs), on = self.state.sel === a.id;
+      g.save();
+      g.globalAlpha = on ? .95 : .4; g.strokeStyle = a.c; g.lineWidth = (on ? 3.4 : 2.2) * z; g.lineCap = 'round';
+      g.beginPath();
+      for (var i = 0; i <= cur.idx; i++) {
+        var pp = i === cur.idx ? cur.pt : pts[i], pr = self.proj(pp.x, pp.y);
+        i ? g.lineTo(pr[0], pr[1]) : g.moveTo(pr[0], pr[1]);
+      }
+      g.stroke();
+      g.restore();
+      var pc = self.proj(cur.pt.x, cur.pt.y), sx = pc[0], sy = pc[1], r = Math.max(9, 12 * z);
+      var inFog = !!cur.pt.off && self.fogAlpha(FOG[0], secs) > 0.05;
+      g.save();
+      g.globalAlpha = .2; g.fillStyle = a.c;
+      g.beginPath(); g.ellipse(sx, sy + 3, r * 1.5, r * .6, 0, 0, 6.283); g.fill();
+      g.globalAlpha = 1;
+      g.beginPath(); g.arc(sx, sy - r * .5, r, 0, 6.283); g.fillStyle = inFog ? 'rgba(120,110,98,.95)' : a.c; g.fill();
+      g.lineWidth = 2.4; g.strokeStyle = inFog ? '#f5ead8' : '#1c1815'; g.stroke();
+      g.font = '700 ' + (r * 1.05).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#fff'; g.fillText(inFog ? '?' : a.name[0], sx, sy - r * .5);
+      g.textBaseline = 'alphabetic';
+      if (on) { g.beginPath(); g.arc(sx, sy - r * .5, r + 5, 0, 6.283); g.strokeStyle = a.c; g.lineWidth = 1.8; g.stroke(); }
+      g.restore();
+    });
+  };
+
+  // ── Scrubbing ────────────────────────────────────────────────────────────
+  BrainModel.prototype.onScrubDown = function (e) { this.scrubbing = true; this.scrubTo(e.clientX); this.setState({ playing: false }); };
+  BrainModel.prototype.onScrubMove = function (e) { if (this.scrubbing) { this.scrubTo(e.clientX); } };
+  BrainModel.prototype.scrubTo = function (cx) {
+    var el = this.track; if (!el) return;
+    var r = el.getBoundingClientRect(), left = r.left + 72, w = Math.max(1, r.width - 156);
+    this.t = Math.min(1, Math.max(0, (cx - left) / w));
+    this.render();
+  };
+  BrainModel.prototype.f = function (n, d) { var m = Math.pow(10, d || 0); return (Math.round(n * m) / m).toFixed(d || 0); };
+
+  // ── DOM render ─────────────────────────────────────────────────────────
+  BrainModel.prototype.renderLegend = function () {
+    var legend = [
+      { label: 'Learned concept', color: '#e0ac86', r: '3px' },
+      { label: 'Source document', color: '#b6c69b', r: '3px' },
+      { label: 'Fog · we don’t know', color: 'rgba(233,224,208,.75)', r: '999px' },
+      { label: 'Verification route', color: '#9a5c8a', r: '2px' },
+      { label: 'Contradiction', color: '#e08a44', r: '2px' }
+    ];
+    document.getElementById('bmLegend').innerHTML = legend.map(function (l) {
+      return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:var(--ink2); border:1px solid var(--line); font-size:10px; font-weight:500; color:var(--parch-dim);">' +
+        '<span style="width:8px; height:8px; border-radius:' + l.r + '; background:' + l.color + ';"></span>' + esc(l.label) + '</span>';
+    }).join('');
+  };
+
+  BrainModel.prototype.render = function () {
+    var self = this, S = this.state, secs = this.t * DUR, budget = S.budget, f = this.f;
+    var sel = AG.filter(function (a) { return a.id === S.sel; })[0] || AG[0];
+    var prog = function (a) { return Math.max(0, Math.min(1, secs / (a.finish * DUR))); };
+    var distOf = function (a) { var d = 0, p = self.paths ? self.paths[a.id] : []; for (var i = 1; i < p.length; i++) d += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y); return d; };
+    var F = function (n, d) { return self.f(n, d); };
+
+    // top bar
+    document.getElementById('bmPlay').textContent = S.playing ? 'Pause' : this.t >= 1 ? 'Replay' : 'Play';
+    document.getElementById('bmSpeeds').innerHTML = [['0.5×', .5], ['1×', 1], ['2×', 2]].map(function (row) {
+      var on = S.speed === row[1];
+      return '<span class="bm-tab" data-act="speed" data-v="' + row[1] + '" style="padding:5px 10px; border-radius:999px; font-size:11px; font-weight:600; background:' + (on ? 'rgba(245,234,216,.14)' : 'transparent') + '; color:' + (on ? 'var(--parch)' : 'var(--parch-dim)') + ';">' + row[0] + '</span>';
+    }).join('');
+
+    // directive bar
+    var past = EVENTS.filter(function (e) { return secs >= e[0]; });
+    var now = past.length ? past[past.length - 1] : EVENTS[0];
+    document.getElementById('bmDirective').textContent = now[1] + ' — ' + now[2];
+    document.getElementById('bmAssign').innerHTML = AG.map(function (a) {
+      var state = prog(a) >= 1 ? 'arrived' : secs < .4 ? 'dispatched' : a.risk > 30 && self.posAt(a, secs).pt.off ? 'in fog' : 'en route';
+      var on = S.sel === a.id;
+      return '<span class="bm-row" data-act="sel" data-id="' + a.id + '" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:11px; font-weight:600; background:' + (on ? 'rgba(245,234,216,.1)' : 'var(--ink3)') + '; border:1px solid ' + (on ? a.c : 'transparent') + '; color:var(--parch);">' +
+        '<span style="width:7px; height:7px; border-radius:999px; background:' + a.c + ';"></span>' + esc(a.name) + ' · ' + esc(state) + '</span>';
+    }).join('');
+
+    // live tags + lod
+    var lod = this.z < 0.55 ? 'Districts' : this.z < 0.95 ? 'Streets' : 'Buildings';
+    document.getElementById('bmLod').textContent = lod;
+    var anyFog = AG.some(function (a) { var c = self.paths ? self.posAt(a, secs) : null; return c && c.pt.off; });
+    var tags = [
+      { label: (anyFog ? 'AGENT IN FOG · UNSOURCED' : secs >= DUR ? 'ANSWER VERIFIED' : 'RACE LIVE · ' + AG.length + (AG.length === 1 ? ' AGENT' : ' AGENTS')), bg: anyFog ? 'rgba(199,107,107,.18)' : 'var(--ink2)', border: anyFog ? 'rgba(199,107,107,.6)' : 'var(--line)', fg: anyFog ? '#e2a3a3' : 'var(--parch)', dot: anyFog ? '#c76b6b' : secs >= 11 ? '#93a56e' : 'var(--accent)' },
+      { label: F(this.z * 100, 0) + '% · ' + this.order.length + ' buildings', bg: 'var(--ink2)', border: 'var(--line)', fg: 'var(--parch-dim)', dot: 'rgba(245,234,216,.35)' }
+    ];
+    document.getElementById('bmLiveTags').innerHTML = tags.map(function (gt) {
+      return '<span style="display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; background:' + gt.bg + '; border:1px solid ' + gt.border + '; font-size:11px; font-weight:700; color:' + gt.fg + ';">' +
+        '<span style="width:7px; height:7px; border-radius:999px; background:' + gt.dot + ';"></span>' + esc(gt.label) + '</span>';
+    }).join('');
+
+    // standings
+    document.getElementById('bmCapLabel').textContent = 'cap ' + budget + 'k · enforced by Plato';
+    var board = AG.slice().sort(function (x, y) { return (y.conf - y.risk) - (x.conf - x.risk); });
+    document.getElementById('bmBoard').innerHTML = board.map(function (a, i) {
+      var p = prog(a);
+      var flag = a.fuel > budget ? 'over cap' : a.risk > 30 ? 'in fog' : null;
+      var flagBg = a.fuel > budget ? 'rgba(224,138,68,.22)' : 'rgba(199,107,107,.22)';
+      var flagFg = a.fuel > budget ? '#e0ac86' : '#e2a3a3';
+      var on = S.sel === a.id;
+      var av = a.avatar ? "background-image:url('" + a.avatar + "');" : '';
+      return '<div class="bm-row" data-act="sel" data-id="' + a.id + '" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:13px; background:' + (on ? 'rgba(224,138,68,.14)' : 'var(--ink3)') + '; border:1px solid ' + (on ? a.c : 'transparent') + ';">' +
+        '<span style="font-family:\'Caprasimo\',serif; font-size:14px; color:var(--parch-dim); width:13px; flex-shrink:0;">' + (i + 1) + '</span>' +
+        '<div style="width:28px; height:28px; border-radius:999px; flex-shrink:0; background-color:' + a.c + '; ' + av + ' background-size:cover; background-position:center; border:2px solid ' + a.c + ';"></div>' +
+        '<div style="min-width:0; flex:1;">' +
+          '<div style="display:flex; align-items:center; gap:6px;">' +
+            '<span style="font-size:12px; font-weight:700;">' + esc(a.name) + '</span>' +
+            '<span style="font-size:9px; color:var(--parch-dim); text-transform:uppercase; letter-spacing:.07em;">' + esc(a.role) + '</span>' +
+            (flag ? '<span style="font-size:8px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; border-radius:999px; background:' + flagBg + '; color:' + flagFg + ';">' + flag + '</span>' : '') +
+          '</div>' +
+          '<div style="height:4px; border-radius:999px; background:rgba(245,234,216,.14); margin-top:5px; overflow:hidden;">' +
+            '<div style="height:100%; border-radius:999px; width:' + F(p * 100, 0) + '%; background:' + a.c + ';"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="text-align:right; flex-shrink:0;">' +
+          '<div style="font-size:11px; font-weight:700; font-variant-numeric:tabular-nums;">' + F(a.fuel * p, 1) + 'k</div>' +
+          '<div style="font-size:9px; color:var(--parch-dim);">' + (p >= 1 ? F(a.finish * DUR, 1) + 's' : 'en route') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    // tabs
+    var tabDefs = [['route', 'Why this route'], ['road', 'Road decision'], ['place', 'Place'], ['log', 'Controller'], ['fog', 'Fog'], ['agent', 'Agent']];
+    document.getElementById('bmTabs').innerHTML = tabDefs.map(function (row) {
+      var on = S.tab === row[0];
+      return '<span class="bm-tab" data-act="tab" data-k="' + row[0] + '" style="padding:6px 11px; border-radius:999px; font-size:11px; font-weight:600; background:' + (on ? 'var(--accent)' : 'var(--ink3)') + '; color:' + (on ? '#fff' : 'var(--parch-dim)') + ';">' + row[1] + '</span>';
+    }).join('');
+
+    // panel
+    document.getElementById('bmPanel').innerHTML = this.renderPanel(sel, secs, budget, prog, distOf, F);
+
+    // budget footer
+    document.getElementById('bmBudgetLabel').textContent = budget + 'k';
+    var over = AG.filter(function (a) { return a.fuel > budget; }).length;
+    document.getElementById('bmBudgetNote').textContent = over + ' of ' + AG.length + (AG.length === 1 ? ' agent exceeds' : ' agents exceed') + ' this cap — Plato would halt them mid-route.';
+    if (+document.getElementById('bmBudget').value !== budget) document.getElementById('bmBudget').value = budget;
+
+    // timeline
+    this.renderTimeline(secs, prog, distOf, F, now);
+  };
+
+  BrainModel.prototype.renderPanel = function (sel, secs, budget, prog, distOf, F) {
+    var self = this, S = this.state;
+    if (S.tab === 'route') {
+      var legs = (this.paths ? this.paths[sel.id] : []).map(function (p, i) {
+        var dot = p.off ? '#c76b6b' : secs >= p.at ? sel.c : 'rgba(245,234,216,.2)';
+        return '<div class="bm-row" data-act="leg" data-i="' + i + '" style="display:flex; gap:10px; padding:8px 9px; border-radius:11px; background:' + (secs >= p.at ? 'var(--ink3)' : 'transparent') + ';">' +
+          '<span style="width:8px; height:8px; border-radius:' + (p.off ? '2px' : '999px') + '; background:' + dot + '; flex-shrink:0; margin-top:4px;"></span>' +
+          '<div style="min-width:0;"><div style="font-size:12px; font-weight:700;">' + esc(p.label) + '</div>' +
+          '<div style="font-size:11px; line-height:1.5; color:var(--parch-dim);">' + esc(p.reason) + '</div></div>' +
+          '<span style="margin-left:auto; font-size:10px; font-variant-numeric:tabular-nums; color:var(--parch-dim); flex-shrink:0;">' + F(p.at, 1) + 's</span>' +
+        '</div>';
+      }).join('');
+      var metrics = [
+        { k: 'Fuel', v: F(sel.fuel * prog(sel), 1) + 'k / ' + F(sel.fuel, 1) + 'k', tone: sel.fuel > budget ? '#e0ac86' : 'var(--parch)' },
+        { k: 'Distance', v: F(distOf(sel) * prog(sel), 0) + ' tiles', tone: 'var(--parch)' },
+        { k: 'Evidence', v: ((this.paths && this.paths[sel.id]) || []).filter(function (p) { return p.id && self.B && self.B[p.id] && self.B[p.id].kind === 'd'; }).length + ' sources', tone: 'var(--parch)' },
+        { k: 'Confidence', v: sel.conf + '%', tone: sel.conf < 70 ? '#e2a3a3' : '#b6c69b' }
+      ];
+      return '<div style="display:flex; flex-direction:column; gap:12px;">' +
+        '<div style="display:flex; align-items:center; gap:9px;"><span style="width:10px; height:10px; border-radius:999px; background:' + sel.c + ';"></span>' +
+        '<span style="font-family:\'Caprasimo\',serif; font-size:15px;">Why ' + esc(sel.name) + ' went this way</span></div>' +
+        '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim); padding:10px 12px; border-radius:13px; background:var(--ink3);">' + esc(sel.chain) + '</div>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' + metrics.map(function (m) {
+          return '<div style="background:var(--ink3); border-radius:11px; padding:8px 10px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--parch-dim);">' + m.k + '</div><div style="font-size:14px; font-weight:700; margin-top:1px; color:' + m.tone + ';">' + esc(m.v) + '</div></div>';
+        }).join('') + '</div>' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Legs travelled · click to see the road</div>' +
+        '<div style="display:flex; flex-direction:column; gap:2px;">' + legs + '</div></div></div>';
+    }
+
+    if (S.tab === 'road') {
+      var r = S.road && this.roads ? this.roads[S.road] : null;
+      if (!r) return '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">Click any road on the map. Every road carries the decision that made an agent take it — and what that choice cost.</div>';
+      var kindLabel = r.kind === 'highway' ? 'Hub highway' : r.kind === 'ring' ? 'Ring road' : r.kind === 'verify' ? 'Verification route · opened by Plato at 4.0s' : 'District street';
+      var stats = [
+        { k: 'Traffic this race', v: r.uses.length + (r.uses.length === 1 ? ' agent' : ' agents') },
+        { k: 'Lifetime passes', v: (this.B[r.a] ? this.B[r.a].uses : this.B[r.b] ? this.B[r.b].uses : 148) },
+        { k: 'Length', v: F(Math.hypot(this.N[r.a].x - this.N[r.b].x, this.N[r.a].y - this.N[r.b].y), 1) + ' tiles' },
+        { k: 'Class', v: r.kind === 'street' ? 'Street' : r.kind === 'verify' ? 'Verify' : 'Highway' }
+      ];
+      var decisions = r.uses.map(function (u) {
+        var a = AG.filter(function (x) { return x.id === u.agent; })[0];
+        return '<div style="padding:10px 12px; border-radius:13px; background:var(--ink3);">' +
+          '<div style="display:flex; align-items:center; gap:7px; margin-bottom:4px;"><span style="width:8px; height:8px; border-radius:999px; background:' + a.c + ';"></span>' +
+          '<span style="font-size:12px; font-weight:700;">' + esc(a.name + ' · ' + a.role) + '</span>' +
+          '<span style="margin-left:auto; font-size:10px; color:var(--parch-dim); font-variant-numeric:tabular-nums;">' + F(u.at, 1) + 's</span></div>' +
+          '<div style="font-size:12px; line-height:1.55; color:var(--parch-dim);">' + esc(u.why) + '</div></div>';
+      }).join('');
+      if (!r.uses.length) decisions = '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">No agent took this road in this race. It stays on the map because it was paved by earlier questions.</div>';
+      return '<div style="display:flex; flex-direction:column; gap:12px;">' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim);">' + esc(kindLabel) + '</div>' +
+        '<div style="font-family:\'Caprasimo\',serif; font-size:17px; margin-top:3px; line-height:1.25;">' + esc(r.name) + '</div></div>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' + stats.map(function (s) {
+          return '<div style="background:var(--ink3); border-radius:11px; padding:8px 10px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--parch-dim);">' + s.k + '</div><div style="font-size:14px; font-weight:700; margin-top:1px;">' + esc(s.v) + '</div></div>';
+        }).join('') + '</div>' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">The decision that chose this road</div>' +
+        '<div style="display:flex; flex-direction:column; gap:6px;">' + decisions + '</div></div></div>';
+    }
+
+    if (S.tab === 'place') {
+      var pb = S.pop && this.B ? this.B[S.pop] : null;
+      if (!pb) return '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">Click any building on the map to see what it is, how often it’s used, and which agents’ routes pass through it.</div>';
+      var pstats = [
+        { k: 'Lifetime passes', v: pb.uses }, { k: 'Storeys', v: pb.h },
+        { k: 'Tile', v: pb.x + ',' + pb.y }, { k: 'District', v: pb.distName }
+      ];
+      var visitors = AG.filter(function (a) { return (self.paths[a.id] || []).some(function (p) { return p.id === S.pop; }); });
+      var vis = visitors.map(function (a) {
+        return '<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:12px; font-weight:600; background:var(--ink3);"><span style="width:8px; height:8px; border-radius:999px; background:' + a.c + ';"></span>' + esc(a.name) + '</span>';
+      }).join('');
+      if (!visitors.length) vis = '<span style="font-size:12px; color:var(--parch-dim);">No agent came through here this race.</span>';
+      return '<div style="display:flex; flex-direction:column; gap:12px;">' +
+        '<div style="display:flex; align-items:center; gap:10px;"><span style="width:30px; height:30px; border-radius:9px; flex-shrink:0; background:' + (pb.kind === 'c' ? '#e0ac86' : '#b6c69b') + ';"></span>' +
+        '<div style="min-width:0;"><div style="font-family:\'Caprasimo\',serif; font-size:16px; line-height:1.2;">' + esc(pb.label) + '</div>' +
+        '<div style="font-size:10px; text-transform:uppercase; letter-spacing:.09em; color:var(--parch-dim); margin-top:2px;">' + (pb.kind === 'c' ? 'Learned concept' : 'Source document') + ' · ' + esc(pb.distName) + '</div></div></div>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' + pstats.map(function (s) {
+          return '<div style="background:var(--ink3); border-radius:11px; padding:8px 10px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--parch-dim);">' + s.k + '</div><div style="font-size:14px; font-weight:700; margin-top:1px;">' + esc(s.v) + '</div></div>';
+        }).join('') + '</div>' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Visited in this race</div>' +
+        '<div style="display:flex; flex-wrap:wrap; gap:6px;">' + vis + '</div></div></div>';
+    }
+
+    if (S.tab === 'log') {
+      var rows = EVENTS.map(function (e) {
+        var at = e[0], title = e[1], body = e[2], kind = e[3];
+        var reached = secs >= at;
+        var col = kind === 'plato' ? PLATO.c : kind === 'contradiction' ? '#e08a44' : kind === 'fog' ? '#c76b6b' : kind === 'clear' ? '#93a56e' : kind === 'done' ? '#f5ead8' : (AG.filter(function (a) { return a.id === kind; })[0] || { c: '#f5ead8' }).c;
+        return '<div class="bm-row" data-act="log" data-at="' + at + '" style="display:flex; gap:10px; padding:8px 9px; border-radius:11px; background:' + (reached ? 'var(--ink3)' : 'transparent') + ';">' +
+          '<span style="font-size:10px; font-variant-numeric:tabular-nums; color:var(--parch-dim); width:30px; flex-shrink:0; padding-top:2px;">' + F(at, 1) + 's</span>' +
+          '<span style="width:8px; height:8px; border-radius:' + (kind === 'contradiction' || kind === 'fog' ? '2px' : '999px') + '; background:' + (reached ? col : 'rgba(245,234,216,.2)') + '; flex-shrink:0; margin-top:4px;"></span>' +
+          '<div style="min-width:0;"><div style="font-size:12px; font-weight:700; color:' + (reached ? 'var(--parch)' : 'rgba(245,234,216,.45)') + ';">' + esc(title) + '</div>' +
+          '<div style="font-size:11px; line-height:1.5; color:var(--parch-dim);">' + esc(body) + '</div></div></div>';
+      }).join('');
+      return '<div style="display:flex; flex-direction:column; gap:11px;"><span style="font-family:\'Caprasimo\',serif; font-size:15px;">Controller log</span>' +
+        '<div style="display:flex; flex-direction:column; gap:2px;">' + rows + '</div></div>';
+    }
+
+    if (S.tab === 'fog') {
+      var rows2 = FOG.map(function (fog, i) {
+        var cleared = fog.clearsAt != null && secs >= fog.clearsAt + 1.6;
+        var clearing = fog.clearsAt != null && secs >= fog.clearsAt && !cleared;
+        var state = cleared ? 'lifted' : clearing ? 'lifting' : 'unknown';
+        return '<div class="bm-row" data-act="fog" data-i="' + i + '" style="padding:11px 12px; border-radius:13px; background:var(--ink3); border:1px dashed ' + (cleared ? 'rgba(147,165,110,.5)' : 'rgba(245,234,216,.3)') + ';">' +
+          '<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;"><span style="font-size:12px; font-weight:700; color:' + (cleared ? '#b6c69b' : 'var(--parch)') + ';">' + esc(fog.name) + '</span>' +
+          '<span style="margin-left:auto; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:' + (cleared ? 'rgba(147,165,110,.22)' : 'rgba(245,234,216,.12)') + '; color:' + (cleared ? '#b6c69b' : 'var(--parch-dim)') + ';">' + state + '</span></div>' +
+          '<div style="font-size:11px; line-height:1.55; color:var(--parch-dim);">' + esc(fog.body) + '</div></div>';
+      }).join('');
+      return '<div style="display:flex; flex-direction:column; gap:12px;"><span style="font-family:\'Caprasimo\',serif; font-size:15px;">Fog · what we don’t know</span>' +
+        '<div style="display:flex; flex-direction:column; gap:7px;">' + rows2 + '</div>' +
+        '<div style="font-size:11px; line-height:1.65; color:var(--parch-dim);">Fog is the system saying we don’t know enough here. It is not decoration: an agent inside fog is asserting without a source. When another agent brings evidence, the fog lifts and the ground becomes paved.</div></div>';
+    }
+
+    // agent
+    var bars = [
+      { k: 'Confidence', v: sel.conf + '%', pct: sel.conf, color: '#93a56e' },
+      { k: 'Learning rate', v: sel.rate, pct: sel.rate, color: 'var(--accent)' },
+      { k: 'Hallucination risk', v: sel.risk + '%', pct: sel.risk, color: '#c76b6b' },
+      { k: 'Fuel efficiency', v: F(distOf(sel) / sel.fuel, 1) + ' tiles/k', pct: Math.min(100, distOf(sel) / sel.fuel * 14), color: 'rgba(245,234,216,.5)' }
+    ];
+    var av2 = sel.avatar ? "background-image:url('" + sel.avatar + "');" : '';
+    return '<div style="display:flex; flex-direction:column; gap:13px;">' +
+      '<div style="display:flex; align-items:center; gap:12px;"><div style="width:52px; height:52px; border-radius:999px; flex-shrink:0; background-color:' + sel.c + '; ' + av2 + ' background-size:cover; background-position:center; border:3px solid ' + sel.c + ';"></div>' +
+      '<div><div style="font-family:\'Caprasimo\',serif; font-size:19px;">' + esc(sel.name) + '</div>' +
+      '<div style="font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--parch-dim); margin-top:2px;">' + esc(sel.role) + '</div></div></div>' +
+      '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">' + esc(sel.bio) + '</div>' +
+      '<div style="display:flex; flex-direction:column; gap:7px;">' + bars.map(function (b) {
+        return '<div><div style="display:flex; justify-content:space-between; font-size:10px; margin-bottom:3px;"><span style="color:var(--parch-dim); font-weight:500;">' + b.k + '</span><span style="font-weight:700; font-variant-numeric:tabular-nums;">' + esc(b.v) + '</span></div>' +
+          '<div style="height:6px; border-radius:999px; background:rgba(245,234,216,.14); overflow:hidden;"><div style="height:100%; border-radius:999px; width:' + b.pct + '%; background:' + b.color + ';"></div></div></div>';
+      }).join('') + '</div></div>';
+  };
+
+  BrainModel.prototype.renderTimeline = function (secs, prog, distOf, F, now) {
+    var self = this;
+    document.getElementById('bmClock').textContent = F(secs, 1) + 's / ' + F(DUR, 1) + 's';
+    var nowEl = document.getElementById('bmNowEvent');
+    nowEl.textContent = now[1];
+    nowEl.style.color = now[3] === 'fog' ? '#e2a3a3' : now[3] === 'contradiction' ? '#e0ac86' : now[3] === 'clear' ? '#b6c69b' : 'var(--parch)';
+
+    var lanes = AG.map(function (a) {
+      var p = prog(a), fin = a.finish;
+      var events = (self.paths ? self.paths[a.id] : []).map(function (pt) {
+        return { at: F(pt.at / DUR * 100, 1), title: pt.reason, color: pt.off ? '#c76b6b' : a.c, radius: pt.off ? '2px' : '999px' };
+      });
+      return { name: a.name, color: a.c, fill: a.c + '33', pct: F(p * fin * 100, 1),
+        readout: F(a.fuel * p, 1) + 'k · ' + F(distOf(a) * p, 0) + 't',
+        finished: secs >= fin * DUR, finishAt: F(fin * 100, 1), events: events };
+    });
+    lanes.push({
+      name: 'Plato', color: PLATO.c, fill: 'rgba(154,92,138,.22)', pct: F(self.t * 100, 1),
+      readout: secs >= 11 ? 'verified' : 'monitoring', finished: secs >= 11, finishAt: '100',
+      events: EVENTS.filter(function (e) { return e[3] === 'plato' || e[3] === 'done' || e[3] === 'clear' || e[3] === 'contradiction'; }).map(function (e) {
+        return { at: F(e[0] / DUR * 100, 1), title: e[1], color: e[3] === 'contradiction' ? '#e08a44' : e[3] === 'clear' ? '#93a56e' : PLATO.c, radius: e[3] === 'contradiction' ? '2px' : '999px' };
+      })
+    });
+
+    document.getElementById('bmLanes').innerHTML = lanes.map(function (ln) {
+      var evs = ln.events.map(function (ev) {
+        return '<span title="' + esc(ev.title) + '" style="position:absolute; top:4px; left:' + ev.at + '%; width:10px; height:10px; margin-left:-5px; border-radius:' + ev.radius + '; background:' + ev.color + '; border:1.5px solid var(--ink2);"></span>';
+      }).join('');
+      var flag = ln.finished ? '<span style="position:absolute; top:3px; left:' + ln.finishAt + '%; font-size:10px; margin-left:-5px;">🏁</span>' : '';
+      return '<div style="display:flex; align-items:center; gap:10px;">' +
+        '<span style="width:62px; flex-shrink:0; font-size:10px; font-weight:700; color:' + ln.color + '; text-align:right;">' + esc(ln.name) + '</span>' +
+        '<div style="position:relative; flex:1; height:18px; border-radius:999px; background:var(--ink3); overflow:hidden;">' +
+          '<div style="position:absolute; inset:0 auto 0 0; width:' + ln.pct + '%; background:' + ln.fill + ';"></div>' + evs + flag +
+        '</div>' +
+        '<span style="width:74px; flex-shrink:0; font-size:10px; font-variant-numeric:tabular-nums; color:var(--parch-dim);">' + esc(ln.readout) + '</span>' +
+      '</div>';
+    }).join('');
+
+    document.getElementById('bmHead').style.left = 'calc(72px + (100% - 156px) * ' + F(this.t, 4) + ')';
+  };
+
+  // ── Real execution → scenario ────────────────────────────────────────────
+  // Everything above runs on the module-level scenario vars (DUR, DNAMES, BLD,
+  // AG, PLATO, EVENTS, FOG, DEFAULT_Q). applyScenario swaps them, so the exact
+  // same engine replays a real run. The demo is captured first so "back to
+  // demo" is lossless.
+  var DEMO = { DUR: DUR, DNAMES: DNAMES, BLD: BLD, AG: AG, PLATO: PLATO, EVENTS: EVENTS, FOG: FOG, question: DEFAULT_Q, realDurationMs: null, live: false };
+  var REAL_DUR_MS = null, IS_LIVE = false, RUN_ACTIVE = false, execShort = '', loadFailed = false;
+  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
+  function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
+
+  function applyScenario(s) {
+    DUR = s.DUR; DNAMES = s.DNAMES; BLD = s.BLD; AG = s.AG; PLATO = s.PLATO; EVENTS = s.EVENTS; FOG = s.FOG;
+    DEFAULT_Q = s.question; REAL_DUR_MS = s.realDurationMs != null ? s.realDurationMs : null; RUN_ACTIVE = !!s.live;
+  }
+
+  // Reshape a /trace payload into the scenario shape the engine consumes. Real
+  // wall-clock time is normalised onto an 11s virtual timeline so playback feels
+  // like the demo regardless of whether the run took 2s or 2 minutes.
+  function buildScenarioFromTrace(tr) {
+    var VDUR = 11;
+    var dmap = {}, order = [];
+    (tr.districts || []).forEach(function (d) { if (!dmap[d.id]) { dmap[d.id] = { name: d.name, tone: d.tone, items: [] }; order.push(d.id); } });
+    (tr.buildings || []).forEach(function (b) { if (!dmap[b.district]) { dmap[b.district] = { name: cap2(b.district), tone: 'n', items: [] }; order.push(b.district); } });
+    (tr.buildings || []).forEach(function (b) { dmap[b.district].items.push(b); });
+
+    var DN = [], BL = {}, keyOf = {};
+    order.forEach(function (did) {
+      var d = dmap[did]; if (!d) return;
+      DN.push([did, d.name, d.tone]);
+      BL[did] = d.items.map(function (b, j) { keyOf[b.id] = did + '-' + j; return [b.label, b.kind === 'doc' ? 'd' : 'c', b.storeys || 2, b.uses || 1]; });
+    });
+    if (DN.length === 0) { DN.push(['reasoning', 'Reasoning', 'a']); BL['reasoning'] = [['Direct answer', 'c', 3, 1]]; }
+
+    var span = 0;
+    (tr.waypoints || []).forEach(function (w) { span = Math.max(span, w.atMs || 0); });
+    (tr.events || []).forEach(function (e) { span = Math.max(span, e.atMs || 0); });
+    span = span || tr.durationMs || 1;
+    var tiny = span < 300;
+    var vt = function (ms, idx, count) { return tiny ? (count > 1 ? idx / (count - 1) * VDUR * 0.92 : 0) : (ms / span) * VDUR; };
+
+    var wpn = (tr.waypoints || []).length;
+    var wp = (tr.waypoints || []).map(function (w, i) {
+      var loc = (w.buildingId && keyOf[w.buildingId]) ? keyOf[w.buildingId] : 'hub';
+      var at = vt(w.atMs, i, wpn);
+      return w.offRoad ? [loc, w.reason || '', at, 1] : [loc, w.reason || '', at];
+    });
+    if (!wp.length || wp[0][0] !== 'hub') wp.unshift(['hub', 'Task received', 0]);
+
+    var lastAt = wp.length ? wp[wp.length - 1][2] : VDUR;
+    var A = {
+      id: tr.agent.id, name: tr.agent.name, role: tr.agent.role, avatar: tr.agent.avatar || '', c: tr.agent.color || '#c67139',
+      fuel: tr.agent.fuel || 0, conf: tr.agent.confidence || 70, risk: tr.agent.risk || 0, rate: tr.agent.rate || 60,
+      finish: Math.max(0.08, (lastAt / VDUR) || 1), bio: tr.agent.bio || '', chain: tr.agent.chain || '', wp: wp
+    };
+
+    var evn = (tr.events || []).length;
+    var EV = (tr.events || []).map(function (e, i) { return [vt(e.atMs, i, evn), e.title || '', e.body || '', e.kind || 'plato']; });
+    if (!EV.length) EV = [[0, 'Task issued', tr.question || '', 'plato']];
+
+    var FG = (tr.fog || []).map(function (f, i) {
+      var ang = -Math.PI / 2 + i * 1.25;
+      return { id: 'f' + i, name: f.name, x: Math.round(Math.cos(ang) * 11), y: Math.round(Math.sin(ang) * 8) - 6, r: 3.6, clearsAt: f.state === 'lifted' ? 0.1 : null, body: f.body };
+    });
+
+    return {
+      DUR: VDUR, DNAMES: DN, BLD: BL, AG: [A], PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
+      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live
+    };
+  }
+
+  // ── API plumbing ─────────────────────────────────────────────────────────
+  function apiBase() { return location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000'; }
+  function getToken() {
+    try { var raw = sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session'); var s = raw ? JSON.parse(raw) : null; return (s && s.token) || null; }
+    catch (e) { return null; }
+  }
+  function loadTrace(id) {
+    var tok = getToken();
+    return fetch(apiBase() + '/api/executions/' + encodeURIComponent(id) + '/trace', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { if (!d.trace) throw new Error('empty trace'); return d.trace; });
+  }
+  function gotoExec(id) { var p = new URLSearchParams(location.search); p.set('execution', id); location.search = p.toString(); }
+
+  // ── Recent-runs picker ───────────────────────────────────────────────────
+  function wirePicker() {
+    var picker = document.getElementById('bmPicker'), body = document.getElementById('bmPickerBody');
+    document.getElementById('bmMode').addEventListener('click', function () { openPicker(body, picker); });
+    document.getElementById('bmPickerClose').addEventListener('click', function () { picker.style.display = 'none'; });
+    picker.addEventListener('click', function (e) { if (e.target === picker) picker.style.display = 'none'; });
+  }
+  function demoRowHtml() {
+    return '<div class="bm-row" data-demo="1" style="padding:11px 12px;border-radius:12px;background:#322a22;margin-bottom:10px;cursor:pointer;display:flex;gap:10px;align-items:center;">' +
+      '<span style="width:8px;height:8px;border-radius:999px;background:#c67139;"></span>' +
+      '<div><div style="font-size:13px;font-weight:700;">Demo scenario</div><div style="font-size:11px;color:rgba(245,234,216,.55);">The Meridian Logistics race · four agents</div></div></div>';
+  }
+  function wirePickerRows(body) {
+    body.querySelectorAll('[data-exec]').forEach(function (el) { el.addEventListener('click', function () { gotoExec(el.getAttribute('data-exec')); }); });
+    var demo = body.querySelector('[data-demo]'); if (demo) demo.addEventListener('click', function () { location.search = '?demo=1'; });
+  }
+  function openPicker(body, picker) {
+    picker.style.display = 'flex';
+    var tok = getToken();
+    if (!tok) {
+      body.innerHTML = demoRowHtml() + '<div style="font-size:12px;color:rgba(245,234,216,.6);padding:8px 2px;">Sign in to load your real executions. <a href="finchat_login.html" style="color:#ffc6a5;">Go to login →</a></div>';
+      wirePickerRows(body); return;
+    }
+    body.innerHTML = demoRowHtml() + '<div style="font-size:12px;color:rgba(245,234,216,.6);padding:8px 2px;">Loading recent runs…</div>';
+    fetch(apiBase() + '/api/executions/list/recent?limit=25', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var runs = (d && d.executions) || [];
+        if (!runs.length) { body.innerHTML = demoRowHtml() + '<div style="font-size:12px;color:rgba(245,234,216,.6);padding:8px 2px;">No executions yet. Ask an agent something in Chat, then come back.</div>'; wirePickerRows(body); return; }
+        body.innerHTML = demoRowHtml() + runs.map(function (x) {
+          var col = AGENT_COLORS[x.assigned_agent] || '#c67139';
+          var st = x.completion_reason || x.current_state || '';
+          var when = x.created_at ? new Date(x.created_at).toLocaleString() : '';
+          return '<div class="bm-row" data-exec="' + esc(x.execution_id) + '" style="padding:10px 12px;border-radius:12px;background:#322a22;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;">' +
+            '<span style="width:8px;height:8px;border-radius:999px;background:' + col + ';margin-top:5px;flex-shrink:0;"></span>' +
+            '<div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.goal || '(no goal)') + '</div>' +
+            '<div style="font-size:10px;color:rgba(245,234,216,.5);margin-top:2px;">' + esc(cap2(x.assigned_agent || 'agent')) + ' · ' + esc(st) + ' · ' + (x.tokens_used || 0) + ' tok · ' + esc(when) + '</div></div></div>';
+        }).join('');
+        wirePickerRows(body);
+      })
+      .catch(function (e) { body.innerHTML = demoRowHtml() + '<div style="font-size:12px;color:#e2a3a3;padding:8px 2px;">Could not load runs: ' + esc(e.message) + '</div>'; wirePickerRows(body); });
+  }
+
+  function refreshChrome() {
+    var lbl = document.getElementById('bmModeLabel'), kicker = document.getElementById('bmKicker'), dot = document.querySelector('#bmMode span');
+    if (IS_LIVE) {
+      lbl.textContent = 'Live · ' + execShort;
+      if (kicker) kicker.textContent = REAL_DUR_MS != null ? ('real ' + (REAL_DUR_MS / 1000).toFixed(1) + 's') : 'live run';
+      if (dot) dot.style.background = '#93a56e';
+    } else {
+      lbl.textContent = loadFailed ? 'Run unavailable — demo' : 'Demo run';
+      if (kicker) kicker.textContent = loadFailed ? 'showing demo' : 'agent routes';
+      if (dot) dot.style.background = loadFailed ? '#e2a3a3' : 'var(--parch-dim)';
+    }
+  }
+
+  function shortId(id) { return id && id.length > 14 ? id.slice(0, 6) + '…' + id.slice(-4) : (id || ''); }
+
+  function init() {
+    wirePicker();
+    var params = new URLSearchParams(location.search);
+    var execId = params.get('execution') || params.get('exec');
+    var start = function () { window.__bm = new BrainModel(); refreshChrome(); };
+
+    if (execId) {
+      execShort = shortId(execId);
+      loadTrace(execId)
+        .then(function (tr) { applyScenario(buildScenarioFromTrace(tr)); IS_LIVE = true; })
+        .catch(function (e) { console.warn('Brain Model: could not load execution ' + execId + ': ' + e.message); loadFailed = true; })
+        .then(start);
+      return;
+    }
+
+    // No explicit run. For a signed-in user, default to their MOST RECENT real
+    // execution so the map shows real data instead of the demo. `?demo=1` forces
+    // the demo; a logged-out user, or one with no runs yet, falls back to it too.
+    if (getToken() && params.get('demo') == null) {
+      fetch(apiBase() + '/api/executions/list/recent?limit=1', { headers: { Authorization: 'Bearer ' + getToken() } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          var run = d && d.executions && d.executions[0];
+          if (!run) throw new Error('no runs');
+          execShort = shortId(run.execution_id);
+          return loadTrace(run.execution_id);
+        })
+        .then(function (tr) { applyScenario(buildScenarioFromTrace(tr)); IS_LIVE = true; })
+        .catch(function () { /* no runs / not reachable — demo is the fallback */ })
+        .then(start);
+      return;
+    }
+
+    start();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
