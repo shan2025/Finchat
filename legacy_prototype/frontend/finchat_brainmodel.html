@@ -93,6 +93,9 @@
     </div>
 
     <div id="bmSpeeds" style="display:flex; align-items:center; gap:3px; padding:3px; border-radius:999px; background:var(--ink3);"></div>
+    <button id="bmAskBtn" class="bm-btn" title="Ask a question and watch the agent route live" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; background:var(--ink3); color:var(--parch); font-family:inherit; font-weight:700; font-size:12px; border:1px solid var(--line);">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Ask
+    </button>
     <button id="bmPlay" class="bm-btn" style="display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:999px; background:var(--accent); color:#fff; font-family:inherit; font-weight:700; font-size:12px;">Play</button>
   </div>
 
@@ -190,6 +193,34 @@
     </div>
     <div id="bmPickerBody" class="bm-scroll" style="padding:12px 15px; overflow-y:auto;">
       <div style="font-size:12px; color:rgba(245,234,216,.6);">Loading recent runs…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Ask overlay — trigger a real run and watch the map form live -->
+<div id="bmAsk" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(12,10,8,.6); align-items:flex-start; justify-content:center; padding:80px 16px;">
+  <div style="width:min(560px,100%); background:#262019; border:1px solid rgba(245,234,216,.14); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.5); display:flex; flex-direction:column; overflow:hidden; color:#f5ead8; font-family:'Figtree',system-ui,sans-serif;">
+    <div style="display:flex; align-items:center; gap:10px; padding:15px 17px; border-bottom:1px solid rgba(245,234,216,.14);">
+      <span style="font-family:'Caprasimo',serif; font-size:16px;">Ask an agent</span>
+      <span style="font-size:11px; color:rgba(245,234,216,.55);">watch the route form live on the map</span>
+      <button id="bmAskClose" class="bm-btn" style="margin-left:auto; width:28px; height:28px; border-radius:999px; background:#322a22; color:#f5ead8; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+    </div>
+    <div style="padding:15px 17px; display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <label style="font-size:11px; color:rgba(245,234,216,.6);">Route to</label>
+        <select id="bmAskPersona" style="flex:1; padding:8px 10px; border-radius:10px; background:#322a22; color:#f5ead8; border:1px solid rgba(245,234,216,.14); font-family:inherit; font-size:13px;">
+          <option value="plato">Plato — supervisor (auto-routes)</option>
+          <option value="nova" selected>Nova — Finance</option>
+          <option value="aurelius">Aurelius — Research</option>
+          <option value="rasha">Rasha — Analyst</option>
+        </select>
+        <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:rgba(245,234,216,.6); cursor:pointer;">
+          <input id="bmAskWeb" type="checkbox" checked style="accent-color:#c67139;"> Web
+        </label>
+      </div>
+      <textarea id="bmAskText" rows="3" placeholder="e.g. What's the latest on AI chip demand?" style="width:100%; padding:11px 13px; border-radius:12px; background:#322a22; color:#f5ead8; border:1px solid rgba(245,234,216,.14); font-family:inherit; font-size:13px; resize:vertical; outline:none;"></textarea>
+      <div id="bmAskNote" style="font-size:11px; color:rgba(245,234,216,.5);"></div>
+      <button id="bmAskSend" class="bm-btn" style="align-self:flex-end; padding:9px 20px; border-radius:999px; background:#c67139; color:#fff; font-family:inherit; font-weight:700; font-size:13px;">Ask &amp; watch →</button>
     </div>
   </div>
 </div>
@@ -1164,6 +1195,40 @@
     }
   }
 
+  // ── Ask box: trigger a real run from the Brain Model and watch it stream ──
+  function wireAsk() {
+    var ov = document.getElementById('bmAsk');
+    document.getElementById('bmAskBtn').addEventListener('click', function () {
+      ov.style.display = 'flex';
+      document.getElementById('bmAskNote').textContent = getToken() ? '' : 'Sign in first to run a real agent.';
+      setTimeout(function () { var t = document.getElementById('bmAskText'); if (t) t.focus(); }, 50);
+    });
+    document.getElementById('bmAskClose').addEventListener('click', function () { ov.style.display = 'none'; });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.style.display = 'none'; });
+    document.getElementById('bmAskSend').addEventListener('click', sendAsk);
+    document.getElementById('bmAskText').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendAsk();
+    });
+  }
+  function sendAsk() {
+    var tok = getToken();
+    var note = document.getElementById('bmAskNote');
+    if (!tok) { note.textContent = 'Sign in first to run a real agent.'; return; }
+    var persona = document.getElementById('bmAskPersona').value;
+    var msg = document.getElementById('bmAskText').value.trim();
+    if (!msg) { note.textContent = 'Type a question first.'; return; }
+    var web = document.getElementById('bmAskWeb').checked;
+    note.textContent = 'Dispatching…';
+    fetch(apiBase() + '/api/ai-chat/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ persona: persona, message: msg, web: web })
+    }).catch(function () { /* the run streams over the socket regardless */ });
+    // The 'start' pulse will flip the map to LIVE; close and let it animate.
+    document.getElementById('bmAsk').style.display = 'none';
+    document.getElementById('bmAskText').value = '';
+    note.textContent = '';
+  }
+
   function wireLiveStream() {
     if (typeof io === 'undefined') return; // socket.io client failed to load
     var tok = getToken(); if (!tok) return;
@@ -1239,6 +1304,7 @@
 
   function init() {
     wirePicker();
+    wireAsk();
     var params = new URLSearchParams(location.search);
     var execId = params.get('execution') || params.get('exec');
     var start = function () { window.__bm = new BrainModel(); refreshChrome(); wireLiveStream(); };
