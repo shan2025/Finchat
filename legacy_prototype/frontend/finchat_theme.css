@@ -269,3 +269,29 @@ hr { border: 0; border-top: 1px solid var(--border); }
   --side-fg:     var(--chrome-fg);
   --side-muted:  var(--chrome-muted);
 }
+
+/* ---------------------------------------------------------------------------
+   MINIMAL LINE-ART CAR THINKING ANIMATION STYLES
+   ------------------------------------------------------------------------- */
+.minimal-car-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 70px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.minimal-car-canvas {
+  display: block;
+  width: 100%;
+  height: 70px;
+  background: transparent;
+}
+
+
+
+

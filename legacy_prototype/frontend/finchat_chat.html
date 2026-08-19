@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -681,6 +681,13 @@
     <script src="knowledge_search.js"></script>
     <script src="notifications_widget.js"></script>
     <script src="study_blocks.js"></script>
+    <script src="car_road_anim.js?v=minimal_v7"></script>
+
+
+
+
+
+
 
   </main>
 </div>
@@ -1041,23 +1048,32 @@
       // replacing the canned thinking phrases with the real retrieval path.
       socket.on('graph_pulse', (pulse) => {
         if (pulse.type !== 'activation' || !Array.isArray(pulse.entities) || pulse.entities.length === 0) return;
-        const phraseEl = document.querySelector('.typing-phrase');
-        if (!phraseEl) return; // no answer pending — nothing to narrate
         const path = pulse.entities.slice(0, 4).map(e => e.name).join(' → ');
-        phraseEl.style.opacity = '0';
-        setTimeout(() => {
-          phraseEl.textContent = `🧠  Recalling: ${path}`;
-          phraseEl.style.opacity = '1';
-        }, 200);
-        // Hold the real recall on screen: push the rotating-phrase timer back
-        // by clearing it for a few seconds (it lives in window.typingTimers).
-        const typingGroup = phraseEl.closest('.msg-group');
+        const phraseText = `🧠 Recalling: ${path}`;
+        
+        // Update 3D Road Animation telemetry phrase if active
+        if (window.activeRoadInstance) {
+          window.activeRoadInstance.setPhrase(phraseText);
+        }
+
+        const phraseEl = document.querySelector('.typing-phrase');
+        if (phraseEl) {
+          phraseEl.style.opacity = '0';
+          setTimeout(() => {
+            phraseEl.textContent = phraseText;
+            phraseEl.style.opacity = '1';
+          }, 200);
+        }
+
+        // Hold the real recall on screen
+        const typingGroup = (phraseEl || document.querySelector('.msg-group.bot[id^="typing"]'))?.closest('.msg-group');
         const tid = typingGroup && typingGroup.id;
         if (tid && window.typingTimers && window.typingTimers[tid]) {
           clearInterval(window.typingTimers[tid]);
           delete window.typingTimers[tid];
         }
       });
+
 
     } catch (e) {
       console.error('Socket init error:', e);
@@ -2108,6 +2124,7 @@
     ];
 
     window.typingTimers = window.typingTimers || {};
+    window.roadInstances = window.roadInstances || {};
 
     function showTyping(userText = '') {
       updatePersonaStatusUI(activePersona, true);
@@ -2127,63 +2144,54 @@
       let phraseIdx = Math.floor(Math.random() * phrases.length);
       const initialPhrase = phrases[phraseIdx];
 
-      if (isTengu) {
-        div.innerHTML = `
+      div.innerHTML = `
     <div class="msg-row">
       <div class="msg-avatar-space"><div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div></div>
       <div class="msg-content">
-        <div class="msg-sender">${p.name} (Tengu Mode)</div>
-        <div class="tengu-bubble">
-          <div class="tengu-icon">👺</div>
-          <span class="tengu-phrase" id="${id}-phrase">${initialPhrase}</span>
-        </div>
+        <div class="msg-sender">${p.name} ${isTengu ? '(Tengu Mode)' : ''}</div>
+        <div id="${id}-road-mount" style="margin-top:4px;"></div>
       </div>
     </div>`;
-      } else {
-        div.innerHTML = `
-    <div class="msg-row">
-      <div class="msg-avatar-space"><div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div></div>
-      <div class="msg-content">
-        <div class="msg-sender">${p.name}</div>
-        <div class="typing-bubble">
-          <div class="typing-dots">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-          </div>
-          <span class="typing-phrase" id="${id}-phrase">${initialPhrase}</span>
-        </div>
-      </div>
-    </div>`;
-      }
       
       document.getElementById('messages').appendChild(div);
       document.getElementById('messages').scrollTop = 999999;
 
+      // Mount 3D Car & Road Animation
+      const mountEl = document.getElementById(`${id}-road-mount`);
+      if (mountEl && window.CarRoadAnim) {
+        const roadInst = window.CarRoadAnim.mount(mountEl, userText, p.name);
+        roadInst.setPhrase(initialPhrase);
+        window.roadInstances[id] = roadInst;
+        window.activeRoadInstance = roadInst;
+      }
+
       window.typingTimers[id] = setInterval(() => {
         phraseIdx = (phraseIdx + 1) % phrases.length;
-        const phraseEl = document.getElementById(`${id}-phrase`);
-        if (phraseEl) {
-          phraseEl.style.opacity = '0';
-          setTimeout(() => {
-            if (phraseEl) {
-              phraseEl.textContent = phrases[phraseIdx];
-              phraseEl.style.opacity = '1';
-            }
-          }, 250);
+        const currentPhrase = phrases[phraseIdx];
+        if (window.roadInstances[id]) {
+          window.roadInstances[id].setPhrase(currentPhrase);
         }
-      }, 1400);
+      }, 1800);
 
       return id;
     }
+
     function removeTyping(id) {
       updatePersonaStatusUI(activePersona, false);
+      if (window.roadInstances && window.roadInstances[id]) {
+        window.roadInstances[id].destroy();
+        delete window.roadInstances[id];
+      }
+      if (window.activeRoadInstance && window.activeRoadInstance.isDestroyed) {
+        window.activeRoadInstance = null;
+      }
       if (window.typingTimers && window.typingTimers[id]) {
         clearInterval(window.typingTimers[id]);
         delete window.typingTimers[id];
       }
       document.getElementById(id)?.remove();
     }
+
     function updatePersonaStatusUI(personaId, isTalking) {
       const p = PERSONAS[personaId];
       if (!p) return;
