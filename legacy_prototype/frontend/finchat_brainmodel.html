@@ -393,14 +393,29 @@
       a.wp.forEach(function (w, i) {
         var id = w[0], p;
         if (id[0] === '@') { var parts = id.slice(1).split(',').map(Number); p = { x: parts[0], y: parts[1], raw: true }; }
-        else { var n = self.N[id]; p = { x: n.x, y: n.y, id: id }; }
+        else { var n = self.N[id]; if (!n) return; p = { x: n.x, y: n.y, id: id }; }
         p.off = !!w[3]; p.at = w[2]; p.reason = w[1]; p.label = p.raw ? 'Open ground' : self.N[id].label;
-        pts.push(p);
-        if (i > 0 && !p.raw && !pts[i - 1].raw) {
-          var k = [a.wp[i - 1][0], id].sort().join('|');
-          if (self.roads[k]) self.roads[k].uses.push({ agent: a.id, why: w[1], at: w[2] });
+        // Route the hop through the road graph so the trail follows streets/highways
+        // instead of cutting across. Inserted nodes are transit-only (via:true).
+        if (ROAD_EXPAND && pts.length && !p.raw) {
+          var prev = pts[pts.length - 1];
+          if (!prev.raw && prev.id && p.id) {
+            var mids = self.roadPath(prev.id, p.id);
+            for (var m = 0; m < mids.length; m++) {
+              var nn = self.N[mids[m]];
+              pts.push({ x: nn.x, y: nn.y, id: mids[m], via: true, at: prev.at + (p.at - prev.at) * ((m + 1) / (mids.length + 1)), reason: '', label: self.N[mids[m]].label || '' });
+            }
+          }
         }
+        pts.push(p);
       });
+      // Light the roads actually travelled (over the possibly-expanded path).
+      for (var j = 1; j < pts.length; j++) {
+        var pa = pts[j - 1], pb = pts[j];
+        if (pa.raw || pb.raw || !pa.id || !pb.id) continue;
+        var rk = [pa.id, pb.id].sort().join('|');
+        if (self.roads[rk]) self.roads[rk].uses.push({ agent: a.id, why: pb.reason || '', at: pb.at });
+      }
       self.paths[a.id] = pts;
     });
     this.roadKeys = Object.keys(this.roads);
@@ -854,6 +869,7 @@
     var self = this, S = this.state;
     if (S.tab === 'route') {
       var legs = (this.paths ? this.paths[sel.id] : []).map(function (p, i) {
+        if (p.via) return ''; // transit node — not a decision, keep it out of the legs list
         var dot = p.off ? '#c76b6b' : secs >= p.at ? sel.c : 'rgba(245,234,216,.2)';
         return '<div class="bm-row" data-act="leg" data-i="' + i + '" style="display:flex; gap:10px; padding:8px 9px; border-radius:11px; background:' + (secs >= p.at ? 'var(--ink3)' : 'transparent') + ';">' +
           '<span style="width:8px; height:8px; border-radius:' + (p.off ? '2px' : '999px') + '; background:' + dot + '; flex-shrink:0; margin-top:4px;"></span>' +
@@ -989,7 +1005,7 @@
 
     var lanes = AG.map(function (a) {
       var p = prog(a), fin = a.finish;
-      var events = (self.paths ? self.paths[a.id] : []).map(function (pt) {
+      var events = (self.paths ? self.paths[a.id] : []).filter(function (pt) { return !pt.via; }).map(function (pt) {
         return { at: F(pt.at / DUR * 100, 1), title: pt.reason, color: pt.off ? '#c76b6b' : a.c, radius: pt.off ? '2px' : '999px' };
       });
       return { name: a.name, color: a.c, fill: a.c + '33', pct: F(p * fin * 100, 1),
@@ -1028,12 +1044,17 @@
   // demo" is lossless.
   var DEMO = { DUR: DUR, DNAMES: DNAMES, BLD: BLD, AG: AG, PLATO: PLATO, EVENTS: EVENTS, FOG: FOG, question: DEFAULT_Q, realDurationMs: null, live: false };
   var REAL_DUR_MS = null, IS_LIVE = false, RUN_ACTIVE = false, execShort = '', loadFailed = false;
+  // Real traces/races jump hub→building directly; expanding each hop through the
+  // road graph (district junctions + hub) makes the trail follow roads and lights
+  // the roads travelled. The demo already routes through junctions, so it opts out.
+  var ROAD_EXPAND = false;
   var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
   function applyScenario(s) {
     DUR = s.DUR; DNAMES = s.DNAMES; BLD = s.BLD; AG = s.AG; PLATO = s.PLATO; EVENTS = s.EVENTS; FOG = s.FOG;
     DEFAULT_Q = s.question; REAL_DUR_MS = s.realDurationMs != null ? s.realDurationMs : null; RUN_ACTIVE = !!s.live;
+    ROAD_EXPAND = !!s.roadExpand;
   }
 
   // Reshape a /trace payload into the scenario shape the engine consumes. Real
@@ -1087,7 +1108,7 @@
 
     return {
       DUR: VDUR, DNAMES: DN, BLD: BL, AG: [A], PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
-      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live
+      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live, roadExpand: true
     };
   }
 
@@ -1144,7 +1165,7 @@
 
     return {
       DUR: VDUR, DNAMES: DN, BLD: BL, AG: AG, PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
-      EVENTS: EV, FOG: FG, question: race.question || '', realDurationMs: span, live: true
+      EVENTS: EV, FOG: FG, question: race.question || '', realDurationMs: span, live: true, roadExpand: true
     };
   }
 
@@ -1164,6 +1185,30 @@
     this.build();
     this.t = 0; this.state.playing = false;
     this.render();
+  };
+
+  // The district a node belongs to: hub → null, 'd:web' → 'web', 'web-0' → 'web',
+  // 'kd:company-0' → 'kd:company' (district ids never contain '-').
+  BrainModel.prototype._districtOf = function (id) {
+    if (!id || id === 'hub') return null;
+    if (id.slice(0, 2) === 'd:') return id.slice(2);
+    var i = id.lastIndexOf('-');
+    return i > 0 ? id.slice(0, i) : id;
+  };
+  // The road-network nodes to pass through going from `a` to `b` (exclusive):
+  // building → its district junction → hub → next junction → building.
+  BrainModel.prototype.roadPath = function (a, b) {
+    var da = this._districtOf(a), db = this._districtOf(b), seq = [];
+    if (da !== null && a !== 'd:' + da) seq.push('d:' + da);      // step off a building to its junction
+    if (db === null) { if (da !== null) seq.push('hub'); }        // heading to the hub
+    else if (da === null) { seq.push('d:' + db); }                // leaving the hub
+    else if (da !== db) { seq.push('hub'); seq.push('d:' + db); } // cross-district via the hub
+    var out = [];
+    for (var i = 0; i < seq.length; i++) {
+      var m = seq[i];
+      if (m && this.N[m] && m !== a && m !== b && out[out.length - 1] !== m) out.push(m);
+    }
+    return out;
   };
 
   // ── API plumbing ─────────────────────────────────────────────────────────
