@@ -99,11 +99,15 @@ function getRouteStatsCached({ userId = null } = {}) {
  * @param {Array<string>} [opts.coveredDistricts] - districts rivals already grounded
  * @param {number} [opts.minRuns=5]
  * @param {boolean} [opts.shouldExplore=false]
+ * @param {string|null} [opts.lastDistrict] - the district the agent is moving FROM
+ * @param {Object} [opts.transitionWeights] - learned from→to→weight map (RouteOptimizer)
+ * @param {number} [opts.transitionWeight=0.25] - bounded corrective; yield/cost stay primary
  * @returns {Array} ranked legs, best first, with the scoring breakdown
  */
 function scoreLegs({
   legs, districtStats = {}, coveredDistricts = [], minRuns = 5, shouldExplore = false,
-  yieldWeight = 0.7, costWeight = 0.3, coveredPenalty = 0.5, exploreBoost = 0.15
+  yieldWeight = 0.7, costWeight = 0.3, coveredPenalty = 0.5, exploreBoost = 0.15,
+  lastDistrict = null, transitionWeights = null, transitionWeight = 0.25
 }) {
   const list = Array.isArray(legs) ? legs : [];
   const covered = new Set(coveredDistricts || []);
@@ -126,13 +130,21 @@ function scoreLegs({
     } else {
       base = 0.5; // neutral: unproven legs neither trusted nor penalised
     }
-    const score = isCovered ? base * coveredPenalty : base;
+    // Learned transition term: a bounded additive corrective for a move the
+    // system has learned tends to lead to verified answers. yield/cost stay
+    // primary; this only nudges. Applied AFTER the coverage penalty so a
+    // rival-held district is still deprioritised.
+    const boost = (lastDistrict && transitionWeights && transitionWeights[lastDistrict])
+      ? (transitionWeights[lastDistrict][l.district] || 0) : 0;
+    const penalised = isCovered ? base * coveredPenalty : base;
+    const score = penalised + transitionWeight * boost;
     return {
       district: l.district, tool: l.tool || null,
       proven: !!cell, runs: cell ? cell.runs : 0,
       yield: yieldVal == null ? null : round(yieldVal, 3),
       costEff: eff == null ? null : round(eff, 3),
       covered: isCovered, explored: false,
+      transitionBoost: round(boost, 3),
       score: round(score, 4)
     };
   });

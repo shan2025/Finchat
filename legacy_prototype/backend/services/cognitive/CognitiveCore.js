@@ -12,6 +12,7 @@ const { STATES, WAIT_REASONS } = require('./StateMachine');
 const brainStream = require('./BrainStream');
 const RaceState = require('./RaceState');
 const { getRouteStatsCached, scoreLegs, districtOf } = require('./RouteStats');
+const { getLearnedWeights } = require('./RouteOptimizer');
 const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
 const { classifyTask } = require('../AgentLeaderboard');
 const { query } = require('../../database');
@@ -426,7 +427,8 @@ async function _runWithinStallClock({
         contestNote = RaceState.contestNote(raceId, execId, {
           budgetRemainingTokens: Math.max(0, (Number(execution.max_tokens) || 0) - liveTokens)
         });
-        // Competitive route adaptation: prefer proven, uncovered legs.
+        // Competitive route adaptation + learned optimization: prefer proven,
+        // uncovered legs, nudged by learned district transitions.
         try {
           const taskType = classifyTask(goal);
           const { byTask } = await getRouteStatsCached({ userId });
@@ -434,9 +436,14 @@ async function _runWithinStallClock({
           const legs = Object.keys(districtStats).map(d => ({ district: d }));
           if (legs.length) {
             const rivalCovered = RaceState.rivalCoveredDistricts(raceId, execId).filter(d => !myDistricts.includes(d));
+            // The learned map (global, nightly) and this lane's current position.
+            const transitionWeights = await getLearnedWeights({ taskType }).catch(() => null);
+            const lastTool = accumulatedToolResults.length ? accumulatedToolResults[accumulatedToolResults.length - 1].tool : null;
+            const lastDistrict = lastTool ? districtOf(lastTool) : null;
             const scored = scoreLegs({
               legs, districtStats, coveredDistricts: [...new Set([...myDistricts, ...rivalCovered])],
-              shouldExplore: Math.random() < 0.15
+              shouldExplore: Math.random() < 0.15,
+              lastDistrict, transitionWeights
             });
             routeHint = buildRouteHint({ taskType, scored, rivalCovered });
           }

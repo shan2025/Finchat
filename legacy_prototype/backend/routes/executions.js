@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resumeExecution } = require('../services/cognitive/CognitiveCore');
 const { buildExecutionTrace } = require('../services/cognitive/ExecutionTrace');
 const { getRouteStatsCached } = require('../services/cognitive/RouteStats');
+const { getLearnedEdges } = require('../services/cognitive/RouteOptimizer');
 const { classifyTask } = require('../services/AgentLeaderboard');
 
 // ── GET /api/executions?state=waiting ────────────────────────
@@ -138,13 +139,17 @@ router.get('/:id/trace', requireAuth, async (req, res) => {
     // so the Brain Model can colour roads by how productive that ground has been.
     // Done here (not in the read-only assembler) to avoid a require cycle.
     try {
+      const taskType = classifyTask(trace.question);
       const { byTask } = await getRouteStatsCached({ userId: req.user.id });
-      const stats = (byTask && byTask[classifyTask(trace.question)]) || {};
+      const stats = (byTask && byTask[taskType]) || {};
       trace.routeYield = Object.fromEntries(Object.entries(stats).map(([d, c]) => [d, c.verifiedRate]));
       for (const dd of trace.districts || []) {
         const c = stats[dd.id];
         if (c) { dd.yield = c.verifiedRate; dd.yieldRuns = c.runs; }
       }
+      // Learned district→district shortcuts (global map) for this task type, so
+      // the Brain Model can draw paved roads the base ring/hub layout never had.
+      trace.learnedRoutes = await getLearnedEdges({ taskType });
     } catch (_) { /* colouring is optional; trace still renders without it */ }
     res.json({ trace });
   } catch (err) {

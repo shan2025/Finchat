@@ -86,6 +86,7 @@
     </button>
     <button id="bmRanksBtn" class="bm-btn" title="Global agent leaderboard — who's actually the better agent" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">🏆 Ranks</button>
     <button id="bmProfBtn" class="bm-btn" title="Agent performance by task type — who's best at what" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">📊 Profiles</button>
+    <button id="bmLearnedBtn" class="bm-btn" title="Toggle learned route shortcuts — the roads the optimizer paved from history" style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:999px; background:rgba(224,138,68,.16); color:var(--parch); font-family:inherit; font-size:11px; font-weight:700;">🛣 Learned</button>
     <div style="width:1px; height:20px; background:var(--line);"></div>
     <span id="bmQuestion" style="font-size:13px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--parch);"></span>
 
@@ -403,6 +404,19 @@
       var id = row[0], nx = DNAMES[(i + 1) % DNAMES.length][0];
       add('d:' + id, 'd:' + nx, 'ring', 'Ring Road · ' + self.D[id].name + ' ↔ ' + self.D[nx].name);
     });
+    // Learned shortcuts — district→district roads the optimizer paved from
+    // history (GET /trace `learnedRoutes`). Drawn only between districts that
+    // exist on THIS map, glowing by weight; toggled by SHOW_LEARNED.
+    (LEARNED || []).forEach(function (e) {
+      var a = 'd:' + e.from, b = 'd:' + e.to;
+      if (!self.N[a] || !self.N[b] || a === b) return;
+      var k = [a, b].sort().join('|');
+      // Reuse an existing road if the pair already has one, else pave a new edge.
+      if (!self.roads[k]) self.roads[k] = { k: k, a: a, b: b, kind: 'learned', name: 'Learned shortcut · ' + self.D[e.from].name + ' → ' + self.D[e.to].name, uses: [], appearsAt: 0 };
+      self.roads[k].learned = true;
+      self.roads[k].weight = Math.max(self.roads[k].weight || 0, e.weight || 0);
+    });
+
     add('filings-0', 'd:compliance', 'verify', 'Verification Route · 10-K Vault → Compliance');
     var vk = ['filings-0', 'd:compliance'].sort().join('|');
     // Demo-only: the verification route reveals at 4s. Absent on real traces,
@@ -654,10 +668,27 @@
         g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
       }
     };
+    // Learned shortcut overlay — a paved amber edge glowing by learned weight,
+    // drawn on top of whatever base road (if any) shares the pair. This is the
+    // visible payoff of route optimization: roads the base map never had.
+    var drawLearned = function (r) {
+      var pa = self.proj(self.N[r.a].x, self.N[r.a].y), pb = self.proj(self.N[r.b].x, self.N[r.b].y);
+      var w = Math.max(0, Math.min(1, r.weight || 0));
+      g.save();
+      g.lineCap = 'round';
+      g.strokeStyle = 'rgba(224,172,134,' + (0.35 + 0.5 * w).toFixed(3) + ')';
+      g.lineWidth = (2 + 6 * w) * z;
+      g.shadowColor = 'rgba(224,138,68,.8)'; g.shadowBlur = (6 + 14 * w) * z;
+      g.setLineDash([10 * z, 7 * z]);
+      g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke();
+      g.restore();
+    };
+
     this.roadKeys.filter(function (k) { return self.roads[k].kind === 'street'; }).forEach(function (k) { drawRoad(self.roads[k]); });
     this.roadKeys.filter(function (k) { return self.roads[k].kind === 'ring'; }).forEach(function (k) { drawRoad(self.roads[k]); });
     this.roadKeys.filter(function (k) { return self.roads[k].kind === 'highway'; }).forEach(function (k) { drawRoad(self.roads[k]); });
     this.roadKeys.filter(function (k) { return self.roads[k].kind === 'verify'; }).forEach(function (k) { drawRoad(self.roads[k]); });
+    if (SHOW_LEARNED) this.roadKeys.filter(function (k) { return self.roads[k].learned; }).forEach(function (k) { drawLearned(self.roads[k]); });
 
     // hub
     (function () {
@@ -1082,6 +1113,10 @@
   // Plato's routing breakdown (capability vs history) for the current run/race,
   // shown in the "Why this route" panel.
   var ROUTING = null;
+  // Learned district→district shortcuts for the current run's task type, and the
+  // before/after toggle. LEARNED feeds build() (paves the amber overlay roads).
+  var LEARNED = [];
+  var SHOW_LEARNED = true;
   var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
@@ -1090,6 +1125,7 @@
     DEFAULT_Q = s.question; REAL_DUR_MS = s.realDurationMs != null ? s.realDurationMs : null; RUN_ACTIVE = !!s.live;
     ROAD_EXPAND = !!s.roadExpand;
     ROUTING = s.routing || null;
+    LEARNED = s.learnedRoutes || [];
   }
 
   // Reshape a /trace payload into the scenario shape the engine consumes. Real
@@ -1143,7 +1179,8 @@
 
     return {
       DUR: VDUR, DNAMES: DN, BLD: BL, AG: [A], PLATO: { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' },
-      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live, roadExpand: true, routing: tr.routing || null
+      EVENTS: EV, FOG: FG, question: tr.question || '', realDurationMs: tr.durationMs, live: tr.live, roadExpand: true, routing: tr.routing || null,
+      learnedRoutes: tr.learnedRoutes || []
     };
   }
 
@@ -1445,6 +1482,14 @@
   function wireLeaderboard() {
     var ov = document.getElementById('bmLeaderboard');
     document.getElementById('bmRanksBtn').addEventListener('click', function () { openLeaderboard('global'); });
+    // Before/after toggle for the learned shortcut overlay. Rebuilds so paved
+    // edges appear/vanish; dims the button when off.
+    document.getElementById('bmLearnedBtn').addEventListener('click', function () {
+      SHOW_LEARNED = !SHOW_LEARNED;
+      this.style.background = SHOW_LEARNED ? 'rgba(224,138,68,.16)' : 'var(--ink3)';
+      this.style.color = SHOW_LEARNED ? 'var(--parch)' : 'var(--parch-dim)';
+      if (window.__bm) { window.__bm.build(); window.__bm.render(); }
+    });
     document.getElementById('bmLbClose').addEventListener('click', function () { ov.style.display = 'none'; });
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.style.display = 'none'; });
     document.getElementById('bmLbGlobal').addEventListener('click', function () { openLeaderboard('global'); });

@@ -181,6 +181,25 @@ router.all('/briefing', async (req, res) => {
   res.status(202).json({ ok: true, userId, note: 'Briefing started in the background.' });
 });
 
+/**
+ * Rebuild the global learned-route map from recent history. Point a nightly
+ * trigger here. Idempotent (full recompute over a trailing window), so a stray
+ * extra call is harmless; pass ?rebuild=1 for the same effect explicitly. Awaits
+ * by default — the pass is a couple of bounded aggregate queries, not agent work.
+ */
+router.all('/route-learning', async (req, res) => {
+  const { runRouteLearning } = require('../services/cognitive/RouteOptimizer');
+  const windowDays = Number(req.query.windowDays) || undefined;
+  try {
+    const result = await runRouteLearning({ windowDays });
+    console.log(`🧭 [Cron] Route learning: ${result.edges} edges across ${result.taskTypes} task type(s), ${result.windowDays}d window.`);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('❌ [Cron] Route learning failed:', err.message);
+    res.status(503).json({ ok: false, error: err.message });
+  }
+});
+
 /** Cheap authenticated no-op, so you can verify the secret without side effects. */
 router.all('/ping', (req, res) => {
   res.json({ ok: true, service: 'FinChat cron', time: new Date().toISOString() });
