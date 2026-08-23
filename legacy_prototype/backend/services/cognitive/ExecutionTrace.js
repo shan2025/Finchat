@@ -13,24 +13,9 @@
 const { query } = require('../../database');
 
 // Which knowledge "district" each tool belongs to, and its tone
-// ('a' = analytical/orange, 's' = source/green, 'n' = neutral).
-const TOOL_DISTRICT = {
-  stocks: ['markets', 'Markets', 'a'], crypto: ['markets', 'Markets', 'a'],
-  forex: ['markets', 'Markets', 'a'], commodities: ['markets', 'Markets', 'a'],
-  news: ['news', 'News & Sentiment', 's'], reddit: ['news', 'News & Sentiment', 's'],
-  quora: ['news', 'News & Sentiment', 's'],
-  paper: ['research', 'Research', 'a'], wikipedia: ['research', 'Research', 'a'],
-  search: ['web', 'Web & Search', 's'], fetch: ['web', 'Web & Search', 's'],
-  crawl: ['web', 'Web & Search', 's'],
-  watchlist: ['portfolio', 'Portfolio', 's'], resume: ['portfolio', 'Portfolio', 's'],
-  jobs: ['portfolio', 'Portfolio', 's'],
-  neural_map: ['knowledge', 'Knowledge', 'a'],
-  notifications: ['ops', 'Operations', 'n'], apply_draft: ['ops', 'Operations', 'n'],
-  bash: ['system', 'System', 'n'], file_read: ['system', 'System', 'n'],
-  file_write: ['system', 'System', 'n'], file_edit: ['system', 'System', 'n'],
-  glob: ['system', 'System', 'n']
-};
-const DEFAULT_DISTRICT = ['tools', 'Tools', 'n'];
+// ('a' = analytical/orange, 's' = source/green, 'n' = neutral). Shared taxonomy
+// so replay, live stream, and route-yield all resolve legs the same way.
+const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
 
 // Identity + colour for the four specialists + Plato, matching the Brain Model
 // demo palette and the avatar files in the frontend.

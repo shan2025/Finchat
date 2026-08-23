@@ -374,10 +374,10 @@
     this.D = {}; this.B = {}; this.order = [];
     var self = this;
     DNAMES.forEach(function (row, i) {
-      var id = row[0], name = row[1], tone = row[2];
+      var id = row[0], name = row[1], tone = row[2], yld = (typeof row[3] === 'number' ? row[3] : null);
       var a = (i / DNAMES.length) * Math.PI * 2 - Math.PI / 2;
       var cx = Math.round(Math.cos(a) * 18), cy = Math.round(Math.sin(a) * 15);
-      self.D[id] = { id: id, name: name, cx: cx, cy: cy, tone: tone, keys: [] };
+      self.D[id] = { id: id, name: name, cx: cx, cy: cy, tone: tone, yield: yld, keys: [] };
       self.N['d:' + id] = { x: cx, y: cy, label: name, junction: true };
       (BLD[id] || []).forEach(function (b, j) {
         var ba = a + (j - 1) * 0.55, r = 5.2;
@@ -608,10 +608,17 @@
     // district ground
     Object.keys(this.D).forEach(function (id) {
       var d = self.D[id], p = self.proj(d.cx, d.cy);
-      var fill = d.tone === 'a' ? 'rgba(198,113,57,.10)' : d.tone === 's' ? 'rgba(122,138,94,.10)' : 'rgba(245,234,216,.05)';
+      // Ground alpha carries historical verified-yield: a district that reliably
+      // produces grounded evidence for this task glows warmer; a barren one fades.
+      var base = d.tone === 'a' ? [198, 113, 57] : d.tone === 's' ? [122, 138, 94] : [245, 234, 216];
+      var baseA = d.tone === 'n' ? 0.05 : 0.10;
+      var alpha = (typeof d.yield === 'number') ? (0.05 + 0.22 * Math.max(0, Math.min(1, d.yield))) : baseA;
+      var fill = 'rgba(' + base[0] + ',' + base[1] + ',' + base[2] + ',' + alpha.toFixed(3) + ')';
       g.beginPath(); g.ellipse(p[0], p[1], 168 * z, 84 * z, 0, 0, 6.283);
       g.fillStyle = fill; g.fill();
-      g.strokeStyle = 'rgba(245,234,216,.09)'; g.lineWidth = 1; g.stroke();
+      // A brighter rim on proven-productive ground so the yield reads at a glance.
+      var rim = (typeof d.yield === 'number' && d.yield >= 0.6) ? 'rgba(224,172,134,.28)' : 'rgba(245,234,216,.09)';
+      g.strokeStyle = rim; g.lineWidth = 1; g.stroke();
     });
 
     // roads: casing then surface, lit by traversal
@@ -1091,14 +1098,14 @@
   function buildScenarioFromTrace(tr) {
     var VDUR = 11;
     var dmap = {}, order = [];
-    (tr.districts || []).forEach(function (d) { if (!dmap[d.id]) { dmap[d.id] = { name: d.name, tone: d.tone, items: [] }; order.push(d.id); } });
-    (tr.buildings || []).forEach(function (b) { if (!dmap[b.district]) { dmap[b.district] = { name: cap2(b.district), tone: 'n', items: [] }; order.push(b.district); } });
+    (tr.districts || []).forEach(function (d) { if (!dmap[d.id]) { dmap[d.id] = { name: d.name, tone: d.tone, yield: (typeof d.yield === 'number' ? d.yield : null), items: [] }; order.push(d.id); } });
+    (tr.buildings || []).forEach(function (b) { if (!dmap[b.district]) { dmap[b.district] = { name: cap2(b.district), tone: 'n', yield: null, items: [] }; order.push(b.district); } });
     (tr.buildings || []).forEach(function (b) { dmap[b.district].items.push(b); });
 
     var DN = [], BL = {}, keyOf = {};
     order.forEach(function (did) {
       var d = dmap[did]; if (!d) return;
-      DN.push([did, d.name, d.tone]);
+      DN.push([did, d.name, d.tone, d.yield]);
       BL[did] = d.items.map(function (b, j) { keyOf[b.id] = did + '-' + j; return [b.label, b.kind === 'doc' ? 'd' : 'c', b.storeys || 2, b.uses || 1]; });
     });
     if (DN.length === 0) { DN.push(['reasoning', 'Reasoning', 'a']); BL['reasoning'] = [['Direct answer', 'c', 3, 1]]; }

@@ -11,7 +11,44 @@ const { createExecution, updateState, completeExecution, failExecution, checkBud
 const { STATES, WAIT_REASONS } = require('./StateMachine');
 const brainStream = require('./BrainStream');
 const RaceState = require('./RaceState');
+const { getRouteStatsCached, scoreLegs, districtOf } = require('./RouteStats');
+const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
+const { classifyTask } = require('../AgentLeaderboard');
 const { query } = require('../../database');
+
+// Display name per district, derived from the shared taxonomy, for route hints.
+const DISTRICT_NAME = (() => {
+  const m = {};
+  for (const d of Object.values(TOOL_DISTRICT)) m[d[0]] = d[1];
+  m[DEFAULT_DISTRICT[0]] = DEFAULT_DISTRICT[1];
+  return m;
+})();
+const districtName = (d) => DISTRICT_NAME[d] || d;
+
+/**
+ * Render the competitive route hint for one race lane (PURE). Steers toward the
+ * top proven, uncovered legs and names the ground a rival already holds, so
+ * lanes diversify. Advisory — returns null when there is nothing worth saying.
+ */
+function buildRouteHint({ taskType, scored, rivalCovered }) {
+  const uncoveredProven = scored.filter(l => l.proven && !l.covered).slice(0, 2);
+  const explored = scored.find(l => l.explored);
+  if (!uncoveredProven.length && !explored) return null;
+  const lines = [`--- ROUTE GUIDANCE (task: ${taskType}) ---`];
+  if (uncoveredProven.length) {
+    lines.push('Historically productive, still-uncovered ground for this task: ' +
+      uncoveredProven.map(l => `${districtName(l.district)} (${Math.round(l.yield * 100)}% verified yield)`).join(', ') + '.');
+  }
+  if (explored) {
+    lines.push(`Consider probing ${districtName(explored.district)} — little history for this task, but worth testing whether it is a better route.`);
+  }
+  if (rivalCovered && rivalCovered.length) {
+    lines.push('A rival already holds verified sources from: ' +
+      rivalCovered.map(districtName).join(', ') + '. Prefer complementary ground unless one of those districts is essential to YOUR answer.');
+  }
+  lines.push('Advisory only — what the question actually needs comes first.');
+  return lines.join('\n');
+}
 
 // Community sources whose facts must be treated as unverified opinion.
 const UNVERIFIED_TOOLS = new Set(['reddit', 'quora']);
@@ -379,11 +416,31 @@ async function _runWithinStallClock({
       // standings, so the reasoning turn below sees where it stands against its
       // rivals and can weigh more evidence against more fuel. Race lanes only.
       let contestNote = null;
+      let routeHint = null;
       if (raceId) {
-        RaceState.update(raceId, execId, { evidence: extractSources(accumulatedToolResults).length, fuel: liveTokens, turn: i });
+        // Districts this lane has already grounded verified evidence in — the
+        // coverage signal rivals diversify against.
+        const mySources = extractSources(accumulatedToolResults);
+        const myDistricts = [...new Set(mySources.map(s => districtOf(s.tool)))];
+        RaceState.update(raceId, execId, { evidence: mySources.length, fuel: liveTokens, turn: i, districts: myDistricts });
         contestNote = RaceState.contestNote(raceId, execId, {
           budgetRemainingTokens: Math.max(0, (Number(execution.max_tokens) || 0) - liveTokens)
         });
+        // Competitive route adaptation: prefer proven, uncovered legs.
+        try {
+          const taskType = classifyTask(goal);
+          const { byTask } = await getRouteStatsCached({ userId });
+          const districtStats = (byTask && byTask[taskType]) || {};
+          const legs = Object.keys(districtStats).map(d => ({ district: d }));
+          if (legs.length) {
+            const rivalCovered = RaceState.rivalCoveredDistricts(raceId, execId).filter(d => !myDistricts.includes(d));
+            const scored = scoreLegs({
+              legs, districtStats, coveredDistricts: [...new Set([...myDistricts, ...rivalCovered])],
+              shouldExplore: Math.random() < 0.15
+            });
+            routeHint = buildRouteHint({ taskType, scored, rivalCovered });
+          }
+        } catch (_) { /* route hints are advisory; never block the turn */ }
       }
 
       // 3c. Build context (includes memories + tool results + graph + recipes)
@@ -399,6 +456,7 @@ async function _runWithinStallClock({
         budgetExceeded: lastTurn,
         missingSources,
         contest: contestNote,
+        routeHint,
         traits: agentTraits,
         userPreferences,
         allowWeb,

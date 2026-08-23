@@ -5,6 +5,8 @@ const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { resumeExecution } = require('../services/cognitive/CognitiveCore');
 const { buildExecutionTrace } = require('../services/cognitive/ExecutionTrace');
+const { getRouteStatsCached } = require('../services/cognitive/RouteStats');
+const { classifyTask } = require('../services/AgentLeaderboard');
 
 // ── GET /api/executions?state=waiting ────────────────────────
 // List the user's executions, defaulting to those awaiting human approval
@@ -132,6 +134,18 @@ router.get('/:id/trace', requireAuth, async (req, res) => {
     const trace = await buildExecutionTrace({ executionId: req.params.id, userId: req.user.id });
     if (!trace) return res.status(404).json({ error: 'Execution not found' });
     if (trace.forbidden) return res.status(403).json({ error: 'Not your execution' });
+    // Enrich each district with its historical verified-yield for this task type,
+    // so the Brain Model can colour roads by how productive that ground has been.
+    // Done here (not in the read-only assembler) to avoid a require cycle.
+    try {
+      const { byTask } = await getRouteStatsCached({ userId: req.user.id });
+      const stats = (byTask && byTask[classifyTask(trace.question)]) || {};
+      trace.routeYield = Object.fromEntries(Object.entries(stats).map(([d, c]) => [d, c.verifiedRate]));
+      for (const dd of trace.districts || []) {
+        const c = stats[dd.id];
+        if (c) { dd.yield = c.verifiedRate; dd.yieldRuns = c.runs; }
+      }
+    } catch (_) { /* colouring is optional; trace still renders without it */ }
     res.json({ trace });
   } catch (err) {
     console.error('Build execution trace error:', err);

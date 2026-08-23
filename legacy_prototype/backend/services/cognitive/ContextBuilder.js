@@ -300,6 +300,11 @@ function buildContext({
   // that let this agent decide, economically, whether more evidence is worth the
   // fuel. A prebuilt string (see RaceState.contestNote); injected only mid-race.
   contest = null,
+  // Competitive route hint — the historically most productive, still-uncovered
+  // knowledge districts for this task, so the agent can prefer a proven leg and
+  // diversify away from ground a rival already holds. A prebuilt string (see
+  // CognitiveCore.buildRouteHint); advisory, injected only when it exists.
+  routeHint = null,
   traits = null,
   userPreferences = [],
   allowWeb = true,
@@ -402,6 +407,13 @@ function buildContext({
   // is a decision input, not an order to keep searching.
   if (!budgetExceeded && contest) {
     messages.push({ role: 'system', content: contest });
+  }
+
+  // 2b-bis. Route hint — advisory guidance toward proven, uncovered legs. Also
+  // suppressed under a breached budget: with the answer being cut off, steering
+  // the agent toward one more district is the wrong nudge.
+  if (!budgetExceeded && routeHint) {
+    messages.push({ role: 'system', content: routeHint });
   }
 
   // 3. Tool results from previous iterations

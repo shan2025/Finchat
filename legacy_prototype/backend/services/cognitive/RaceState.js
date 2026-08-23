@@ -27,15 +27,29 @@ function register(raceId, executionId, agentId) {
   let r = races.get(raceId);
   if (!r) { r = { createdAt: Date.now(), lanes: new Map() }; races.set(raceId, r); }
   if (!r.lanes.has(executionId)) {
-    r.lanes.set(executionId, { executionId, agentId, evidence: 0, fuel: 0, turn: 0, done: false, updatedAt: Date.now() });
+    r.lanes.set(executionId, { executionId, agentId, evidence: 0, fuel: 0, turn: 0, done: false, districts: [], updatedAt: Date.now() });
   }
 }
 
-/** Update a lane's live progress. */
+/** Update a lane's live progress. `districts` (if given) REPLACES the lane's
+ *  covered-district list — the caller passes the full current set each turn. */
 function update(raceId, executionId, patch = {}) {
   const r = races.get(raceId); if (!r) return;
   const l = r.lanes.get(executionId); if (!l) return;
   Object.assign(l, patch, { updatedAt: Date.now() });
+}
+
+/** Distinct knowledge districts every OTHER lane has already grounded evidence
+ *  in — the live-coverage signal that pushes a lane toward complementary ground
+ *  instead of duplicating a rival's sources. */
+function rivalCoveredDistricts(raceId, executionId) {
+  const r = races.get(raceId); if (!r) return [];
+  const out = new Set();
+  for (const l of r.lanes.values()) {
+    if (l.executionId === executionId) continue;
+    for (const d of (l.districts || [])) out.add(d);
+  }
+  return [...out];
 }
 
 /** Ranked standings: most evidence first, then least fuel. */
@@ -88,4 +102,4 @@ function contestNote(raceId, executionId, { budgetRemainingTokens = null } = {})
 
 function clear(raceId) { races.delete(raceId); }
 
-module.exports = { register, update, standings, contestNote, clear, _races: races };
+module.exports = { register, update, standings, contestNote, rivalCoveredDistricts, clear, _races: races };
