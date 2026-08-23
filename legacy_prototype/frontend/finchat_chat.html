@@ -1549,51 +1549,77 @@
     // ─────────────────────────────────
     // RECENT CONVERSATIONS (real Supabase sessions, not design mock)
     // ─────────────────────────────────
+    // Build the Recent list markup + wire its clicks. Shared by the instant
+    // cache paint and the post-fetch repaint so both render identically.
+    function renderRecentList(sessions) {
+      const list = document.getElementById('recentList');
+      if (!list) return;
+      if (!sessions.length) {
+        list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">No conversations yet</div>';
+        return;
+      }
+      list.innerHTML = sessions.map(s => {
+        const p = PERSONAS[s.persona];
+        const av = p
+          ? `<span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0" style="background:#efe8de;">${p.avatar}</span>`
+          : `<span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style="background:#efe8de; font-size:13px;">${s.personaAvatar || '🤖'}</span>`;
+        const active = s.session_id === personaSessions[activePersona];
+        return `<a class="fc-nav fc-recent" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:${active ? '#fff' : '#cfc3ad'}; background:${active ? 'rgba(255,255,255,.09)' : 'transparent'}; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
+            ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
+            <span class="rc-actions">
+              <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
+              <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
+              <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
+              <button data-act="delete" title="Delete conversation"><span class="material-symbols-outlined" style="font-size:14px">delete</span></button>
+            </span>
+          </a>`;
+      }).join('');
+      list.querySelectorAll('[data-session]').forEach(a => {
+        a.onclick = (ev) => {
+          if (ev.target.closest('[data-act]')) return; // action buttons handle themselves
+          openSession(a.dataset.session, a.dataset.persona);
+        };
+      });
+      list.querySelectorAll('[data-act]').forEach(b => {
+        b.onclick = (ev) => {
+          ev.preventDefault(); ev.stopPropagation();
+          const a = b.closest('[data-session]');
+          if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
+          else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
+          else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
+          else if (b.dataset.act === 'mindmap') mindMapFromChat(a.dataset.session);
+        };
+      });
+    }
+
     async function loadRecentSessions() {
       const list = document.getElementById('recentList');
       const token = _session?.token;
       if (!list || !token) return;
+      // Instant paint from the shared cache (first 6) so returning to Chat never
+      // flashes "Loading…" — then revalidate below and repaint with the full 10.
+      let cached = null;
+      try {
+        const c = JSON.parse(sessionStorage.getItem('finchat_recents_cache') || 'null');
+        if (c && c.token === token && Array.isArray(c.sessions)) { cached = c.sessions; renderRecentList(cached); }
+      } catch (e) {}
       try {
         const res = await fetch(`${API_URL}/api/ai-chat/sessions`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) return;
         const data = await res.json();
-        const sessions = (data.sessions || []).slice(0, 10);
-        if (!sessions.length) {
-          list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">No conversations yet</div>';
-          return;
-        }
-        list.innerHTML = sessions.map(s => {
-          const p = PERSONAS[s.persona];
-          const av = p
-            ? `<span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0" style="background:#efe8de;">${p.avatar}</span>`
-            : `<span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style="background:#efe8de; font-size:13px;">${s.personaAvatar || '🤖'}</span>`;
-          const active = s.session_id === personaSessions[activePersona];
-          return `<a class="fc-nav fc-recent" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:${active ? '#fff' : '#cfc3ad'}; background:${active ? 'rgba(255,255,255,.09)' : 'transparent'}; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
-              ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
-              <span class="rc-actions">
-                <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
-                <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
-                <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
-                <button data-act="delete" title="Delete conversation"><span class="material-symbols-outlined" style="font-size:14px">delete</span></button>
-              </span>
-            </a>`;
-        }).join('');
-        list.querySelectorAll('[data-session]').forEach(a => {
-          a.onclick = (ev) => {
-            if (ev.target.closest('[data-act]')) return; // action buttons handle themselves
-            openSession(a.dataset.session, a.dataset.persona);
-          };
-        });
-        list.querySelectorAll('[data-act]').forEach(b => {
-          b.onclick = (ev) => {
-            ev.preventDefault(); ev.stopPropagation();
-            const a = b.closest('[data-session]');
-            if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
-            else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
-            else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
-            else if (b.dataset.act === 'mindmap') mindMapFromChat(a.dataset.session);
-          };
-        });
+        // Seed the shared sidebar's Recent cache so the first hop OFF the chat
+        // page (which uses this inline rail, not sidebar_nav.js) paints Recents
+        // instantly instead of flashing "Loading…". Same key/shape the rail
+        // reads: { token, sessions }. Cache is canonical at 10 (this list's
+        // length); the shared rail slices to its own 6 on read. This runs on
+        // every load and after rename/delete (which re-call this fn), so the
+        // cache never goes stale.
+        try {
+          sessionStorage.setItem('finchat_recents_cache', JSON.stringify({
+            token, sessions: (data.sessions || []).slice(0, 10)
+          }));
+        } catch (e) {}
+        renderRecentList((data.sessions || []).slice(0, 10));
       } catch (e) { console.log('Could not load recent sessions:', e); }
     }
 

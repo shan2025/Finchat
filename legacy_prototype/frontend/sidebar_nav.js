@@ -378,27 +378,67 @@
     });
   }
 
+  // Per-tab cache of the Recent list. FinChat is a multi-page app, so without
+  // this every navigation re-hits /api/ai-chat/sessions (a ~126ms Supabase
+  // round-trip) and flashes "Loading…" before the same rows reappear. We stash
+  // the list in sessionStorage — scoped to the tab, so it clears on tab close
+  // and never leaks a previous user's conversations into a fresh sign-in — and
+  // paint it instantly on the next page, then revalidate in the background.
+  var RECENTS_CACHE_KEY = 'finchat_recents_cache';
+  function readRecentsCache(token) {
+    try {
+      var c = JSON.parse(sessionStorage.getItem(RECENTS_CACHE_KEY) || 'null');
+      if (!c || c.token !== token) return null; // stale token → different user
+      return c.sessions || null;
+    } catch (e) { return null; }
+  }
+  function writeRecentsCache(token, sessions) {
+    try {
+      sessionStorage.setItem(RECENTS_CACHE_KEY,
+        JSON.stringify({ token: token, sessions: sessions }));
+    } catch (e) {}
+  }
+
   function refreshRecents(token) {
+    // The cache is canonical at 10 (the chat page's list length); the rail only
+    // shows 6, so slice on read and compare on the sliced view.
+    var cached = readRecentsCache(token);
+    var cached6 = cached ? cached.slice(0, 6) : null;
+    // Paint whatever we saw last so the rail never starts on "Loading…".
+    if (cached6) renderRecents(cached6, token);
+
     fetch(API + '/api/ai-chat/sessions', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        var list = document.getElementById('sbnRecent');
-        if (!list) return;
-        // Recent settling to its real height resizes the nav list under it, so
-        // re-check the active link once it has.
-        var settled = function () {
-          if (!pendingReveal) return;
-          pendingReveal = false;
-          var nav = document.getElementById('sideNav');
-          if (nav) revealActive(nav);
-        };
-        var sessions = (d && d.sessions || []).slice(0, 6);
-        if (!sessions.length) {
-          list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--sbn-muted);">No conversations yet</div>';
-          settled();
-          return;
-        }
-        list.innerHTML = sessions.map(function (s) {
+        if (!d) return;
+        var all = (d.sessions || []).slice(0, 10);
+        var six = all.slice(0, 6);
+        // Skip the repaint (and its scroll-cue reflow) when the visible rows are
+        // unchanged — the common case once the cache is warm.
+        if (JSON.stringify(six) === JSON.stringify(cached6 || [])) return;
+        writeRecentsCache(token, all);
+        renderRecents(six, token);
+      }).catch(function () {});
+  }
+
+  function renderRecents(sessions, token) {
+    var list = document.getElementById('sbnRecent');
+    if (!list) return;
+    // Recent settling to its real height resizes the nav list under it, so
+    // re-check the active link once it has.
+    var settled = function () {
+      if (!pendingReveal) return;
+      pendingReveal = false;
+      var nav = document.getElementById('sideNav');
+      if (nav) revealActive(nav);
+    };
+    if (!sessions.length) {
+      list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--sbn-muted);">No conversations yet</div>';
+      settled();
+      return;
+    }
+    {
+      list.innerHTML = sessions.map(function (s) {
           var av = AGENT_AVATARS[s.persona]
             ? '<span style="width:24px; height:24px; border-radius:999px; overflow:hidden; flex-shrink:0; background:#efe8de; display:inline-flex;"><img src="' + AGENT_AVATARS[s.persona] + '" style="width:100%;height:100%;object-fit:cover;"></span>'
             : '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(s.personaAvatar || '🤖') + '</span>';
@@ -422,11 +462,11 @@
               var title = prompt('Rename conversation:', a.getAttribute('data-title') || '');
               if (!title || !title.trim()) return;
               fetch(API + '/api/ai-chat/sessions/' + sid, { method: 'PATCH', headers: H, body: JSON.stringify({ title: title.trim() }) })
-                .then(function (r) { if (r.ok) refreshRecents(token); });
+                .then(function (r) { if (r.ok) { try { sessionStorage.removeItem(RECENTS_CACHE_KEY); } catch (e) {} refreshRecents(token); } });
             } else if (act === 'delete') {
               if (!confirm('Delete this conversation? This cannot be undone.')) return;
               fetch(API + '/api/ai-chat/sessions/' + sid, { method: 'DELETE', headers: H })
-                .then(function (r) { if (r.ok) refreshRecents(token); });
+                .then(function (r) { if (r.ok) { try { sessionStorage.removeItem(RECENTS_CACHE_KEY); } catch (e) {} refreshRecents(token); } });
             } else if (act === 'copy') {
               fetch(API + '/api/ai-chat/history/' + sid, { headers: H })
                 .then(function (r) { return r.ok ? r.json() : null; })
@@ -445,7 +485,7 @@
             }
           });
         });
-      }).catch(function () {});
+    }
   }
 
   // The rail owns its own active-state contract; spa_router.js calls syncActive()
