@@ -1,6 +1,6 @@
 # Sprint AA — Provider Routing, Per-Agent Keys, Fallback Ladder & BYOK
 
-**Status:** Budget fix + context efficiency SHIPPED 2026-08-18 · sequencing revised (see §11) · not yet deployed
+**Status:** Shipped and deployed 2026-08-18 · **verified in production over 4.5 days: 91 runs, 0 errors, 0 budget_exceeded** (§0.6) · one open bug: email delivery (§0.7)
 **Written:** 2026-08-18
 
 ---
@@ -194,6 +194,77 @@ still count. Compaction and scoping lower `tokens_used`, which is what protects
 the budget ceiling and the Groq/Gemini free tiers — neither of which caches
 automatically. Both matter, for different reasons.
 
+### 0.6 Verified in production — 4.5 days later
+
+Everything above was measured on one replayed run. This is what actually
+happened, 2026-08-18 18:30 → 2026-08-23 04:00, from `executions`:
+
+| completion_reason | before (08-11 → 08-18) | after |
+|---|---|---|
+| natural | 77 | **91** |
+| **error** | **143** | **0** |
+| **budget_exceeded** | **40** | **0** |
+| abandoned_approval / stale_timeout / resumed | 3 | 0 |
+| | 29% success | **100% success** |
+
+Checked for the obvious way that number could be a lie: every one of the 91 rows
+is `current_state = completed`, so nothing is parked in `running` or `failed`
+and quietly excluded. Both failure modes this sprint set out to fix — the local
+budget ceiling and total provider exhaustion — have not recurred once.
+
+Caching over the same window, from `inference_metrics`:
+
+| provider | calls | prompt tokens | cached | avg latency |
+|---|---|---|---|---|
+| deepseek | 312 | 936,043 | **441,088 (47%)** | 5,028 ms |
+| groq | 158 | 141,138 | 6,144 (4%) | 1,778 ms |
+| mistral | 1 | 1,211 | 0 | 5,221 ms |
+
+47% rather than the 98% of a replayed run, because every mission has a different
+goal and each new run starts cold — the stable part is the catalogue, not the
+task. That is 441k tokens billed at a fraction. Mistral's single call is the
+fallback tail proving it works.
+
+Per-agent, all comfortably inside their ceilings: aurelius 7,267/27,273 (44
+runs), nova 9,652/31,750 (20), plato 14,431/41,389 (18), rasha 12,633/25,714 (7).
+
+**One number NOT to trust from this comparison.** The before-era `prompt_tokens_used`
+average looks like 14,454, which would imply a −42% prompt reduction. That column
+only exists from migration 031, applied mid-sprint, so the "before" figure is a
+single run at the boundary. The completion_reason comparison is sound; that one
+is not. Prompt share is still 85–97% of tokens — caching cut the cost of it, not
+the size.
+
+### 0.7 Open bug — email delivery is 100% failing
+
+Found while verifying the above, not previously known.
+
+| channel | sent | failed |
+|---|---|---|
+| telegram | **40** | 0 |
+| email | **0** | **40** |
+
+Email last delivered successfully on **2026-08-16**; 222 failures total. The
+briefs are being written and reaching Telegram — they are simply not reaching
+the inbox.
+
+The cause has changed once already. `connect ENETUNREACH 2607:f8b0:...:587`
+(IPv6) stops on 2026-08-17, so the `family: 4` fix worked. What replaced it is
+`Connection timeout` — 110 of them, still occurring 2026-08-22 — and
+`notificationChannels.js` already sets `family: 4`, `connectionTimeout: 15000`,
+`greetingTimeout` and `socketTimeout`, so this is not a config gap.
+
+`smtp.gmail.com:587` connects from a local machine in **130 ms**, which rules out
+the credentials, the host and Gmail itself. Telegram works because it is HTTPS on
+443. The remaining explanation is that **Render's free instance does not allow
+outbound SMTP**, which is a standard anti-spam restriction on that class of host
+and cannot be fixed by any nodemailer setting.
+
+The fix is to send over HTTPS instead of SMTP — Resend (3,000/month free), Brevo
+(300/day) and SendGrid (100/day) all expose an HTTP API on 443. That needs an
+account and an API key, so it is a decision rather than a refactor. Worth doing:
+it is the difference between the daily briefs arriving and not.
+
 **Still not done:** the rules block (551 tok/turn) is emphatic anti-hallucination
 prose. It is repetitive and could be tightened, but every clause was added
 against a specific failure, so it is not worth trimming for tokens alone.
@@ -316,11 +387,13 @@ the whole thing. No specialist contributes.
 | nova | Daily Research & Markets Digest | daily | false | 3 |
 | plato | Monitor the stock market | daily | **false** | 3 |
 
-The crypto brief and the job-hunt brief are already defined. Worse: even flipping
-`enabled` would not fire them, because **missions have no scheduler**. pg_cron only
-calls `trigger_daily_briefing()`; `cron-job.org` (which drove `/api/cron/tick`) is
-disabled. The tech briefing you receive is the Plato pg_cron briefing plus Nova's
-digest — the only two things with a live trigger.
+The crypto brief and the job-hunt brief are already defined but switched off.
+
+> **Superseded 2026-08-23.** This paragraph originally said missions had no
+> scheduler and that flipping `enabled` would not fire them. That is no longer
+> true: a `finchat-mission-tick` pg_cron job runs every 15 minutes and all five
+> missions are enabled and succeeding. See §8.5.1. The table above is kept as the
+> state on 2026-08-18, not as current fact.
 
 ### 1.8 BYOK is a parameter with no caller
 
@@ -569,10 +642,27 @@ doomed round-trip isn't paid on every subsequent request of the day.
 
 ## 8. Phase 5 — Per-agent daily briefings
 
-**5.1 — Restore a mission scheduler.** Missions are dead in the water without one.
-Add a second pg_cron job hitting `/api/cron/tick` with `CRON_SECRET`, alongside the
-existing `trigger_daily_briefing()`. This is the single blocker on everything in
-this phase.
+**5.1 — Mission scheduler. ✅ DONE — and this section was wrong.**
+
+Verified 2026-08-23: pg_cron job `finchat-mission-tick` runs `*/15 * * * *`
+calling `public.trigger_mission_tick()`, alongside the three
+`trigger_daily_briefing()` jobs. It is active and has been firing missions.
+
+All five missions are now `enabled` with `consecutive_failures: 0`, including the
+two this document described as switched off. They are producing real briefs, not
+placeholder prose:
+
+| agent | brief | last run |
+|---|---|---|
+| aurelius | Crypto Intelligence Brief | 2026-08-23 04:00 |
+| nova | Frontier Research Intelligence Brief | 2026-08-22 21:45 |
+| nova | Daily Research & Markets Digest | 2026-08-22 14:15 |
+| rasha | Career Intelligence Brief | 2026-08-22 13:45 |
+| plato | Markets & Macro Intelligence Brief | 2026-08-22 13:15 |
+
+So §8.5.2's per-agent domain assignment is effectively live. What remains from
+this phase is §8.5.3's staggering and §8.5.4's advice posture — and the delivery
+bug in §0.7, which is what actually stops these reaching your inbox.
 
 **5.2 — Assign domains by expertise** (matching what you described):
 
@@ -685,14 +775,15 @@ available to a system spending 86% of it re-reading its own prompt.
 | 2 | ContextBuilder efficiency | ✅ **done** (−20%) |
 | 3 | Per-agent tool scoping | ✅ **done** (−37% cumulative) |
 | 4 | Provider isolation + Quota Manager (§6) | ✅ **done** (`b8e47d4`) |
-| 5 | Cerebras | next — needs a signup |
-| 6 | Formal fallback ladder (§7 rows 3, 5, 10) | |
-| 7 | Mission scheduler (§8.5.1) | single blocker on all per-agent briefings |
-| 8 | Per-agent execution policies | |
-| 9 | BYOK (§9) | the multi-tenant unlock |
-| 10 | Per-user agent configuration | multi-tenancy gap, must precede a public §10 |
-| 11 | Agent briefings + Plato synthesis (§8) | |
-| 12 | Chat commands (§10) | |
+| 5 | **Email delivery over HTTPS (§0.7)** | **next** — briefs are written but never arrive; needs an account |
+| 6 | Cerebras | needs a signup; less urgent now that 0 runs fail |
+| 7 | Formal fallback ladder (§7) | rows 3 and 5 largely covered by the Quota Manager; row 10 guards a failure that has not occurred since 08-18 |
+| 8 | Mission scheduler (§8.5.1) | ✅ **already existed** — `finchat-mission-tick`, every 15 min |
+| 9 | Per-agent execution policies | |
+| 10 | BYOK (§9) | the multi-tenant unlock |
+| 11 | Per-user agent configuration | multi-tenancy gap, must precede a public §10 |
+| 12 | Plato cross-agent synthesis (§8.5.2) | the per-agent briefs themselves are live |
+| 13 | Chat commands (§10) | |
 
 Both repair phases are done. Everything remaining is capability, not repair.
 
