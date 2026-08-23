@@ -296,6 +296,10 @@ function buildContext({
   recipeHints = [],
   budgetExceeded = false,
   missingSources = [],
+  // Live contest status during a multi-agent race — the structured standings
+  // that let this agent decide, economically, whether more evidence is worth the
+  // fuel. A prebuilt string (see RaceState.contestNote); injected only mid-race.
+  contest = null,
   traits = null,
   userPreferences = [],
   allowWeb = true,
@@ -390,6 +394,14 @@ function buildContext({
       role: 'system',
       content: `--- PROVEN SKILL RECIPES (reuse if the shape fits, don't force it) ---\n${recipeBlock}`
     });
+  }
+
+  // 2d. Contest awareness (multi-agent race). Never under a breached budget —
+  // when the answer is being cut off, "go gather more" is exactly the wrong
+  // nudge. The note itself tells the agent to weigh fuel against evidence, so it
+  // is a decision input, not an order to keep searching.
+  if (!budgetExceeded && contest) {
+    messages.push({ role: 'system', content: contest });
   }
 
   // 3. Tool results from previous iterations

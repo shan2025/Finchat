@@ -10,6 +10,7 @@ const { runWithStallClock, stalledMs } = require('./StallClock');
 const { createExecution, updateState, completeExecution, failExecution, checkBudget, incrementUsage, evaluateBudget } = require('./ExecutionManager');
 const { STATES, WAIT_REASONS } = require('./StateMachine');
 const brainStream = require('./BrainStream');
+const RaceState = require('./RaceState');
 const { query } = require('../../database');
 
 // Community sources whose facts must be treated as unverified opinion.
@@ -239,6 +240,8 @@ async function _runWithinStallClock({
       [JSON.stringify(metaPatch), execId]
     ).catch(() => { /* best-effort; the run must not fail on a telemetry write */ });
   }
+  // Contest-awareness: enrol this lane so the competing lanes can see it live.
+  if (raceId) RaceState.register(raceId, execId, agentName);
   const toolContext = { userId, agentName, conversationId };
   let pendingApproval = null; // set when a requires_approval tool was attempted
   let hasPlanned = false;     // one plan per execution (re-plan loop guard)
@@ -372,6 +375,17 @@ async function _runWithinStallClock({
         });
       }
 
+      // 3b-bis. Contest-awareness: publish this lane's live progress and read the
+      // standings, so the reasoning turn below sees where it stands against its
+      // rivals and can weigh more evidence against more fuel. Race lanes only.
+      let contestNote = null;
+      if (raceId) {
+        RaceState.update(raceId, execId, { evidence: extractSources(accumulatedToolResults).length, fuel: liveTokens, turn: i });
+        contestNote = RaceState.contestNote(raceId, execId, {
+          budgetRemainingTokens: Math.max(0, (Number(execution.max_tokens) || 0) - liveTokens)
+        });
+      }
+
       // 3c. Build context (includes memories + tool results + graph + recipes)
       const ctxStats = {};
       const messages = buildContext({
@@ -384,6 +398,7 @@ async function _runWithinStallClock({
         recipeHints: enriched.recipeHints,
         budgetExceeded: lastTurn,
         missingSources,
+        contest: contestNote,
         traits: agentTraits,
         userPreferences,
         allowWeb,
@@ -754,6 +769,7 @@ async function _runWithinStallClock({
       executionId: execId, userId, completionReason,
       tokensUsed: (completed && completed.tokens_used) || liveTokens, atMs: Date.now() - t0
     });
+    if (raceId) RaceState.update(raceId, execId, { evidence: extractSources(accumulatedToolResults).length, fuel: liveTokens, done: true });
 
     // Record the timestamp the user-visible response is ready
     const responseReadyAt = new Date().toISOString();
@@ -793,6 +809,7 @@ async function _runWithinStallClock({
   } catch (err) {
     console.error(`❌ CognitiveCore.run() error for ${execId}:`, err.message);
     brainStream.error({ executionId: execId, userId, message: err.message, atMs: Date.now() - t0 });
+    if (raceId) RaceState.update(raceId, execId, { done: true });
     try {
       await failExecution(execId, { error: err });
     } catch (failErr) {
