@@ -279,6 +279,14 @@ app.get('/health', async (req, res) => {
   const base = {
     service: 'FinChat Backend',
     version: '0.2.0',
+    // Git SHA of the running build. Render injects RENDER_GIT_COMMIT at deploy
+    // time; this is the ONLY reliable public proof of which commit is live —
+    // uptime resets on free-tier spin-down too, so it can't confirm a deploy.
+    // Falls back through other providers' vars, then 'unknown' for local dev.
+    commit: (process.env.RENDER_GIT_COMMIT ||
+             process.env.GIT_COMMIT ||
+             process.env.SOURCE_VERSION ||
+             'unknown').slice(0, 7),
     uptime: process.uptime().toFixed(1) + 's'
   };
 
