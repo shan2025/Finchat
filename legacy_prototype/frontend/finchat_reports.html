@@ -125,8 +125,15 @@ function statRow(tiles){ tiles=tiles.filter(Boolean); return tiles.length?`<div 
 function barList(title,items){
  items=(items||[]).filter(i=>i&&i.label!=null);
  if(!items.length) return '';
- const max=Math.max(1,...items.map(i=>Number(i.value)||0));
- const rows=items.map(i=>{ const pct=Math.round((Number(i.value)||0)/max*100);
+ // Range-normalise the bar WIDTHS against the spread of the visible values, so
+ // tightly-clustered numbers (e.g. preference strengths all 0.7–1.0) still read
+ // as clearly different lengths instead of every bar sitting near-full. The bar
+ // is a relative comparison; the true value always shows in the label. A flat
+ // set (all equal, or a single row) fills every bar.
+ const vals=items.map(i=>Number(i.value)||0);
+ const max=Math.max(...vals), min=Math.min(...vals), span=max-min;
+ const width=v=> span>0 ? Math.round(10+((v-min)/span)*90) : 100;
+ const rows=items.map(i=>{ const pct=width(Number(i.value)||0);
   return `<div class="bar-row"><div class="bar-label" title="${esc(i.label)}">${esc(i.label)}</div>`+
    `<div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>`+
    `<div class="bar-val">${esc(i.sub!=null?i.sub:fmt(i.value))}</div></div>`; }).join('');
@@ -205,7 +212,12 @@ function paintReportBodies(reports){
 async function loadList(){
  try{
   const d=await api('/api/reports');
-  const rs=d.reports||[];
+  // The list is newest-first, and the same kind gets regenerated over time
+  // (often producing a stack of near-empty early snapshots). Show only the most
+  // recent report of each kind so the page reads as "current state per kind",
+  // not a scroll of duplicates.
+  const seen=new Set();
+  const rs=(d.reports||[]).filter(r=>{ if(seen.has(r.kind)) return false; seen.add(r.kind); return true; });
   document.getElementById('list').innerHTML = rs.length ? rs.map(reportCard).join('')
    : `<div class="card p-6 text-sm text-center" style="color:var(--sub)">No reports yet — generate your first one above.</div>`;
   paintReportBodies(rs);
