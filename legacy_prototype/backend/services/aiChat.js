@@ -87,16 +87,30 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
       }
     }
 
-    // Determine dynamic cognitive budget based on user prompt keywords
+    // "think hard" and friends: the user asking for more effort than usual.
+    //
+    // These are FLOORS (`floor: true`), not overrides. As plain caller budgets
+    // they outranked the agent's own configured budget in CognitiveCore, so
+    // asking an agent to think harder could hand it LESS than it normally gets
+    // — which is exactly what happened: "think hard" capped a run at 8,000
+    // tokens while raising it to 12 iterations, guaranteeing the breach whose
+    // error message recommends saying "think hard".
+    //
+    // The old numbers were sized against the 4,000-5,000 default that migration
+    // 030 replaced; they were never re-scaled. A tool-using chat turn now costs
+    // ~4k prompt tokens on its own (measured: Rasha's turn-2 prompt is 4,596),
+    // and a reasoning model bills its thinking as completion on top, so a
+    // two-turn answer lands near 15k before any extra effort is asked for.
+    // Each rung must clear that by a real margin or it means nothing.
     let dynamicBudget = undefined;
     const msgLower = goal.toLowerCase();
-    
+
     if (msgLower.includes('ultrathink') || msgLower.includes('think intensely') || msgLower.includes('think super hard')) {
-      dynamicBudget = { maxRuntimeSeconds: 300, maxToolCalls: 20, maxIterations: 20, maxTokens: 32000 };
+      dynamicBudget = { maxRuntimeSeconds: 300, maxToolCalls: 20, maxIterations: 20, maxTokens: 60000, floor: true };
     } else if (msgLower.includes('megathink') || msgLower.includes('think deeply') || msgLower.includes('think really hard')) {
-      dynamicBudget = { maxRuntimeSeconds: 180, maxToolCalls: 15, maxIterations: 15, maxTokens: 15000 };
+      dynamicBudget = { maxRuntimeSeconds: 240, maxToolCalls: 15, maxIterations: 15, maxTokens: 45000, floor: true };
     } else if (msgLower.includes('think hard') || msgLower.includes('think more')) {
-      dynamicBudget = { maxRuntimeSeconds: 120, maxToolCalls: 10, maxIterations: 12, maxTokens: 8000 };
+      dynamicBudget = { maxRuntimeSeconds: 180, maxToolCalls: 10, maxIterations: 10, maxTokens: 30000, floor: true };
     }
 
     // Pass execution to the full cognitive loop (supporting Dual-Entry routing & Sentinel Middleware)

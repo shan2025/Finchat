@@ -16,7 +16,15 @@ function parseInput(input) {
 async function execute(input, context = {}) {
   const opts = parseInput(input);
   const job = typeof opts.job === 'object' ? JSON.stringify(opts.job, null, 1) : String(opts.job || '');
-  const resume = String(opts.resumeText || opts.resume || '').slice(0, 4000);
+  // Fall back to the stored resume. A scheduled 4am run has no one to paste one
+  // in, and a cover letter full of [FILL IN: …] placeholders is not a report.
+  let resume = String(opts.resumeText || opts.resume || '').slice(0, 4000);
+  if (!resume && context.userId && context.userId !== 'system') {
+    try {
+      const stored = await require('./ResumeTool').loadStored(context.userId);
+      if (stored) resume = String(stored.content).slice(0, 4000);
+    } catch (e) { /* no stored resume — fall through to the placeholder letter */ }
+  }
   if (!job) {
     throw new Error('ApplyDraftTool needs a job posting, e.g. {"job":{"title":"Product Analyst","company":"Acme","url":"...","description":"..."},"resumeText":"..."}');
   }
@@ -37,13 +45,40 @@ Produce EXACTLY this structure in markdown:
 (concrete next steps INCLUDING the application URL if one was given; final step must be "Review and submit yourself — this draft was AI-generated")`;
 
   const result = await runInference({
-    provider: 'groq',
+    // Route by workload rather than pinning Groq: a drafting run that lands on
+    // the day Groq's allowance is spent should fall through to the next
+    // provider, not fail the whole mission.
+    feature: 'apply_draft',
     temperature: 0.6,
     messages: [{ role: 'user', content: prompt }]
   });
 
+  // Record the opportunity in the ledger so "how many have I applied to?" has
+  // an answer and tomorrow's hunt can skip what it already drafted. Logged as
+  // 'drafted', never 'applied' — the human is still the one who submits.
+  let ledger = null;
+  if (context.userId && context.userId !== 'system' && typeof opts.job === 'object' && opts.job) {
+    try {
+      const out = await require('./ApplicationsTool').execute({
+        action: 'log',
+        role: opts.job.title || opts.job.role,
+        company: opts.job.company,
+        location: opts.job.location,
+        url: opts.job.url,
+        source: opts.job.source,
+        status: 'drafted',
+        draft: result.content,
+        missionId: opts.missionId || context.missionId || null
+      }, context);
+      ledger = { logged: out.loggedCount, alreadyKnown: out.duplicateCount };
+    } catch (e) {
+      ledger = { error: `not logged: ${e.message}` };
+    }
+  }
+
   return {
     draft: result.content,
+    ledger,
     disclaimer: 'DRAFT ONLY — nothing has been submitted. Review, edit, and submit the application yourself.',
     model: result.model,
     tokens: result.tokens || 0

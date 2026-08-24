@@ -240,11 +240,24 @@ async function _runWithinStallClock({
   // nothing in the chat path had ever set one — which is the whole reason Rasha
   // and Aurelius were capped at 5,000 while Plato and Nova got 15k-40k from
   // their callers. An agent can now carry its own working budget.
+  // …with one exception: a budget flagged `floor: true` RAISES ceilings and
+  // never lowers them. That flag belongs to the "think hard"/"ultrathink"
+  // keywords in aiChat.js, which are a user asking for more effort rather than
+  // a caller sizing a run. Treated as a plain override, "think hard" replaced
+  // an agent's configured budget outright — so asking Rasha (15k) or Aurelius
+  // (20k) to think harder handed them 8,000 tokens and MORE iterations to spend
+  // it over, and the run breached faster than it would have unprompted.
+  const isFloor = budget && budget.floor === true;
+  const pick = (callerValue, agentValue) => {
+    if (!override(callerValue)) return agentValue;
+    if (isFloor && override(agentValue)) return Math.max(Number(callerValue), Number(agentValue));
+    return callerValue;
+  };
   const effectiveBudget = {
-    maxIterations: override(budget.maxIterations) ? budget.maxIterations : agentBudget.maxIterations,
-    maxToolCalls: override(budget.maxToolCalls) ? budget.maxToolCalls : agentBudget.maxToolCalls,
-    maxTokens: override(budget.maxTokens) ? budget.maxTokens : agentBudget.maxTokens,
-    maxRuntimeSeconds: override(budget.maxRuntimeSeconds) ? budget.maxRuntimeSeconds : agentBudget.maxRuntimeSeconds
+    maxIterations: pick(budget.maxIterations, agentBudget.maxIterations),
+    maxToolCalls: pick(budget.maxToolCalls, agentBudget.maxToolCalls),
+    maxTokens: pick(budget.maxTokens, agentBudget.maxTokens),
+    maxRuntimeSeconds: pick(budget.maxRuntimeSeconds, agentBudget.maxRuntimeSeconds)
   };
 
   const execution = await createExecution({
@@ -280,7 +293,19 @@ async function _runWithinStallClock({
   }
   // Contest-awareness: enrol this lane so the competing lanes can see it live.
   if (raceId) RaceState.register(raceId, execId, agentName);
-  const toolContext = { userId, agentName, conversationId };
+  // agentId (not just the display name) so tools that write agent-owned rows —
+  // `mission` assigns a standing task to whoever is speaking — record the id the
+  // router will later match, and missionId so work done inside a scheduled run
+  // is attributable to the task that ordered it.
+  const toolContext = {
+    userId,
+    agentId: execution.assigned_agent || null,
+    agentName,
+    conversationId,
+    missionId: typeof conversationId === 'string' && conversationId.startsWith('mission_')
+      ? conversationId.slice('mission_'.length)
+      : null
+  };
   let pendingApproval = null; // set when a requires_approval tool was attempted
   let hasPlanned = false;     // one plan per execution (re-plan loop guard)
 

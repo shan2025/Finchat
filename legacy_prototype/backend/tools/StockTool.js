@@ -153,6 +153,57 @@ async function _fetchV10(ticker) {
   };
 }
 
+/** Map a day count to the smallest Yahoo range that covers it. */
+function daysToRange(days) {
+  if (days <= 5) return '5d';
+  if (days <= 31) return '1mo';
+  if (days <= 93) return '3mo';
+  if (days <= 186) return '6mo';
+  if (days <= 366) return '1y';
+  if (days <= 731) return '2y';
+  return '5y';
+}
+
+/**
+ * Daily close history for one ticker via the Yahoo v8 chart endpoint — the same
+ * source as the live quote, so history and current price agree. Returns the last
+ * `days` daily closes with start/end price and % change, mirroring CryptoTool's
+ * history shape so the signal engine can treat both asset classes uniformly.
+ */
+async function _fetchHistory(ticker, days) {
+  const clamped = Math.max(2, Math.min(Math.round(days) || 30, 1825));
+  const response = await axios.get(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}`,
+    { params: { interval: '1d', range: daysToRange(clamped) }, headers: { 'User-Agent': USER_AGENT }, timeout: 12000 }
+  );
+  const result = response.data?.chart?.result?.[0];
+  const closes = result?.indicators?.quote?.[0]?.close;
+  const stamps = result?.timestamp;
+  if (!Array.isArray(closes) || !Array.isArray(stamps) || !closes.length) return null;
+
+  const series = [];
+  for (let i = 0; i < stamps.length; i++) {
+    if (closes[i] == null) continue; // Yahoo pads gaps (holidays) with nulls
+    series.push({ date: new Date(stamps[i] * 1000).toISOString().slice(0, 10), price: +closes[i].toFixed(2) });
+  }
+  const trimmed = series.slice(-clamped);
+  if (!trimmed.length) return null;
+  const first = trimmed[0], last = trimmed[trimmed.length - 1];
+  return {
+    ticker: result.meta?.symbol || ticker,
+    name: result.meta?.shortName || result.meta?.longName || ticker,
+    rangeDays: clamped,
+    startDate: first.date,
+    endDate: last.date,
+    startPrice: first.price,
+    endPrice: last.price,
+    changePct: first.price ? +(((last.price - first.price) / first.price) * 100).toFixed(2) : 0,
+    series: trimmed,
+    currency: result.meta?.currency || 'USD',
+    source: 'Yahoo Finance'
+  };
+}
+
 /**
  * Choose a search result for `query`, or null when nothing is safe to use.
  *
@@ -270,6 +321,7 @@ async function execute(input, context = {}) {
     fetchV8: _fetchV8,
     fetchV10: _fetchV10,
     searchSymbol: _searchSymbol,
+    fetchHistory: _fetchHistory,
     ...(context && context.__deps)
   };
 
@@ -279,6 +331,18 @@ async function execute(input, context = {}) {
       error: 'No ticker symbol provided. Pass a symbol string ("AAPL") or {"symbols": ["AAPL", "TSLA"]}.',
       ticker: null
     };
+  }
+
+  // History mode: {"ticker":"AAPL","days":30} → daily close series for one ticker.
+  const daysRaw = (input && typeof input === 'object') ? (input.days ?? input.history ?? input.range) : null;
+  if (daysRaw != null && daysRaw !== '' && !isNaN(+daysRaw)) {
+    try {
+      const hist = await deps.fetchHistory(symbols[0], +daysRaw);
+      return hist || { error: `No price history found for "${symbols[0]}".`, ticker: symbols[0] };
+    } catch (err) {
+      if (isAuthStatus(err)) throw new StockAuthError(err.response.status, symbols[0]);
+      return { error: `Unable to fetch history for "${symbols[0]}". ${err.message}`, ticker: symbols[0] };
+    }
   }
 
   // A StockAuthError propagates out of here: ToolManager then records a tool

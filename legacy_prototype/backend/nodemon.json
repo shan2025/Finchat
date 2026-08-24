@@ -1,5 +1,5 @@
 {
-  "watch": ["routes", "services", "circuits", "server.js"],
+  "watch": ["routes", "services", "circuits", "tools", "middleware", "repositories", "config", "server.js"],
   "ext": "js,mjs,cjs",
   "ignore": [
     "*.test.js",

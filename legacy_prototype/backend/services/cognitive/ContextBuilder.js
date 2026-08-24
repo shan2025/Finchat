@@ -207,6 +207,22 @@ const HISTORY_BUDGET_CHARS = parseInt(process.env.HISTORY_CONTEXT_BUDGET_CHARS |
 // per-turn decision — flipping it mid-run is the bug this constant documents.
 const CATALOGUE_COMPACT = process.env.TOOL_CATALOGUE_COMPACT === '1';
 
+// …unless the catalogue itself is oversized, in which case compact wins.
+//
+// The reasoning above holds while an agent is scoped to its own domain (3-5k
+// chars). It does not hold for a caller that gets the WHOLE catalogue — the
+// orchestrator, and any path that builds a prompt without an agent's tool list.
+// That set only ever grows: adding standing tasks, the application ledger and
+// the portfolio pushed the full rendering past 20k chars, and with tool results
+// alongside it the request went over the size that has already earned a 413
+// from a provider once.
+//
+// This stays a per-RUN decision, not a per-turn one — the catalogue depends on
+// the agent's tool set, which cannot change mid-run — so the prompt prefix is
+// still byte-identical across turns and still cacheable. It just picks the
+// rendering that fits.
+const CATALOGUE_MAX_CHARS = parseInt(process.env.TOOL_CATALOGUE_MAX_CHARS || '9000', 10);
+
 /**
  * Keep the most recent conversation turns that fit the budget.
  *
@@ -324,7 +340,8 @@ function buildContext({
   // Fixed for the whole run, deliberately NOT derived from toolResults — the
   // first system message must be byte-identical on every turn or the provider's
   // prefix cache can never hit. See CATALOGUE_COMPACT.
-  const compactTools = CATALOGUE_COMPACT;
+  const compactTools = CATALOGUE_COMPACT ||
+    buildToolDescriptions(allowWeb, agentName, { compact: false, agentTools }).length > CATALOGUE_MAX_CHARS;
 
   // 1. System prompt: agent persona + runtime style tuning + action schema
   const persona = getPersona(agentName);

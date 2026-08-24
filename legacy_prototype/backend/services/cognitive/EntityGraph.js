@@ -53,10 +53,15 @@ async function extractEntities(text, { userId = null, agentId = null } = {}) {
  * Upsert an entity node. Bumps mention_count + last_seen_at on repeat.
  * Returns the entity_id (existing or new).
  *
- * Fix 5: ON CONFLICT targets entity_id (PK) to handle the race where two
- * concurrent chats generate the same deterministic id. A secondary catch
- * handles the (canonical_name, entity_type) unique constraint if a different
- * id was previously generated for the same name+type, by re-reading.
+ * ON CONFLICT targets the (user_id, canonical_name, entity_type) unique
+ * constraint — the same arbiter MemoryEngine uses — because the generated
+ * entity_id can differ from a row that already exists for this user+name+type
+ * (e.g. a legacy row created before ids were owner-scoped, or a canonical name
+ * that slugs differently). Conflicting on the PK missed those and let the
+ * insert hit the composite constraint, throwing a duplicate-key error on every
+ * repeat mention. RETURNING gives back whichever id actually survived. The
+ * catch below stays as a safety net (e.g. anon rows with a NULL user_id, which
+ * the composite constraint treats as distinct).
  */
 async function upsertEntity({ name, type, userId = null }) {
   const canonical = name.trim();
@@ -70,15 +75,16 @@ async function upsertEntity({ name, type, userId = null }) {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      await query(`
+      const res = await query(`
         INSERT INTO entities (entity_id, canonical_name, entity_type, user_id, mention_count, last_seen_at)
         VALUES ($1, $2, $3, $4, 1, now())
-        ON CONFLICT (entity_id) DO UPDATE
+        ON CONFLICT (user_id, canonical_name, entity_type) DO UPDATE
           SET mention_count = entities.mention_count + 1,
               last_seen_at = now()
+        RETURNING entity_id
       `, [id, canonical, t, userId]);
 
-      return id; // success — the id we generated is the row's id
+      return res.rows[0]?.entity_id || id; // the id that actually survived the upsert
     } catch (err) {
       // Unique violation on (user_id, canonical_name, entity_type): this user already
       // has the node under a different id (e.g. one created before ids were scoped).

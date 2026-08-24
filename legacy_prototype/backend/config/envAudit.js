@@ -42,6 +42,17 @@ const CHECKS = [
     cost: 'the "Continue with Google" button is not rendered on the login and signup pages'
   },
   {
+    keys: ['GOOGLE_CLIENT_SECRET'],
+    cost: 'the Gmail integration cannot be connected (sign-in still works — that flow needs no secret), ' +
+      'so Rasha cannot read the job alerts in the user\'s inbox'
+  },
+  {
+    keys: ['ADZUNA_APP_ID', 'ADZUNA_APP_KEY'],
+    all: true,
+    cost: 'the jobs tool loses its only real jobs API, so a city search falls back to site: web ' +
+      'queries that mostly return board category pages instead of individual postings'
+  },
+  {
     keys: ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'],
     all: true,
     cost: 'Web Push falls back to .vapid-keys.json on disk; where that does not survive a restart, ' +

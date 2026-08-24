@@ -25,7 +25,7 @@ const TOOLS = {
 
   stocks: {
     name: 'stocks',
-    description: 'Look up the current stock price and market data for a given ticker symbol. Use this when the user asks about stock prices, market performance, or financial ticker data.',
+    description: 'Look up stock price and market data for a ticker. Without "days" it returns the current price and daily change; with "days" (e.g. 30, 90, 365) it returns daily price history plus start/end price and % change for one ticker. Use for stock prices, performance, and comparisons.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -34,7 +34,8 @@ const TOOLS = {
           type: 'array',
           items: { type: 'string' },
           description: 'Optional list of ticker symbols to look up in one call (e.g. ["AAPL", "TSLA"])'
-        }
+        },
+        days: { type: 'number', description: 'Optional: past days of daily history for a single ticker (e.g. 30, 90, 365). Omit for the current price.' }
       },
       required: []
     },
@@ -74,14 +75,17 @@ const TOOLS = {
 
   resume: {
     name: 'resume',
-    description: 'Analyze a resume or professional profile against a target role. Use this when the user shares their resume, skills, or asks for career fit analysis.',
+    description: 'Store, score, and tailor the user\'s resume. Actions: {"action":"save","content":"<full resume text>"} keeps it on file so scheduled tasks and later tailoring can read it without the user pasting again; {"action":"get"} reads the stored copy; {"action":"analyze","targetRole":"Product Manager"} scores fit and lists missing skills; {"action":"tailor","job":{"title":"…","company":"…","description":"…"}} rewrites the stored resume for ONE specific posting and reports exactly what it changed and which gaps it could not honestly close. If resumeText is omitted, the stored resume is used. Whenever the user shares their resume text, save it first. Tailoring never overwrites the stored master and never invents experience.',
     inputSchema: {
       type: 'object',
       properties: {
-        resumeText: { type: 'string', description: 'The full resume or skills text to analyze' },
-        targetRole: { type: 'string', description: 'Target job role (e.g. "Full Stack Engineer", "Data Scientist")' }
+        action: { type: 'string', description: 'save | get | analyze | tailor (default analyze)' },
+        content: { type: 'string', description: 'For save: the full resume text' },
+        resumeText: { type: 'string', description: 'Resume text to score/tailor (omit to use the stored resume)' },
+        targetRole: { type: 'string', description: 'Target job role (e.g. "Full Stack Engineer", "Product Manager")' },
+        job: { type: 'object', description: 'For tailor: the posting (title, company, url, description)' }
       },
-      required: ['resumeText']
+      required: []
     },
     outputSchema: {
       type: 'object',
@@ -89,16 +93,131 @@ const TOOLS = {
         matchScore: { type: 'number', description: 'Percentage match score 0-100' },
         matchingSkills: { type: 'array' },
         missingSkills: { type: 'array' },
-        recommendations: { type: 'array' }
+        recommendations: { type: 'array' },
+        tailoredResume: { type: 'string', description: 'For tailor: the rewritten resume + change list + gaps' }
       }
     },
-    cacheTTLSeconds: 0, // No caching — each resume is unique
+    cacheTTLSeconds: 0, // stateful and unique per call — never cache
     rateLimitPerMinute: 20
+  },
+
+  mission: {
+    name: 'mission',
+    description: 'Create and manage the user\'s STANDING TASKS — work you re-run on a schedule and deliver as a report. Use this WHENEVER the user asks for something recurring ("every day", "each morning", "weekly", "keep checking"): nothing else in the system remembers a promise made in chat. Actions: create (needs title, goal, cadence), list, update, pause, resume, delete, run_now — the last three take {"mission":"<title>"}. The "goal" is re-read by a future run with NOBODY watching, so write it standalone: the filters, which tools to use, and what the report must contain. Cadence: "daily"/"6h"/"1h"/"15m", a phrase like "every day at 7am", or a 5-field cron; clock times are read as IST unless "timezone" is given. New tasks start enabled and are assigned to YOU, so only create work you have the tools to do.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | create | update | pause | resume | delete | run_now' },
+        title: { type: 'string', description: 'Short name for the task, e.g. "Daily PM job hunt"' },
+        goal: { type: 'string', description: 'The full standing instructions the future run will follow, written to be read with no conversation context' },
+        cadence: { type: 'string', description: 'daily | 6h | 1h | 15m | a phrase like "every day at 7am" | a 5-field cron pattern' },
+        timezone: { type: 'string', description: 'Zone for clock times, e.g. "IST", "UTC", "+05:30" (default IST)' },
+        mission: { type: 'string', description: 'For update/pause/resume/delete/run_now: the task title or missionId' },
+        enabled: { type: 'boolean', description: 'Set false to create a task without starting it' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        missions: { type: 'array', description: 'For list: the user\'s standing tasks' },
+        mission: { type: 'object', description: 'The created/updated task, with its next run time' },
+        schedule: { type: 'string', description: 'Human-readable schedule, including the UTC conversion' }
+      }
+    },
+    cacheTTLSeconds: 0, // stateful — never cache
+    rateLimitPerMinute: 20
+  },
+
+  applications: {
+    name: 'applications',
+    description: 'The user\'s job-application ledger — the system\'s only memory of which opportunities were found, drafted and applied to. {"action":"stats"} answers "how many have I applied to?"; "list" shows them; {"action":"log","jobs":[{"role":"…","company":"…","url":"…","source":"…","matchScore":78}]} records finds. ALWAYS log the postings you surface — duplicate URLs merge instead of counting twice, and a daily hunt reads this to avoid re-reporting yesterday\'s job. You may write status "drafted"/"shortlisted"/"skipped" only; "applied"/"interviewing"/"rejected"/"offer" describe what the HUMAN did, so set them only when the user says so, with "userConfirmed": true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'log | list | stats | update | delete' },
+        jobs: { type: 'array', description: 'For log: array of {role, company, location, url, source, matchScore, notes}' },
+        role: { type: 'string', description: 'For log of a single job' },
+        company: { type: 'string' },
+        url: { type: 'string', description: 'Posting URL — also the de-duplication key' },
+        status: { type: 'string', description: 'drafted | shortlisted | skipped (agent-writable); applied | interviewing | rejected | offer (user-confirmed only)' },
+        userConfirmed: { type: 'boolean', description: 'True only when the user has said they took this action themselves' },
+        application: { type: 'string', description: 'For update/delete: applicationId, URL, or "role at company"' },
+        days: { type: 'number', description: 'For list: look-back window (default 90)' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number' },
+        applied: { type: 'number' },
+        awaitingSubmission: { type: 'number' },
+        applications: { type: 'array' }
+      }
+    },
+    cacheTTLSeconds: 0, // stateful — never cache
+    rateLimitPerMinute: 20
+  },
+
+  gmail: {
+    name: 'gmail',
+    description: 'Read the user\'s JOB mail — the alerts and recruiter messages already sitting in their inbox from LinkedIn, Naukri, Indeed, Internshala and company careers/ATS addresses. {"action":"list","days":14,"keywords":"product manager"} returns matching messages (sender, subject, snippet); {"action":"read","messageId":"…"} opens ONE of them and returns its text plus the application links inside it; {"action":"status"} reports whether the user has connected their account. This searches ONLY job senders — it is not a search of their mailbox, the filter is fixed in code and you cannot widen it, so never tell the user you looked through their email. Read-only: you cannot reply, send, label or delete anything. If it reports connected:false, ask the user to connect Gmail on the Settings page; you cannot do that for them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | read | status' },
+        days: { type: 'number', description: 'For list: look-back window in days (default 14, max 90)' },
+        keywords: { type: 'string', description: 'For list: optional role words to narrow to, e.g. "product manager analyst"' },
+        limit: { type: 'number', description: 'For list: max messages (default 10, max 25)' },
+        messageId: { type: 'string', description: 'For read: an id from a previous list' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        messages: { type: 'array', description: 'For list: messageId, from, subject, date, snippet' },
+        body: { type: 'string', description: 'For read: the message text' },
+        links: { type: 'array', description: 'For read: application URLs found in the message' }
+      }
+    },
+    cacheTTLSeconds: 0, // a mailbox changes constantly — never cache
+    rateLimitPerMinute: 10
+  },
+
+  portfolio: {
+    name: 'portfolio',
+    description: 'The user\'s ACTUAL holdings, priced live — unlike "watchlist", which is only what they follow. {"action":"value"} is the full review: market value, cost basis, unrealized P/L, each position\'s weight, allocation by asset class, and concentration flags. Use it for any question about their holdings, allocation or "how am I doing". {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove". If it is empty, ask what they hold rather than reviewing a hypothetical portfolio as theirs. Records and prices only: it NEVER buys, sells or places an order.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'value | list | add | update | remove' },
+        symbol: { type: 'string', description: 'Ticker or asset name, e.g. BTC, TSLA, gold' },
+        kind: { type: 'string', description: 'crypto | stock | commodity | cash (auto-detected if omitted)' },
+        quantity: { type: 'number', description: 'Units/shares/coins held — ask the user, never guess' },
+        avgCost: { type: 'number', description: 'Average cost per unit, if the user knows it' },
+        holdings: { type: 'array', description: 'For add: several holdings at once' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        totalValueUsd: { type: 'number' },
+        totalUnrealizedPnlUsd: { type: 'number' },
+        allocation: { type: 'object', description: 'Value and weight per asset class' },
+        holdings: { type: 'array', description: 'Per-position price, value, weight and P/L' },
+        flags: { type: 'array', description: 'Concentration and data-gap warnings to report honestly' }
+      }
+    },
+    cacheTTLSeconds: 0, // stateful and priced live — never cache
+    rateLimitPerMinute: 10
   },
 
   jobs: {
     name: 'jobs',
-    description: 'Search REAL job listings for a role (analyst, data science, ML, AI, product manager, business analyst, etc.), optionally filtered by company and region. Returns direct application URLs — always cite them.',
+    description: 'Search REAL job listings for a role (analyst, data science, ML, AI, product manager, business analyst, etc.), optionally filtered by company and region — always pass the region, it selects the right boards. Every result carries "kind": "posting" is ONE opening (cite it, shortlist it, draft for it); "listing_page" is a board\'s search page such as "Business Analyst Jobs in Hyderabad — 2227 Vacancies" — offer those as "browse here", never as a specific job. Cite each result\'s URL and board label, and report the "sources" field honestly if a source was skipped or unconfigured.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -213,19 +332,20 @@ const TOOLS = {
   news: {
     name: 'news',
     web: true,
-    description: 'Get recent (last 48h) crypto, finance, and tech headlines from trusted RSS feeds (CoinDesk, Cointelegraph, CNBC, MIT Tech Review). Input a symbol or topic like "BTC", "solana", "AI"; optional category: crypto|markets|tech.',
+    description: 'Get recent (last 48h) headlines AND the catalysts moving markets, from trusted RSS feeds (CoinDesk, Cointelegraph, CNBC, Reuters/Bloomberg, plus SEC, the Federal Reserve, and Al Jazeera for regulation/macro/geopolitics). Each headline is tagged with the catalyst it signals — regulation, macro, geopolitics, institutional (whales/ETFs), celebrity, adoption, earnings, security — and the result includes a catalystBreakdown count. Use this to answer WHY a price is moving and whether the setup looks bullish or bearish.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Symbol or topic to match, e.g. "BTC", "AI"' },
-        category: { type: 'string', description: 'Optional: crypto | markets | tech' }
+        query: { type: 'string', description: 'Symbol or topic to match, e.g. "BTC", "AI", "Fed", "Tesla". Leave broad (or omit terms) to scan the whole tape for catalysts.' },
+        category: { type: 'string', description: 'Optional filter: crypto | markets | tech | regulation | macro | geopolitics' }
       },
       required: ['query']
     },
     outputSchema: {
       type: 'object',
       properties: {
-        results: { type: 'array', description: 'Headlines with title, url, feed, publishedAt' }
+        catalystBreakdown: { type: 'object', description: 'Count of headlines per catalyst category' },
+        results: { type: 'array', description: 'Headlines with title, url, feed, publishedAt, and catalysts[] tags' }
       }
     },
     cacheTTLSeconds: 600,
@@ -375,11 +495,13 @@ const TOOLS = {
 
   crypto: {
     name: 'crypto',
-    description: 'Look up the current price, 24h change, and market cap of a cryptocurrency. Use this when the user asks about crypto prices, DeFi tokens, or digital asset performance.',
+    description: 'Look up a cryptocurrency price. Without "days" it returns the current price, 24h change, and market cap. With "days" (e.g. 7, 30, 365) it returns daily price history plus the start/end price and % change over that window — use this for comparisons and "how has X performed" questions. Falls back to Binance/Coinbase if CoinGecko is rate-limited.',
     inputSchema: {
       type: 'object',
       properties: {
-        symbol: { type: 'string', description: 'Cryptocurrency symbol or name (e.g. "BTC", "ethereum", "SOL", "solana")' }
+        symbol: { type: 'string', description: 'Cryptocurrency symbol or name (e.g. "BTC", "ethereum", "SOL", "solana")' },
+        days: { type: 'number', description: 'Optional: number of past days of daily history to return (e.g. 7, 30, 90, 365). Omit for the current price only.' },
+        compare: { type: 'boolean', description: 'Optional: if true, price the coin across all venues at once (CoinGecko, Binance, Kraken, Coinbase) and return each price plus a median consensus and spread. Use to verify a quote or spot venue divergence.' }
       },
       required: ['symbol']
     },
@@ -395,6 +517,55 @@ const TOOLS = {
     },
     cacheTTLSeconds: 90, // 1.5 minutes — crypto moves fast but not microsecond-level
     rateLimitPerMinute: 12
+  },
+
+  signal: {
+    name: 'signal',
+    web: true,
+    description: 'Compute a deterministic BULLISH/BEARISH/NEUTRAL signal for a cryptocurrency OR a stock by fusing price momentum, trend vs its 30-day average, (crypto) cross-venue agreement, and news-catalyst sentiment. Returns the signal, a confidence (low/medium/high), a score from -100 to +100, and the per-factor contributions plus catalysts behind it — the explainable "why". Use this when the user asks whether to buy/sell/hold, "is X bullish or bearish", or wants a read on where an asset is heading. Educational only, never financial advice.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Ticker or name, e.g. "BTC", "ethereum", "SOL", "AAPL", "TSLA"' },
+        kind: { type: 'string', description: 'Optional: "crypto" or "stock". If omitted it is auto-detected (known crypto tickers → crypto, otherwise stock).' }
+      },
+      required: ['symbol']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        signal: { type: 'string' },
+        confidence: { type: 'string' },
+        score: { type: 'number' },
+        factors: { type: 'array', description: 'Each scoring factor with its numeric contribution' },
+        catalystBreakdown: { type: 'object' }
+      }
+    },
+    cacheTTLSeconds: 120,
+    rateLimitPerMinute: 8
+  },
+
+  session: {
+    name: 'session',
+    web: true,
+    description: 'Produce the user\'s "Market Intelligence Session": a ranked, sourced report over their whole watchlist (defaults to BTC/ETH/SOL if empty). For each crypto it runs the signal engine (bullish/bearish/neutral + score), ranks assets most-bullish to most-bearish, rolls up the catalysts driving the market, and returns a finished markdown report plus structured data. Use this when the user asks for a market brief/session, "what should I be watching", a portfolio-wide read, or "run my session". Optionally pass {"symbols":["BTC","ETH"]} to override the watchlist. Deliver the returned markdown; it already carries the not-financial-advice note.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        symbols: { type: 'array', description: 'Optional: override the watchlist with these crypto symbols, e.g. ["BTC","ETH","SOL"]' }
+      }
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        markdown: { type: 'string', description: 'The finished report — deliver this' },
+        overall: { type: 'object' },
+        assets: { type: 'array' },
+        topCatalysts: { type: 'object' }
+      }
+    },
+    cacheTTLSeconds: 180,
+    rateLimitPerMinute: 4
   },
 
   bash: {

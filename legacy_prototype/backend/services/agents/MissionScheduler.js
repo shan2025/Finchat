@@ -98,8 +98,56 @@ function cadenceToCron(cadence, missionId = null) {
 function isValidCadence(cadence) {
   const c = String(cadence || '').trim();
   if (CADENCE_CRON[c]) return true;
-  // Loose 5-field cron validation
-  return /^(\S+\s+){4}\S+$/.test(c);
+  // Five cron-shaped fields. The check used to be `(\S+\s+){4}\S+`, which any
+  // five-word phrase satisfies — so "whenever you feel like it" validated,
+  // stored, and produced a mission that could never come due.
+  return /^[\d*,/-]+(\s+[\d*,/-]+){4}$/.test(c);
+}
+
+// Does a cron field match a value? Supports "*", "N", "*/N" and "a,b,c" —
+// everything the cadence phrases in MissionTool can produce, and everything a
+// user is likely to hand-write. Ranges (1-5) are deliberately not supported;
+// isValidCadence would accept one, and matching nothing is safer than matching
+// the wrong minute, so it falls back to the interval estimate below.
+function cronFieldMatches(field, value) {
+  if (field === '*') return true;
+  for (const part of field.split(',')) {
+    const step = part.match(/^\*\/(\d+)$/);
+    if (step) { if (value % parseInt(step[1], 10) === 0) return true; continue; }
+    if (/^\d+$/.test(part) && parseInt(part, 10) === value) return true;
+  }
+  return false;
+}
+
+// Next UTC time a 5-field cron pattern fires, or null if the pattern uses
+// syntax this understands too little of to answer honestly.
+//
+// This exists because next_run_at IS the schedule — the cron tick claims rows
+// by timestamp and never reads the pattern. Without it, "daily at 07:00" was
+// stored faithfully in `cadence` and then fired 24 hours after whatever moment
+// the mission happened to be created.
+function nextCronRun(pattern, from = Date.now()) {
+  const f = String(pattern).trim().split(/\s+/);
+  if (f.length !== 5) return null;
+  const [min, hour, dom, mon, dow] = f;
+  if (!/^[\d*,/]+$/.test(f.join(''))) return null;
+  // Day-of-month and month are matched only as "*": a mission that fires on the
+  // 3rd of the month is not something the cadence phrases produce, and guessing
+  // would put the next run a month out.
+  if (dom !== '*' || mon !== '*') return null;
+
+  const d = new Date(from);
+  d.setUTCSeconds(0, 0);
+  d.setUTCMinutes(d.getUTCMinutes() + 1);
+  for (let i = 0; i < 8 * 24 * 60; i++) {
+    if (cronFieldMatches(min, d.getUTCMinutes()) &&
+        cronFieldMatches(hour, d.getUTCHours()) &&
+        cronFieldMatches(dow, d.getUTCDay())) {
+      return d.toISOString();
+    }
+    d.setUTCMinutes(d.getUTCMinutes() + 1);
+  }
+  return null;
 }
 
 // When this mission next comes due. This is the schedule, not an estimate of
@@ -109,6 +157,12 @@ function estimateNextRun(cadence, missionId = null) {
   const now = Date.now();
   const c = String(cadence || 'daily');
   const steps = { '15m': 15 * 60e3, '1h': 3600e3, '6h': 6 * 3600e3, 'daily': 24 * 3600e3 };
+  // A raw cron pattern names a wall-clock slot; honour it rather than treating
+  // it as "some time tomorrow".
+  if (!steps[c]) {
+    const exact = nextCronRun(c, now);
+    if (exact) return exact;
+  }
   // The external cron (/api/cron/tick) schedules off next_run_at, and claims up
   // to 5 due missions in one batch, so identical timestamps put them back to
   // back against the same model. Offset them the same way the cron pattern is.
@@ -157,6 +211,10 @@ async function updateMission(missionId, userId, patch = {}) {
   if (patch.cadence != null) {
     if (!isValidCadence(patch.cadence)) throw new Error(`Invalid cadence "${patch.cadence}"`);
     set('cadence', patch.cadence);
+    // Reschedule immediately. next_run_at is the schedule; leaving it alone
+    // meant "make it hourly" took effect only after one more run at the old
+    // cadence — up to a day later for a daily mission.
+    if (patch.enabled == null && mission.enabled) set('next_run_at', estimateNextRun(patch.cadence, missionId));
   }
   if (patch.enabled != null) {
     set('enabled', !!patch.enabled);
@@ -332,5 +390,5 @@ async function missionHistory(missionId, userId, limit = 10) {
 module.exports = {
   listMissions, getMission, createMission, updateMission, deleteMission,
   runMission, missionHistory,
-  cadenceToCron, isValidCadence, estimateNextRun, MAX_CONSECUTIVE_FAILURES
+  cadenceToCron, isValidCadence, estimateNextRun, nextCronRun, MAX_CONSECUTIVE_FAILURES
 };

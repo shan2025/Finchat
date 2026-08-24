@@ -122,8 +122,10 @@ const waitingRow = (over = {}) => ({
  *
  * @param {Function} reason - fake ReasoningEngine.reason, called with the turn index
  * @param {Array}    [seed] - executions to pre-seed (for resumption tests)
+ * @param {object}   [agentConfig] - what AgentRegistry returns; null = an agent
+ *                   with no configured budget, which is the framework-default case
  */
-function buildCore({ reason, seed = [], planSteps = [] } = {}) {
+function buildCore({ reason, seed = [], planSteps = [], agentConfig = null } = {}) {
   const repo = fakeRepo(seed);
   const calls = { reason: [], buildContext: [], executeTool: [] };
 
@@ -181,7 +183,7 @@ function buildCore({ reason, seed = [], planSteps = [] } = {}) {
   stub('../services/cognitive/ReflectionEngine', { async reflect() {} });
   stub('../services/cognitive/EventBus', { eventBus: new EventEmitter() });
   stub('../services/cognitive/MemoryEngine', { async getUserPreferences() { return []; } });
-  stub('../services/agents/AgentRegistry', { async getAgentConfig() { return null; } });
+  stub('../services/agents/AgentRegistry', { async getAgentConfig() { return agentConfig; } });
 
   delete require.cache[CORE_PATH];
   const core = require(CORE_PATH);
@@ -297,6 +299,73 @@ test.describe('the reasoning loop stops at its ceiling', () => {
     // After one 5000-token turn the reserve is 5000, and 10000 left is still
     // above it; after two, 5000 left trips it. The write lands on turn 3.
     assert.deepEqual(h.calls.buildContext.map(c => c.budgetExceeded), [false, false, true]);
+  });
+
+  // --- Budget precedence ----------------------------------------------------
+  //
+  // A caller's budget outranks the agent's configured one, because the callers
+  // that set a budget (briefing, MissionScheduler) size it deliberately. The
+  // "think hard" keywords in aiChat.js are NOT that: they are the user asking
+  // for more effort, and as a plain override "think hard" handed an agent LESS
+  // than its own budget — 8,000 tokens against Rasha's 15,000 — while also
+  // raising its iteration ceiling. It made the breach it claims to relieve.
+
+  const withBudget = (budget) => ({ tools: null, runtimeSettings: { risk: 'Low', budget } });
+
+  test("an agent's own budget applies when the caller sets none", async () => {
+    const h = buildCore({
+      reason: neverResponds(),
+      agentConfig: withBudget({ maxTokens: 30000, maxIterations: 6 })
+    });
+    await h.core.run({ goal: 'g', userId: 'u1' });
+
+    const row = h.repo.only();
+    assert.equal(row.max_tokens, 30000);
+    assert.equal(row.max_iterations, 6);
+  });
+
+  test('a deliberate caller budget still overrides the agent, up or down', async () => {
+    const h = buildCore({
+      reason: neverResponds(),
+      agentConfig: withBudget({ maxTokens: 30000, maxIterations: 6 })
+    });
+    // MissionScheduler and briefing.js size runs on purpose; a smaller number
+    // from them must mean smaller.
+    await h.core.run({ goal: 'g', userId: 'u1', budget: { maxTokens: 12000, maxIterations: 2 } });
+
+    const row = h.repo.only();
+    assert.equal(row.max_tokens, 12000);
+    assert.equal(row.max_iterations, 2);
+  });
+
+  test('a floor budget raises ceilings and can never lower them', async () => {
+    const h = buildCore({
+      reason: neverResponds(),
+      agentConfig: withBudget({ maxTokens: 30000, maxIterations: 6, maxToolCalls: 8 })
+    });
+    // The shape aiChat.js sends for "think hard": more iterations, and a token
+    // number that must not be allowed to undercut the agent's own.
+    await h.core.run({
+      goal: 'think hard about g', userId: 'u1',
+      budget: { maxTokens: 8000, maxIterations: 12, maxToolCalls: 10, floor: true }
+    });
+
+    const row = h.repo.only();
+    assert.equal(row.max_tokens, 30000, 'asking for more effort must not shrink the budget');
+    assert.equal(row.max_iterations, 12, 'the higher of the two still wins');
+    assert.equal(row.max_tool_calls, 10);
+  });
+
+  test('a floor budget still applies to an agent with no budget of its own', async () => {
+    const h = buildCore({ reason: neverResponds(), agentConfig: null });
+    await h.core.run({
+      goal: 'think hard about g', userId: 'u1',
+      budget: { maxTokens: 30000, maxIterations: 10, floor: true }
+    });
+
+    const row = h.repo.only();
+    assert.equal(row.max_tokens, 30000);
+    assert.equal(row.max_iterations, 10);
   });
 
   test('a mid-plan budget breach synthesizes what it gathered', async () => {

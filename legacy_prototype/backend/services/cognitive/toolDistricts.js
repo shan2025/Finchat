@@ -13,9 +13,12 @@ const TOOL_DISTRICT = {
   search: ['web', 'Web & Search', 's'], fetch: ['web', 'Web & Search', 's'],
   crawl: ['web', 'Web & Search', 's'],
   watchlist: ['portfolio', 'Portfolio', 's'], resume: ['portfolio', 'Portfolio', 's'],
-  jobs: ['portfolio', 'Portfolio', 's'],
+  jobs: ['portfolio', 'Portfolio', 's'], portfolio: ['portfolio', 'Portfolio', 's'],
+  applications: ['portfolio', 'Portfolio', 's'],
+  signal: ['markets', 'Markets', 'a'], session: ['markets', 'Markets', 'a'],
   neural_map: ['knowledge', 'Knowledge', 'a'],
   notifications: ['ops', 'Operations', 'n'], apply_draft: ['ops', 'Operations', 'n'],
+  mission: ['ops', 'Operations', 'n'], gmail: ['ops', 'Operations', 's'],
   bash: ['system', 'System', 'n'], file_read: ['system', 'System', 'n'],
   file_write: ['system', 'System', 'n'], file_edit: ['system', 'System', 'n'],
   glob: ['system', 'System', 'n']

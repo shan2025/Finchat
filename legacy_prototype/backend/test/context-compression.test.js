@@ -82,6 +82,21 @@ describe('tool catalogue compaction', () => {
     assert.ok(compact.length < full.length, 'compaction must actually save something');
   });
 
+  test('an oversized catalogue compacts itself, a scoped one does not', () => {
+    // A scoped agent's catalogue is small; it keeps full parameter schemas,
+    // which is what makes the prefix worth caching. A caller that gets the
+    // WHOLE catalogue (the orchestrator, or an agent with no configured tools)
+    // is the case that pushed a request past the size a provider has already
+    // 413'd — there, compact beats accurate-but-rejected.
+    const scoped = buildContext({
+      goal: 'g', agentName: 'rasha',
+      agentTools: ['search', 'resume', 'jobs', 'fetch', 'apply_draft', 'mission', 'applications']
+    });
+    const unscoped = buildContext({ goal: 'g', agentName: 'plato' });
+    assert.match(systemText(scoped), /\| Parameters:/, 'a scoped catalogue keeps its schemas');
+    assert.match(systemText(unscoped), /short form/, 'the full catalogue falls back to compact');
+  });
+
   test('a breached budget keeps its own restricted schema, tools and all', () => {
     const msgs = buildContext({
       goal: 'g', agentName: 'rasha', budgetExceeded: true,
@@ -186,10 +201,17 @@ describe('per-agent tool scoping', () => {
   });
 });
 
+// A scoped agent's real manifest. Production always passes one (CognitiveCore
+// reads agent_configs.tools), and it matters here: without it the build gets the
+// whole catalogue, which is now large enough to trip the size-based compaction
+// in ContextBuilder — so these fixtures would measure that instead of the
+// trimming they exist to pin.
+const RASHA_TOOLS = ['search', 'resume', 'jobs', 'fetch', 'apply_draft', 'mission', 'applications'];
+
 describe('the savings KPI', () => {
   test('reports nothing saved when nothing was trimmed', () => {
     const stats = {};
-    buildContext({ goal: 'g', agentName: 'rasha', stats });
+    buildContext({ goal: 'g', agentName: 'rasha', agentTools: RASHA_TOOLS, stats });
     assert.equal(stats.charsSaved, 0);
     assert.ok(stats.chars > 0);
   });
@@ -198,7 +220,7 @@ describe('the savings KPI', () => {
     const stats = {};
     const long = Array.from({ length: 300 },
       () => ({ role: 'user', content: 'y'.repeat(500) }));
-    const msgs = buildContext({ goal: 'g', agentName: 'rasha', conversationHistory: long, stats });
+    const msgs = buildContext({ goal: 'g', agentName: 'rasha', agentTools: RASHA_TOOLS, conversationHistory: long, stats });
 
     assert.ok(stats.historyCharsSaved > 0, 'this fixture is far over the history budget');
     assert.equal(stats.toolCatalogueCharsSaved, 0, 'no tool results, so no catalogue saving');

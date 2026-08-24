@@ -1,9 +1,22 @@
 // tools/JobsTool.js — Real job listings, primarily for Rasha (Career Strategist).
-// Uses Remotive's public JSON API (remote/tech roles) plus board-targeted web
-// searches (LinkedIn, Indeed, Naukri, Wellfound…) so region-specific queries like
-// "product manager India" actually surface local postings instead of only remote
-// US-centric roles. Returns titles, companies, locations, and DIRECT application
-// URLs so the agent can cite real sources.
+//
+// Three sources, in descending order of how much you can trust a row:
+//
+//   1. Adzuna     — a real jobs API with an India endpoint. Structured rows:
+//                   title, company, location, salary band, posting date, and a
+//                   URL that points at ONE posting. Needs a free key.
+//   2. Remotive   — a real API, but remote-first tech roles only, so it is
+//                   skipped when the user named a concrete city.
+//   3. Web search — `site:linkedin.com/jobs …` style queries. This is NOT an
+//                   API into those boards: neither LinkedIn nor Indeed offers a
+//                   public jobs API (LinkedIn's is partner-only, Indeed retired
+//                   its Publisher API), so this is a search engine reading their
+//                   pages, and a search engine returns whatever RANKS. That is
+//                   usually a category page — "Business Analyst Jobs In
+//                   Hyderabad — 2227 Vacancies" is an index, not a job.
+//
+// Results are therefore tagged `kind: 'posting' | 'listing_page'`, so the agent
+// can say which is which instead of presenting a search page as an opening.
 const axios = require('axios');
 const SearchTool = require('./SearchTool');
 
@@ -65,6 +78,131 @@ function normalizeRole(r) {
   return ROLE_HINTS[key] || key;
 }
 
+// Adzuna publishes one endpoint per country. Only the ones worth mapping from a
+// free-text region are listed; an unrecognised region simply skips Adzuna
+// rather than guessing a country and returning confidently wrong postings.
+const ADZUNA_COUNTRIES = [
+  [INDIA_RE, 'in'],
+  [/\b(united states|usa|u\.s\.|america|new york|san francisco|seattle|austin|boston)\b/i, 'us'],
+  [/\b(uk|united kingdom|england|london|manchester|scotland)\b/i, 'gb'],
+  [/\b(canada|toronto|vancouver|montreal)\b/i, 'ca'],
+  [/\b(australia|sydney|melbourne|brisbane)\b/i, 'au'],
+  [/\b(singapore)\b/i, 'sg'],
+  [/\b(germany|berlin|munich|deutschland)\b/i, 'de'],
+  [/\b(netherlands|amsterdam)\b/i, 'nl']
+];
+
+function adzunaCountry(region) {
+  if (!region) return null;
+  const hit = ADZUNA_COUNTRIES.find(([rx]) => rx.test(region));
+  return hit ? hit[1] : null;
+}
+
+function adzunaConfigured() {
+  return Boolean((process.env.ADZUNA_APP_ID || '').trim() && (process.env.ADZUNA_APP_KEY || '').trim());
+}
+
+/**
+ * Query Adzuna — the one source here that is an actual jobs API.
+ *
+ * Returns [] rather than throwing when unconfigured or when the region maps to
+ * no country endpoint: this is one source among three, and a missing optional
+ * key must degrade the search, not fail it.
+ */
+async function fromAdzuna({ role, company, region, limit, maxDaysOld }) {
+  const country = adzunaCountry(region);
+  if (!country || !adzunaConfigured()) return [];
+
+  const params = {
+    app_id: (process.env.ADZUNA_APP_ID || '').trim(),
+    app_key: (process.env.ADZUNA_APP_KEY || '').trim(),
+    results_per_page: Math.min(limit || 8, 20),
+    what: [role, company].filter(Boolean).join(' ').trim(),
+    // Adzuna's index keeps expired ads indefinitely — a default search for
+    // "business analyst Bangalore" returned postings from 2020 and 2024
+    // alongside this week's. Nobody can apply to those, and a daily hunt that
+    // reports them looks broken.
+    //
+    // Bounding the window is enough on its own: measured, it moved the oldest
+    // result from 2020 to 23 days ago while leaving the default RELEVANCE
+    // ordering intact. `sort_by=date` also works but ranks a fresh irrelevant
+    // ad above a good one from last week, and `sort_by=hybrid` — which reads
+    // like the obvious answer — is not a value this API accepts and 400s.
+    max_days_old: Math.min(Math.max(Number(maxDaysOld) || 60, 1), 365),
+    'content-type': 'application/json'
+  };
+  // `where` is a place within the country. Passing the country name itself
+  // narrows nothing and can return zero rows, so only send a real locality.
+  const where = String(region).replace(/\b(india|indian|remote india)\b/gi, '').trim();
+  if (where) params.where = where;
+
+  const res = await axios.get(`https://api.adzuna.com/v1/api/jobs/${country}/search/1`, {
+    params, headers: { 'User-Agent': UA, Accept: 'application/json' }, timeout: 12000
+  });
+
+  const rows = (res.data && Array.isArray(res.data.results)) ? res.data.results : [];
+  return rows.map(j => ({
+    source: 'adzuna',
+    board: 'Adzuna',
+    kind: 'posting',
+    title: j.title ? String(j.title).replace(/<[^>]+>/g, '') : null,
+    company: (j.company && j.company.display_name) || company || null,
+    location: (j.location && j.location.display_name) || region || null,
+    // A salary band is the single most useful thing a search result never has.
+    salary: j.salary_min || j.salary_max
+      ? { min: j.salary_min || null, max: j.salary_max || null, currency: country === 'in' ? 'INR' : null,
+          predicted: j.salary_is_predicted === '1' }
+      : null,
+    contract: j.contract_time || j.contract_type || null,
+    category: (j.category && j.category.label) || null,
+    url: j.redirect_url,
+    postedAt: j.created,
+    snippet: j.description ? String(j.description).replace(/<[^>]+>/g, '').slice(0, 300) : null
+  })).filter(j => j.url && j.title);
+}
+
+// Does this URL point at ONE job, or at a board's category/search page?
+//
+// A generic pattern is not good enough here. It passed
+// "in.linkedin.com/jobs/business-analysts-experience-2-to-4-years-jobs-bengaluru"
+// as a posting — an index page whose slug happens to carry digits — and every
+// board has its own shape. So the boards we actually query are matched on their
+// KNOWN posting form, which is a positive test rather than a guess:
+//
+//   linkedin  /jobs/view/<id>          everything else under /jobs/ is an index
+//   naukri    /job-listings-<slug>-<id>
+//   indeed    /viewjob?jk=<id> or /rc/clk
+//   wellfound /jobs/<id>-<slug>        (/role/l/… is the browse page)
+//   foundit   /job/<slug>
+//   glassdoor /job-listing/<slug>
+//
+// Anything on a domain with no rule falls through to the generic heuristic,
+// which is deliberately biased toward calling a page an index: mislabelling one
+// real job as "browse this" costs a lead, while the reverse puts a search page
+// into a shortlist and, downstream, into a cover letter.
+const POSTING_RULES = [
+  [/(^|\.)linkedin\.com/i, /\/jobs\/view\//i],
+  [/(^|\.)naukri\.com/i, /\/job-listings-/i],
+  [/(^|\.)indeed\.[a-z.]+/i, /\/(viewjob|rc\/clk)/i],
+  [/(^|\.)wellfound\.com/i, /\/jobs\/\d/i],
+  [/(^|\.)foundit\.in/i, /\/job\//i],
+  [/(^|\.)glassdoor\.[a-z.]+/i, /\/job-listing\//i],
+  [/(^|\.)instahyre\.com/i, /\/job\//i]
+];
+
+const INDEX_URL_RE = /(\/jobs-in-|-jobs-[a-z]+\/?$|\/job-vacancies|\/jobs\/search|\/browse|\/role\/l\/|\/q-[^/]*-jobs|\/[a-z0-9-]*-jobs\/?$|\?k=|\/careers\/?$)/i;
+
+function classifyUrl(url = '') {
+  const u = String(url);
+  let host = '';
+  try { host = new URL(u).hostname; } catch (e) { host = u; }
+
+  for (const [domain, posting] of POSTING_RULES) {
+    if (domain.test(host)) return posting.test(u) ? 'posting' : 'listing_page';
+  }
+  return INDEX_URL_RE.test(u) ? 'listing_page' : 'posting';
+}
+
 /**
  * Query Remotive for real remote-first / tech job listings.
  */
@@ -81,6 +219,7 @@ async function fromRemotive({ role, company, region, limit }) {
   let mapped = jobs.map(j => ({
     source: 'remotive',
     board: 'Remotive',
+    kind: 'posting',
     title: j.title,
     company: j.company_name,
     location: j.candidate_required_location || 'Remote',
@@ -142,6 +281,8 @@ async function fromWebSearch({ role, company, region }) {
       out.push({
         source: 'web',
         board: board || boardLabelFromUrl(x.url),
+        // Search hits are pages, not rows. Say which kind of page it is.
+        kind: classifyUrl(x.url),
         title: x.title,
         company: company || null,
         location: region || null,
@@ -159,29 +300,47 @@ async function fromWebSearch({ role, company, region }) {
  * @param {string|object} input - role, or {role, company, region, limit}
  */
 async function execute(input) {
-  let role = '', company = '', region = '', limit = 8;
+  let role = '', company = '', region = '', limit = 8, maxDaysOld = null;
+  const read = (p) => {
+    role = p.role || p.query || role;
+    company = p.company || '';
+    region = p.region || p.location || '';
+    if (p.limit) limit = +p.limit;
+    if (p.maxDaysOld || p.max_days_old) maxDaysOld = +(p.maxDaysOld || p.max_days_old);
+  };
   if (typeof input === 'string') {
     try {
       const p = JSON.parse(input);
-      role = p.role || p.query || input;
-      company = p.company || '';
-      region = p.region || p.location || '';
-      if (p.limit) limit = +p.limit;
+      role = input;
+      read(p);
     } catch {
       role = input.trim();
     }
   } else if (input && typeof input === 'object') {
-    role = input.role || input.query || '';
-    company = input.company || '';
-    region = input.region || input.location || '';
-    if (input.limit) limit = +input.limit;
+    role = '';
+    read(input);
   }
 
   const normalizedRole = normalizeRole(role);
   const results = [];
   const seen = new Set();
 
-  // 1. Remotive — reliable JSON API, remote-tech-heavy. Skip it for a concrete
+  // 1. Adzuna FIRST when the region maps to one of its country endpoints. It is
+  //    the only source that returns individual postings with a company, a
+  //    salary band and a date, so its rows should lead the list rather than
+  //    being buried under whatever a search engine ranked.
+  let adzunaError = null;
+  try {
+    const paid = await fromAdzuna({ role, company, region, limit, maxDaysOld });
+    for (const j of paid) {
+      if (j.url && !seen.has(j.url)) { seen.add(j.url); results.push(j); }
+    }
+  } catch (err) {
+    adzunaError = err.message;
+    console.warn(`⚠️ JobsTool: Adzuna failed: ${err.message}`);
+  }
+
+  // 2. Remotive — reliable JSON API, remote-tech-heavy. Skip it for a concrete
   //    non-remote region (e.g. India), where its remote-only index rarely helps
   //    and the board searches below are the real source.
   const regionIsLocal = region && !/remote|anywhere|worldwide/i.test(region);
@@ -196,8 +355,8 @@ async function execute(input) {
     }
   }
 
-  // 2. Board-targeted web search: always run when a region/company was given
-  //    (that's where local postings live), or to backfill thin Remotive results.
+  // 3. Board-targeted web search: always run when a region/company was given
+  //    (that's where local postings live), or to backfill thin API results.
   const needSearch = results.length < 4 || company || region;
   if (needSearch) {
     try {
@@ -210,14 +369,34 @@ async function execute(input) {
     }
   }
 
+  // Individual postings first, index pages last: a category page is a lead, not
+  // an opening, and it should never be the first thing the user is shown.
+  results.sort((a, b) => (a.kind === 'listing_page' ? 1 : 0) - (b.kind === 'listing_page' ? 1 : 0));
+
+  const shown = results.slice(0, limit);
+  const postings = shown.filter(j => j.kind !== 'listing_page').length;
+  const indexPages = shown.length - postings;
+  const country = adzunaCountry(region);
+
   return {
     query: { role, company, region },
-    count: Math.min(results.length, limit),
-    results: results.slice(0, limit),
-    tip: results.length === 0
+    count: shown.length,
+    postingCount: postings,
+    listingPageCount: indexPages,
+    results: shown,
+    sources: {
+      adzuna: !country ? 'skipped — region maps to no Adzuna country endpoint'
+        : !adzunaConfigured() ? 'unconfigured — set ADZUNA_APP_ID and ADZUNA_APP_KEY for real postings with salary and posting date'
+          : adzunaError ? `failed: ${adzunaError}` : `queried (${country})`,
+      remotive: regionIsLocal ? 'skipped — remote-only index, and a specific city was requested' : 'queried',
+      webSearch: needSearch ? 'queried' : 'skipped'
+    },
+    tip: shown.length === 0
       ? `No listings surfaced${region ? ` for "${region}"` : ''}. Web search may be rate-limited — retry, broaden the role, or point the user to ${(boardsForRegion(region)[1] || {}).label || 'a job board'} directly.`
-      : 'Each result includes a direct URL and a "board" label — cite them in your response.'
+      : indexPages
+        ? `Cite each result's URL and board. ${indexPages} of these have "kind":"listing_page" — those are a board's SEARCH page, not a single opening. Present them as "browse these" and never as a specific job, and prefer "kind":"posting" rows for anything you shortlist or draft an application for.`
+        : 'Each result is an individual posting — cite its URL and board.'
   };
 }
 
-module.exports = { execute };
+module.exports = { execute, classifyUrl, adzunaCountry, adzunaConfigured };

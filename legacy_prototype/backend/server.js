@@ -240,6 +240,7 @@ app.use('/api/neural-map', require('./routes/neuralMap'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/missions', require('./routes/missions'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/integrations', require('./routes/integrations'));
 app.use('/api/group-chat', require('./routes/groupChat'));
 app.use('/api/blockchain', require('./routes/blockchain'));
 app.use('/api/knowledge', require('./routes/knowledge'));

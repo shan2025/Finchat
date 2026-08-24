@@ -96,6 +96,19 @@
     </div>
    </section>
 
+   <!-- Connected accounts -->
+   <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
+    <h2 class="text-lg font-bold flex items-center gap-2">
+     <span class="material-symbols-outlined">link</span> Connected accounts
+    </h2>
+    <p class="mt-1 text-[12px]" style="color:var(--text3);">
+     Outside services FinChat may read on your behalf. Each one states exactly what it can see; you can disconnect at any time.
+    </p>
+    <div id="integrations" class="mt-4 space-y-3">
+     <div class="text-[12px]" style="color:var(--text3);">Loading…</div>
+    </div>
+   </section>
+
    <!-- Recent deliveries -->
    <section class="rounded-3xl p-6" style="background:var(--surface); border:1px solid var(--border);">
     <h2 class="text-lg font-bold flex items-center gap-2">
@@ -462,6 +475,106 @@
   } catch (e) { showToast('Push setup failed: ' + e.message); return false; }
  }
 
+ // ── Connected accounts (Gmail for Rasha) ──
+ //
+ // The card is deliberately explicit about scope. "Connect Gmail" reads to most
+ // people as "give it my email", and what this actually grants is read-only
+ // access to job-board mail — so the card says that in the place where consent
+ // is given, not only in the docs.
+ let gStatus = {};
+
+ function renderIntegrations() {
+  const el = document.getElementById('integrations');
+  if (!el) return;
+
+  if (!gStatus.configured) {
+   el.innerHTML = `
+    <div class="rounded-2xl px-4 py-3.5" style="background:var(--surface2); border:1px solid var(--border);">
+     <div class="text-[13.5px] font-bold">Gmail
+      <span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#fee2e2; border:1px solid #dc2626; color:#991b1b;">server not configured</span>
+     </div>
+     <div class="text-[11.5px] mt-1" style="color:var(--text3);">
+      Set <code>GOOGLE_CLIENT_SECRET</code> and register <code>${esc(gStatus.redirectUri || '')}</code> as a redirect URI in the Google Cloud console.
+     </div>
+    </div>`;
+   return;
+  }
+
+  const connected = gStatus.connected;
+  el.innerHTML = `
+   <div class="rounded-2xl px-4 py-3.5" style="background:var(--surface2); border:1px solid var(--border);">
+    <div class="flex items-center gap-3">
+     <span class="material-symbols-outlined text-[20px]" style="color:var(--text2);">mail</span>
+     <div class="flex-1 min-w-0">
+      <div class="text-[13.5px] font-bold">Gmail — job alerts
+       ${connected ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#dcfce7; border:1px solid #16a34a; color:#166534;">connected</span>' : ''}
+      </div>
+      <div class="text-[11.5px]" style="color:var(--text3);">
+       Lets Rasha read the job mail already in your inbox — LinkedIn, Naukri, Indeed, Internshala and company careers addresses.
+      </div>
+     </div>
+    </div>
+
+    <div class="mt-2.5 text-[11.5px] rounded-xl px-3 py-2.5" style="background:var(--surface); border:1px solid var(--border); color:var(--text2); line-height:1.6;">
+     <div><b>Can:</b> read mail from job senders only, from the last 90 days.</div>
+     <div><b>Cannot:</b> read the rest of your mailbox, send, reply, label or delete anything, or apply to jobs for you.</div>
+     ${connected && gStatus.email ? `<div class="mt-1" style="color:var(--text3);">Account: <b>${esc(gStatus.email)}</b></div>` : ''}
+     ${connected && gStatus.lastUsedAt ? `<div style="color:var(--text3);">Last read: ${new Date(gStatus.lastUsedAt).toLocaleString()}</div>` : ''}
+     ${connected && !gStatus.lastUsedAt ? '<div style="color:var(--text3);">Not read yet.</div>' : ''}
+    </div>
+
+    <button data-act="${connected ? 'g-disconnect' : 'g-connect'}" class="w-full py-2.5 rounded-xl text-[13px] font-bold mt-2.5"
+      style="${connected
+        ? 'background:transparent; border:1px solid #dc2626; color:#991b1b; cursor:pointer;'
+        : 'background:#1a73e8; color:#fff; border:none; cursor:pointer;'}">
+     ${connected ? 'Disconnect Gmail' : 'Connect Gmail (read-only)'}
+    </button>
+   </div>`;
+ }
+
+ async function loadIntegrations() {
+  try {
+   const r = await fetch(API + '/api/integrations/google/status', { headers: AUTH });
+   gStatus = r.ok ? await r.json() : { configured: false };
+  } catch (e) {
+   gStatus = { configured: false };
+  }
+  renderIntegrations();
+ }
+
+ async function connectGoogle() {
+  try {
+   const r = await fetch(API + '/api/integrations/google/connect', { headers: AUTH });
+   const d = await r.json();
+   if (!r.ok) throw new Error(d.error || 'could not start');
+   // Full navigation, not a popup: Google blocks its consent screen in many
+   // embedded/popup contexts, and the callback redirects straight back here.
+   location.href = d.url;
+  } catch (e) { showToast('Could not connect Gmail: ' + e.message); }
+ }
+
+ async function disconnectGoogle() {
+  if (!confirm('Disconnect Gmail? Rasha will stop reading your job alerts, and the permission is revoked at Google.')) return;
+  try {
+   const r = await fetch(API + '/api/integrations/google', { method: 'DELETE', headers: AUTH });
+   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'failed');
+   showToast('✅ Gmail disconnected');
+   loadIntegrations();
+  } catch (e) { showToast('Disconnect failed: ' + e.message); }
+ }
+
+ // The OAuth callback redirects back with the outcome in the query string.
+ function reportOAuthOutcome() {
+  const q = new URLSearchParams(location.search);
+  const g = q.get('google');
+  if (!g) return;
+  if (g === 'connected') showToast('✅ Gmail connected' + (q.get('account') ? ' — ' + q.get('account') : ''));
+  else if (g === 'cancelled') showToast('Gmail connection cancelled');
+  else showToast('Gmail connection failed: ' + (q.get('reason') || 'unknown error'));
+  // Clear it so a refresh does not re-announce a one-time result.
+  history.replaceState({}, '', location.pathname);
+ }
+
  // ── Event wiring ──
  // This page is served through spa_router.js, which runs view scripts inside a
  // function scope — so nothing here is reachable from a global `onclick=`.
@@ -487,6 +600,13 @@
   }
  });
 
+ bind('integrations', 'click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  if (el.dataset.act === 'g-connect') connectGoogle();
+  if (el.dataset.act === 'g-disconnect') disconnectGoogle();
+ });
+
  // Drawer
  bind('navToggle', 'click', () => {
   document.getElementById('sideNav').classList.toggle('open');
@@ -506,6 +626,8 @@
  });
 
  loadPrefs();
+ loadIntegrations();
+ reportOAuthOutcome();
 </script>
 </main>
 
