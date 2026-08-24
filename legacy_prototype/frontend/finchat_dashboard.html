@@ -561,7 +561,19 @@
     }
 
     tbody.innerHTML = '';
+    // The feed shows raw mission/task prompts, which are written in markdown.
+    // Strip the emphasis/heading/code markers so `**bold**` etc. don't leak into the cell.
+    const stripMd = (s) => String(s == null ? '' : s)
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/(^|\s)[*_]([^*_\n]+)[*_]/g, '$1$2')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/[*_`#]/g, '')
+      .trim();
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     data.recentActivity.forEach(act => {
+      const goalText = stripMd(act.goal);
       let stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#f3eee3] text-[#5c4a38]">${act.state.toUpperCase()}</span>`;
       if (act.state === 'completed') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#dcfce7] text-[#166534]">COMPLETED</span>`;
       if (act.state === 'running' || act.state === 'ready') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#bfdbfe] text-[#1e40af] animate-pulse">RUNNING</span>`;
@@ -575,7 +587,7 @@
       tbody.innerHTML += `
         <tr class="hover:bg-[#f3eee3]/50 transition-colors">
           <td class="py-3.5 px-4 font-bold text-[#3a2e23] capitalize">${act.agentId}</td>
-          <td class="py-3.5 px-4 max-w-md truncate text-[#3a2e23]" title="${act.goal}">${act.goal}</td>
+          <td class="py-3.5 px-4 max-w-md truncate text-[#3a2e23]" title="${esc(goalText)}">${esc(goalText)}</td>
           <td class="py-3.5 px-4">${stateBadge}</td>
           <td class="py-3.5 px-4 flex flex-wrap gap-1">${toolsList}</td>
           <td class="py-3.5 px-4 font-mono text-[#5c4a38]">${act.iterationsUsed} step(s)</td>
