@@ -2179,8 +2179,9 @@
       </div>
     </div>`;
       
-      document.getElementById('messages').appendChild(div);
-      document.getElementById('messages').scrollTop = 999999;
+      const msgsEl = document.getElementById('messages');
+      msgsEl.appendChild(div);
+      msgsEl.scrollTop = 999999;
 
       // Mount 3D Car & Road Animation
       const mountEl = document.getElementById(`${id}-road-mount`);
@@ -2190,6 +2191,14 @@
         window.roadInstances[id] = roadInst;
         window.activeRoadInstance = roadInst;
       }
+
+      // The car/road canvas grows the row AFTER it mounts, so the scroll
+      // set above lands short and leaves the animation half-cut. Re-pin to
+      // the bottom across the next couple of frames once layout settles.
+      requestAnimationFrame(() => {
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+        requestAnimationFrame(() => { msgsEl.scrollTop = msgsEl.scrollHeight; });
+      });
 
       window.typingTimers[id] = setInterval(() => {
         phraseIdx = (phraseIdx + 1) % phrases.length;
