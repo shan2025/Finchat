@@ -39,7 +39,9 @@ router.get('/', requireAuth, async (req, res) => {
 // Fetch details and current status of an execution
 router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const resExec = await query('SELECT * FROM executions WHERE execution_id = $1', [req.params.id]);
+    // Scope by owner: without the user_id check any signed-in account could read
+    // another account's execution (and its full logs) by guessing the id.
+    const resExec = await query('SELECT * FROM executions WHERE execution_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     if (resExec.rows.length === 0) {
       return res.status(404).json({ error: 'Execution not found' });
     }
@@ -166,8 +168,9 @@ router.post('/:id/resume', requireAuth, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Check if execution exists and is in waiting state
-    const resExec = await query('SELECT * FROM executions WHERE execution_id = $1', [executionId]);
+    // Check the execution exists, belongs to this user, and is in waiting state.
+    // The user_id scope stops one account resuming another account's run.
+    const resExec = await query('SELECT * FROM executions WHERE execution_id = $1 AND user_id = $2', [executionId, userId]);
     if (resExec.rows.length === 0) {
       return res.status(404).json({ error: 'Execution not found' });
     }

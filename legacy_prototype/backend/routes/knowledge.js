@@ -412,11 +412,15 @@ router.get('/memory/overview', requireAuth, async (req, res) => {
       safeScalar(`SELECT COUNT(*) FROM executions WHERE current_state = 'completed' AND user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'episodic' AND user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'procedural' AND user_id = $1`, [req.user.id]),
-      safeScalar(`SELECT COUNT(*) FROM skill_recipes`),
+      safeScalar(`SELECT COUNT(*) FROM skill_recipes sr
+                  JOIN executions e ON e.execution_id = sr.source_execution_id
+                  WHERE e.user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'semantic' AND user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM knowledge`),
       safeScalar(`SELECT COUNT(*) FROM knowledge_embeddings`),
-      safeScalar(`SELECT COUNT(*) FROM reflections`)
+      safeScalar(`SELECT COUNT(*) FROM reflections r
+                  JOIN executions e ON e.execution_id = r.execution_id
+                  WHERE e.user_id = $1`, [req.user.id])
     ]);
 
     const status = (n) => (n == null ? 'roadmap' : n > 0 ? 'live' : 'instrumented');

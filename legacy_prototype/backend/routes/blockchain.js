@@ -11,6 +11,16 @@ const { requireAuth } = require('../middleware/auth');
 const { LAMPORTS_PER_SOL } = require('@solana/web3.js');
 const { getOrCreateKeypair, getConnection, SOLANA_RPC } = require('../services/solana');
 
+// All AI-chat messages share one global "general" channel, so the proof chain
+// is a single stream mixing every account's conversations. A proof's real owner
+// is the user_id recorded in ai_conversations for that message; the user's own
+// messages also carry their id directly in proof_chain.sender_id. Scoping on
+// both is what keeps one account's blocks out of another account's Audit Logs.
+const ownedProof = (n) => `(
+  EXISTS (SELECT 1 FROM ai_conversations ac WHERE ac.message_id = proof_chain.message_id AND ac.user_id = $${n})
+  OR proof_chain.sender_id = $${n}
+)`;
+
 // Bound every RPC call — devnet can stall for many seconds and the page
 // shouldn't wait on it. Timed-out calls just report null/offline.
 function withTimeout(promise, ms) {
@@ -44,12 +54,13 @@ router.get('/status', requireAuth, async (req, res) => {
              COUNT(*) FILTER (WHERE solana_tx IS NOT NULL)::int AS anchored,
              COUNT(*) FILTER (WHERE solana_tx IS NOT NULL AND solana_tx NOT LIKE 'sim_%')::int AS anchored_real
       FROM proof_chain
-    `);
+      WHERE ${ownedProof(1)}
+    `, [req.user.id]);
     const lastAnchor = await query(`
       SELECT chain_height, solana_tx, solana_slot, timestamp
-      FROM proof_chain WHERE solana_tx IS NOT NULL
+      FROM proof_chain WHERE solana_tx IS NOT NULL AND ${ownedProof(1)}
       ORDER BY chain_height DESC LIMIT 1
-    `);
+    `, [req.user.id]);
 
     const s = stats.rows[0] || {};
     res.json({
@@ -85,9 +96,10 @@ router.get('/blocks', requireAuth, async (req, res) => {
       SELECT proof_id, chain_height, hash, prev_hash, sender_id,
              solana_tx, solana_slot, solana_confirmed, timestamp
       FROM proof_chain
+      WHERE ${ownedProof(2)}
       ORDER BY chain_height DESC
       LIMIT $1
-    `, [limit]);
+    `, [limit, req.user.id]);
     res.json({ blocks: blocks.rows.reverse() });
   } catch (err) {
     console.error('Blockchain blocks error:', err);

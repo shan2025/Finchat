@@ -28,7 +28,30 @@
  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
  .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:.3s; transform:translateY(20px); z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.2); }
  .toast.show { opacity:1; transform:translateY(0); }
- @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+ /* Report card visuals — lead with the numbers, keep prose optional. */
+ .stat-row{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+ .stat{ flex:1 1 120px; min-width:108px; background:var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
+ .stat-n{ font-size:26px; font-weight:800; letter-spacing:-.02em; color:var(--txt); line-height:1; font-variant-numeric:tabular-nums; }
+ .stat-l{ font-size:11.5px; font-weight:600; color:var(--sub); margin-top:5px; }
+ .bars-wrap{ margin-top:4px; }
+ .bars-title{ font-size:12px; font-weight:700; color:var(--sub); margin-bottom:8px; }
+ .bars{ display:flex; flex-direction:column; gap:7px; }
+ .bar-row{ display:flex; align-items:center; gap:10px; }
+ .bar-label{ width:112px; flex-shrink:0; font-size:12.5px; font-weight:600; color:var(--txt); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+ .bar-track{ flex:1; height:8px; background:var(--accent-soft); border-radius:999px; overflow:hidden; }
+ .bar-fill{ height:100%; background:var(--accent); border-radius:999px; }
+ .bar-val{ min-width:44px; text-align:right; white-space:nowrap; font-size:12px; font-weight:700; color:var(--sub); font-variant-numeric:tabular-nums; }
+ .tl{ display:flex; flex-direction:column; gap:6px; }
+ .tl-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--txt); }
+ .tl-tag{ font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px; border-radius:999px; background:var(--accent-soft); color:var(--accent); flex-shrink:0; }
+ .tl-label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+ .empty-note{ font-size:12.5px; color:var(--sub); padding:4px 2px; }
+ .rep-details{ margin-top:12px; border-top:1px solid var(--border); padding-top:10px; }
+ .rep-details>summary{ cursor:pointer; font-size:12.5px; font-weight:700; color:var(--sub); list-style:none; display:flex; align-items:center; gap:4px; }
+ .rep-details>summary::-webkit-details-marker{ display:none; }
+ .rep-details>summary::before{ content:'chevron_right'; font-family:'Material Symbols Outlined'; font-size:18px; transition:transform .15s ease; }
+ .rep-details[open]>summary::before{ transform:rotate(90deg); }
+ @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} .bar-label{width:88px;} }
 </style>
 </head>
 <body class="min-h-screen ">
@@ -92,14 +115,75 @@ function renderKindPicker(){
  document.querySelectorAll('.kind-tab').forEach(b=>b.addEventListener('click',()=>{ selectedKind=b.dataset.k; renderKindPicker(); }));
 }
 
+// ── Numbers-first rendering ────────────────────────────────────────────────
+// A report used to be a paragraph you had to read start-to-finish. Every kind
+// stores a structured `payload`, so lead with those numbers as stat tiles +
+// ranked bars and demote the LLM narrative to a collapsed "Written summary".
+function fmt(n){ n=Number(n); if(!isFinite(n)) return '0'; return n>=1000?n.toLocaleString():String(n); }
+function statTile(value,label){ return `<div class="stat"><div class="stat-n">${fmt(value)}</div><div class="stat-l">${esc(label)}</div></div>`; }
+function statRow(tiles){ tiles=tiles.filter(Boolean); return tiles.length?`<div class="stat-row">${tiles.join('')}</div>`:''; }
+function barList(title,items){
+ items=(items||[]).filter(i=>i&&i.label!=null);
+ if(!items.length) return '';
+ const max=Math.max(1,...items.map(i=>Number(i.value)||0));
+ const rows=items.map(i=>{ const pct=Math.round((Number(i.value)||0)/max*100);
+  return `<div class="bar-row"><div class="bar-label" title="${esc(i.label)}">${esc(i.label)}</div>`+
+   `<div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>`+
+   `<div class="bar-val">${esc(i.sub!=null?i.sub:fmt(i.value))}</div></div>`; }).join('');
+ return `<div class="bars-wrap">${title?`<div class="bars-title">${esc(title)}</div>`:''}<div class="bars">${rows}</div></div>`;
+}
+function tagList(title,items){
+ items=(items||[]).filter(i=>i&&i.label!=null);
+ if(!items.length) return '';
+ const rows=items.map(i=>`<div class="tl-row">${i.tag?`<span class="tl-tag">${esc(i.tag)}</span>`:''}<span class="tl-label" title="${esc(i.label)}">${esc(i.label)}</span></div>`).join('');
+ return `<div class="bars-wrap">${title?`<div class="bars-title">${esc(title)}</div>`:''}<div class="tl">${rows}</div></div>`;
+}
+function payloadView(kind,p){
+ if(!p) return '';
+ try{ if(typeof p==='string') p=JSON.parse(p); }catch(e){ return ''; }
+ if(kind==='growth'){
+  return statRow([statTile(p.conceptsLearned,'concepts learned'),statTile(p.newLinks,'new links'),statTile(p.activations,'recall activations')])+
+   barList('Most active concepts',(p.mostActive||[]).map(m=>({label:m.canonical_name,value:m.activation_count})));
+ }
+ if(kind==='agent_learning'){
+  const ag=p.agents||[], leader=ag[0];
+  return statRow([statTile(ag.length,'agents with knowledge'),leader&&statTile(leader.nodes,'top: '+leader.agent)])+
+   barList('Concepts owned per agent',ag.map(a=>({label:a.agent,value:a.nodes,sub:fmt(a.nodes)+' · '+fmt(a.activations)+' acts'})));
+ }
+ if(kind==='dream_digest'){
+  const dr=p.dreams||[];
+  const merged=dr.reduce((s,d)=>s+((d.payload&&d.payload.merged)||0),0);
+  const gaps=dr.reduce((s,d)=>s+((d.payload&&d.payload.gapsFound)||0),0);
+  return statRow([statTile(dr.length,'consolidation cycles'),statTile(merged,'nodes merged'),statTile(gaps,'gaps surfaced')])+
+   tagList('Recent cycles',dr.slice(0,5).map(d=>({label:d.title})));
+ }
+ if(kind==='gaps'){
+  const ins=p.insights||[];
+  const gapN=ins.filter(i=>i.kind==='gap').length, conN=ins.filter(i=>i.kind==='contradiction').length;
+  return statRow([statTile(ins.length,'open items'),statTile(gapN,'gaps'),statTile(conN,'contradictions')])+
+   tagList(null,ins.slice(0,6).map(i=>({label:String(i.title||'').replace(/^Missing concept:\s*/i,''),tag:i.kind})));
+ }
+ if(kind==='user_profile'){
+  const pr=p.preferences||[];
+  if(!pr.length) return statRow([statTile(0,'learned preferences')])+`<div class="empty-note">No preferences learned yet — chat more and they'll appear here.</div>`;
+  return statRow([statTile(pr.length,'learned preferences')])+barList('What you care about',pr.map(x=>({label:x.topic,value:x.strength})));
+ }
+ return '';
+}
+
 function reportCard(r){
+ const viz=payloadView(r.kind,r.payload);
  return `<div class="card p-5">
-  <div class="flex items-center justify-between flex-wrap gap-2">
+  <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
    <div class="font-bold flex items-center gap-2">
     <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">${KIND_ICON[r.kind]||'description'}</span> ${esc(r.title||r.kind)}</div>
    <div class="text-xs" style="color:var(--sub)">${when(r.created_at)}</div>
   </div>
-  <div class="text-sm mt-3" style="color:var(--txt);line-height:1.6" data-report-body="${esc(r.report_id)}"></div>
+  ${viz}
+  <details class="rep-details">
+   <summary>Written summary</summary>
+   <div class="text-sm mt-2" style="color:var(--txt);line-height:1.6" data-report-body="${esc(r.report_id)}"></div>
+  </details>
   <div class="text-[11px] mt-3" style="color:var(--sub)">${r.period_start?('Period: '+when(r.period_start)+' → '+when(r.period_end)):''}</div>
  </div>`;
 }

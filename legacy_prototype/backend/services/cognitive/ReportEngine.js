@@ -24,11 +24,13 @@ const TITLES = {
 async function gather(kind, { userId, days }) {
   const span = `${days} days`;
   if (kind === 'growth') {
+    // Every source table is per-user; scope to userId so a growth report reflects
+    // only the caller's own memory, not a pool of everyone's activity.
     const [created, activated, edges, top] = await Promise.all([
-      query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='created' AND created_at > now() - ($1||' days')::interval`, [String(days)]),
-      query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='activated' AND created_at > now() - ($1||' days')::interval`, [String(days)]),
-      query(`SELECT COUNT(*)::int n FROM entity_edges WHERE created_at > now() - ($1||' days')::interval`, [String(days)]),
-      query(`SELECT canonical_name, activation_count FROM entities WHERE status='active' ORDER BY activation_count DESC LIMIT 5`)
+      query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='created' AND user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
+      query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='activated' AND user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
+      query(`SELECT COUNT(*)::int n FROM entity_edges WHERE user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
+      query(`SELECT canonical_name, activation_count FROM entities WHERE status='active' AND user_id=$1 ORDER BY activation_count DESC LIMIT 5`, [userId])
     ]);
     return { conceptsLearned: created.rows[0].n, activations: activated.rows[0].n,
       newLinks: edges.rows[0].n, mostActive: top.rows };
@@ -37,15 +39,16 @@ async function gather(kind, { userId, days }) {
     const q = await query(`
       SELECT owner_agent AS agent, COUNT(*)::int nodes,
              COALESCE(SUM(activation_count),0)::int activations
-      FROM entities WHERE status='active' AND owner_agent IS NOT NULL
-      GROUP BY owner_agent ORDER BY nodes DESC LIMIT 10`);
+      FROM entities WHERE status='active' AND owner_agent IS NOT NULL AND user_id=$1
+      GROUP BY owner_agent ORDER BY nodes DESC LIMIT 10`, [userId]);
     return { agents: q.rows };
   }
   if (kind === 'dream_digest') {
     const q = await query(`
       SELECT title, detail, payload, created_at FROM graph_insights
-      WHERE kind='dream_report' AND created_at > now() - ($1||' days')::interval
-      ORDER BY created_at DESC LIMIT 10`, [String(days)]);
+      WHERE kind='dream_report' AND (user_id IS NULL OR user_id=$2)
+        AND created_at > now() - ($1||' days')::interval
+      ORDER BY created_at DESC LIMIT 10`, [String(days), userId || null]);
     return { dreams: q.rows };
   }
   if (kind === 'gaps') {

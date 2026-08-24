@@ -37,9 +37,12 @@
     ['finchat_mindmap', 'mindmap'],
     ['finchat_knowledge', 'knowledge'],
     ['finchat_reports', 'reports'],
-    ['finchat_blockchain', 'blockchain'],
+    // Blockchain + Audit Logs were pulled out of the top-level rail and now live
+    // under Settings → Security & audit; map their pages to the Settings key so
+    // that row highlights while you're on them.
+    ['finchat_blockchain', 'settings'],
+    ['finchat_audit', 'settings'],
     ['finchat_settings', 'settings'],
-    ['finchat_audit', 'audit'],
     ['finchat_inbox', 'chat']
   ];
   function activeKey() {
@@ -236,8 +239,6 @@
           navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
           navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +
           soonItem('account_balance', 'Governance') +
-          navItem('blockchain', 'finchat_blockchain.html', 'account_tree', 'Blockchain') +
-          navItem('audit', 'finchat_audit.html', 'policy', 'Audit Logs') +
         '</div>' +
         '<div class="sbn-label sbn-syslabel">System</div>' +
         '<div style="display:flex; flex-direction:column; gap:2px;">' +

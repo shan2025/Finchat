@@ -63,14 +63,15 @@ router.get('/status', requireAuth, async (req, res) => {
   try {
     const personas = listPersonas(); // plato, aurelius, rasha, nova
 
-    // 1. Check active executions right now
+    // 1. Check active executions right now — scoped to the signed-in user so one
+    // account never sees another account's running agents.
     const resActive = await query(`
       SELECT execution_id, assigned_agent, current_state, goal, created_at, updated_at,
              iterations_used, max_iterations, tool_calls_used, max_tool_calls, tokens_used, wait_reason
       FROM executions
-      WHERE current_state IN ('running', 'ready', 'waiting')
+      WHERE user_id = $1 AND current_state IN ('running', 'ready', 'waiting')
       ORDER BY updated_at DESC
-    `);
+    `, [req.user.id]);
     const activeExecutions = resActive.rows;
 
     // 1b. Per-agent lifetime burn metrics + average task duration (for ETA)
@@ -84,9 +85,9 @@ router.get('/status', requireAuth, async (req, res) => {
                AVG(EXTRACT(EPOCH FROM (updated_at - created_at)))
                FILTER (WHERE current_state = 'completed'), 0)  AS avg_duration_seconds
       FROM executions
-      WHERE assigned_agent IS NOT NULL
+      WHERE assigned_agent IS NOT NULL AND user_id = $1
       GROUP BY assigned_agent
-    `);
+    `, [req.user.id]);
     const metricsByAgent = {};
     for (const m of resMetrics.rows) {
       metricsByAgent[m.assigned_agent] = {
@@ -163,9 +164,10 @@ router.get('/status', requireAuth, async (req, res) => {
                WHERE el.execution_id = e.execution_id AND el.phase = 'using_tool'
              ) as tools_invoked
       FROM executions e
+      WHERE e.user_id = $1
       ORDER BY e.updated_at DESC
       LIMIT 15
-    `);
+    `, [req.user.id]);
     const recentActivity = resHistory.rows.map(row => ({
       executionId: row.execution_id,
       agentId: row.assigned_agent || 'plato',
@@ -193,11 +195,12 @@ router.get('/status', requireAuth, async (req, res) => {
           count(*) FILTER (WHERE current_state = 'completed' AND updated_at >= date_trunc('day', now())) AS completed,
           count(*) FILTER (WHERE current_state = 'failed'    AND updated_at >= date_trunc('day', now())) AS failed
         FROM executions
-      `);
+        WHERE user_id = $1
+      `, [req.user.id]);
       const due = await query(`
         SELECT count(*) AS n FROM agent_missions
-        WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= now()
-      `);
+        WHERE user_id = $1 AND enabled = true AND next_run_at IS NOT NULL AND next_run_at <= now()
+      `, [req.user.id]);
       queueStatus = {
         active: Number(counts.rows[0].active),
         waiting: Number(due.rows[0].n),
