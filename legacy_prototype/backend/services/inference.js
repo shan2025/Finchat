@@ -119,6 +119,26 @@ const PROVIDERS = [
     baseUrl: process.env.MISTRAL_BASE_URL || 'https://api.mistral.ai/v1/chat/completions',
     models: (process.env.MISTRAL_MODELS || 'mistral-small-latest')
       .split(',').map(s => s.trim()).filter(Boolean)
+  },
+  {
+    // Cerebras — the biggest free daily budget on the bench (1M tokens/day) and
+    // very fast, but its free tier caps context at 8,192 tokens. Registered
+    // primarily as a BYOK target: a user who brings a Cerebras key gets that 1M
+    // for themselves. OpenAI-compatible, so no new call path.
+    name: 'cerebras',
+    style: 'openai',
+    baseUrl: process.env.CEREBRAS_BASE_URL || 'https://api.cerebras.ai/v1/chat/completions',
+    models: (process.env.CEREBRAS_MODELS || 'llama-3.3-70b')
+      .split(',').map(s => s.trim()).filter(Boolean)
+  },
+  {
+    // OpenRouter — one key, many models. Useful mostly as a BYOK option for a
+    // user who already routes everything through it. OpenAI-compatible.
+    name: 'openrouter',
+    style: 'openai',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions',
+    models: (process.env.OPENROUTER_MODELS || 'meta-llama/llama-3.3-70b-instruct:free')
+      .split(',').map(s => s.trim()).filter(Boolean)
   }
 ];
 
@@ -665,9 +685,40 @@ async function _runProviderChain({
 async function runInference({
   messages, provider = 'groq', model, temperature = 0.7, jsonMode = false,
   byokKey, byokProvider = 'groq', feature = 'chat', workload = null,
-  agentId = null, userId = null
+  agentId = null, userId = null, onlyProvider = null
 }) {
   const _startedAt = Date.now();
+
+  // BYOK harness resolution. A real user's own provider keys, and whether the
+  // shared pool is still open to them, are resolved ONCE here from a 60s cache
+  // (UserKeys.resolveForUser) rather than threaded through route → think →
+  // reason as extra arguments. `system` and background calls skip this entirely
+  // and keep the old behaviour: shared keys, no cap.
+  //
+  // `onlyProvider` is the key-validation path: restrict to one provider and use
+  // ONLY the supplied byokKey (no shared fallback), so a bad key fails honestly
+  // instead of a system key answering in its place.
+  let userKeys = {};
+  let allowSystem = true;
+  let preferredProvider = null;   // the provider the user assigned to this work
+  if (onlyProvider) {
+    allowSystem = false;
+  } else if (userId && userId !== 'system') {
+    try {
+      const UserKeys = require('./UserKeys');
+      const r = await UserKeys.resolveForUser(userId);
+      userKeys = r.keys || {};
+      allowSystem = r.allowSystem !== false;
+      // Task→key assignment: the key tagged for this agent's kind of work leads,
+      // then the `everything` key, then the default route. A preference, not a
+      // wall — the rest of the user's keys stay as fallback below.
+      const roleProviders = r.roleProviders || {};
+      const role = UserKeys.roleForAgent(agentId);
+      preferredProvider = roleProviders[role] || roleProviders.everything || null;
+    } catch (err) {
+      console.warn(`⚠️ UserKeys.resolveForUser(${userId}) failed, using shared pool: ${err.message}`);
+    }
+  }
 
   // Providers are tried in order and the first completion wins. `attempted`
   // exists only so the final error can say WHICH providers were actually
@@ -675,7 +726,15 @@ async function runInference({
   // least useful line in the logs while this was failing daily.
   const attempted = [];
   const effectiveWorkload = workload || feature;
-  const route = _providersFor(effectiveWorkload);
+  let route = _providersFor(effectiveWorkload);
+  // Key validation restricts the whole run to the one provider being tested.
+  if (onlyProvider) route = route.filter(cfg => cfg.name === onlyProvider);
+  // Move the user's role-assigned provider to the front so their chosen key
+  // serves this work; everything else keeps its order as fallback.
+  if (preferredProvider) {
+    const lead = route.filter(cfg => cfg.name === preferredProvider);
+    if (lead.length) route = [...lead, ...route.filter(cfg => cfg.name !== preferredProvider)];
+  }
   const patient = !IMPATIENT_WORKLOADS.has(effectiveWorkload);
   // A caller that named a model always wins; the hint only fills the gap for
   // workloads known not to need a frontier model. See WORKLOAD_MODEL_HINTS.
@@ -691,10 +750,13 @@ async function runInference({
     //
     // `byokKey` keeps its name for callers but is no longer Groq-only: a user's
     // key is simply the first credential in that provider's pool.
-    const credentials = quota.resolveCredentials(cfg.name, {
-      agentId,
-      userKey: (byokKey && cfg.name === byokProvider) ? byokKey : null
-    });
+    // A user's own key for THIS provider comes from the resolved map first, then
+    // the legacy single-provider byokKey argument (kept for the validation path
+    // and any old caller). `allowSystem` drops the shared key when the user has
+    // spent their allowance — see UserKeys / QuotaManager.
+    const userKey = userKeys[cfg.name] ||
+      ((byokKey && cfg.name === byokProvider) ? byokKey : null);
+    const credentials = quota.resolveCredentials(cfg.name, { agentId, userKey, allowSystem });
     if (credentials.length === 0) continue;
 
     // An explicit `model` argument names a Groq model, so it leads Groq's list
@@ -724,6 +786,17 @@ async function runInference({
       });
       if (result) return result;
     }
+  }
+
+  // BYOK gate. A capped user with no key of their own has had every provider
+  // skipped above (empty pools), not merely throttled — so the honest answer is
+  // "connect your own AI", not "temporary network delay". Thrown with a stable
+  // marker the chat layer maps to a Settings deep-link.
+  if (!onlyProvider && !allowSystem && Object.keys(userKeys).length === 0 && !byokKey
+      && userId && userId !== 'system') {
+    const e = new Error('BYOK_REQUIRED: You have used your free allowance. Connect your own AI provider key in Settings to continue.');
+    e.code = 'BYOK_REQUIRED';
+    throw e;
   }
 
   // Local Ollama fallback or explicit provider.

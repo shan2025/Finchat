@@ -77,9 +77,17 @@ function _credentialId(source, key) {
  * Returns [] when nothing usable is configured, which the router reads as
  * "skip this provider" — the same meaning the old `_usableKey` guard had.
  *
+ * `allowSystem` is the BYOK gate. It defaults to true so every existing caller
+ * (and every background/system call) is unchanged, but a user who has spent
+ * their shared-pool allowance is resolved with `allowSystem: false`, which drops
+ * the shared `system` credential from the pool. Their own `user` key still
+ * serves them; with no key of their own the pool goes empty and the provider is
+ * skipped — which is how "connect your own key to continue" is enforced without
+ * the router needing to know what a tier is.
+ *
  * @returns {Array<{id: string, key: string, source: 'user'|'agent'|'system'}>}
  */
-function resolveCredentials(provider, { agentId = null, userKey = null } = {}) {
+function resolveCredentials(provider, { agentId = null, userKey = null, allowSystem = true } = {}) {
   const out = [];
   const seen = new Set();
   const add = (source, key) => {
@@ -97,7 +105,7 @@ function resolveCredentials(provider, { agentId = null, userKey = null } = {}) {
   const ENV = provider.toUpperCase();
   add('user', userKey);
   if (agentId) add('agent', process.env[`${ENV}_API_KEY_${agentId.toUpperCase()}`]);
-  add('system', process.env[`${ENV}_API_KEY`]);
+  if (allowSystem) add('system', process.env[`${ENV}_API_KEY`]);
   return out;
 }
 

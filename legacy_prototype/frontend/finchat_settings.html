@@ -269,6 +269,8 @@
    prefs: {}, serverChannels: {}, waStatus: {}, deliveries: [],
    gStatus: {},
    chain: null, blocks: [],
+   providers: null, // { catalogue, keys, access, referral }
+   addKeyRows: 1,   // how many blank "add a key" rows are showing
    appearance: {
      theme: (localStorage.getItem('finchat_theme_mode') || 'system'),
      rail: (localStorage.getItem('finchat_nav_collapsed') === '1' ? 'Collapsed' : 'Expanded'),
@@ -299,7 +301,7 @@
  // ─────────────────────────────────────────────────────────────────────────
  const NAV = [
    { label: 'Preferences', items: [['notifications', 'Notifications'], ['appearance', 'Appearance']] },
-   { label: 'Connections', items: [['connections', 'Connected accounts'], ['log', 'Delivery log']] },
+   { label: 'Connections', items: [['ai', 'Bring Your Own AI'], ['connections', 'Connected accounts'], ['log', 'Delivery log']] },
    { label: 'Trust & records', items: [['audit', 'Security & audit'], ['chain', 'Blockchain anchoring']] },
    { label: 'Account', items: [['account', 'Account & profile']] }
  ];
@@ -329,7 +331,7 @@
    const panel = $('setPanel');
    const r = ({
      notifications: secNotifications, appearance: secAppearance, connections: secConnections,
-     log: secLog, audit: secAudit, chain: secChain, account: secAccount
+     ai: secAI, log: secLog, audit: secAudit, chain: secChain, account: secAccount
    })[state.section];
    panel.innerHTML = r ? r() : '';
    if (r && r.after) r.after();
@@ -442,6 +444,109 @@
    ['Slack', 'Post approvals and fraud flags into a channel.'],
    ['Outlook', 'Same read-only job-mail scope as Gmail.']
  ];
+ // ── Bring Your Own AI (BYOK harness) ──
+ function secAI() {
+   const p = state.providers;
+   if (!p) return `<div class="set-sec-head"><h2>Bring Your Own AI</h2><p>Loading…</p></div>`;
+
+   const connected = {};
+   for (const k of (p.keys || [])) connected[k.provider] = k;
+
+   const acc = p.access || {};
+   const TIER = {
+     byok: { tag: 'stag-on', text: 'Running on your own AI key' },
+     referred: { tag: 'stag-on', text: `Shared pool · ${acc.sharedUsed || 0}/${acc.sharedCap || 0} today` },
+     free: { tag: (acc.allowShared ? 'stag-neutral' : 'stag-warn'), text: acc.allowShared ? `Free trial · ${acc.sharedUsed || 0}/${acc.sharedCap || 0} used` : 'Free trial used up — connect a key' }
+   }[acc.tier] || { tag: 'stag-neutral', text: acc.tier || '' };
+
+   const ref = p.referral || {};
+   const refLink = location.origin + '/finchat_signup.html?ref=' + encodeURIComponent(ref.code || '');
+
+   const catalogue = p.catalogue || [];
+   const byProv = {}; for (const c of catalogue) byProv[c.provider] = c;
+
+   const roles = p.roles || [{ role: 'everything', label: 'Everything / General' }];
+   // A connected key — one card, whatever provider it is. The role selector is
+   // how the user points this key at a kind of work.
+   const connectedCard = (k) => {
+     const ok = k.lastOkAt && !k.lastError;
+     const meta = byProv[k.provider] || { label: k.providerLabel || k.provider };
+     return `
+     <div class="set-card" style="padding:16px 18px;">
+       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+         <span style="width:9px;height:9px;border-radius:50%;background:${ok ? 'var(--ok)' : 'var(--warn)'};"></span>
+         <div style="flex:1; min-width:150px;">
+           <div class="rt">${esc(meta.label)} <span class="stag stag-on">connected</span></div>
+           <div class="rd" style="font-family:var(--mono);">key ••••${esc(k.last4)}${k.lastError ? ' · <span style="color:var(--danger)">' + esc(k.lastError) + '</span>' : (k.lastOkAt ? ' · verified ' + fmtTime(k.lastOkAt) : '')}</div>
+         </div>
+         <label style="font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:6px;">Use for
+           <select class="chan-input" data-ai-role="${esc(k.provider)}" style="display:block; width:auto; min-width:150px; margin:0;">
+             ${roles.map(r => `<option value="${esc(r.role)}" ${k.role === r.role ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}
+           </select>
+         </label>
+         <button class="sb sb-secondary" data-ai-test="${esc(k.provider)}">Test</button>
+         <button class="sb sb-danger" data-ai-del="${esc(k.provider)}">Remove</button>
+       </div>
+     </div>`;
+   };
+
+   // A blank add-key row: just paste a key. The provider is detected from the
+   // key and confirmed by a live validation — no dropdown to get wrong.
+   const addRow = (i) => `
+     <div class="set-card" style="padding:14px 16px; border-style:dashed;">
+       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+         <input class="chan-input" id="aikey_${i}" placeholder="Paste your API key — we'll detect the provider" style="display:block; flex:1; min-width:220px; margin:0;">
+         <button class="sb sb-primary" data-ai-save="${i}">Connect</button>
+         ${i > 0 ? `<button class="sb sb-secondary" data-ai-rmrow="${i}" title="Remove this row">✕</button>` : ''}
+       </div>
+       <div class="rd" style="margin-top:8px;">Works with Groq, Gemini, DeepSeek, Mistral, Cerebras or OpenRouter — we detect which from the key. Encrypted at rest and never shown again.</div>
+     </div>`;
+
+   const rows = Math.max(1, state.addKeyRows || 1);
+   const addForms = Array.from({ length: rows }, (_, i) => addRow(i)).join('') +
+     `<div><button class="sb sb-secondary" data-ai-addrow="1">+ Add another AI key</button></div>`;
+
+   return `
+   <div class="set-sec-head"><div class="kicker">Connections</div><h2>Bring Your Own AI</h2>
+     <p>FinChat is the harness — the tools, knowledge, agents, missions and learning are already built. Connect your own AI provider key and everything runs on <b>your</b> AI: chat, job hunting, research, trading intel and more. Your key is encrypted at rest and never shown again.</p></div>
+
+   <div class="set-card" style="padding:16px 18px; display:flex; align-items:center; gap:12px;">
+     <span class="stag ${TIER.tag}">${esc(TIER.text)}</span>
+     <div class="rd" style="flex:1;">${acc.tier === 'byok' ? 'Your calls use your own key with no shared-pool limit.' : acc.tier === 'referred' ? 'You joined via a referral, so you can use our shared AI pool up to a daily cap. Connect your own key anytime for unlimited use.' : 'You can try FinChat on our shared pool for a limited number of requests, then connect your own AI key to continue.'}</div>
+   </div>
+
+   <div style="margin-top:8px;"><h3 style="font-family:var(--serif); font-size:17px; margin:0 0 12px; color:var(--text);">Your AI keys</h3>
+     <div style="display:flex; flex-direction:column; gap:10px;">
+       ${(p.keys || []).map(connectedCard).join('')}
+       ${addForms}
+     </div>
+   </div>
+
+   <div style="margin-top:20px;"><h3 style="font-family:var(--serif); font-size:17px; margin:0 0 4px; color:var(--text);">Referrals</h3>
+     <p style="margin:0 0 12px; font-size:13.5px; color:var(--text-2);">Share your code and people you invite can use the shared AI pool you set up — no key needed to start.</p>
+     <div class="set-card" style="padding:16px 18px;">
+       <div class="set-grid2">
+         <div>
+           <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin-bottom:6px;">Your referral code</div>
+           <div style="display:flex; gap:8px; align-items:center;">
+             <code style="font-family:var(--mono); font-size:16px; font-weight:700; color:var(--accent-warm);">${esc(ref.code || '—')}</code>
+             <button class="sb sb-secondary" data-copy="${esc(refLink)}">Copy invite link</button>
+           </div>
+           <div class="rd" style="margin-top:6px;">${(ref.referredCount || 0)} joined with your code.</div>
+         </div>
+         <div>
+           <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin-bottom:6px;">Have a code?</div>
+           ${ref.referredBy ? `<div class="rd">You joined via a referral. ✓</div>` : `
+           <div style="display:flex; gap:8px;">
+             <input class="chan-input" id="refCode" placeholder="Enter referral code" style="display:block; flex:1; margin:0;">
+             <button class="sb sb-primary" data-ref-apply="1">Redeem</button>
+           </div>`}
+         </div>
+       </div>
+     </div>
+   </div>`;
+ }
+
  function secConnections() {
    const g = state.gStatus;
    let gmailCard;
@@ -741,6 +846,73 @@
    } catch (e) { /* keep the section usable without chain data */ }
    if (['audit', 'chain'].includes(state.section)) renderSection();
  }
+ async function loadProviders() {
+   try {
+     const r = await fetch(API + '/api/settings/providers', { headers: AUTH });
+     state.providers = r.ok ? await r.json() : null;
+   } catch (e) { state.providers = null; }
+   if (state.section === 'ai') renderSection();
+ }
+
+ // ── BYOK actions ──
+ async function saveProviderKey(i) {
+   const inp = $('aikey_' + i); const key = inp ? inp.value.trim() : '';
+   if (!key) return showToast('Paste a key first');
+   showToast('Detecting provider and validating your key…');
+   try {
+     const r = await fetch(API + '/api/settings/providers', { method: 'POST', headers: AUTH, body: JSON.stringify({ key }) });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'failed');
+     state.addKeyRows = 1; // reset the add area after a successful connect
+     showToast('Connected — detected ' + (d.detected || 'your provider') + '. FinChat now runs on your key.');
+     await loadProviders();
+   } catch (e) { showToast(e.message); }
+ }
+ async function setProviderRole(provider, role) {
+   try {
+     const r = await fetch(API + '/api/settings/providers/' + provider + '/role', { method: 'PUT', headers: AUTH, body: JSON.stringify({ role }) });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'failed');
+     if (state.providers) state.providers.keys = d.keys;
+     showToast('Assignment saved — ' + provider + ' will handle that work.');
+   } catch (e) { showToast(e.message); await loadProviders(); }
+ }
+ function addKeyRow() { state.addKeyRows = (state.addKeyRows || 1) + 1; renderSection(); }
+ function removeKeyRow() { state.addKeyRows = Math.max(1, (state.addKeyRows || 1) - 1); renderSection(); }
+ async function testProviderKey(provider) {
+   showToast('Testing ' + provider + '…');
+   try {
+     const r = await fetch(API + '/api/settings/providers/' + provider + '/test', { method: 'POST', headers: AUTH });
+     const d = await r.json();
+     showToast(d.status === 'ok' ? provider + ' key works ✓' : (provider + ' failed: ' + (d.error || 'unknown')));
+     await loadProviders();
+   } catch (e) { showToast(e.message); }
+ }
+ async function deleteProviderKey(provider) {
+   try {
+     const r = await fetch(API + '/api/settings/providers/' + provider, { method: 'DELETE', headers: AUTH });
+     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'failed');
+     showToast(provider + ' disconnected.');
+     await loadProviders();
+   } catch (e) { showToast(e.message); }
+ }
+ async function applyReferralCode() {
+   const inp = $('refCode'); const code = inp ? inp.value.trim() : '';
+   if (!code) return showToast('Enter a code');
+   try {
+     const r = await fetch(API + '/api/settings/referral', { method: 'POST', headers: AUTH, body: JSON.stringify({ code }) });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'failed');
+     showToast('Referral applied — shared pool unlocked.');
+     await loadProviders();
+   } catch (e) { showToast(e.message); }
+ }
+ function copyText(text) {
+   navigator.clipboard && navigator.clipboard.writeText(text).then(
+     () => showToast('Invite link copied'),
+     () => showToast(text)
+   );
+ }
 
  // ─────────────────────────────────────────────────────────────────────────
  // Actions
@@ -949,6 +1121,13 @@
    if (t.id === 'testBtn' || t.closest('#testBtn')) return sendTest();
    if (t.id === 'logoutBtn' || t.closest('#logoutBtn')) return logout();
    if ((el = t.closest('[data-gmail]'))) return el.dataset.gmail === 'connect' ? connectGoogle() : askDisconnectGmail();
+   if ((el = t.closest('[data-ai-save]'))) return saveProviderKey(el.dataset.aiSave);
+   if ((el = t.closest('[data-ai-addrow]'))) return addKeyRow();
+   if ((el = t.closest('[data-ai-rmrow]'))) return removeKeyRow();
+   if ((el = t.closest('[data-ai-test]'))) return testProviderKey(el.dataset.aiTest);
+   if ((el = t.closest('[data-ai-del]'))) return deleteProviderKey(el.dataset.aiDel);
+   if ((el = t.closest('[data-ref-apply]'))) return applyReferralCode();
+   if ((el = t.closest('[data-copy]'))) return copyText(el.dataset.copy);
    if ((el = t.closest('[data-connect]'))) {
      const name = el.dataset.connect; state.connectRequested[name] = true; renderSection();
      return showToast(name + ' — request noted; this connector is coming soon.');
@@ -958,7 +1137,17 @@
    if ((el = t.closest('[data-blk]'))) return showChainBlock(+el.dataset.blk);
  });
  // Editing a channel field or the display name marks the form dirty.
- bind('setPanel', 'input', e => { if (e.target.classList.contains('chan-input')) setDirty(true); });
+ bind('setPanel', 'input', e => {
+   // BYOK key/referral inputs and the role selector save on their own, not via
+   // the global savebar.
+   if (/^(aikey_|aiprov_|refCode)/.test(e.target.id)) return;
+   if (e.target.hasAttribute && e.target.hasAttribute('data-ai-role')) return;
+   if (e.target.classList.contains('chan-input')) setDirty(true);
+ });
+ bind('setPanel', 'change', e => {
+   const el = e.target.closest && e.target.closest('[data-ai-role]');
+   if (el) setProviderRole(el.dataset.aiRole, el.value);
+ });
 
  bind('dialogHost', 'click', e => {
    const b = e.target.closest('[data-dlg]');
@@ -980,6 +1169,7 @@
  loadPrefs();
  loadIntegrations();
  loadChain();
+ loadProviders();
 </script>
 </main>
 

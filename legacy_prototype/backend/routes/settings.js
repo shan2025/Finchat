@@ -9,6 +9,8 @@ const {
 } = require('../services/notificationChannels');
 const wa = require('../services/whatsapp');
 const { createNotification } = require('../services/notifications');
+const userKeys = require('../services/UserKeys');
+const { runInference } = require('../services/inference');
 
 // In-memory Telegram link codes: code -> { userId, createdAt }. Short-lived;
 // the user starts a link, messages the bot, and we match their /start payload.
@@ -302,6 +304,170 @@ router.post('/push/subscribe', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Push subscribe error:', err);
     res.status(500).json({ error: 'Failed to save push subscription' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Bring Your Own AI (BYOK harness) — routes/settings.js
+//
+// Users connect their own provider key so every tool, agent and mission runs on
+// THEIR AI. Keys are validated with a live 1-token ping, then stored sealed
+// (services/UserKeys.js → secretBox). The client only ever sees the last 4.
+// ══════════════════════════════════════════════════════════════════
+
+// One live ping to prove a pasted key actually works, restricted to that one
+// provider so no shared key can answer in its place. Returns {ok, error}.
+async function validateProviderKey(provider, key) {
+  try {
+    const r = await runInference({
+      messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
+      onlyProvider: provider,
+      byokKey: key,
+      byokProvider: provider,
+      feature: 'keytest',
+      temperature: 0
+    });
+    if (r && typeof r.content === 'string') return { ok: true };
+    return { ok: false, error: 'Provider returned an empty response' };
+  } catch (err) {
+    return { ok: false, error: (err.message || 'validation failed').slice(0, 300) };
+  }
+}
+
+// ── GET /api/settings/providers ── masked keys + tier + referral ──
+router.get('/providers', requireAuth, async (req, res) => {
+  try {
+    const [keys, resolved, referral] = await Promise.all([
+      userKeys.listKeys(req.user.id),
+      userKeys.resolveForUser(req.user.id),
+      userKeys.getReferral(req.user.id)
+    ]);
+    res.json({
+      // The catalogue the picker renders — name, label, key-format hint, docs.
+      catalogue: userKeys.PROVIDERS.map(p => ({ provider: p, ...userKeys.PROVIDER_META[p] })),
+      roles: userKeys.ROLE_KEYS.map(r => ({ role: r, label: userKeys.ROLES[r].label })),
+      keys,
+      access: {
+        tier: resolved.tier,          // byok | referred | free
+        allowShared: resolved.allowSystem,
+        sharedUsed: resolved.used,
+        sharedCap: resolved.cap
+      },
+      referral
+    });
+  } catch (err) {
+    console.error('Get providers error:', err);
+    res.status(500).json({ error: 'Failed to load AI provider settings' });
+  }
+});
+
+// ── POST /api/settings/providers ── auto-detect, validate, store sealed ──
+// The user just pastes a key. `provider` is OPTIONAL: when omitted we detect it
+// from the key's shape and confirm by validating the candidate(s) live, keeping
+// whichever one actually authenticates. When a provider IS given (e.g. the user
+// overrode an ambiguous detection) we honour it.
+router.post('/providers', requireAuth, async (req, res) => {
+  try {
+    const { provider, label } = req.body || {};
+    const key = String((req.body && req.body.key) || '').trim();
+    if (!key) return res.status(400).json({ error: 'Paste a key first' });
+    if (provider && !userKeys.PROVIDERS.includes(provider)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+
+    const candidates = provider ? [provider] : userKeys.detectCandidates(key);
+    let matched = null; let lastErr = null;
+    for (const cand of candidates) {
+      const check = await validateProviderKey(cand, key);
+      if (check.ok) { matched = cand; break; }
+      lastErr = check.error;
+    }
+    if (!matched) {
+      return res.status(400).json({
+        error: provider
+          ? `That key did not work with ${provider}: ${lastErr}`
+          : `Could not detect a working provider for that key (tried ${candidates.join(', ')}). ${lastErr ? 'Last error: ' + lastErr : ''}`
+      });
+    }
+
+    await userKeys.saveKey(req.user.id, matched, key, {
+      label: label ? String(label).slice(0, 80) : null,
+      lastOkAt: new Date()
+    });
+    const keys = await userKeys.listKeys(req.user.id);
+    res.json({ status: 'ok', validated: true, detected: matched, keys });
+  } catch (err) {
+    console.error('Save provider key error:', err);
+    res.status(500).json({ error: 'Failed to save AI provider key' });
+  }
+});
+
+// ── POST /api/settings/providers/:provider/test ── re-validate stored key ──
+router.post('/providers/:provider/test', requireAuth, async (req, res) => {
+  try {
+    const provider = req.params.provider;
+    if (!userKeys.PROVIDERS.includes(provider)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+    const resolved = await userKeys.resolveForUser(req.user.id);
+    const key = resolved.keys[provider];
+    if (!key) return res.status(404).json({ error: 'No key stored for this provider' });
+    const check = await validateProviderKey(provider, key);
+    await userKeys.markKeyStatus(req.user.id, provider, { ok: check.ok, error: check.error });
+    res.json({ status: check.ok ? 'ok' : 'error', ...check });
+  } catch (err) {
+    console.error('Test provider key error:', err);
+    res.status(500).json({ error: 'Failed to test AI provider key' });
+  }
+});
+
+// ── PUT /api/settings/providers/:provider/role ── assign key to a task ──
+router.put('/providers/:provider/role', requireAuth, async (req, res) => {
+  try {
+    const provider = req.params.provider;
+    const role = (req.body && req.body.role) || '';
+    if (!userKeys.PROVIDERS.includes(provider)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+    if (!userKeys.ROLE_KEYS.includes(role)) {
+      return res.status(400).json({ error: 'Unknown role' });
+    }
+    const ok = await userKeys.setRole(req.user.id, provider, role);
+    if (!ok) return res.status(404).json({ error: 'No key stored for this provider' });
+    const keys = await userKeys.listKeys(req.user.id);
+    res.json({ status: 'ok', keys });
+  } catch (err) {
+    console.error('Set provider role error:', err);
+    res.status(500).json({ error: 'Failed to assign the key' });
+  }
+});
+
+// ── DELETE /api/settings/providers/:provider ── disconnect ──
+router.delete('/providers/:provider', requireAuth, async (req, res) => {
+  try {
+    const provider = req.params.provider;
+    if (!userKeys.PROVIDERS.includes(provider)) {
+      return res.status(400).json({ error: 'Unknown provider' });
+    }
+    await userKeys.deleteKey(req.user.id, provider);
+    const keys = await userKeys.listKeys(req.user.id);
+    res.json({ status: 'ok', keys });
+  } catch (err) {
+    console.error('Delete provider key error:', err);
+    res.status(500).json({ error: 'Failed to remove AI provider key' });
+  }
+});
+
+// ── POST /api/settings/referral ── redeem someone's code ──
+router.post('/referral', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    const result = await userKeys.applyReferral(req.user.id, code);
+    const referral = await userKeys.getReferral(req.user.id);
+    res.json({ status: 'ok', ...result, referral });
+  } catch (err) {
+    // These are user-facing validation messages ("already used a code", etc.).
+    res.status(400).json({ error: err.message || 'Failed to apply referral code' });
   }
 });
 

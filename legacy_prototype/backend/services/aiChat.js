@@ -150,9 +150,14 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
   } catch (err) {
     console.error('⚠️ CognitiveCore Route Error:', err.stack || err.message);
     const errMessage = err.message || '';
-    const userMsg = errMessage.includes('AI Inference unavailable') || errMessage.includes('rate limit') || errMessage.includes('429')
-      ? `I'm currently experiencing temporary network delays connecting to my inference engine (${errMessage}). Please try asking your question again in a moment.`
-      : 'System error processing your cognitive request. Falling back to safe mode.';
+    let userMsg;
+    if (err.code === 'BYOK_REQUIRED' || errMessage.includes('BYOK_REQUIRED')) {
+      userMsg = "You've used up your free allowance on our shared AI pool. To keep going, connect your own AI provider key (Groq, Gemini, DeepSeek, Mistral, Cerebras or OpenRouter) in **Settings → Bring Your Own AI**. Once connected, all the tools, knowledge and agents run on your key.";
+    } else if (errMessage.includes('AI Inference unavailable') || errMessage.includes('rate limit') || errMessage.includes('429')) {
+      userMsg = `I'm currently experiencing temporary network delays connecting to my inference engine (${errMessage}). Please try asking your question again in a moment.`;
+    } else {
+      userMsg = 'System error processing your cognitive request. Falling back to safe mode.';
+    }
     return {
       response: userMsg,
       cleanResponse: userMsg,
