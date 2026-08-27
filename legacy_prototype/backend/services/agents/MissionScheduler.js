@@ -257,6 +257,34 @@ async function runMission(missionId, { manual = false } = {}) {
     return { skipped: true, reason: 'disabled' };
   }
 
+  // Concurrency guard. A manual "run now" firing while the scheduled tick (or a
+  // previous click) is still in flight used to start a SECOND execution on the
+  // same mission conversation; the two collided on shared per-conversation state
+  // and surfaced as `Illegal state transition from "running" to "running"` plus a
+  // spurious "Mission didn't complete" notification. Refuse to start when a run
+  // for this mission is already active. Bounded to the runtime window so a
+  // crashed/orphaned run (the stale sweeper moves it to 'timeout'/'failed') can
+  // never wedge the mission shut. This is a best-effort check, not a lock — it
+  // closes the seconds-apart double-click that was actually observed, not a
+  // sub-millisecond race.
+  try {
+    const active = await query(
+      `SELECT execution_id FROM executions
+         WHERE conversation_id = $1
+           AND current_state IN ('created', 'ready', 'running', 'waiting')
+           AND created_at > now() - make_interval(secs => $2)
+         ORDER BY created_at DESC
+         LIMIT 1`,
+      [`mission_${mission.mission_id}`, MISSION_MAX_RUNTIME_SECONDS + 30]);
+    if (active.rows.length) {
+      console.log(`🗓️ [Missions] "${mission.title}" already has an active run (${active.rows[0].execution_id}) — skipping duplicate trigger${manual ? ' (manual)' : ''}`);
+      return { skipped: true, reason: 'already_running', executionId: active.rows[0].execution_id };
+    }
+  } catch (e) {
+    // A guard failure must not block a legitimate run — fall through and start.
+    console.warn(`⚠️ [Missions] concurrency guard check failed (${e.message}) — proceeding`);
+  }
+
   console.log(`🗓️ [Missions] Running "${mission.title}" [${mission.agent_id}] for user ${mission.user_id}${manual ? ' (manual)' : ''}`);
   const start = Date.now();
 
