@@ -13,8 +13,40 @@ function parseInput(input) {
   return { job: s };
 }
 
+// The model frequently passes the posting FLAT — {role/title, company, url,
+// description/requirements} — instead of the documented {job:{...}} wrapper,
+// which used to throw "needs a job posting" and fail the whole mission. Accept
+// both by folding the flat fields into a job object.
+function coerceJob(opts) {
+  if (opts.job != null && opts.job !== '') return opts;
+  const flat = ['title', 'role', 'company', 'url', 'description', 'requirements', 'location', 'source'];
+  if (flat.some(k => opts[k] != null)) {
+    return {
+      ...opts,
+      job: {
+        title: opts.title || opts.role,
+        company: opts.company,
+        url: opts.url,
+        location: opts.location,
+        source: opts.source,
+        description: opts.description || opts.requirements || ''
+      }
+    };
+  }
+  return opts;
+}
+
+// A "posting" that is really an unfilled planner placeholder (e.g. "<Job URL>",
+// "{{SELECTED_JOB_URL_FROM_STEPS_1_2_3}}", "<top_match_url>") only produces a
+// letter full of angle-bracket gaps. Detect it on the identifying fields —
+// which never legitimately contain these tokens — so we can send back an
+// instruction the agent can act on instead of drafting garbage or looping.
+function looksLikePlaceholder(s) {
+  return /\{\{|<[^>]{1,60}>|SELECTED_JOB|TOP_MATCH|_FROM_STEP/i.test(String(s || ''));
+}
+
 async function execute(input, context = {}) {
-  const opts = parseInput(input);
+  const opts = coerceJob(parseInput(input));
   const job = typeof opts.job === 'object' ? JSON.stringify(opts.job, null, 1) : String(opts.job || '');
   // Fall back to the stored resume. A scheduled 4am run has no one to paste one
   // in, and a cover letter full of [FILL IN: …] placeholders is not a report.
@@ -26,7 +58,16 @@ async function execute(input, context = {}) {
     } catch (e) { /* no stored resume — fall through to the placeholder letter */ }
   }
   if (!job) {
-    throw new Error('ApplyDraftTool needs a job posting, e.g. {"job":{"title":"Product Analyst","company":"Acme","url":"...","description":"..."},"resumeText":"..."}');
+    throw new Error('ApplyDraftTool needs a job posting, e.g. {"job":{"title":"Product Analyst","company":"Acme","url":"...","description":"..."},"resumeText":"..."} — or pass the posting fields flat: {"title","company","url","description"}.');
+  }
+  // Guard against a placeholder posting (the planner sometimes emits template
+  // tokens instead of a real result). Check the identifying fields, not the
+  // free-text description, so a legit posting with stray "<" isn't rejected.
+  const idText = (typeof opts.job === 'object' && opts.job)
+    ? [opts.job.url, opts.job.title, opts.job.company].filter(Boolean).join(' ')
+    : job;
+  if (looksLikePlaceholder(idText)) {
+    throw new Error('That job posting is an unfilled placeholder (e.g. "<Job URL>" / "{{SELECTED_JOB_URL}}"). Pass a REAL posting from your "jobs" tool results — its actual title, company, url and description — not a template token. Do not fetch a made-up URL; draft from a posting the jobs search already returned.');
   }
 
   const prompt = `You are an expert career coach drafting a job application package.
