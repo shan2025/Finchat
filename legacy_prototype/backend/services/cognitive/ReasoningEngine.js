@@ -259,31 +259,93 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
   // Fallback per Decision #11: treat raw text or extracted response as a "respond" action
   console.warn('⚠️ ReasoningEngine: Corrective retry also failed. Extracting response or falling back to raw text.');
 
-  let fallbackResponse = firstResult.content.trim() || 'I encountered an issue processing your request. Please try again.';
+  const GENERIC_EMPTY = 'I encountered an issue processing your request. Please try again.';
+  const GENERIC_FORMAT = 'I gathered information but had trouble formatting the reply. Please try asking again.';
+
+  // Part 1 — diagnostic capture. The raw synthesis output is not persisted on the
+  // execution row, so a fallback used to be a dead end when debugging WHY a long,
+  // URL-heavy report (Rasha's job hunt is the repeat offender) failed to come back
+  // as valid JSON. Log a bounded prefix so one real failure reveals the exact
+  // malformation (truncated string vs. empty completion vs. bad escaping).
+  const rawContent = firstResult.content || '';
+  console.warn(
+    `⚠️ ReasoningEngine: fallback raw output ` +
+    `(len=${rawContent.length}, provider=${firstResult.provider || '?'}/${firstResult.model || '?'}, ` +
+    `completionTokens=${firstResult.completionTokens || 0}): ` +
+    JSON.stringify(rawContent.slice(0, 2000))
+  );
+
+  // Best-effort unescape of a JSON string body salvaged by regex (not full JSON).
+  const unescapeJsonString = (s) => s
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\\//g, '/')
+    .replace(/\\\\/g, '\\')
+    // Drop a dangling incomplete escape left by a truncated string.
+    .replace(/\\$/, '')
+    .trim();
+
+  // Part 2 — salvage a malformed-but-present report instead of discarding it.
+  // `salvaged` stays false only when we could NOT recover real content; it drives
+  // the `fallback` flag below, which CognitiveCore maps to completion_reason
+  // ('natural' when we delivered a real answer, 'error' when we truly failed).
+  let fallbackResponse = rawContent.trim() || GENERIC_EMPTY;
+  let salvaged = false;
+  const isSubstantial = (s) => typeof s === 'string' && s.trim().length >= 40;
+
   try {
     const maybeObj = JSON.parse(fallbackResponse);
     if (maybeObj && typeof maybeObj === 'object') {
       // Prefer a real non-empty string field; NEVER dump raw JSON if response was falsy.
       const pickString = (v) => typeof v === 'string' && v.trim().length > 0 ? v : null;
-      fallbackResponse =
-        pickString(maybeObj.response) ||
-        pickString(maybeObj.message) ||
-        pickString(maybeObj.content) ||
-        pickString(maybeObj.thought) ||
-        'I gathered information but had trouble formatting the reply. Please try asking again.';
+      const body = pickString(maybeObj.response) || pickString(maybeObj.message) || pickString(maybeObj.content);
+      if (body) {
+        fallbackResponse = body;
+        salvaged = isSubstantial(body);
+      } else {
+        // `thought` is reasoning scaffolding, not the answer — deliver it as a
+        // last resort but do NOT treat it as a successfully salvaged report.
+        fallbackResponse = pickString(maybeObj.thought) || GENERIC_FORMAT;
+      }
     }
   } catch (e) {
-    const respMatch = fallbackResponse.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-    if (respMatch && respMatch[1]) {
-      fallbackResponse = respMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+    // The JSON did not parse — most often because the big `response` string was
+    // truncated mid-body (long report + URLs) so its closing quote never arrived.
+    // 1) A complete, well-formed "response":"…" (closing quote present).
+    const complete = fallbackResponse.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (complete && complete[1]) {
+      fallbackResponse = unescapeJsonString(complete[1]);
+      salvaged = isSubstantial(fallbackResponse);
     } else {
-      fallbackResponse = fallbackResponse.replace(/\{?\s*"thought"\s*:\s*"[^"]*"\s*,?\s*/i, '').replace(/[\{\}]/g, '').trim();
+      // 2) A TRUNCATED "response":"… with no closing quote — take everything after
+      //    the opening quote. This is the case that turned Rasha's finished report
+      //    into an "error" notification: the content was all there, just unterminated.
+      const truncated = fallbackResponse.match(/"response"\s*:\s*"([\s\S]*)$/);
+      if (truncated && truncated[1]) {
+        fallbackResponse = unescapeJsonString(truncated[1]);
+        salvaged = isSubstantial(fallbackResponse);
+      } else {
+        // 3) Last resort: strip the JSON scaffolding and keep whatever prose remains.
+        //    Unreliable, so this is NOT counted as a salvaged report.
+        fallbackResponse = fallbackResponse
+          .replace(/\{?\s*"thought"\s*:\s*"[^"]*"\s*,?\s*/i, '')
+          .replace(/[\{\}]/g, '')
+          .trim() || GENERIC_FORMAT;
+      }
     }
+  }
+
+  if (salvaged) {
+    console.warn('✅ ReasoningEngine: salvaged a real response from malformed JSON — delivering as natural.');
   }
 
   return {
     action: {
-      thought: 'Fallback: LLM did not produce valid JSON after correction attempt.',
+      thought: salvaged
+        ? 'Recovered the response from malformed JSON (likely a truncated or unescaped body).'
+        : 'Fallback: LLM did not produce valid JSON after correction attempt.',
       action: 'respond',
       response: fallbackResponse
     },
@@ -294,7 +356,10 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
     promptTokens: firstResult.promptTokens || 0,
     completionTokens: firstResult.completionTokens || 0,
     retried: true,
-    fallback: true
+    // A recovered report is a real answer — let CognitiveCore record it as
+    // 'natural' so the mission delivers it instead of an "error" notification.
+    // We only flag `fallback` (→ 'error') when nothing usable could be recovered.
+    fallback: !salvaged
   };
 }
 
