@@ -64,15 +64,20 @@ function parseActionResponse(rawContent) {
     parsed.input = input != null ? input : '';
   }
 
-  // Normalize missing thought if response exists
-  if (!parsed.thought && typeof parsed.response === 'string') {
-    parsed.thought = 'Responding directly to user.';
+  // A missing/blank `thought` used to hard-fail the WHOLE turn — even when the
+  // action itself (a valid plan, tool call, or respond) was perfectly usable.
+  // Observed live: gpt-oss emits a correct multi-step `plan` with no `thought`,
+  // which failed parse → corrective retry (on a weaker fallback model) → error,
+  // sinking the entire run over the least important field. The narration is
+  // recoverable; the plan is not. Synthesize a thought rather than discarding
+  // real work.
+  if (typeof parsed.thought !== 'string' || !parsed.thought.trim()) {
+    parsed.thought = parsed.action === 'respond'
+      ? 'Responding directly to user.'
+      : `Proceeding with ${parsed.action || 'the chosen action'}.`;
   }
 
   // Validate required fields
-  if (typeof parsed.thought !== 'string' || !parsed.thought) {
-    return { parsed, valid: false, error: 'Missing or invalid "thought" field' };
-  }
   if (!VALID_ACTIONS.includes(parsed.action)) {
     return { parsed, valid: false, error: `Invalid action "${parsed.action}". Must be one of: ${VALID_ACTIONS.join(', ')}` };
   }
