@@ -106,10 +106,58 @@ async function fetchUrl(url) {
   };
 }
 
+// Jina Reader fallback (the one durable win from Agent-Reach's playbook): route the
+// URL through r.jina.ai, which renders the page (JS included) and returns clean
+// markdown. Works keyless from datacenter IPs where a direct GET gets blocked or
+// returns a near-empty JS shell; an optional JINA_API_KEY raises the rate limit.
+// No login, no proxy, runs fine on Render — unlike Agent-Reach's social channels.
+async function fetchViaJina(url) {
+  const target = normalizeUrl(url);
+  // Jina 403s browser-spoofing User-Agents (anti-scraper); a plain client UA passes.
+  // We deliberately do NOT send X-Return-Format:text so Jina keeps the "Title:/URL
+  // Source:" header block we parse the title from.
+  const headers = { 'User-Agent': 'FinChat-Fetch/1.0', 'Accept': 'text/plain' };
+  if (process.env.JINA_API_KEY) headers['Authorization'] = `Bearer ${process.env.JINA_API_KEY}`;
+
+  const res = await axios.get(`https://r.jina.ai/${target}`, {
+    headers, timeout: 20000, maxContentLength: MAX_BYTES, responseType: 'text',
+    validateStatus: s => s >= 200 && s < 400
+  });
+  const text = String(res.data || '').trim();
+  // Jina prepends "Title: ...\nURL Source: ...\nMarkdown Content:\n" — lift the title.
+  const titleMatch = text.match(/^Title:\s*(.+)$/m);
+  return {
+    url: target,
+    contentType: 'markdown',
+    title: titleMatch ? titleMatch[1].trim().slice(0, 200) : '',
+    text: text.slice(0, MAX_TEXT),
+    truncated: text.length > MAX_TEXT,
+    links: [],
+    via: 'jina'
+  };
+}
+
 async function execute(input) {
   const { url } = parseInput(input);
-  const page = await fetchUrl(url);
+  let page;
+  try {
+    page = await fetchUrl(url);
+    // Thin extraction (block page, cookie wall, or JS-rendered shell) → let Jina try.
+    if (page.contentType === 'html' && (page.text || '').length < 200) {
+      try {
+        const jina = await fetchViaJina(url);
+        if ((jina.text || '').length > (page.text || '').length) page = jina;
+      } catch (e) { /* keep the thin direct result */ }
+    }
+  } catch (directErr) {
+    // Direct fetch failed outright (403/timeout/DNS) — Jina is the fallback.
+    try {
+      page = await fetchViaJina(url);
+    } catch (jinaErr) {
+      throw new Error(`Fetch failed directly (${directErr.message}) and via Jina Reader (${jinaErr.message}).`);
+    }
+  }
   return { ...page, source: page.url };
 }
 
-module.exports = { execute, fetchUrl, htmlToText, extractTitle, extractLinks, normalizeUrl };
+module.exports = { execute, fetchUrl, fetchViaJina, htmlToText, extractTitle, extractLinks, normalizeUrl };

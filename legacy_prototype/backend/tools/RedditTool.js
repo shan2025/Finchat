@@ -6,7 +6,17 @@
 const axios = require('axios');
 const { runProviders } = require('./SearchTool');
 
-const UA = 'FinChat/1.0 (research agent by u/finchat; +https://finchat.local)';
+// Ordered backend list (Agent-Reach style): try each Reddit host in turn before
+// falling through to site-scoped search. Reddit bot-blocks datacenter IPs hard on
+// www, but old.reddit.com is often less aggressive, so listing both buys real
+// resilience on hosts like Render where www 403s. A realistic User-Agent is
+// mandatory or Reddit 429s; we rotate a couple so one blocked UA doesn't sink all
+// hosts.
+const REDDIT_HOSTS = ['www.reddit.com', 'old.reddit.com'];
+const USER_AGENTS = [
+  'FinChat/1.0 (research agent by u/finchat; +https://finchat.local)',
+  'Mozilla/5.0 (compatible; FinChatResearch/1.0; +https://finchat.local)'
+];
 
 // Fallback when Reddit's JSON API 403s (it bot-blocks datacenter IPs): find Reddit
 // threads via a site-scoped search. This used to run its own DuckDuckGo scrape, which
@@ -67,19 +77,35 @@ async function execute(input) {
   const { query, subreddit, limit } = parseInput(input);
   if (!query) return { query, results: [], source: 'reddit', error: 'empty query' };
 
-  const base = subreddit
-    ? `https://www.reddit.com/r/${encodeURIComponent(subreddit.replace(/^r\//, ''))}/search.json`
-    : 'https://www.reddit.com/search.json';
+  const path = subreddit
+    ? `/r/${encodeURIComponent(subreddit.replace(/^r\//, ''))}/search.json`
+    : '/search.json';
   const params = { q: query, sort: 'relevance', t: 'month', limit: Math.min(limit, 10), raw_json: 1 };
   if (subreddit) params.restrict_sr = 1;
 
   let results = [];
   let via = 'reddit-api';
-  try {
-    const res = await axios.get(base, { params, headers: { 'User-Agent': UA, 'Accept': 'application/json' }, timeout: 12000 });
-    results = mapPosts(res.data?.data?.children, limit);
-  } catch (err) {
-    console.warn(`⚠️ RedditTool JSON API failed (${err.message}) — falling back to site-scoped search`);
+  // Walk the ordered backend list: each host, and on a block retry with the next
+  // User-Agent, until one returns posts. First success wins; only when the whole
+  // ladder is exhausted do we drop to the search fallback below.
+  const apiErrors = [];
+  outer: for (const host of REDDIT_HOSTS) {
+    for (const ua of USER_AGENTS) {
+      try {
+        const res = await axios.get(`https://${host}${path}`, {
+          params,
+          headers: { 'User-Agent': ua, 'Accept': 'application/json' },
+          timeout: 12000
+        });
+        const posts = mapPosts(res.data?.data?.children, limit);
+        if (posts.length) { results = posts; via = `reddit-api:${host}`; break outer; }
+      } catch (err) {
+        apiErrors.push(`${host} (${err.response?.status || err.code || err.message})`);
+      }
+    }
+  }
+  if (!results.length && apiErrors.length) {
+    console.warn(`⚠️ RedditTool JSON API exhausted [${apiErrors.join('; ')}] — falling back to site-scoped search`);
   }
 
   // API blocked or empty → site:reddit.com search via the shared provider chain

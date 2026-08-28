@@ -23,6 +23,7 @@ const TOOL_IMPLEMENTATIONS = {
   wikipedia: require('../../tools/WikipediaTool'),
   reddit: require('../../tools/RedditTool'),
   quora: require('../../tools/QuoraTool'),
+  agent_reach: require('../../tools/AgentReachTool'),
   watchlist: require('../../tools/WatchlistTool'),
   portfolio: require('../../tools/PortfolioTool'),
   mission: require('../../tools/MissionTool'),

@@ -286,7 +286,7 @@ const TOOLS = {
   fetch: {
     name: 'fetch',
     web: true,
-    description: 'Fetch a specific URL and extract its readable text content, title, and links. Use this AFTER search/jobs/news gave you a URL and you need the actual page content. Input: {"url": "https://..."}',
+    description: 'Fetch a specific URL and extract its readable text content, title, and links. Use this AFTER search/jobs/news gave you a URL and you need the actual page content. Automatically falls back to the Jina Reader renderer when a page is blocked, times out, or is a JavaScript shell, so it can read pages a plain fetch cannot. Input: {"url": "https://..."}',
     inputSchema: {
       type: 'object',
       properties: {
@@ -490,6 +490,26 @@ const TOOLS = {
       properties: { results: { type: 'array' }, crossCheckAdvice: { type: 'string' } }
     },
     cacheTTLSeconds: 600,
+    rateLimitPerMinute: 6
+  },
+
+  agent_reach: {
+    name: 'agent_reach',
+    web: true,
+    description: 'Reach authed/social platforms our other tools cannot — logged-in Reddit, Twitter/X, LinkedIn, Instagram, Facebook — via a self-hosted Agent-Reach worker. Results are UNVERIFIED social/UGC opinion: cross-check any factual claim with wikipedia/news/search before reporting it. If the result has "searchUnavailable": true, the worker/backend is offline (setup gap or the user\'s machine is off) — report that outage and never say the topic has no discussion. Input: {"platform":"twitter","query":"..."}',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        platform: { type: 'string', description: 'Platform to reach: reddit, twitter (x), linkedin, instagram, facebook' },
+        query: { type: 'string', description: 'What to search that platform for' }
+      },
+      required: ['platform', 'query']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: { results: { type: 'array' }, crossCheckAdvice: { type: 'string' } }
+    },
+    cacheTTLSeconds: 300,
     rateLimitPerMinute: 6
   },
 
