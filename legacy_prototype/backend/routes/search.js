@@ -59,7 +59,7 @@ router.get('/', requireAuth, async (req, res) => {
         type: 'node',
         title: `Map node: ${row.label}`,
         snippet: makeSnippet(row.note || row.label, q),
-        href: 'finchat_neuralmap.html',
+        href: `finchat_neuralmap.html?mapId=${encodeURIComponent(row.map_id)}&focus=${encodeURIComponent(row.label)}`,
         ts: row.created_at
       });
     }
@@ -98,7 +98,7 @@ router.get('/', requireAuth, async (req, res) => {
         type: 'entity',
         title: `Concept: ${row.canonical_name}`,
         snippet: `${row.entity_type} — mentioned ${row.mention_count}× across conversations`,
-        href: 'finchat_neuralmap.html',
+        href: `finchat_neuralmap.html?mapId=system&focus=${encodeURIComponent(row.canonical_name)}`,
         ts: row.last_seen_at
       });
     }

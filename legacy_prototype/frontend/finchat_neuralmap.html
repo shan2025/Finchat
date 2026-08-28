@@ -413,6 +413,17 @@ const AUTH = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/
 // updates the URL so it's bookmarkable and survives a reload.
 // ══════════════════════════════════════════════════════════
 let currentMapId = new URLSearchParams(location.search).get('mapId') || null;
+// Agent-scoped brain view (opened from the Universe). Filters the System Map to
+// one agent's own knowledge; null = normal full-graph view.
+const AGENT_FILTER = new URLSearchParams(location.search).get('agent') || null;
+// Specialist agents that each get their own brain tab in the switcher (plato is
+// excluded — it's the orchestrator, not a knowledge owner). System Map remains
+// the consolidated brain of all agents together.
+const AGENT_TABS = [
+ { id: 'aurelius', name: 'Aurelius' },
+ { id: 'rasha',    name: 'Rasha' },
+ { id: 'nova',     name: 'Nova' }
+];
 let currentMapName = '';
 let myMaps = [];  // cache from GET /maps, refreshed on load and after create/rename/delete
 const withMap = (url) => url + (url.includes('?') ? '&' : '?') + 'mapId=' + encodeURIComponent(currentMapId);
@@ -565,6 +576,17 @@ const ctx = canvas.getContext('2d');
 let cw = 0, ch = 0, dpr = 1;
 
 const byKey = k => nodes.find(n => n.key === k);
+
+// The graph's actual middle. Node positions come from the DB and can cluster
+// well off world-origin, so centering on (0,0) drifts the cluster sideways
+// whenever the canvas width changes (e.g. sidebar collapsed → full width).
+// Center on the real centroid instead so the map looks anchored either way.
+function graphCentroid() {
+ if (!nodes.length) return { x: 0, y: 0 };
+ let sx = 0, sy = 0;
+ for (const n of nodes) { sx += n.x; sy += n.y; }
+ return { x: sx / nodes.length, y: sy / nodes.length };
+}
 const radiusOf = n => n.key === 'user:me' ? 30 : n.type === 'agent' ? 19 : n.type === 'chain' ? 14 : n.type === 'idea' ? 13 : 12;
 
 function resize() {
@@ -573,7 +595,7 @@ function resize() {
  canvas.width = r.width * dpr; canvas.height = r.height * dpr;
  cw = r.width; ch = r.height;
  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
- if (!centered && cw > 0) { view.panX = cw / 2; view.panY = ch / 2; centered = true; }
+ if (!centered && cw > 0) { const c = graphCentroid(); view.panX = cw / 2 - c.x * view.scale; view.panY = ch / 2 - c.y * view.scale; centered = true; }
 }
 window.addEventListener('resize', resize);
 
@@ -608,11 +630,35 @@ async function loadGraph() {
   }));
   edges = data.edges.slice();
   communities = data.communities || [];
+
+  // Agent-scoped "brain" view: ?agent=<id> keeps only that agent's own node and
+  // the entities it owns (owner_agent), so each agent has its own neural map.
+  // Opened from the Universe's "Open Brain" action.
+  if (AGENT_FILTER) {
+    const agentKey = 'agent:' + AGENT_FILTER;
+    const keep = new Set();
+    const ownedKeys = [];
+    nodes.forEach(n => {
+      if (n.key === agentKey) keep.add(n.key);
+      else if (n.ownerAgent === AGENT_FILTER) { keep.add(n.key); ownedKeys.push(n.key); }
+    });
+    nodes = nodes.filter(n => keep.has(n.key));
+    edges = edges.filter(e => keep.has(e.from) && keep.has(e.to));
+    // Spoke the agent to each node it owns, so its brain reads as a hub — the
+    // real co-mention edges (entity↔entity) still show the internal structure.
+    if (keep.has(agentKey)) {
+      ownedKeys.forEach(k => edges.push({ from: agentKey, to: k, edge_type: 'owns', reason: AGENT_FILTER + ' learned this.', label: 'learned' }));
+    }
+    // Scope is shown by the highlighted agent tab + stats text; no separate banner.
+  }
+
   selection.clear(); syncSelBanner(); closePanels();
   centered = false; view.scale = 1;
 
   const s = data.stats || {};
-  const statsText = data.map?.builtIn
+  const statsText = AGENT_FILTER
+   ? `${AGENT_FILTER}'s brain · ${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} link${edges.length === 1 ? '' : 's'}`
+   : data.map?.builtIn
    ? `${s.agents || 0} agents · ${s.tools || 0} tools · ${s.entities || 0} learned · chain ${s.chainHeight || 0}`
    : `${nodes.length} node${nodes.length === 1 ? '' : 's'} · ${edges.length} connection${edges.length === 1 ? '' : 's'}`;
   const statsEl = document.getElementById('mapStats');
@@ -624,6 +670,7 @@ async function loadGraph() {
   renderLegend();
   document.getElementById('loadingVeil').classList.add('hidden');
   resize();
+  focusFromUrl();
  } catch (err) {
   document.getElementById('loadingVeil').classList.remove('hidden');
   document.getElementById('loadingVeil').innerHTML =
@@ -649,7 +696,8 @@ async function loadMapList() {
 function renderMapTabs() {
  const bar = document.getElementById('mapTabs');
  const tab = (m) => {
-  const active = m.mapId === currentMapId;
+  // While an agent brain is scoped, no real map tab is "active".
+  const active = m.mapId === currentMapId && !AGENT_FILTER;
   const icon = m.builtIn ? 'hub' : (m.kind === 'network' ? 'network_intelligence' : 'hub');
   const edit = m.builtIn ? '' : `
    <span class="nm-tab-edit inline-flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity ml-0.5" data-edit="${m.mapId}"
@@ -671,15 +719,40 @@ function renderMapTabs() {
     <span class="nm-tab-label" title="${m.builtIn ? '' : 'Double-click to rename'}">${esc(m.name)}</span>${edit}${del}
    </span>`;
  };
- bar.innerHTML = myMaps.map(tab).join('') + `
-  <button id="newMapBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 nm-btn">
+ // Per-agent brain tabs, sitting after the maps: System Map (consolidated) then
+ // Aurelius / Rasha / Nova (each their own brain).
+ const agentTab = (a) => {
+  const on = AGENT_FILTER === a.id;
+  return `
+   <span class="nm-agent-tab inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 whitespace-nowrap"
+    data-agent="${a.id}" title="${a.name}'s own brain"
+    style="cursor:pointer; ${on
+     ? 'background: var(--accent); color: var(--bg); border: none'
+     : 'background: var(--field); color: var(--txt); border: 1px solid var(--border)'}">
+    <span class="material-symbols-outlined text-[14px]">${on ? 'psychology' : 'psychology_alt'}</span>
+    ${a.name}
+   </span>`;
+ };
+ bar.innerHTML = myMaps.map(tab).join('')
+  + `<span class="shrink-0" style="width:1px;height:20px;background:var(--border);margin:0 3px;align-self:center;"></span>`
+  + AGENT_TABS.map(agentTab).join('')
+  + `<button id="newMapBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0 nm-btn">
    <span class="material-symbols-outlined text-[14px]">add</span> New map
   </button>`;
 
  bar.querySelectorAll('.nm-tab').forEach(btn => {
   btn.onclick = (e) => {
    if (e.target.closest('[data-del]') || e.target.closest('[data-edit]') || btn.querySelector('.nm-tab-label').isContentEditable) return;
+   // Leaving an agent brain for a real map: full navigation so AGENT_FILTER
+   // (read once from the URL at load) is actually dropped.
+   if (AGENT_FILTER) { location.href = 'finchat_neuralmap.html?mapId=' + encodeURIComponent(btn.dataset.map); return; }
    switchToMap(btn.dataset.map, btn.dataset.kind);
+  };
+ });
+ bar.querySelectorAll('.nm-agent-tab').forEach(btn => {
+  btn.onclick = () => {
+   if (AGENT_FILTER === btn.dataset.agent) return; // already on this brain
+   location.href = 'finchat_neuralmap.html?mapId=system&agent=' + encodeURIComponent(btn.dataset.agent);
   };
  });
  bar.querySelectorAll('[data-del]').forEach(x => {
@@ -935,6 +1008,7 @@ function draw() {
  }
  ctx.globalAlpha = 1;
 
+ const labelQueue = [];
  for (const n of nodes) {
   const r = radiusOf(n);
   const dim = dimmed(n);
@@ -992,17 +1066,52 @@ function draw() {
    ctx.fillStyle = T.accent; ctx.fill();
   }
 
+  // Labels are collected here and drawn in a second pass (screen space) so we
+  // can cull overlaps — otherwise 120 concept labels stack into a solid blur.
   if (view.scale > 0.45) {
-   ctx.globalAlpha = dim ? 0.25 : 1;
-   ctx.fillStyle = T.label;
    const bold = n.type === 'agent' || n.key === 'user:me';
-   ctx.font = `${bold ? '700' : '600'} ${bold ? 13 : 12}px Inter, sans-serif`;
-   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-   ctx.fillText(n.label, n.x, n.y + r + 4);
+   const strong = hi && hi.nodes.has(n.key); // hovered node or its neighbours
+   // Priority decides who keeps the space when labels collide.
+   const prio = (match || n.key === focus || picked) ? 5
+    : strong ? 4
+    : bold ? 3
+    : n.pinned ? 2
+    : 1;
+   labelQueue.push({ n, r, dim, bold, prio });
   }
  }
  ctx.globalAlpha = 1;
  ctx.restore();
+
+ // Second pass: draw labels in screen space, highest priority first, skipping
+ // any label whose box would overlap one already placed. Constant size (no zoom
+ // scaling) keeps them crisp and readable.
+ labelQueue.sort((a, b) => b.prio - a.prio);
+ const placed = [];
+ ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+ for (const L of labelQueue) {
+  const { n, r, dim, bold, prio } = L;
+  const sx = n.x * view.scale + view.panX;
+  const sy = (n.y + r) * view.scale + view.panY + 4;
+  ctx.font = `${bold ? '700' : '600'} ${bold ? 13 : 12}px Inter, sans-serif`;
+  const w = ctx.measureText(n.label).width;
+  const h = bold ? 15 : 14;
+  const box = { x: sx - w / 2 - 2, y: sy - 1, w: w + 4, h: h + 2 };
+  // High-priority labels (hovered/searched/agents) always draw; the long tail
+  // of concept labels yields when they'd collide.
+  let clash = false;
+  if (prio < 4) {
+   for (const p of placed) {
+    if (box.x < p.x + p.w && box.x + box.w > p.x && box.y < p.y + p.h && box.y + box.h > p.y) { clash = true; break; }
+   }
+  }
+  if (clash) continue;
+  placed.push(box);
+  ctx.globalAlpha = dim ? 0.25 : 1;
+  ctx.fillStyle = T.label;
+  ctx.fillText(n.label, sx, sy);
+ }
+ ctx.globalAlpha = 1;
 
  // marquee box (screen space)
  if (marquee) {
@@ -1683,6 +1792,28 @@ async function deleteEdge(e) {
 // ══════════════════════════════════════════════════════════
 // Toolbar
 // ══════════════════════════════════════════════════════════
+// Deep-link focus: the header knowledge search (and map-node search results)
+// link here as ?focus=<label or concept name>. Jump to and open that node once
+// on load. Fires only for the first graph load so switching maps doesn't re-jump.
+let focusHandled = false;
+function focusFromUrl() {
+ if (focusHandled) return;
+ const params = new URLSearchParams(location.search);
+ const target = (params.get('focus') || params.get('node') || '').trim();
+ if (!target) return;
+ focusHandled = true;
+ const q = target.toLowerCase();
+ const hit = nodes.find(n => n.label.toLowerCase() === q) || nodes.find(n => n.label.toLowerCase().includes(q));
+ if (hit) {
+  view.panX = cw / 2 - hit.x * view.scale;
+  view.panY = ch / 2 - hit.y * view.scale;
+  centered = true; // keep the render loop from re-centering over this jump
+  openNode(hit);
+ } else {
+  showToast(`“${target}” isn’t a node on this map yet.`);
+ }
+}
+
 const searchInput = document.getElementById('searchInput');
 searchInput.oninput = e => { searchQuery = e.target.value; };
 searchInput.onkeydown = e => {
@@ -1725,7 +1856,7 @@ document.getElementById('cancelLink').onclick = () => {
  document.getElementById('linkBanner').classList.add('hidden');
 };
 document.getElementById('resetViewBtn').onclick = () => {
- view.scale = 1; view.panX = cw / 2; view.panY = ch / 2;
+ view.scale = 1; const c = graphCentroid(); view.panX = cw / 2 - c.x; view.panY = ch / 2 - c.y;
 };
 // ══════════════════════════════════════════════════════════
 // Sprint X · Cognitive Memory Engine — heatmap, pulses, insights, dream
