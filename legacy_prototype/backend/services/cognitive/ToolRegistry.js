@@ -493,6 +493,26 @@ const TOOLS = {
     rateLimitPerMinute: 6
   },
 
+  youtube: {
+    name: 'youtube',
+    web: true,
+    description: 'Search YouTube for videos, or read a specific video\'s metadata (title, channel, views, publish date, description) and its transcript. Great for earnings calls, analyst breakdowns, and company presentations. Give {"query":"..."} to search, or {"url":"https://youtu.be/..."} / {"videoId":"..."} for one video with its transcript. Transcript may be null if the video has no captions. If the result has "searchUnavailable": true, the lookup is misconfigured or over quota — report that and never say the topic does not exist.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search terms for finding videos' },
+        url: { type: 'string', description: 'A YouTube URL for a specific video (returns details + transcript)' },
+        videoId: { type: 'string', description: 'An 11-char YouTube video id (alternative to url)' }
+      }
+    },
+    outputSchema: {
+      type: 'object',
+      properties: { results: { type: 'array' }, video: { type: 'object' }, transcript: { type: 'object' } }
+    },
+    cacheTTLSeconds: 600,
+    rateLimitPerMinute: 10
+  },
+
   agent_reach: {
     name: 'agent_reach',
     web: true,

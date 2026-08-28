@@ -24,6 +24,7 @@ const TOOL_IMPLEMENTATIONS = {
   reddit: require('../../tools/RedditTool'),
   quora: require('../../tools/QuoraTool'),
   agent_reach: require('../../tools/AgentReachTool'),
+  youtube: require('../../tools/YouTubeTool'),
   watchlist: require('../../tools/WatchlistTool'),
   portfolio: require('../../tools/PortfolioTool'),
   mission: require('../../tools/MissionTool'),
