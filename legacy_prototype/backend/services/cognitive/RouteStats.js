@@ -14,7 +14,7 @@ const db = require('../../database');
 const microCache = require('../microCache');
 const { classifyTask } = require('../AgentLeaderboard');
 
-// Reuse the SAME tool→district taxonomy the Brain Model and ExecutionTrace use,
+// Reuse the SAME tool→district taxonomy the Agent Map and ExecutionTrace use,
 // so a scored leg maps to exactly the building the map already draws.
 const { TOOL_DISTRICT } = require('./toolDistricts');
 

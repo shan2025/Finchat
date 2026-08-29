@@ -1,5 +1,5 @@
 // services/cognitive/ExecutionTrace.js — read-only assembler that reshapes one
-// real execution into the Brain Model's ExecutionTrace shape.
+// real execution into the Agent Map's ExecutionTrace shape.
 //
 // This is the "instrument the existing pipeline" seam: it adds NO tables and
 // NO writes. Every field is read back from rows the cognitive loop already
@@ -8,7 +8,7 @@
 // districts/buildings are derived from the tools the run actually used (always
 // present) and enriched with knowledge entities when the graph has them.
 //
-// The Brain Model UI does the geometry (isometric layout); this only supplies
+// The Agent Map UI does the geometry (isometric layout); this only supplies
 // the ordered route, the fuel/verification/fog facts, and the controller log.
 const { query } = require('../../database');
 
@@ -17,7 +17,7 @@ const { query } = require('../../database');
 // so replay, live stream, and route-yield all resolve legs the same way.
 const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
 
-// Identity + colour for the four specialists + Plato, matching the Brain Model
+// Identity + colour for the four specialists + Plato, matching the Agent Map
 // demo palette and the avatar files in the frontend.
 // The real FinChat roster: Plato supervises; Nova / Aurelius / Rasha are the
 // specialists. (There is no "Cato" — that was a design-mock placeholder.)
@@ -93,7 +93,7 @@ function extractSources(toolRows) {
 }
 
 /**
- * Assemble one execution into a Brain Model trace. Returns null if the row does
+ * Assemble one execution into a Agent Map trace. Returns null if the row does
  * not exist, or { forbidden: true } if it belongs to another user.
  *
  * @param {object} opts

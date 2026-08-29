@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
-<title>FinChat | Brain Model</title>
+<title>FinChat | Agent Map</title>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Socket.io client (served by the backend) — powers live execution streaming -->
 <script src="/socket.io/socket.io.js"></script>
 <style>
-  /* ── Brain Model — a live map of how the agents route through the knowledge
+  /* ── Agent Map — a live map of how the agents route through the knowledge
      graph to answer one question. Espresso palette, matching the Neural Map's
      dark mode so this reads as the same product. All tokens are scoped to
      .bm-app so nothing here leaks into the shared sidebar. ────────────────── */
@@ -79,7 +79,7 @@
       <span class="material-symbols-outlined" style="font-size:18px;">menu</span>
     </button>
     <div style="display:flex; align-items:baseline; gap:9px;">
-      <span style="font-family:'Caprasimo',serif; font-size:20px; color:var(--accent-300);">Brain Model</span>
+      <span style="font-family:'Caprasimo',serif; font-size:20px; color:var(--accent-300);">Agent Map</span>
       <span id="bmKicker" style="font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--parch-dim); font-weight:600;">agent routes</span>
     </div>
     <button id="bmMode" class="bm-btn" style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:var(--ink3); color:var(--parch-dim); font-family:inherit; font-size:11px; font-weight:700;">
@@ -313,7 +313,7 @@
     document.getElementById('sideNav').classList.remove('open'); backdrop.style.display = 'none';
   });
 
-  // ── Race definition — the same scenario the Brain Model design shipped:
+  // ── Race definition — the same scenario the Agent Map design shipped:
   // a durability question routed by four agents under Plato's control. This is
   // the seam where live agent-run telemetry would plug in later. ────────────
   // Tile geometry for the isometric town. TW/TH are the half-width/half-height
@@ -2359,7 +2359,7 @@
       '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;"><thead><tr>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
-  // ── Ask box: trigger a real run from the Brain Model and watch it stream ──
+  // ── Ask box: trigger a real run from the Agent Map and watch it stream ──
   function wireAsk() {
     var ov = document.getElementById('bmAsk');
     document.getElementById('bmAskBtn').addEventListener('click', function () {
@@ -2404,8 +2404,8 @@
     try {
       liveSocket = io(apiBase(), { auth: { token: tok }, transports: ['websocket', 'polling'] });
       liveSocket.on('brain:pulse', onPulse);
-      liveSocket.on('connect_error', function (err) { console.warn('Brain Model live: socket error ' + (err && err.message)); });
-    } catch (e) { console.warn('Brain Model live: could not connect — ' + e.message); }
+      liveSocket.on('connect_error', function (err) { console.warn('Agent Map live: socket error ' + (err && err.message)); });
+    } catch (e) { console.warn('Agent Map live: could not connect — ' + e.message); }
   }
 
   // ── Recent-runs picker ───────────────────────────────────────────────────
@@ -2500,7 +2500,7 @@
       execShort = shortId(execId);
       loadTrace(execId)
         .then(function (tr) { applyScenario(buildScenarioFromTrace(tr)); IS_LIVE = true; })
-        .catch(function (e) { console.warn('Brain Model: could not load execution ' + execId + ': ' + e.message); loadFailed = true; })
+        .catch(function (e) { console.warn('Agent Map: could not load execution ' + execId + ': ' + e.message); loadFailed = true; })
         .then(start);
       return;
     }

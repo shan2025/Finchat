@@ -84,7 +84,7 @@ router.get('/list/recent', requireAuth, async (req, res) => {
 // ── POST /api/executions/race ────────────────────────────────
 // Multi-agent race: Plato picks 2–3 relevant specialists and dispatches the
 // SAME question to each in parallel (each its own execution). Every run streams
-// its own brain:pulse events tagged with the shared raceId, so the Brain Model
+// its own brain:pulse events tagged with the shared raceId, so the Agent Map
 // groups them onto one map and shows them racing. Returns immediately — the
 // runs stream live over the socket. Reuses CognitiveCore.run; no new tables.
 router.post('/race', requireAuth, async (req, res) => {
@@ -130,7 +130,7 @@ router.post('/race', requireAuth, async (req, res) => {
 });
 
 // ── GET /api/executions/:id/trace ────────────────────────────
-// Read-only: reshape one real execution into the Brain Model's ExecutionTrace.
+// Read-only: reshape one real execution into the Agent Map's ExecutionTrace.
 // Adds no tables and writes nothing — see services/cognitive/ExecutionTrace.js.
 router.get('/:id/trace', requireAuth, async (req, res) => {
   try {
@@ -138,7 +138,7 @@ router.get('/:id/trace', requireAuth, async (req, res) => {
     if (!trace) return res.status(404).json({ error: 'Execution not found' });
     if (trace.forbidden) return res.status(403).json({ error: 'Not your execution' });
     // Enrich each district with its historical verified-yield for this task type,
-    // so the Brain Model can colour roads by how productive that ground has been.
+    // so the Agent Map can colour roads by how productive that ground has been.
     // Done here (not in the read-only assembler) to avoid a require cycle.
     try {
       const taskType = classifyTask(trace.question);
@@ -150,7 +150,7 @@ router.get('/:id/trace', requireAuth, async (req, res) => {
         if (c) { dd.yield = c.verifiedRate; dd.yieldRuns = c.runs; }
       }
       // Learned district→district shortcuts (global map) for this task type, so
-      // the Brain Model can draw paved roads the base ring/hub layout never had.
+      // the Agent Map can draw paved roads the base ring/hub layout never had.
       trace.learnedRoutes = await getLearnedEdges({ taskType });
     } catch (_) { /* colouring is optional; trace still renders without it */ }
     res.json({ trace });

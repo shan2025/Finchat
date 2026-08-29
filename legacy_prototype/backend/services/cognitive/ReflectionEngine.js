@@ -77,7 +77,7 @@ async function reflect(execution) {
       JSON.stringify(reflectionData.learnings || [])
     ]);
 
-    // Live: tell the Brain Model this run is now verified (best-effort).
+    // Live: tell the Agent Map this run is now verified (best-effort).
     try {
       require('./BrainStream').verified({
         executionId: execution.execution_id,

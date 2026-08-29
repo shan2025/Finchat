@@ -234,7 +234,7 @@
           navItem('chat', 'finchat_chat.html', 'chat', 'Chat') +
           navItem('groupchat', 'finchat_groupchat.html', 'forum', 'Group Chat') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
-          navItem('brainmodel', 'finchat_brainmodel.html', 'travel_explore', 'Brain Model') +
+          navItem('brainmodel', 'finchat_brainmodel.html', 'travel_explore', 'Agent Map') +
           navItem('mindmap', 'finchat_mindmap.html', 'schema', 'Mind Maps') +
           navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
           navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +

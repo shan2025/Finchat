@@ -185,11 +185,11 @@ async function _runWithinStallClock({
   studyMode = false,
   approvedTools = [],
   // When set, this run is one lane of a multi-agent race — the id is forwarded
-  // on the live start pulse so the Brain Model groups the parallel runs onto one
+  // on the live start pulse so the Agent Map groups the parallel runs onto one
   // map. Purely a telemetry tag; it changes nothing about how the loop executes.
   raceId = null,
   // Why Plato selected this agent (capability vs history blend). Stored in the
-  // execution metadata so the Brain Model can explain the routing decision.
+  // execution metadata so the Agent Map can explain the routing decision.
   routing = null,
   budget = {} // optional overrides: { maxIterations, maxToolCalls, maxTokens, maxRuntimeSeconds }
 }) {
@@ -272,7 +272,7 @@ async function _runWithinStallClock({
   });
   const execId = execution.execution_id;
   // Live telemetry clock — atMs on every pulse is measured from here so the
-  // Brain Model can lay the route out on one timeline without parsing timestamps.
+  // Agent Map can lay the route out on one timeline without parsing timestamps.
   const t0 = Date.now();
   let liveTokens = 0; // last-known cumulative token spend, carried onto tool pulses
   brainStream.start({
@@ -281,7 +281,7 @@ async function _runWithinStallClock({
   });
   // Stamp race membership + the routing breakdown onto the row (existing metrics
   // jsonb — no schema change). raceId lets the leaderboard group races; routing
-  // lets the Brain Model explain why Plato chose this agent.
+  // lets the Agent Map explain why Plato chose this agent.
   const metaPatch = {};
   if (raceId) metaPatch.raceId = raceId;
   if (routing) metaPatch.routing = routing;

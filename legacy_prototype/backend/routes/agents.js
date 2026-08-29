@@ -59,7 +59,7 @@ router.get('/profiles', requireAuth, async (req, res) => {
   }
 });
 
-// Where each agent lives on the Brain Model map, and where it is right now.
+// Where each agent lives on the Agent Map, and where it is right now.
 // Home is derived from the agent's OWN tool grant (agent_configs.tools → the
 // district its tools mostly land in), so an agent parks in the part of the map
 // it is actually equipped to work in — no separate roster table to drift.
