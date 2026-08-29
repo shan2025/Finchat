@@ -1,0 +1,45 @@
+<svg viewBox="0 0 110 148" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FinChat robot mascot, waving">
+  <title>FinChat mascot — waving</title>
+
+  <!-- Implements the #fcWave symbol from "Robot Mascot Full Body.dc.html".
+       Identical to the idle pose except the right arm is raised; the design
+       drops the right-hand finger accent in this pose. -->
+
+  <!-- Raised right arm -->
+  <rect x="85" y="48" width="17" height="36" rx="8.5" fill="var(--mascot-ink, #3a2b1c)" />
+  <circle cx="93.5" cy="46" r="9" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Left arm + hand -->
+  <circle cx="22" cy="85" r="10" fill="var(--mascot-ink, #3a2b1c)" />
+  <rect x="12" y="74" width="20" height="30" rx="10" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Shoulders closing into a waist -->
+  <path d="M25 80 C 25 65, 85 65, 85 80 L 85 100 Q 85 108 55 108 Q 25 108 25 100 Z" fill="var(--mascot-ink, #3a2b1c)" />
+  <rect x="34" y="98" width="42" height="18" rx="9" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Chassis -->
+  <rect x="31" y="112" width="48" height="16" rx="8" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Wheels -->
+  <circle cx="42" cy="131" r="8" fill="var(--mascot-ink, #3a2b1c)" />
+  <circle cx="42" cy="131" r="3" fill="var(--mascot-bg, #f6f3eb)" />
+  <circle cx="68" cy="131" r="8" fill="var(--mascot-ink, #3a2b1c)" />
+  <circle cx="68" cy="131" r="3" fill="var(--mascot-bg, #f6f3eb)" />
+
+  <!-- Antenna -->
+  <circle cx="55" cy="12" r="5" fill="var(--mascot-ink, #3a2b1c)" />
+  <line x1="55" y1="16" x2="55" y2="28" stroke="var(--mascot-ink, #3a2b1c)" stroke-width="3" />
+
+  <!-- Side nubs -->
+  <path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="var(--mascot-ink, #3a2b1c)" />
+  <path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Head -->
+  <rect x="25" y="27" width="60" height="46" rx="22" fill="var(--mascot-ink, #3a2b1c)" />
+  <rect x="35" y="37" width="40" height="26" rx="12" fill="var(--mascot-bg, #f6f3eb)" />
+  <circle cx="46" cy="48" r="4.5" fill="var(--mascot-ink, #3a2b1c)" />
+  <circle cx="64" cy="48" r="4.5" fill="var(--mascot-ink, #3a2b1c)" />
+
+  <!-- Finger accent -->
+  <path d="M 18 80 Q 22 76 26 80" stroke="var(--mascot-bg, #f6f3eb)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5" />
+</svg>

@@ -1,0 +1,26 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FinChat">
+  <title>FinChat</title>
+
+  <!-- Tab icon. Head only: the full-body mark loses its face below about 20px,
+       and a favicon renders at 16. Geometry is finchat_login.html verbatim,
+       fitted to the tile by the transform below (bbox x17..93, y7..73).
+       The cream tile keeps the brown mark legible against dark browser chrome. -->
+
+  <rect width="64" height="64" rx="14" fill="var(--mascot-bg, #f6f3eb)" />
+
+  <g transform="translate(-9.97, 1.46) scale(0.763)" fill="var(--mascot-ink, #3a2b1c)">
+    <!-- Antenna -->
+    <circle cx="55" cy="12" r="5" />
+    <rect x="53.5" y="14" width="3" height="15" rx="1.5" />
+
+    <!-- Side nubs -->
+    <path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" />
+    <path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" />
+
+    <!-- Head -->
+    <rect x="25" y="27" width="60" height="46" rx="22" />
+    <rect x="35" y="37" width="40" height="26" rx="12" fill="var(--mascot-bg, #f6f3eb)" />
+    <circle cx="46" cy="48" r="4.5" />
+    <circle cx="64" cy="48" r="4.5" />
+  </g>
+</svg>

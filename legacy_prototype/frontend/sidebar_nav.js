@@ -31,6 +31,8 @@
     ['finchat_agents', 'agents'],
     ['finchat_chat', 'chat'],
     ['finchat_groupchat', 'groupchat'],
+    ['finchat_neuralspace', 'neuralspace'],
+    ['finchat_universe', 'neuralspace'], // old name — the page now redirects
     ['finchat_neuralmap', 'neuralmap'],
     ['finchat_neuralnetwork', 'neuralmap'], // Model Lab lives under Neural Map
     ['finchat_brainmodel', 'brainmodel'],
@@ -58,6 +60,25 @@
     rasha: 'rasha_avatar.png', nova: 'nova_avatar.png'
   };
 
+  // The mascot head, at finchat_login.html's original coordinates — the viewBox
+  // is just cropped to its bounding box. Inlined rather than <img src> because
+  // the mark has to invert with the rail theme: ink follows currentColor
+  // (--sbn-fg) and the face panel is punched in --sbn-bg, so it reads cream-on-
+  // espresso and brown-on-cream without a second file.
+  var MASCOT_HEAD =
+    '<svg viewBox="17 7 76 66" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<circle cx="55" cy="12" r="5" fill="currentColor"/>' +
+      '<rect x="53.5" y="14" width="3" height="15" rx="1.5" fill="currentColor"/>' +
+      '<path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="currentColor"/>' +
+      '<path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="currentColor"/>' +
+      '<rect x="25" y="27" width="60" height="46" rx="22" fill="currentColor"/>' +
+      // Fallback matters: an undefined var here makes fill invalid, which paints
+      // the face solid black and erases the eyes.
+      '<rect x="35" y="37" width="40" height="26" rx="12" fill="var(--sbn-bg, #2a241d)"/>' +
+      '<circle cx="46" cy="48" r="4.5" fill="currentColor"/>' +
+      '<circle cx="64" cy="48" r="4.5" fill="currentColor"/>' +
+    '</svg>';
+
   var CSS = [
     // Espresso (default, dark) theme vars — the cream theme overrides them below.
     '#sideNav.sbn { --sbn-bg:#2a241d; --sbn-fg:#efe6d6; --sbn-muted:#a99e88; --sbn-accent:#c67139; --sbn-accent-hover:#b2622d; --sbn-item:#cfc3ad; --sbn-hover:rgba(255,255,255,.07); --sbn-soon:#867a63; --sbn-badge:rgba(239,230,214,.1); --sbn-line:rgba(239,230,214,.14); }',
@@ -75,6 +96,8 @@
     '#sideNav.sbn > * { flex:0 0 auto; }',
     '#sideNav.sbn .sbn-scroll { flex:1 1 0%; min-height:132px; overflow-y:auto; padding:8px 14px; }',
     '.sbn-head { padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px; }',
+    '.sbn-logo { flex:0 0 auto; line-height:0; cursor:pointer; margin-top:1px; color:var(--sbn-fg); }',
+    '.sbn-logo svg { display:block; width:34px; height:auto; }',
     '.sbn-brand { font-size:27px; line-height:1; letter-spacing:-.01em; color:var(--sbn-fg); }',
     '.sbn-brandsub { font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--sbn-muted); margin-top:7px; }',
     '.sbn-newwrap { padding:4px 14px 12px; }',
@@ -127,6 +150,7 @@
     // hide anything.
     '@media (max-height:860px) {',
     '  .sbn-head { padding:14px 18px 8px; }',
+    '  .sbn-logo svg { width:28px; }',
     '  .sbn-brand { font-size:22px; }',
     '  .sbn-brandsub { font-size:9.5px; letter-spacing:.18em; margin-top:5px; }',
     '  .sbn-newwrap { padding:2px 12px 8px; }',
@@ -207,8 +231,9 @@
 
     nav.innerHTML =
       '<div class="sbn-head">' +
+        '<div class="sbn-logo" title="Home — Neural Space" onclick="location.href=\'finchat_neuralspace.html\'">' + MASCOT_HEAD + '</div>' +
         '<div style="flex:1; min-width:0;">' +
-          '<div class="sbn-serif sbn-brand">FinChat</div>' +
+          '<div class="sbn-serif sbn-brand" style="cursor:pointer;" title="Home — Neural Space" onclick="location.href=\'finchat_neuralspace.html\'">FinChat</div>' +
           '<div class="sbn-brandsub">AI Operating System</div>' +
         '</div>' +
         '<button class="sbn-themebtn" id="sbnThemeBtn" title="Switch nav theme (espresso / cream)">' +
@@ -233,6 +258,7 @@
           navItem('agents', 'finchat_agents.html', 'smart_toy', 'Agents') +
           navItem('chat', 'finchat_chat.html', 'chat', 'Chat') +
           navItem('groupchat', 'finchat_groupchat.html', 'forum', 'Group Chat') +
+          navItem('neuralspace', 'finchat_neuralspace.html', 'scatter_plot', 'Neural Space') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
           navItem('brainmodel', 'finchat_brainmodel.html', 'travel_explore', 'Agent Map') +
           navItem('mindmap', 'finchat_mindmap.html', 'schema', 'Mind Maps') +
@@ -247,13 +273,15 @@
         '</div>' +
       '</div>' +
       '<div class="sbn-foot">' +
-        '<div class="sbn-item" id="sbnProfile" style="padding:9px 10px; border-radius:14px;">' +
+        // A real <a> so the SPA router intercepts it like any other nav item;
+        // the #account hash opens Settings straight on Account & profile.
+        '<a class="sbn-item" id="sbnProfile" href="finchat_settings.html#account" title="Account &amp; profile" style="padding:9px 10px; border-radius:14px;">' +
           '<div id="sbnAvatar" class="sbn-serif sbn-avatar">' + esc(initials) + '</div>' +
           '<div style="flex:1; overflow:hidden;">' +
             '<div class="sbn-truncate sbn-uname">' + esc(name) + '</div>' +
             '<div class="sbn-truncate sbn-urole">' + roleLabel + '</div>' +
           '</div>' +
-        '</div>' +
+        '</a>' +
       '</div>';
 
     wireScrollCues(nav);
