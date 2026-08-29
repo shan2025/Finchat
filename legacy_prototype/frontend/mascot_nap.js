@@ -281,9 +281,11 @@
 
   /* Shared tail: it walks a few steps, drops out of frame, and the strip
      collapses. `wakeMs` is how long the wake-up it just had runs for. */
-  function leave(svg, wakeMs, wakeClass) {
+  function leave(svg, wakeMs, wakeClass, appleFell) {
     later(function () {
       svg.classList.remove(wakeClass);
+      // only now: during the wake-up the apple still has a fall to finish
+      if (appleFell) svg.classList.add('no-apple');
       svg.classList.add('is-leaving');
     }, wakeMs);
 
@@ -320,8 +322,8 @@
   function bonk() {
     var svg = begin();
     if (!svg) return;
-    svg.classList.add('is-bonk', 'no-apple');   // the apple fell; it doesn't come back
-    leave(svg, WAKE_MS, 'is-bonk');
+    svg.classList.add('is-bonk');
+    leave(svg, WAKE_MS, 'is-bonk', true);       // apple fell; it must not reappear
   }
 
   /* Someone prodded it. It startles awake and heads off — no apple involved,
