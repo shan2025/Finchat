@@ -783,11 +783,17 @@
  function secAccount() {
    const u = SESSION_USER;
    const initials = (u.name || u.username || 'You').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase();
+   // Cached sessions can predate an avatar upload (or a Google sign-in), so the
+   // photo only appears once refreshUser() has been back to /api/auth/me.
+   const avatar = u.avatar_url
+     ? `<img src="${esc(u.avatar_url)}" alt="" referrerpolicy="no-referrer"
+          style="width:54px; height:54px; flex:none; border-radius:50%; object-fit:cover; background:var(--accent-soft);">`
+     : `<span style="width:54px; height:54px; flex:none; border-radius:50%; background:var(--accent-soft); color:var(--accent-warm); display:grid; place-items:center; font-family:var(--serif); font-size:20px;">${esc(initials)}</span>`;
    return `
    <div class="set-sec-head"><h2>Account &amp; profile</h2><p>Your identity across this workspace.</p></div>
    <div class="set-card" style="padding:24px;">
      <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid var(--border);">
-       <span style="width:54px; height:54px; flex:none; border-radius:50%; background:var(--accent-soft); color:var(--accent-warm); display:grid; place-items:center; font-family:var(--serif); font-size:20px;">${esc(initials)}</span>
+       ${avatar}
        <div style="flex:1; min-width:0;">
          <div style="font-size:17px; font-weight:700; color:var(--text);">${esc(u.name || u.username || 'You')}</div>
          <div style="font-size:12.5px; color:var(--text-3);">${esc(u.username ? '@' + u.username : (u.email || ''))}</div>
@@ -816,6 +822,25 @@
  // ─────────────────────────────────────────────────────────────────────────
  // Data loading
  // ─────────────────────────────────────────────────────────────────────────
+ // The cached session is whatever login wrote months ago — name, role and
+ // avatar can all have moved on since. /api/auth/me is the source of truth.
+ async function refreshUser() {
+   try {
+     const r = await fetch(API + '/api/auth/me', { headers: AUTH });
+     if (!r.ok) return;
+     const d = await r.json();
+     if (!d || !d.user) return;
+     Object.assign(SESSION_USER, d.user);
+     try {
+       sessionStorage.setItem('finchat_user', JSON.stringify(SESSION_USER));
+       if (localStorage.getItem('finchat_session')) localStorage.setItem('finchat_session', JSON.stringify(SESSION_USER));
+     } catch (e) { /* storage full or blocked — the in-memory copy still updates */ }
+     $('hdName').textContent = SESSION_USER.name || SESSION_USER.username || 'you';
+     $('hdRole').textContent = (SESSION_USER.role || 'user');
+     if (state.section === 'account') renderSection();
+   } catch (e) { /* offline — keep showing the cached identity */ }
+ }
+
  async function loadPrefs() {
    try {
      const r = await fetch(API + '/api/settings/notifications', { headers: AUTH });
@@ -1166,8 +1191,14 @@
 
  // ── boot ──
  reportOAuthOutcome();
+ // Deep link: finchat_settings.html#account (the sidebar profile card uses it).
+ (function openHashSection() {
+   const id = (location.hash || '').replace('#', '');
+   if (id && NAV.some(g => g.items.some(it => it[0] === id))) state.section = id;
+ })();
  renderNav();
  renderSection();
+ refreshUser();
  loadPrefs();
  loadIntegrations();
  loadChain();

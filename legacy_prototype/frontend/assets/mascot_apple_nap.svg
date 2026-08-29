@@ -1,0 +1,260 @@
+<svg viewBox="0 0 240 220" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Animation: the FinChat robot dozes under a tree until an apple drops on its head">
+  <title>FinChat mascot — apple nap</title>
+
+  <!-- Same robot as assets/mascot_full.svg (login-page geometry, 110x148 local
+       coords), placed under a tree and animated on a single 6s loop:
+       0.0-3.0s asleep, 3.0s the apple lets go, 3.4s impact, then it wakes,
+       shakes it off and nods back to sleep. Everything is one file so it drops
+       straight into an <img> tag; colours come from the brand pair via CSS
+       custom properties, exactly like the other mascot assets. -->
+
+  <style>
+    :root, svg {
+      --mascot-ink: #3a2b1c;
+      --mascot-bg:  #f6f3eb;
+    }
+    .ink   { fill: var(--mascot-ink, #3a2b1c); }
+    .cream { fill: var(--mascot-bg,  #f6f3eb); }
+
+    /* --- the falling apple ------------------------------------------------ */
+    /* pivot on the stem, not on the SVG origin — SVG's transform-origin
+       defaults to 0 0, which would sling the apple off-canvas as it spins */
+    .apple { transform-origin: 104px 55px; animation: appleDrop 6s linear infinite; }
+    @keyframes appleDrop {
+      0%     { transform: translate(0px, 0px)   rotate(-2deg); opacity: 1;
+               animation-timing-function: ease-in-out; }
+      25%    { transform: translate(0px, 0px)   rotate(2deg);
+               animation-timing-function: ease-in-out; }
+      50%    { transform: translate(0px, 0px)   rotate(-1deg);
+               animation-timing-function: cubic-bezier(.55,0,1,.55); }   /* let go */
+      56.6%  { transform: translate(0px, 39px)  rotate(8deg);            /* bonk   */
+               animation-timing-function: cubic-bezier(0,.5,.45,1); }
+      60%    { transform: translate(-15px, 21px) rotate(-40deg);
+               animation-timing-function: cubic-bezier(.55,0,1,.6); }
+      66.5%  { transform: translate(-48px, 124px) rotate(-125deg);
+               animation-timing-function: cubic-bezier(0,.5,.45,1); }
+      69%    { transform: translate(-56px, 113px) rotate(-145deg);
+               animation-timing-function: cubic-bezier(.55,0,1,.6); }
+      72%    { transform: translate(-64px, 124px) rotate(-168deg); }
+      95%    { transform: translate(-64px, 124px) rotate(-168deg); opacity: 1; }
+      98%    { transform: translate(-64px, 124px) rotate(-168deg); opacity: 0; }
+      98.01% { transform: translate(0px, 0px)   rotate(-2deg);  opacity: 0; }
+      100%   { transform: translate(0px, 0px)   rotate(-2deg);  opacity: 1; }
+    }
+    /* the stem stays on the branch once the apple has gone */
+    .stem { animation: stemDrop 6s linear infinite; }
+    @keyframes stemDrop {
+      0%, 50% { opacity: 1; } 52%, 97% { opacity: .45; } 100% { opacity: 1; }
+    }
+
+    /* --- the robot: sleep bob, then the jolt ------------------------------ */
+    .bot { transform-origin: 95px 196px; animation: botLoop 6s linear infinite; }
+    @keyframes botLoop {
+      0%     { transform: translateY(0) scaleY(1) rotate(0deg); }
+      12.5%  { transform: translateY(2px) scaleY(.995); }
+      25%    { transform: translateY(0) scaleY(1); }
+      37.5%  { transform: translateY(2px) scaleY(.995); }
+      50%    { transform: translateY(0) scaleY(1); }
+      56.6%  { transform: translateY(0) scaleY(1) rotate(0deg); }
+      58.5%  { transform: translateY(5px) scaleY(.9) rotate(0deg); }   /* squash */
+      61%    { transform: translateY(-2px) scaleY(1.04) rotate(0deg); }
+      63%    { transform: translateY(0) scaleY(1) rotate(-3deg); }     /* dazed  */
+      65.5%  { transform: rotate(3deg); }
+      68%    { transform: rotate(-2deg); }
+      70.5%  { transform: rotate(0deg); }
+      85%    { transform: translateY(0); }
+      92.5%  { transform: translateY(2px) scaleY(.995); }
+      100%   { transform: translateY(0) scaleY(1); }
+    }
+
+    /* eyes: shut, snap open on impact, droop shut again */
+    .eyes-shut { animation: eyesShut 6s linear infinite; }
+    .eyes-open { animation: eyesOpen 6s linear infinite; }
+    @keyframes eyesShut { 0%,56.5% {opacity:1} 56.6%,77% {opacity:0} 80%,100% {opacity:1} }
+    @keyframes eyesOpen { 0%,56.5% {opacity:0} 56.6%,77% {opacity:1} 80%,100% {opacity:0} }
+
+    /* antenna springs on the hit */
+    .antenna { transform-origin: 55px 28px; animation: antenna 6s linear infinite; }
+    @keyframes antenna {
+      0%, 56.6% { transform: rotate(0deg); }
+      58.5%     { transform: rotate(-16deg); }
+      61%       { transform: rotate(12deg); }
+      63.5%     { transform: rotate(-7deg); }
+      66%       { transform: rotate(3deg); }
+      69%, 100% { transform: rotate(0deg); }
+    }
+
+    /* --- reactions -------------------------------------------------------- */
+    .zzz { animation: zzzShow 6s linear infinite; }
+    @keyframes zzzShow { 0%,51% {opacity:1} 53%,80% {opacity:0} 86%,100% {opacity:1} }
+    .z { animation: zFloat 2s ease-out infinite; }
+    .z2 { animation-delay: .66s; }
+    .z3 { animation-delay: 1.33s; }
+    @keyframes zFloat {
+      0%   { transform: translate(0,0) scale(.6); opacity: 0; }
+      20%  { opacity: 1; }
+      70%  { opacity: .8; }
+      100% { transform: translate(14px,-26px) scale(1.15); opacity: 0; }
+    }
+
+    .bang { transform-origin: 135px 98px; animation: bang 6s linear infinite; }
+    @keyframes bang {
+      0%, 56.5% { opacity: 0; transform: translateY(4px) scale(.4); }
+      58.5%     { opacity: 1; transform: translateY(-3px) scale(1.15); }
+      61%       { opacity: 1; transform: translateY(-5px) scale(1); }
+      70%       { opacity: 1; transform: translateY(-7px) scale(1); }
+      76%, 100% { opacity: 0; transform: translateY(-10px) scale(.9); }
+    }
+
+    .spark { transform-origin: 104px 111px; animation: spark 6s linear infinite; }
+    @keyframes spark {
+      0%, 56.5% { opacity: 0; transform: scale(.2); }
+      57.5%     { opacity: 1; transform: scale(.7); }
+      61%, 100% { opacity: 0; transform: scale(1.6); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .apple, .stem, .bot, .eyes-shut, .eyes-open,
+      .antenna, .zzz, .z, .bang, .spark { animation: none; }
+      .eyes-open, .bang, .spark { opacity: 0; }
+    }
+  </style>
+
+  <!-- ============================ scenery ============================ -->
+  <!-- sky: painted so the asset reads the same on any host background -->
+  <rect x="0" y="0" width="240" height="220" fill="var(--mascot-bg, #f6f3eb)" />
+  <!-- ground -->
+  <path d="M0 196 H240 V220 H0 Z" fill="#e3ddcd" />
+  <path d="M0 196 H240" stroke="var(--mascot-ink, #3a2b1c)" stroke-width="2" opacity=".35" />
+  <ellipse cx="150" cy="197" rx="46" ry="5" fill="#3a2b1c" opacity=".12" />
+  <ellipse cx="96"  cy="196" rx="34" ry="5" fill="#3a2b1c" opacity=".14" />
+
+  <!-- tree -->
+  <path d="M141 196 C 141 160, 137 120, 143 78 L 161 78 C 167 122, 163 160, 163 196 Z"
+        fill="#4a3828" />
+  <path d="M148 118 C 130 106, 120 96, 112 84" stroke="#4a3828" stroke-width="6"
+        stroke-linecap="round" fill="none" />
+  <path d="M156 108 C 172 100, 180 92, 186 82" stroke="#4a3828" stroke-width="5"
+        stroke-linecap="round" fill="none" />
+  <g fill="#6f8259">
+    <circle cx="152" cy="60" r="44" />
+    <circle cx="108" cy="52" r="30" />
+    <circle cx="194" cy="66" r="28" />
+    <circle cx="150" cy="22" r="28" />
+  </g>
+  <g fill="#7f9367">
+    <circle cx="134" cy="40" r="22" />
+    <circle cx="172" cy="44" r="18" />
+    <circle cx="118" cy="70" r="15" />
+  </g>
+
+  <!-- grass tufts -->
+  <g stroke="#6f8259" stroke-width="2.5" stroke-linecap="round" fill="none">
+    <path d="M28 196 C 27 190, 24 187, 21 185" />
+    <path d="M33 196 C 33 189, 35 186, 38 184" />
+    <path d="M206 196 C 205 190, 202 187, 199 185" />
+    <path d="M211 196 C 211 190, 213 187, 216 185" />
+    <path d="M74 196 C 73 192, 71 190, 69 188" />
+  </g>
+
+  <!-- ============================ the robot ============================ -->
+  <g transform="rotate(6 95 196)">
+    <g class="bot">
+      <g transform="translate(53.75 90.5) scale(0.75)">
+
+        <!-- right arm + hand -->
+        <circle class="ink" cx="88" cy="85" r="10" />
+        <rect class="ink" x="78" y="74" width="20" height="30" rx="10" />
+        <!-- left arm + hand, resting in its lap -->
+        <circle class="ink" cx="22" cy="85" r="10" />
+        <rect class="ink" x="12" y="74" width="20" height="30" rx="10" />
+
+        <!-- shoulders into waist -->
+        <path class="ink" d="M25 80 C 25 65, 85 65, 85 80 L 85 100 Q 85 108 55 108 Q 25 108 25 100 Z" />
+        <rect class="ink" x="34" y="98" width="42" height="18" rx="9" />
+        <!-- chassis -->
+        <rect class="ink" x="31" y="112" width="48" height="16" rx="8" />
+        <!-- wheels -->
+        <circle class="ink"   cx="42" cy="131" r="8" />
+        <circle class="cream" cx="42" cy="131" r="3" />
+        <circle class="ink"   cx="68" cy="131" r="8" />
+        <circle class="cream" cx="68" cy="131" r="3" />
+
+        <!-- antenna -->
+        <g class="antenna">
+          <circle class="ink" cx="55" cy="12" r="5" />
+          <line x1="55" y1="16" x2="55" y2="28"
+                stroke="var(--mascot-ink, #3a2b1c)" stroke-width="3" />
+        </g>
+
+        <!-- side nubs -->
+        <path class="ink" d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" />
+        <path class="ink" d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" />
+
+        <!-- head + face screen -->
+        <rect class="ink"   x="25" y="27" width="60" height="46" rx="22" />
+        <rect class="cream" x="35" y="37" width="40" height="26" rx="12" />
+
+        <!-- eyes: shut -->
+        <g class="eyes-shut" fill="none" stroke="var(--mascot-ink, #3a2b1c)"
+           stroke-width="3" stroke-linecap="round">
+          <path d="M41 47 q 5 5 10 0" />
+          <path d="M59 47 q 5 5 10 0" />
+        </g>
+        <!-- eyes: wide awake -->
+        <g class="eyes-open">
+          <circle class="ink" cx="46" cy="48" r="5.5" />
+          <circle class="ink" cx="64" cy="48" r="5.5" />
+          <circle class="cream" cx="47.5" cy="46.5" r="1.8" />
+          <circle class="cream" cx="65.5" cy="46.5" r="1.8" />
+        </g>
+
+        <!-- finger accents -->
+        <path d="M 18 80 Q 22 76 26 80" stroke="var(--mascot-bg, #f6f3eb)"
+              stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".5" />
+        <path d="M 84 80 Q 88 76 92 80" stroke="var(--mascot-bg, #f6f3eb)"
+              stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".5" />
+      </g>
+    </g>
+  </g>
+
+  <!-- ============================ reactions ============================ -->
+  <!-- impact sparks, centred on the top of the head -->
+  <g class="spark" stroke="var(--mascot-ink, #3a2b1c)" stroke-width="2.5"
+     stroke-linecap="round" fill="none">
+    <path d="M104 101 v-8" />
+    <path d="M92 105 l-6 -5" />
+    <path d="M116 105 l6 -5" />
+    <path d="M86 113 l-8 -2" />
+    <path d="M122 113 l8 -2" />
+  </g>
+
+  <!-- the startled "!" -->
+  <g class="bang">
+    <path d="M133 86 h5 l-1 14 h-3 Z" fill="var(--mascot-ink, #3a2b1c)" />
+    <circle cx="135.5" cy="105" r="2.6" fill="var(--mascot-ink, #3a2b1c)" />
+  </g>
+
+  <!-- Zzz -->
+  <g class="zzz" fill="var(--mascot-ink, #3a2b1c)"
+     font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+     font-weight="700">
+    <text class="z z1" x="128" y="124" font-size="11">z</text>
+    <text class="z z2" x="134" y="116" font-size="14">z</text>
+    <text class="z z3" x="141" y="106" font-size="17">z</text>
+  </g>
+
+  <!-- ============================ the apple ============================ -->
+  <!-- stem stays behind on the branch -->
+  <path class="stem" d="M104 56 C 103 51, 105 48, 108 46" stroke="#4a3828"
+        stroke-width="2.5" stroke-linecap="round" fill="none" />
+  <g class="apple">
+    <path d="M104 55 C 103 50, 105 47, 108 45" stroke="#4a3828" stroke-width="2.5"
+          stroke-linecap="round" fill="none" />
+    <path d="M105 51 C 110 46, 117 47, 118 50 C 114 54, 108 54, 105 51 Z" fill="#6f8259" />
+    <circle cx="104" cy="64" r="9" fill="#c0563f" />
+    <path d="M99 60 a 6 6 0 0 1 4 -2.5" stroke="#f6f3eb" stroke-width="2"
+          stroke-linecap="round" fill="none" opacity=".55" />
+  </g>
+</svg>

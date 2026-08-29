@@ -617,6 +617,9 @@
 
       <!-- Input Area (rounded pill composer, design: Chat.dc.html) -->
       <div class="shrink-0" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
+        <!-- The napping mascot perches on the composer's top edge; it sleeps
+             until sendMessage() calls fcNap.bonk(). See mascot_nap.js. -->
+        <div id="fcNapMascot" aria-hidden="true"></div>
         <div id="composerBox" style="max-width:860px; margin:0 auto; background:#fffaf0; border:1px solid #e3d3ba; border-radius:26px; box-shadow:0 8px 28px rgba(46,43,37,.10); transition:border-color .15s;">
           <div class="attach-preview" id="attachPreview" style="border-top:none; border-radius:26px 26px 0 0;"></div>
           <textarea id="msgInput" rows="1" placeholder="Message Plato..." style="width:100%; border:none; background:transparent; resize:none; outline:none; font-family:inherit; font-size:15.5px; line-height:1.55; color:#201e1d; padding:17px 20px 4px; min-height:40px; max-height:180px;"></textarea>
@@ -676,6 +679,7 @@
     <script src="system_panels.js"></script>
     <script src="knowledge_search.js"></script>
     <script src="notifications_widget.js"></script>
+    <script src="mascot_nap.js"></script>
     <script src="study_blocks.js"></script>
     <script src="car_road_anim.js?v=minimal_v7"></script>
 
@@ -1218,6 +1222,8 @@
       const mi = document.getElementById('msgInput');
       if (mi) { mi.value = ''; mi.style.height = '40px'; mi.focus(); }
       if (typeof loadRecentSessions === 'function') loadRecentSessions();
+      // fresh conversation, fresh nap: put the mascot back on the composer
+      if (window.fcNap) window.fcNap.reset();
       if (typeof showToast === 'function') showToast('New chat started');
     }
 
@@ -2283,6 +2289,9 @@
 
       if (!text && !files.length) return;
       if (tokenBalance < 5) { showToast('Insufficient tokens to send.', 'warn'); return; }
+
+      // wake the napping mascot: the apple drops the moment a message goes out
+      if (window.fcNap) window.fcNap.bonk();
 
       if (text.startsWith('/graphify')) {
         const topic = text.replace(/^\/graphify\s*/i, '').trim() || 'General Conversation Summary';
