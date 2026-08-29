@@ -8,7 +8,11 @@
 
   <rect width="64" height="64" rx="14" fill="var(--mascot-bg, #f6f3eb)" />
 
-  <g transform="translate(-9.97, 1.46) scale(0.763)" fill="var(--mascot-ink, #3a2b1c)">
+  <!-- Tilted -7deg about the head's own bbox centre (55,40), matching the lean
+       the login robot has mid-animation. The rotation widens the bounding box
+       from 76x66 to 83.5x74.8, so the fit scale drops 0.763 -> 0.695 to keep
+       the antenna and nubs inside the tile. -->
+  <g transform="translate(-6.2, 4.2) scale(0.695) rotate(-7 55 40)" fill="var(--mascot-ink, #3a2b1c)">
     <!-- Antenna -->
     <circle cx="55" cy="12" r="5" />
     <rect x="53.5" y="14" width="3" height="15" rx="1.5" />
