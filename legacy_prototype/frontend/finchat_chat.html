@@ -821,48 +821,53 @@
         </div>
       </div>
 
-      <!-- Token Balance -->
+      <!-- Workspace shortcuts -->
       <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Token Balance</h3>
-        <div style="background:linear-gradient(135deg, #3a2e23, #4a3828); border:1px solid var(--border); border-radius:14px; padding:20px;">
-          <div id="settingsBalance" style="font-size:32px; font-weight:800; color:#efe8de; letter-spacing:-1px;">1000</div>
-          <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#c9c0b0; margin-top:2px;">CHAT Tokens</div>
-          <div style="display:flex; gap:24px; margin-top:14px; padding-top:14px; border-top:1px solid #5c4a38; font-size:11px; color:#c9c0b0;">
-            <span>💸 Spent: <strong style="color:#efe8de;" id="settingsSpent">0</strong></span>
-            <span>🚨 Penalties: <strong style="color:#efe8de;" id="settingsPenalties">0</strong></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Phantom Wallet -->
-      <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Buy Tokens — Phantom Wallet</h3>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="wallet-btn phantom" id="connectWalletBtn" onclick="connectPhantom()" style="background:#3a2e23; color:#efe8de; border-radius:12px; border:1px solid var(--border2);">👻 Connect Phantom Wallet</button>
-          <div id="walletInfo" style="display:none;font-size:11px;color:var(--text3);font-family:ui-monospace, monospace;text-align:center;"></div>
-          <div id="tierSection" style="display:none;">
-            <div class="tier-grid">
-              <div class="tier-card" data-tier="small" onclick="selectTier('small')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">100</div><div class="tier-price" style="color:var(--text3);">0.01 SOL</div><div class="tier-label" style="color:var(--text2);">Starter</div></div>
-              <div class="tier-card" data-tier="medium" onclick="selectTier('medium')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">500</div><div class="tier-price" style="color:var(--text3);">0.05 SOL</div><div class="tier-label" style="color:var(--text2);">Popular</div></div>
-              <div class="tier-card" data-tier="large" onclick="selectTier('large')" style="background:var(--surface2); border-color:var(--border); color:var(--text);"><div class="tier-tokens" style="color:var(--text);">1000</div><div class="tier-price" style="color:var(--text3);">0.10 SOL</div><div class="tier-label" style="color:var(--text2);">Best Value</div></div>
-            </div>
-            <button class="buy-btn" id="buyTokensBtn" onclick="buyTokens()" disabled style="background:#3a2e23; color:#efe8de; border:1px solid var(--border2);">Select a tier to purchase</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Transaction History -->
-      <div>
-        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Recent Transactions</h3>
-        <div class="tx-list-settings" id="txListSettings" style="max-height:160px; overflow-y:auto; background:var(--surface2); border-radius:12px; padding:4px 14px; border:1px solid var(--border);">
-          <div style="text-align:center;color:var(--text3);font-size:11px;padding:12px;">Loading...</div>
+        <h3 style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); margin-bottom:10px;">Workspace</h3>
+        <div style="border:1px solid var(--border); border-radius:14px; overflow:hidden;">
+          <a href="finchat_settings.html" style="display:flex; align-items:center; gap:12px; padding:14px 16px; text-decoration:none; color:var(--text); background:var(--surface2); transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+            <span class="material-symbols-outlined" style="font-size:20px; color:var(--text2);">tune</span>
+            <span style="flex:1; min-width:0;">
+              <span style="display:block; font-size:13px; font-weight:600;">All settings</span>
+              <span style="display:block; font-size:11px; color:var(--text3);">Providers and API keys, notifications, appearance</span>
+            </span>
+            <span class="material-symbols-outlined" style="font-size:18px; color:var(--text3);">chevron_right</span>
+          </a>
+          <a href="finchat_agents.html" style="display:flex; align-items:center; gap:12px; padding:14px 16px; text-decoration:none; color:var(--text); background:var(--surface2); border-top:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+            <span class="material-symbols-outlined" style="font-size:20px; color:var(--text2);">smart_toy</span>
+            <span style="flex:1; min-width:0;">
+              <span style="display:block; font-size:13px; font-weight:600;">Agent configuration</span>
+              <span style="display:block; font-size:11px; color:var(--text3);">Risk level, model, persona traits</span>
+            </span>
+            <span class="material-symbols-outlined" style="font-size:18px; color:var(--text3);">chevron_right</span>
+          </a>
         </div>
       </div>
 
       <!-- Buttons -->
       <div style="display:flex; flex-direction:column; gap:8px; padding-top:4px;">
-        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">🛡️ Admin Dashboard</button>
-        <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:#b91c1c; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fbeaea'; this.style.borderColor='#e7b7b7'" onmouseout="this.style.background='transparent'; this.style.borderColor='var(--border)'">🚪 Logout</button>
+        <button id="adminSettingsBtn" style="display:none; width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s;" onclick="openAdminModal();closeSettings()" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">Admin dashboard</button>
+        <button onclick="logoutUser()" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:#b91c1c; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#fbeaea'; this.style.borderColor='#e7b7b7'" onmouseout="this.style.background='transparent'; this.style.borderColor='var(--border)'">Log out</button>
+      </div>
+
+      <!-- Legacy "CHAT token" economy + Phantom wallet UI. Retired from the panel but
+           kept in the DOM: syncServerState/loadTxHistory/connectPhantom write into
+           these ids without null-guards, so removing them throws on open. -->
+      <div style="display:none;" aria-hidden="true">
+        <div id="settingsBalance">1000</div>
+        <span id="settingsSpent">0</span>
+        <span id="settingsPenalties">0</span>
+        <button id="connectWalletBtn" onclick="connectPhantom()">Connect Phantom Wallet</button>
+        <div id="walletInfo"></div>
+        <div id="tierSection">
+          <div class="tier-grid">
+            <div class="tier-card" data-tier="small" onclick="selectTier('small')"><div class="tier-tokens">100</div><div class="tier-price">0.01 SOL</div><div class="tier-label">Starter</div></div>
+            <div class="tier-card" data-tier="medium" onclick="selectTier('medium')"><div class="tier-tokens">500</div><div class="tier-price">0.05 SOL</div><div class="tier-label">Popular</div></div>
+            <div class="tier-card" data-tier="large" onclick="selectTier('large')"><div class="tier-tokens">1000</div><div class="tier-price">0.10 SOL</div><div class="tier-label">Best Value</div></div>
+          </div>
+          <button id="buyTokensBtn" onclick="buyTokens()" disabled>Select a tier to purchase</button>
+        </div>
+        <div id="txListSettings"></div>
       </div>
     </div>
   </div>
@@ -2849,6 +2854,27 @@
     (function initSessionDeepLink() {
       const sess = new URLSearchParams(location.search).get('session');
       if (sess) openSession(sess);
+    })();
+
+    // Deep-link a specific agent (e.g. from the Universe's "Talk to Agent" /
+    // "Assign Task"): ?persona=aurelius selects that agent; ?draft=… pre-fills the
+    // composer so the user reviews and sends (never auto-sent).
+    (function initPersonaDeepLink() {
+      const params = new URLSearchParams(location.search);
+      const persona = params.get('persona');
+      if (persona && PERSONAS[persona] && persona !== activePersona) {
+        try { switchChat(persona); } catch (e) { /* fall back to default persona */ }
+      }
+      const draft = params.get('draft');
+      if (draft) {
+        const input = document.getElementById('msgInput');
+        if (input) {
+          input.value = draft;
+          input.dispatchEvent(new Event('input')); // auto-grow + enable send
+          input.focus();
+          try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+        }
+      }
     })();
 
     // ── Sync State from Server on Startup ────────────────
