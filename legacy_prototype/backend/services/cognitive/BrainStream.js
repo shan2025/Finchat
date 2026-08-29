@@ -35,13 +35,16 @@ module.exports = {
       buildings: (entities || []).filter(e => e && (e.entityId || e.entity_id))
         .map(e => entityLocation(e.type, e.entityId || e.entity_id, e.name))
     }),
-  // Tool dispatched — agent heads for that building.
-  toolStart: ({ executionId, userId, tool, input, atMs }) =>
-    pulse('tool_start', { executionId, userId, tool, input, atMs, building: toolLocation(tool) }),
+  // Tool dispatched — agent heads for that building. `why` is the agent's own
+  // stated reason for going (plan step description, or the turn's thought); the
+  // input is what it asked for once it arrived. Both travel, so the live map can
+  // answer "why did it go there" without waiting for the persisted trace.
+  toolStart: ({ executionId, userId, tool, input, why, atMs }) =>
+    pulse('tool_start', { executionId, userId, tool, input, why: why || null, atMs, building: toolLocation(tool) }),
   // Tool returned (or failed) — arrival, with the road lit or flagged as fog.
-  toolEnd: ({ executionId, userId, tool, input, error, durationMs, atMs, tokensUsed }) =>
+  toolEnd: ({ executionId, userId, tool, input, why, error, durationMs, atMs, tokensUsed }) =>
     pulse('tool_end', {
-      executionId, userId, tool, input, error: error || null, durationMs, atMs,
+      executionId, userId, tool, input, why: why || null, error: error || null, durationMs, atMs,
       tokensUsed, fuel: (tokensUsed || 0) / 1000, building: toolLocation(tool)
     }),
   // Verification pass (ReflectionEngine) finished.

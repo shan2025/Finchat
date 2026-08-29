@@ -663,7 +663,7 @@ async function _runWithinStallClock({
             // Execute the tool from the plan
             await updateState(execId, STATES.WAITING, { waitReason: WAIT_REASONS.TOOL_RESPONSE });
             const toolStart = new Date();
-            brainStream.toolStart({ executionId: execId, userId, tool: step.tool, input: step.input || goal, atMs: Date.now() - t0 });
+            brainStream.toolStart({ executionId: execId, userId, tool: step.tool, input: step.input || goal, why: step.description || null, atMs: Date.now() - t0 });
             try {
               const toolOut = await executeTool({
                 executionId: execId,
@@ -676,7 +676,7 @@ async function _runWithinStallClock({
               });
               await incrementUsage(execId, { toolCalls: 1 });
               brainStream.toolEnd({
-                executionId: execId, userId, tool: step.tool, input: step.input || goal,
+                executionId: execId, userId, tool: step.tool, input: step.input || goal, why: step.description || null,
                 error: toolOut.output && toolOut.output.error, durationMs: toolOut.durationMs,
                 atMs: Date.now() - t0, tokensUsed: liveTokens
               });
@@ -692,7 +692,7 @@ async function _runWithinStallClock({
               if (toolErr.name === 'ApprovalRequiredError') {
                 pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput, planStep: step.step };
               }
-              brainStream.toolEnd({ executionId: execId, userId, tool: step.tool, input: step.input || goal, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
+              brainStream.toolEnd({ executionId: execId, userId, tool: step.tool, input: step.input || goal, why: step.description || null, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
               await logPhase(execId, 'using_tool', stepNumber, {
                 tool: step.tool,
                 input: step.input,
@@ -747,7 +747,7 @@ async function _runWithinStallClock({
         // Log the using_tool phase
         const toolStart = new Date();
         let toolOutput;
-        brainStream.toolStart({ executionId: execId, userId, tool: toolName, input: toolInput, atMs: Date.now() - t0 });
+        brainStream.toolStart({ executionId: execId, userId, tool: toolName, input: toolInput, why: result.action.thought || null, atMs: Date.now() - t0 });
 
         try {
           toolOutput = await executeTool({
@@ -763,7 +763,7 @@ async function _runWithinStallClock({
           // Increment tool call usage
           await incrementUsage(execId, { toolCalls: 1 });
           brainStream.toolEnd({
-            executionId: execId, userId, tool: toolName, input: toolInput,
+            executionId: execId, userId, tool: toolName, input: toolInput, why: result.action.thought || null,
             error: toolOutput.output && toolOutput.output.error, durationMs: toolOutput.durationMs,
             atMs: Date.now() - t0, tokensUsed: liveTokens
           });
@@ -791,7 +791,7 @@ async function _runWithinStallClock({
           if (toolErr.name === 'ApprovalRequiredError') {
             pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput };
           }
-          brainStream.toolEnd({ executionId: execId, userId, tool: toolName, input: toolInput, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
+          brainStream.toolEnd({ executionId: execId, userId, tool: toolName, input: toolInput, why: result.action.thought || null, error: toolErr.message, atMs: Date.now() - t0, tokensUsed: liveTokens });
 
           await logPhase(execId, 'using_tool', stepNumber, {
             tool: toolName,

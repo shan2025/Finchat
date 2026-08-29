@@ -5,6 +5,7 @@ const personas = {
     name: 'Plato',
     avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#3a2e23"/><circle cx="50" cy="50" r="46" fill="none" stroke="#d4af37" stroke-width="2"/><circle cx="50" cy="35" r="14" fill="#efe8de"/><path d="M24 78 C24 58 76 58 76 78 Z" fill="#efe8de"/></svg>',
     roleTitle: 'Chief AI Officer & System Supervisor',
+    shortRole: 'Supervisor',
     description: 'Executive AI supervisor orchestrating specialized agents, evaluating performance, and governing system security.',
     systemPrompt: `You are Plato, the Chief AI Officer and Executive Supervisor of FinChat — an AI Operating System for frontier intelligence.
 You oversee a specialized roster of autonomous domain agents:
@@ -36,6 +37,7 @@ SYSTEM TOOLS & AUTONOMY:
     name: 'Aurelius',
     avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#2d3748"/><circle cx="50" cy="50" r="46" fill="none" stroke="#d4af37" stroke-width="2"/><path d="M35 65 L45 45 L55 55 L68 32" stroke="#d4af37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="68" cy="32" r="4" fill="#d4af37"/></svg>',
     roleTitle: 'Finance & Investment Strategist',
+    shortRole: 'Finance',
     description: 'Tracks newly seed-funded startups, advises on stocks, and identifies cryptocurrency & DeFi opportunities.',
     systemPrompt: `You are Aurelius, FinChat's elite Finance & Investment Agent.
 
@@ -87,6 +89,7 @@ ANALYTICAL STANDARDS:
     name: 'Rasha',
     avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#4a3828"/><circle cx="50" cy="50" r="46" fill="none" stroke="#efe8de" stroke-width="2"/><rect x="30" y="32" width="40" height="46" rx="4" fill="#efe8de"/><line x1="38" y1="44" x2="62" y2="44" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/><line x1="38" y1="54" x2="62" y2="54" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/><line x1="38" y1="64" x2="52" y2="64" stroke="#4a3828" stroke-width="3" stroke-linecap="round"/></svg>',
     roleTitle: 'Executive Career Strategist',
+    shortRole: 'Careers',
     description: 'Analyzes your skills & resume, scans for available openings, and drafts tailored job applications.',
     systemPrompt: `You are Rasha, FinChat's Executive Career Strategist & Application Advisor.
 
@@ -127,6 +130,7 @@ ANALYTICAL STANDARDS:
     name: 'Nova',
     avatar: '<svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="50" fill="#1e293b"/><circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2"/><circle cx="50" cy="50" r="18" fill="none" stroke="#38bdf8" stroke-width="3"/><circle cx="50" cy="20" r="5" fill="#38bdf8"/><circle cx="78" cy="62" r="5" fill="#38bdf8"/><circle cx="22" cy="62" r="5" fill="#38bdf8"/><line x1="50" y1="38" x2="50" y2="25" stroke="#38bdf8" stroke-width="2"/><line x1="62" y1="56" x2="73" y2="60" stroke="#38bdf8" stroke-width="2"/><line x1="38" y1="56" x2="27" y2="60" stroke="#38bdf8" stroke-width="2"/></svg>',
     roleTitle: 'Frontier Science & Technology Researcher',
+    shortRole: 'Research',
     description: 'Researches Neuroscience, AI, Neuro-computation, and Fintech/Blockchain breakthroughs.',
     systemPrompt: `You are Nova, FinChat's Deep Research Agent specializing in Frontier Sciences and Systems Architecture.
 
@@ -224,6 +228,7 @@ function listPersonas() {
     name: p.name,
     avatar: p.avatar,
     roleTitle: p.roleTitle,
+    shortRole: p.shortRole,
     description: p.description
   }));
 }

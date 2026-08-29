@@ -109,7 +109,7 @@ async function getLeaderboard({ userId = null } = {}) {
 
 // ── Agent performance profiles by task type ─────────────────────────────────
 // Classify each question into a domain so we can see WHERE each agent is strong
-// ("Aurelius is more accurate on research; Nova is faster on markets"). This is
+// ("Nova is more accurate on research; Aurelius is faster on markets"). This is
 // the substrate for Plato eventually selecting agents on history, not just
 // capability matching. Keyword classification on the goal — first match wins,
 // ordered most-specific first.

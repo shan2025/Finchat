@@ -21,12 +21,30 @@ const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
 // demo palette and the avatar files in the frontend.
 // The real FinChat roster: Plato supervises; Nova / Aurelius / Rasha are the
 // specialists. (There is no "Cato" — that was a design-mock placeholder.)
-const AGENT_META = {
-  plato: { name: 'Plato', role: 'Supervisor', color: '#9a5c8a', avatar: 'plato_avatar.png' },
-  nova: { name: 'Nova', role: 'Finance', color: '#e08a44', avatar: 'nova_avatar.png' },
-  aurelius: { name: 'Aurelius', role: 'Research', color: '#93a56e', avatar: 'aurelius_avatar.png' },
-  rasha: { name: 'Rasha', role: 'Analyst', color: '#c76b6b', avatar: 'rasha_avatar.png' }
+// Identity comes from personas.js — the same definitions that build the live
+// system prompts — so an agent's name and role can never drift from what it is
+// actually told to be. (They had: Nova was labelled "Finance" and Aurelius
+// "Research", the exact reverse of both their prompts and their tool grants.)
+// Only the map's own presentation lives here: a plate colour and the PNG the
+// canvas draws, neither of which personas carries — its `avatar` is inline SVG
+// for the chat UI.
+const { personas } = require('../personas');
+const AGENT_SKIN = {
+  plato: { color: '#9a5c8a', avatar: 'plato_avatar.png' },
+  nova: { color: '#e08a44', avatar: 'nova_avatar.png' },
+  aurelius: { color: '#93a56e', avatar: 'aurelius_avatar.png' },
+  rasha: { color: '#c76b6b', avatar: 'rasha_avatar.png' }
 };
+const AGENT_META = Object.keys(AGENT_SKIN).reduce((acc, id) => {
+  const p = personas[id] || {};
+  acc[id] = {
+    name: p.name || id,
+    role: p.shortRole || p.roleTitle || 'Agent',
+    color: AGENT_SKIN[id].color,
+    avatar: AGENT_SKIN[id].avatar
+  };
+  return acc;
+}, {});
 const DOC_TYPES = new Set(['document', 'report', 'filing', 'paper', 'source']);
 const UNVERIFIED_TOOLS = new Set(['reddit', 'quora']);
 
@@ -155,6 +173,29 @@ async function buildExecutionTrace({ executionId, userId = null }) {
   const events = [{ atMs: 0, title: 'Task issued', body: `Routed to ${meta.name}. Budget ${e.max_tokens} tokens.`, kind: 'plato' }];
   let toolCursor = 0;
 
+  // Why an agent goes somewhere lives in two places, neither of which is the
+  // tool input: a plan step's `description` (plan-based runs, the common shape)
+  // and the `thought` on the preceding reasoning turn (iterative runs). Index the
+  // plan up front and carry the last thought forward so every stop can state a
+  // reason. The input is kept separately as what it actually asked for.
+  const planSteps = [];
+  for (const lg of logs) {
+    const steps = lg.phase === 'planning' && lg.content && lg.content.plan && Array.isArray(lg.content.plan.steps)
+      ? lg.content.plan.steps : null;
+    if (steps) for (const s of steps) planSteps.push(s);
+  }
+  const planUsed = new Set();
+  const planReason = (tool) => {
+    // Prefer the first unconsumed step for this tool; fall back to positional
+    // order so a plan whose tool names drift still lines up with the run.
+    let i = planSteps.findIndex((s, idx) => !planUsed.has(idx) && s && s.tool === tool);
+    if (i < 0) i = planSteps.findIndex((s, idx) => !planUsed.has(idx) && s && s.action === 'tool');
+    if (i < 0) return null;
+    planUsed.add(i);
+    return asText(planSteps[i].description) || null;
+  };
+  let lastThought = null;
+
   for (const lg of logs) {
     const c = lg.content || {};
     const at = relMs(lg.started_at);
@@ -163,21 +204,29 @@ async function buildExecutionTrace({ executionId, userId = null }) {
       const bId = toolBuilding(tool);
       const b = buildings.find((x) => x.id === bId); if (b) b.uses++;
       const errored = !!c.error;
+      const why = planReason(tool) || lastThought || `Used ${toolLabel(tool)}`;
       waypoints.push({
         buildingId: bId,
-        reason: errored ? `Tool "${tool}" failed: ${asText(c.error)}` : (asText(c.input) || `Used ${toolLabel(tool)}`),
+        reason: errored ? `Tool "${tool}" failed: ${asText(c.error)}` : why,
+        detail: asText(c.input) || null,
+        tool,
         atMs: at, offRoad: errored, phase: 'tool'
       });
       events.push({
         atMs: at, title: `${meta.name} used ${toolLabel(tool)}`,
-        body: errored ? 'Failed: ' + asText(c.error) : asText(c.input), kind: errored ? 'fog' : (e.assigned_agent || 'plato')
+        body: errored ? 'Failed: ' + asText(c.error) : why, kind: errored ? 'fog' : (e.assigned_agent || 'plato')
       });
       toolCursor++;
     } else if (lg.phase === 'planning') {
       const steps = c.plan && Array.isArray(c.plan.steps) ? c.plan.steps.length : 0;
-      events.push({ atMs: at, title: `Planned ${steps} step${steps === 1 ? '' : 's'}`, body: '', kind: 'plato' });
+      events.push({
+        atMs: at, title: `Planned ${steps} step${steps === 1 ? '' : 's'}`,
+        body: steps ? c.plan.steps.map((s, i) => `${i + 1}. ${asText(s.description) || s.tool || ''}`).join(' · ') : '',
+        kind: 'plato'
+      });
     } else if (lg.phase === 'thinking') {
       const last = waypoints.length ? waypoints[waypoints.length - 1].buildingId : null;
+      lastThought = asText(c.thought) || lastThought;
       waypoints.push({ buildingId: last, reason: asText(c.thought) || 'Reasoning', atMs: at, offRoad: false, phase: 'think' });
     } else if (lg.phase === 'waiting') {
       events.push({ atMs: at, title: 'Waiting for approval', body: asText(c.message || c.reason), kind: 'plato' });

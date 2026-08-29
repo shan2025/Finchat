@@ -59,6 +59,61 @@ router.get('/profiles', requireAuth, async (req, res) => {
   }
 });
 
+// Where each agent lives on the Brain Model map, and where it is right now.
+// Home is derived from the agent's OWN tool grant (agent_configs.tools → the
+// district its tools mostly land in), so an agent parks in the part of the map
+// it is actually equipped to work in — no separate roster table to drift.
+// `last` is that agent's most recent run for this user, which is what the map
+// uses to place a dispatched agent at its final building.
+router.get('/locations', requireAuth, async (req, res) => {
+  try {
+    const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('../services/cognitive/toolDistricts');
+    const { agentMeta } = require('../services/cognitive/ExecutionTrace');
+    // Generic tools every agent carries — they say nothing about a home.
+    const GENERIC = new Set(['search', 'fetch', 'crawl', 'mission']);
+
+    const cfg = await query('SELECT agent_id, tools FROM agent_configs ORDER BY agent_id');
+    const rows = cfg.rows.filter((r) => Array.isArray(r.tools) && r.tools.length);
+
+    const runs = await query(`
+      SELECT DISTINCT ON (assigned_agent)
+             assigned_agent, execution_id, current_state, goal, updated_at
+      FROM executions
+      WHERE user_id = $1 AND assigned_agent IS NOT NULL
+      ORDER BY assigned_agent, updated_at DESC
+    `, [req.user.id]);
+    const lastByAgent = new Map(runs.rows.map((r) => [r.assigned_agent, r]));
+
+    const agents = rows.map((r) => {
+      const tally = new Map();
+      for (const t of r.tools) {
+        if (GENERIC.has(t)) continue;
+        const d = TOOL_DISTRICT[t] || DEFAULT_DISTRICT;
+        const cur = tally.get(d[0]) || { d, n: 0 };
+        cur.n++; tally.set(d[0], cur);
+      }
+      // Nothing but generic tools (Plato) — home is the hub it dispatches from.
+      const best = [...tally.values()].sort((a, b) => b.n - a.n)[0];
+      const home = best ? best.d : null;
+      const last = lastByAgent.get(r.agent_id) || null;
+      const meta = agentMeta(r.agent_id);
+      const active = last && !['completed', 'failed', 'cancelled'].includes(last.current_state);
+      return {
+        id: r.agent_id, name: meta.name, role: meta.role, color: meta.color, avatar: meta.avatar,
+        home: home ? { id: home[0], name: home[1], tone: home[2] } : null,
+        atHub: !home,
+        districts: [...tally.values()].sort((a, b) => b.n - a.n).map((v) => ({ id: v.d[0], name: v.d[1], tools: v.n })),
+        status: active ? 'running' : 'idle',
+        last: last ? { executionId: last.execution_id, state: last.current_state, goal: last.goal, at: last.updated_at } : null
+      };
+    });
+    res.json({ agents });
+  } catch (err) {
+    console.error('Agent locations error:', err);
+    res.status(500).json({ error: 'Failed to load agent locations', details: err.message });
+  }
+});
+
 router.get('/status', requireAuth, async (req, res) => {
   try {
     const personas = listPersonas(); // plato, aurelius, rasha, nova

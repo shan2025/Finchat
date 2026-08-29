@@ -29,7 +29,8 @@
 
   .bm-app a { color: var(--accent-300); text-decoration: none; }
   .bm-app a:hover { color: var(--accent-200); text-decoration: underline; }
-  .bm-canvas { display: block; touch-action: none; cursor: crosshair; }
+  .bm-canvas { display: block; touch-action: none; cursor: grab; }
+  .bm-canvas:active { cursor: grabbing; }
   .bm-scroll { overflow-y: auto; scrollbar-width: thin; }
   .bm-scroll::-webkit-scrollbar { width: 8px; }
   .bm-scroll::-webkit-scrollbar-thumb { background: rgba(245,234,216,.18); border-radius: 999px; }
@@ -137,12 +138,34 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"></path></svg>
           </span>
         </div>
-        <div id="bmLegend" style="display:flex; flex-wrap:wrap; gap:5px; max-width:236px;"></div>
       </div>
 
-      <div id="bmLiveTags" style="position:absolute; top:13px; right:13px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:none;"></div>
+      <div id="bmLiveTags" style="position:absolute; top:13px; right:13px; width:max-content; max-width:calc(100% - 26px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:none;"></div>
 
-      <div style="position:absolute; left:13px; bottom:11px; font-size:10px; color:var(--parch-dim); pointer-events:none;">click a road to see the decision that chose it · click a building to inspect · drag to pan</div>
+      <!-- A new question builds new ground: the composer raises a building. -->
+      <button id="bmComposeOpen" class="bm-btn" style="position:absolute; left:50%; transform:translateX(-50%); bottom:44px; display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:999px; background:rgba(28,24,21,.9); color:var(--parch); font-size:12px; font-weight:700; white-space:nowrap; backdrop-filter:blur(3px);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M5 12h14M12 5v14"></path></svg>
+        A new query builds new ground
+      </button>
+      <div id="bmComposer" class="bm-pop" style="display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:40px; width:440px; max-width:calc(100% - 26px); padding:14px 15px 15px; border-radius:16px; background:rgba(28,24,21,.94); border:1px solid var(--line); box-shadow:0 12px 40px rgba(0,0,0,.45); backdrop-filter:blur(4px); z-index:14;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:11px;">
+          <span style="font-family:'Caprasimo',serif; font-size:15px;">What did the agents just learn?</span>
+          <span id="bmComposeClose" class="bm-ico" style="margin-left:auto; display:inline-flex; padding:4px; border-radius:999px; color:var(--parch-dim);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </span>
+        </div>
+        <input id="bmComposeText" placeholder="e.g. Freight rate seasonality" style="width:100%; padding:10px 14px; border-radius:999px; border:1px solid var(--line); background:var(--ink3); color:var(--parch); font-family:inherit; font-size:13px; outline:none;">
+        <div style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+          <select id="bmComposeDist" style="flex:1; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--ink3); color:var(--parch); font-family:inherit; font-size:12px; font-weight:600; outline:none;"></select>
+          <button id="bmComposeSend" class="bm-btn" style="padding:9px 18px; border-radius:999px; background:var(--accent); color:#fff; font-size:12px; font-weight:700; white-space:nowrap;">Build it</button>
+        </div>
+        <div id="bmComposeNote" style="font-size:10px; color:var(--parch-dim); margin-top:8px;"></div>
+      </div>
+
+      <div style="position:absolute; left:13px; right:13px; bottom:11px; display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; pointer-events:none;">
+        <div id="bmLegend" style="display:flex; flex-wrap:wrap; gap:5px; max-width:300px;"></div>
+        <span style="font-size:10px; color:var(--parch); text-shadow:0 1px 3px rgba(0,0,0,.6); margin-left:auto;">click a road for the decision that chose it · click a building to inspect · drag to pan</span>
+      </div>
     </div>
 
     <div class="bm-scroll" style="width:372px; flex-shrink:0; border-left:1px solid var(--line); background:var(--ink2); display:flex; flex-direction:column;">
@@ -255,9 +278,9 @@
         <label style="font-size:11px; color:rgba(245,234,216,.6);">Route to</label>
         <select id="bmAskPersona" style="flex:1; padding:8px 10px; border-radius:10px; background:#322a22; color:#f5ead8; border:1px solid rgba(245,234,216,.14); font-family:inherit; font-size:13px;">
           <option value="plato">Plato — supervisor (auto-routes)</option>
-          <option value="nova" selected>Nova — Finance</option>
-          <option value="aurelius">Aurelius — Research</option>
-          <option value="rasha">Rasha — Analyst</option>
+          <option value="nova" selected>Nova — Research</option>
+          <option value="aurelius">Aurelius — Finance</option>
+          <option value="rasha">Rasha — Careers</option>
         </select>
         <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:rgba(245,234,216,.6); cursor:pointer;">
           <input id="bmAskWeb" type="checkbox" checked style="accent-color:#c67139;"> Web
@@ -293,62 +316,115 @@
   // ── Race definition — the same scenario the Brain Model design shipped:
   // a durability question routed by four agents under Plato's control. This is
   // the seam where live agent-run telemetry would plug in later. ────────────
-  var DUR = 11;
+  // Tile geometry for the isometric town. TW/TH are the half-width/half-height
+  // of one ground tile in screen space before zoom.
+  var DUR = 11, TW = 22, TH = 11;
+  // Districts are cells on a 12-unit grid. The optional 5th field pins a cell to
+  // an explicit [col, row]; without it districts auto-place around the hub, which
+  // is what real traces (arbitrary district counts) rely on.
+  // [id, name, tone, yield, [col,row]]
   var DNAMES = [
-    ['markets', 'Markets', 'a'], ['filings', 'Filings & Reports', 's'], ['models', 'Valuation Models', 'a'],
-    ['compliance', 'Compliance', 'n'], ['risk', 'Risk', 'a'], ['portfolio', 'Portfolio', 's'],
-    ['clients', 'Client History', 'a'], ['macro', 'Macro', 'n'], ['news', 'News & Sentiment', 's']
+    ['macro', 'Macro', 's', null, [0, 0]], ['news', 'News & Sentiment', 's', null, [1, 0]],
+    ['models', 'Valuation Models', 'a', null, [3, 0]], ['clients', 'Client History', 'a', null, [0, 1]],
+    ['portfolio', 'Portfolio', 's', null, [1, 1]], ['filings', 'Filings & Reports', 's', null, [3, 1]],
+    ['risk', 'Risk', 'a', null, [1, 2]], ['markets', 'Markets', 'a', null, [2, 2]],
+    ['compliance', 'Compliance', 'n', null, [3, 2]]
   ];
+  var HUB_CELL = [2, 1];
   var BLD = {
-    markets: [['Order Flow', 'c', 3, 337], ['Liquidity Depth', 'c', 2, 244], ['NYSE Tick Feed', 'd', 2, 401]],
-    filings: [['10-K Vault', 'd', 4, 486], ['Segment Revenue', 'c', 3, 302], ['Auditor Notes', 'd', 2, 88]],
-    models: [['DCF Works', 'c', 4, 205], ['Comps Table', 'c', 3, 167]],
-    compliance: [['Suitability Rules', 'c', 3, 226], ['Disclosure Bank', 'd', 2, 174]],
-    risk: [['Drawdown Ridge', 'c', 4, 377], ['Concentration', 'c', 3, 261], ['Stress Library', 'd', 2, 72]],
-    portfolio: [['Client Holdings', 'c', 4, 501], ['Cost Basis', 'c', 2, 233]],
-    clients: [['Mandate & Limits', 'c', 3, 318], ['Meeting Notes', 'd', 2, 279]],
-    macro: [['Rate Path', 'c', 3, 356], ['CPI Series', 'd', 2, 244]],
-    news: [['Earnings Calls', 'd', 3, 268], ['Sentiment Flats', 'c', 2, 91]]
+    macro: [['Rate Path', 'c', 3, 356], ['CPI Series', 'd', 2, 244], ['FOMC Minutes', 'd', 2, 131], ['Yield Curve', 'c', 3, 208]],
+    news: [['Earnings Calls', 'd', 3, 268], ['Sentiment Flats', 'c', 2, 91], ['Analyst Revisions', 'c', 2, 152], ['Press Wire', 'd', 3, 187]],
+    models: [['DCF Works', 'c', 4, 205], ['Comps Table', 'c', 3, 167], ['Scenario Lab', 'c', 2, 143], ['Assumption Shed', 'd', 2, 58]],
+    clients: [['Mandate & Limits', 'c', 3, 318], ['Meeting Notes', 'd', 2, 279], ['Risk Appetite', 'c', 2, 143], ['Fee Schedule', 'd', 3, 97]],
+    portfolio: [['Client Holdings', 'c', 4, 501], ['Cost Basis', 'c', 2, 233], ['Rebalance Rules', 'c', 3, 154], ['Custody Export', 'd', 2, 96]],
+    filings: [['10-K Vault', 'd', 4, 486], ['Segment Revenue', 'c', 3, 302], ['Auditor Notes', 'd', 2, 88], ['8-K Wire', 'd', 2, 209]],
+    risk: [['Drawdown Ridge', 'c', 4, 377], ['Concentration', 'c', 3, 261], ['VaR Engine', 'c', 3, 188], ['Stress Library', 'd', 2, 72]],
+    markets: [['Order Flow', 'c', 3, 337], ['Liquidity Depth', 'c', 2, 244], ['Tick Feed', 'd', 3, 401], ['Options Skew', 'c', 2, 121]],
+    compliance: [['Suitability Rules', 'c', 3, 226], ['Disclosure Bank', 'd', 3, 174], ['Trade Surveillance', 'c', 2, 63], ['KYC Registry', 'd', 2, 118]]
   };
+  var LINE_V = ['West Ring', 'Ledger Avenue', 'Central Spine', 'Evidence Avenue', 'East Ring'];
+  var LINE_H = ['North Ring', 'Source Road', 'Mandate Road', 'South Ring'];
+  // Ground palette for the town. Kept separate from the espresso chrome tokens —
+  // the map is daylight, the app frame around it stays dark.
+  var C = {
+    grass: '#9cb46f', grassAlt: '#8aa361', grassLight: '#b0c489',
+    road: '#e3d4b6', walk: '#efe4cd', mark: '#f7efdd',
+    wall: '#f5ead8', wallDark: '#dcccb0', roofA: '#c67139', roofADark: '#9d5527', roofS: '#7a8a5e', roofSDark: '#5c6a44',
+    tree: '#6f8a4c', treeLight: '#8cab5f', treeDark: '#52683a', trunk: '#7a5c3c',
+    water: '#8fb0b8', waterLight: '#a9c4c9', field: '#d9c49c', crop: '#b08a4a',
+    plaza: '#e8dcc2'
+  };
+  // Atlas growth — each answered question is a query; queries unlock new ground.
+  var TIERS = [
+    { id: 'fogclear', at: 2, name: 'Unlock the guidance block', kind: 'fog', note: 'Enough evidence to pave the unknown block north of Portfolio.' },
+    { id: 'island1', at: 4, name: 'Alternatives Isle', kind: 'island', note: 'A new landmass: satellite counts, fund marks, freight rates. Reached by bridge.' },
+    { id: 'airport', at: 7, name: 'Evidence Airport', kind: 'infra', note: 'Air routes let an agent cross the whole atlas in one hop instead of driving it.' },
+    { id: 'island2', at: 10, name: 'Digital Atoll', kind: 'island', note: 'On-chain flows, tokenised assets, custody tech — a second island off the west coast.' },
+    { id: 'rail', at: 14, name: 'Hyperloop Spine', kind: 'infra', note: 'Elevated line from the Question Hub to the far coast. Fuel cost per tile drops sharply.' }
+  ];
+  var ISLANDS = [
+    {
+      id: 'isl1', tier: 'island1', name: 'Alternatives Isle', cx: 42, cy: -8, entry: [24, -6],
+      clusters: [[-6, -3, 'Alt Data', [['Satellite Counts', 'd', 2], ['Card Panels', 'c', 2]]],
+        [5, -4, 'Private Markets', [['Fund Marks', 'd', 3], ['Vintage Curves', 'c', 2]]],
+        [0, 5, 'Commodities', [['Freight Rates', 'd', 2], ['Storage Costs', 'c', 2]]]]
+    },
+    {
+      id: 'isl2', tier: 'island2', name: 'Digital Atoll', cx: -42, cy: 16, entry: [-24, 6],
+      clusters: [[-5, -3, 'Tokenised Assets', [['Chain Registry', 'd', 2], ['Wrapper Risk', 'c', 2]]],
+        [5, 0, 'On-chain Flows', [['Bridge Volumes', 'd', 2], ['Stable Flows', 'c', 2]]],
+        [-1, 5, 'Custody Tech', [['Key Policy', 'c', 2], ['Attestations', 'd', 2]]]]
+    }
+  ];
+  var AIRPORT = { x: 27, y: 15, entry: [24, 6] };
   var AG = [
     {
-      id: 'nova', name: 'Nova', role: 'Finance', avatar: 'nova_avatar.png', c: '#e08a44', fuel: 9.2, conf: 91, risk: 4, rate: 78, finish: 6 / DUR,
-      bio: 'Retrieval-first. Reads the holding, then the filing, then answers. Cheapest fuel per tile of anyone in the field.',
-      chain: 'Nova selected Portfolio → Markets → Risk → Filings → Valuation.',
-      wp: [['hub', 'Task received at the Question Hub', 0], ['d:portfolio', 'Went to Portfolio first — the question is about client suitability', .5], ['portfolio-0', 'Read Client Holdings to know the current exposure', 1.0], ['d:portfolio', 'Back to the interchange', 1.4], ['d:markets', 'Took the ring road to Markets to confirm the move was real', 2.0], ['markets-0', 'Order Flow confirmed a genuine bid, not a print', 2.5], ['d:markets', 'Rejoined the highway', 2.9], ['d:risk', 'Risk before recommendation — a rule it never skips', 3.5], ['risk-1', 'Concentration check against the mandate', 4.1], ['d:risk', 'Left Risk with a number it could defend', 4.5], ['d:filings', 'Straight to the source rather than inferring', 5.0], ['filings-1', 'Segment Revenue — the actual answer', 5.5], ['d:models', 'Carried it to Valuation to price the durability', 5.8], ['models-0', 'Arrived at DCF Works with evidence in hand', 6.0]]
+      id: 'aurelius', name: 'Aurelius', role: 'Finance', avatar: 'aurelius_avatar.png', c: '#93a56e', fuel: 9.2, conf: 91, risk: 4, rate: 78, finish: 6 / DUR,
+      bio: 'Retrieval-first. Reads the holding, then the source, then answers. Cheapest fuel per tile in the field.',
+      chain: 'Aurelius drove Portfolio → Markets → Risk → Filings → Valuation.',
+      wp: [['hub', 'Dispatched from the Question Hub', 0], ['portfolio-0', 'Client Holdings first — the question is about suitability', 1.2], ['markets-0', 'Order Flow to confirm the move was a real bid', 2.4], ['risk-1', 'Concentration check before recommending anything', 3.6], ['filings-1', 'Segment Revenue — the actual answer, from the source', 4.9], ['models-0', 'Carried it to DCF Works to price durability', 6]]
     },
     {
-      id: 'aurelius', name: 'Aurelius', role: 'Research', avatar: 'aurelius_avatar.png', c: '#93a56e', fuel: 13.4, conf: 96, risk: 2, rate: 71, finish: 8 / DUR,
-      bio: 'Will not pass a claim it cannot cite. Pays a fuel premium to route through Compliance every single race — and lifted the fog this run.',
-      chain: 'Aurelius selected News → Filings → Compliance → Valuation, adding a verification leg Plato requested.',
-      wp: [['hub', 'Task received', 0], ['d:news', 'Started with what the market was told', .7], ['news-0', 'Read the earnings call transcript in full', 1.6], ['d:news', 'Left News', 2.1], ['d:filings', 'Went to the primary source next', 3.2], ['filings-0', 'Pulled the 10-K — this is the evidence that lifted the fog', 4.4], ['filings-2', 'Read Auditor Notes, an unusual but decisive stop', 5.3], ['d:compliance', 'Took Plato’s verification road', 6.2], ['compliance-0', 'Suitability confirmed before any recommendation', 6.9], ['d:models', 'Carried citations to Valuation', 7.5], ['models-0', 'Arrived second, with every claim sourced', 8.0]]
+      id: 'nova', name: 'Nova', role: 'Research', avatar: 'nova_avatar.png', c: '#e08a44', fuel: 13.4, conf: 96, risk: 2, rate: 71, finish: 8 / DUR,
+      bio: 'Will not pass a claim it cannot cite. Pays a fuel premium through Compliance every race — and lifted the fog this run.',
+      chain: 'Nova drove News → Filings → Compliance → Valuation, adding the verification leg Plato opened.',
+      wp: [['hub', 'Dispatched', 0], ['news-0', 'Read the earnings call in full before touching numbers', 1.5], ['filings-0', 'The 10-K Vault — this is the evidence that lifted the fog', 3.6], ['filings-2', 'Auditor Notes, an unusual but decisive stop', 4.8], ['compliance-0', 'Took Plato’s verification route to Suitability Rules', 6.4], ['models-0', 'Arrived with every claim sourced', 8]]
     },
     {
-      id: 'rasha', name: 'Rasha', role: 'Analyst', avatar: 'rasha_avatar.png', c: '#c76b6b', fuel: 6.4, conf: 62, risk: 47, rate: 44, finish: 10.5 / DUR,
-      bio: 'Fastest to a confident-sounding answer. Left the road network entirely between News and Valuation — for that stretch nothing on the map supported it.',
-      chain: 'Rasha selected News → open ground → Valuation, skipping every source.',
-      wp: [['hub', 'Task received', 0], ['d:news', 'Went to News for the quickest read', .6], ['news-1', 'Sentiment Flats — already soft ground', 1.8], ['@5,-17', 'Left the road: asserted a guidance figure with no source', 3.4, 1], ['@10,-15', 'Still in fog, compounding the assumption', 5.6, 1], ['@13,-9', 'Navigating by inference alone', 7.4, 1], ['d:models', 'Rejoined the network at Valuation', 9.4], ['models-1', 'Arrived third with the weakest answer', 10.5]]
+      id: 'cato', name: 'Cato', role: 'Risk', avatar: '', c: '#5b8fa6', fuel: 11.8, conf: 88, risk: 6, rate: 66, finish: 9.5 / DUR,
+      bio: 'Looks for the reason not to act. Found the contradiction this race — the mandate and the concentration limit disagreed.',
+      chain: 'Cato drove Risk → Portfolio → Client History → Valuation, doubling back after finding a contradiction.',
+      wp: [['hub', 'Dispatched', 0], ['risk-0', 'Drawdown Ridge — modelled the downside before the upside', 1.6], ['risk-1', 'Concentration: a figure that contradicts the mandate', 3], ['portfolio-1', 'Cost Basis confirmed exposure was understated', 5.2], ['clients-0', 'Mandate & Limits settled which figure governs', 7.4], ['models-1', 'Delivered a hard ceiling to Comps Table', 9.5]]
+    },
+    {
+      id: 'rasha', name: 'Rasha', role: 'Careers', avatar: 'rasha_avatar.png', c: '#c76b6b', fuel: 6.4, conf: 62, risk: 47, rate: 44, finish: 10.5 / DUR,
+      bio: 'Fastest to a confident-sounding answer. Left the road network entirely across the unknown block — for that stretch nothing on the map supported it.',
+      chain: 'Rasha drove News → open ground → Valuation, skipping every source.',
+      wp: [['hub', 'Dispatched', 0], ['news-1', 'Sentiment Flats — the quickest read available', 1.7], ['@-5,-12', 'Left the road: asserted guidance with no source', 3.6, 1], ['@1,-12', 'Deeper into the unknown block, compounding the guess', 5.6, 1], ['@7,-13', 'Navigating by inference alone', 7.4, 1], ['models-1', 'Rejoined the network at Comps Table, weakest answer', 10.5]]
     }
   ];
   var PLATO = { name: 'Plato', role: 'Race controller', avatar: 'plato_avatar.png', c: '#9a5c8a' };
   var EVENTS = [
     [0, 'Task issued', 'Four agents dispatched from the Question Hub. Fuel cap 14k each, verification required before any recommendation.', 'plato'],
-    [1.0, 'Nova opens Portfolio road', 'First road of the race lights up: Question Hub → Portfolio.', 'nova'],
-    [1.6, 'Aurelius opens News road', 'A second highway lights up towards News & Sentiment.', 'aurelius'],
-    [3.0, 'Contradiction found', 'Concentration disagrees with Mandate & Limits — the Risk district flags it on the map.', 'contradiction'],
-    [3.4, 'Rasha left the network', 'Route entered fog north of Sentiment Flats. No source under the ground it is crossing.', 'fog'],
-    [4.0, 'Verification route opened', 'Plato paves a new road: 10-K Vault → Compliance. Aurelius is reassigned to walk it.', 'plato'],
-    [6.0, 'Nova reaches Valuation', 'First arrival. 9.2k fuel, every claim sourced except the durability estimate.', 'nova'],
-    [7.0, 'Fog lifted', 'Aurelius produced the 10-K figure Rasha had guessed. The unknown region north of News is now paved ground.', 'clear'],
-    [8.0, 'Aurelius reaches Valuation', 'Second arrival, highest confidence on the board, 34% more fuel than Nova.', 'aurelius'],
-    [9.5, 'Contradiction resolved', 'The mandate governs — position size is capped and the Risk flag clears.', 'clear'],
-    [10.5, 'Rasha arrives', 'Fastest route, weakest support. Flagged for review, not included in the answer.', 'fog'],
-    [11, 'Answer verified', 'Plato validates: Nova’s answer and Aurelius’ citations. Rasha’s unsourced claim is discarded.', 'done']
+    [1.2, 'Aurelius opens Ledger Avenue', 'First road of the race lights up: Hub → Portfolio.', 'aurelius'],
+    [1.5, 'Nova heads for News', 'A second route lights up across the north of the map.', 'nova'],
+    [3.0, 'Contradiction found', 'Cato reports Concentration disagreeing with Mandate & Limits. The building is flagged on the map.', 'contradiction'],
+    [3.6, 'Rasha left the network', 'Route entered the unknown block north of Portfolio. No road, no source, no support.', 'fog'],
+    [4.0, 'Verification route opened', 'Plato paves a new road: Auditor Notes → Suitability Rules. Nova is reassigned to drive it.', 'plato'],
+    [6.0, 'Aurelius reaches Valuation', 'First arrival. 9.2k fuel, every claim sourced.', 'aurelius'],
+    [7.0, 'Fog lifted', 'Nova produced the 10-K figure Rasha had guessed. The unknown block is paved and Q3 Guidance is built.', 'clear'],
+    [8.0, 'Nova reaches Valuation', 'Second arrival, highest confidence on the board, 46% more fuel than Aurelius.', 'nova'],
+    [9.5, 'Cato delivers the ceiling', 'Contradiction resolved in favour of the mandate. Position size capped.', 'cato'],
+    [10.5, 'Rasha arrives', 'Fastest route, weakest support. Flagged for review, excluded from the answer.', 'fog'],
+    [11, 'Answer verified', 'Plato validates: Aurelius’ answer, Nova’s citations, Cato’s ceiling. Rasha’s claim discarded.', 'done']
   ];
+  // Fog sits on open grid cells rather than on a district. `grown` names the
+  // building that goes up once the block is paved; `noBlob` lists a gap that is
+  // real but has no ground to draw (data that simply ends).
   var FOG = [
-    { id: 'f1', name: 'Guidance north of Sentiment Flats', x: 7.5, y: -16, r: 5.2, clearsAt: 7, body: 'Rasha asserted forward guidance here. Nothing on the map supported it until Aurelius returned with the 10-K figure at 7.0s — the fog then lifted and the ground was paved.' },
-    { id: 'f2', name: 'Private-credit exposure', x: 15, y: -13, r: 4.2, clearsAt: null, body: 'No source in the atlas covers the fund’s private-credit sleeve. Still unknown at the end of the race — the system says so rather than guessing.' },
-    { id: 'f3', name: 'Post-quarter freight rates', x: -13, y: -13, r: 3.6, clearsAt: null, body: 'Data ends at the quarter close. Any claim about current rates would be made inside this fog.' }
+    { id: 'fog1', name: 'Q3 guidance block', x: 6, y: -12, r: 6.6, clearsAt: 7, grown: 'Q3 Guidance', body: 'Rasha asserted forward guidance while crossing this block. Nothing on the map supported it until Nova returned with the 10-K figure at 7.0s — the fog lifted, the block was paved, and Q3 Guidance was built.' },
+    { id: 'fog2', name: 'Private-credit block', x: -18, y: 12, r: 6.6, clearsAt: null, grown: 'Private Credit Sleeve', body: 'No source in the atlas covers the fund’s private-credit sleeve. Still unknown at the end of the race — the system says so rather than guessing.' },
+    { id: 'fog3', name: 'Post-quarter freight rates', x: -18, y: -12, r: 4, clearsAt: null, noBlob: true, body: 'Data ends at the quarter close. Any claim about current rates would be made inside this fog — no building, no road, no source.' }
   ];
   var DEFAULT_Q = 'Is the Q3 beat at Meridian Logistics durable enough to add to client portfolios?';
 
@@ -360,101 +436,446 @@
 
   // ── The engine. Plain 2D canvas + imperative DOM; no framework. ──────────
   function BrainModel() {
-    this.state = { playing: true, speed: 1, tab: 'route', sel: 'nova', budget: 14, search: '', pop: null, road: null, matches: 0 };
+    this.state = {
+      playing: true, speed: 1, tab: 'route', sel: 'aurelius', budget: 14, search: '', pop: null, road: null, matches: 0,
+      // Atlas growth: answered queries, the buildings they raised, fog the user
+      // cleared by dispatching an agent, and the query composer.
+      queries: 0, grown: [], clearedFog: {}, composer: false, qText: '', qDist: null
+    };
+    this.unlockMs = {};
     this.canvas = document.getElementById('bmCanvas');
     this.track = document.getElementById('bmTrack');
-    this.t = 0; this.z = 0.72; this.px = 0; this.py = 0; this.frame = 0;
+    this.t = 0; this.z = 0.62; this.px = 0; this.py = 0; this.frame = 0;
     this.w = 1000; this.h = 600; this.dpr = 1;
     this.build();
     this.mount();
   }
   BrainModel.prototype.setState = function (patch) { Object.assign(this.state, patch); this.render(); };
 
+  // Build the town: districts on a 12-unit grid, a full road graph (avenues on
+  // the cell boundaries, streets inside each cell, a driveway per building), then
+  // the islands and airport that atlas growth unlocks, then every agent route
+  // solved through the graph so cars stay on roads.
   BrainModel.prototype.build = function () {
-    this.N = { hub: { x: 0, y: 0, label: 'Question Hub', hub: true } };
-    this.D = {}; this.B = {}; this.order = [];
     var self = this;
+    this.D = {}; this.B = {}; this.order = []; this.decor = [];
+    this.nodes = {}; this.roads = {}; this.alias = {};
+    var seedS = 987654321;
+    var rnd = function () { seedS = (seedS * 1103515245 + 12345) & 0x7fffffff; return seedS / 0x7fffffff; };
+
+    // ── grid geometry ──────────────────────────────────────────────────────
+    // The demo pins every district to a cell so the map matches the design.
+    // Real traces arrive with an arbitrary district list and get auto-placed on
+    // the smallest square-ish grid that leaves the hub in the middle.
+    var explicit = DNAMES.length > 0 && DNAMES.every(function (r) { return !!r[4]; });
+    var cols, rows, hubCell;
+    if (explicit) {
+      cols = HUB_CELL[0] + 1; rows = HUB_CELL[1] + 1;
+      DNAMES.forEach(function (r) { cols = Math.max(cols, r[4][0] + 1); rows = Math.max(rows, r[4][1] + 1); });
+      hubCell = HUB_CELL;
+    } else {
+      var n = DNAMES.length + 1;
+      cols = Math.max(2, Math.ceil(Math.sqrt(n)));
+      rows = Math.max(1, Math.ceil(n / cols));
+      hubCell = [Math.floor((cols - 1) / 2), Math.floor((rows - 1) / 2)];
+    }
+    this.cols = cols; this.rows = rows;
+    var colX = function (i) { return (i - (cols - 1) / 2) * 12; };
+    var rowY = function (j) { return (j - (rows - 1) / 2) * 12; };
+    this.hub = { cx: colX(hubCell[0]), cy: rowY(hubCell[1]), name: 'Question Hub' };
+
+    // Auto-placement walks the grid row-major, skipping the hub cell.
+    var free = [], ci, cj;
+    for (cj = 0; cj < rows; cj++) for (ci = 0; ci < cols; ci++) {
+      if (ci === hubCell[0] && cj === hubCell[1]) continue;
+      free.push([ci, cj]);
+    }
+
+    var nid = function (x, y) { return 'n:' + x.toFixed(1) + ',' + y.toFixed(1); };
+    var node = function (x, y) {
+      var k = nid(x, y);
+      if (!self.nodes[k]) self.nodes[k] = { id: k, x: x, y: y, adj: [] };
+      return self.nodes[k];
+    };
+    var seg = function (a, b, kind, name, appearsAt) {
+      if (a.id === b.id) return null;
+      var k = [a.id, b.id].sort().join('|');
+      if (self.roads[k]) return self.roads[k];
+      var w = Math.hypot(a.x - b.x, a.y - b.y);
+      var r = { k: k, a: a.id, b: b.id, kind: kind, name: name, uses: [], appearsAt: appearsAt || 0, len: w };
+      self.roads[k] = r;
+      a.adj.push({ id: b.id, w: w, k: k }); b.adj.push({ id: a.id, w: w, k: k });
+      return r;
+    };
+    this.nidOf = nid; this.mkNode = node; this.mkSeg = seg;
+
+    // ── districts + buildings ──────────────────────────────────────────────
+    var OFFS = [[-3.4, -3.4], [3.4, -3.4], [-3.4, 3.4], [3.4, 3.4]];
     DNAMES.forEach(function (row, i) {
-      var id = row[0], name = row[1], tone = row[2], yld = (typeof row[3] === 'number' ? row[3] : null);
-      var a = (i / DNAMES.length) * Math.PI * 2 - Math.PI / 2;
-      var cx = Math.round(Math.cos(a) * 18), cy = Math.round(Math.sin(a) * 15);
-      self.D[id] = { id: id, name: name, cx: cx, cy: cy, tone: tone, yield: yld, keys: [] };
-      self.N['d:' + id] = { x: cx, y: cy, label: name, junction: true };
+      var id = row[0], name = row[1], tone = row[2];
+      var yld = (typeof row[3] === 'number' ? row[3] : null);
+      var cell = row[4] || free[i % free.length] || [0, 0];
+      var cx = colX(cell[0]), cy = rowY(cell[1]);
+      var d = { id: id, name: name, tone: tone, yield: yld, cx: cx, cy: cy, col: cell[0], row: cell[1], keys: [] };
+      self.D[id] = d;
+      self.alias['d:' + id] = nid(cx, cy);
       (BLD[id] || []).forEach(function (b, j) {
-        var ba = a + (j - 1) * 0.55, r = 5.2;
-        var x = Math.round(cx + Math.cos(ba) * r), y = Math.round(cy + Math.sin(ba) * r * 0.85);
+        var o = OFFS[j % 4], ring = Math.floor(j / 4) * 0.42;   // 5th+ building steps outward
         var key = id + '-' + j;
-        self.B[key] = { id: key, label: b[0], kind: b[1], h: b[2], uses: b[3], x: x, y: y, dist: id, distName: name, tone: tone };
-        self.N[key] = { x: x, y: y, label: b[0] };
-        self.order.push(key); self.D[id].keys.push(key);
+        self.B[key] = {
+          id: key, label: b[0], kind: b[1], h: b[2], uses: b[3],
+          x: cx + o[0] * (1 + ring), y: cy + o[1] * (1 + ring), dx: o[0], dy: o[1],
+          dist: id, distName: name, tone: tone
+        };
+        self.order.push(key); d.keys.push(key);
       });
     });
+    this.alias.hub = nid(this.hub.cx, this.hub.cy);
 
-    this.roads = {};
-    var add = function (a, b, kind, name) {
-      if (!self.N[a] || !self.N[b]) return;
-      var k = [a, b].sort().join('|');
-      if (!self.roads[k]) self.roads[k] = { k: k, a: a, b: b, kind: kind, name: name, uses: [], appearsAt: 0 };
+    // ── avenues on the cell boundaries ─────────────────────────────────────
+    var uniq = function (arr) { return arr.filter(function (v, i) { return arr.indexOf(v) === i; }).sort(function (p, q) { return p - q; }); };
+    var avX = [], avY = [], cenX = [], cenY = [];
+    for (ci = 0; ci < cols; ci++) { avX.push(colX(ci) - 6); avX.push(colX(ci) + 6); cenX.push(colX(ci)); }
+    for (cj = 0; cj < rows; cj++) { avY.push(rowY(cj) - 6); avY.push(rowY(cj) + 6); cenY.push(rowY(cj)); }
+    avX = uniq(avX); avY = uniq(avY);
+    var xCuts = uniq(avX.concat(cenX)), yCuts = uniq(avY.concat(cenY));
+    // Name an avenue by the districts it runs between, so clicking a road reads
+    // as a place rather than an index.
+    var cellAt = function (x, y) {
+      var hit = null;
+      Object.keys(self.D).forEach(function (id) {
+        var d = self.D[id];
+        if (Math.abs(x - d.cx) <= 6.001 && Math.abs(y - d.cy) <= 6.001) hit = d.name;
+      });
+      if (!hit && Math.abs(x - self.hub.cx) <= 6.001 && Math.abs(y - self.hub.cy) <= 6.001) hit = 'Question Hub';
+      return hit;
+    };
+    var between = function (x1, y1, x2, y2, line) {
+      var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      var perp = x1 === x2 ? [[mx - 6, my], [mx + 6, my]] : [[mx, my - 6], [mx, my + 6]];
+      var sides = [cellAt(perp[0][0], perp[0][1]), cellAt(perp[1][0], perp[1][1])].filter(Boolean);
+      return line + (sides.length ? ' · ' + sides.join(' ↔ ') : '');
+    };
+    avX.forEach(function (x, i) {
+      for (var m = 0; m < yCuts.length - 1; m++) {
+        seg(node(x, yCuts[m]), node(x, yCuts[m + 1]), 'avenue', between(x, yCuts[m], x, yCuts[m + 1], LINE_V[i % LINE_V.length]));
+      }
+    });
+    avY.forEach(function (y, i) {
+      for (var m = 0; m < xCuts.length - 1; m++) {
+        seg(node(xCuts[m], y), node(xCuts[m + 1], y), 'avenue', between(xCuts[m], y, xCuts[m + 1], y, LINE_H[i % LINE_H.length]));
+      }
+    });
+
+    // ── streets inside each cell, plus a driveway per building ─────────────
+    var CUT = [-6, -3.4, 0, 3.4, 6];
+    var cellStreets = function (cx, cy, name) {
+      for (var i = 0; i < CUT.length - 1; i++) seg(node(cx, cy + CUT[i]), node(cx, cy + CUT[i + 1]), 'street', name + ' Lane');
+      for (var j = 0; j < CUT.length - 1; j++) seg(node(cx + CUT[j], cy), node(cx + CUT[j + 1], cy), 'street', name + ' Row');
     };
     Object.keys(this.D).forEach(function (id) {
-      add('hub', 'd:' + id, 'highway', 'Hub Highway → ' + self.D[id].name);
-      self.D[id].keys.forEach(function (k) { add('d:' + id, k, 'street', self.D[id].name + ' Street → ' + self.B[k].label); });
+      var d = self.D[id];
+      cellStreets(d.cx, d.cy, d.name);
+      d.keys.forEach(function (k) {
+        var b = self.B[k];
+        var bn = node(b.x, b.y); bn.bld = k;
+        self.alias[k] = bn.id;
+        seg(node(d.cx, d.cy + b.dy), bn, 'drive', b.label + ' Drive');
+      });
     });
-    DNAMES.forEach(function (row, i) {
-      var id = row[0], nx = DNAMES[(i + 1) % DNAMES.length][0];
-      add('d:' + id, 'd:' + nx, 'ring', 'Ring Road · ' + self.D[id].name + ' ↔ ' + self.D[nx].name);
-    });
+    cellStreets(this.hub.cx, this.hub.cy, 'Hub Plaza');
+
+    // Plato's verification route — a road the controller paves mid-race.
+    this.verifyKey = null;
+    if (this.B['filings-2'] && this.B['compliance-0']) {
+      var vr = seg(node(this.B['filings-2'].x, this.B['filings-2'].y), node(this.B['compliance-0'].x, this.B['compliance-0'].y),
+        'verify', 'Verification Route · Auditor Notes → Suitability Rules', 4);
+      if (vr) this.verifyKey = vr.k;
+    }
+
     // Learned shortcuts — district→district roads the optimizer paved from
-    // history (GET /trace `learnedRoutes`). Drawn only between districts that
-    // exist on THIS map, glowing by weight; toggled by SHOW_LEARNED.
+    // history (GET /trace `learnedRoutes`), glowing by weight, toggled by
+    // SHOW_LEARNED. Only drawn between districts that exist on THIS map.
     (LEARNED || []).forEach(function (e) {
-      var a = 'd:' + e.from, b = 'd:' + e.to;
-      if (!self.N[a] || !self.N[b] || a === b) return;
-      var k = [a, b].sort().join('|');
-      // Reuse an existing road if the pair already has one, else pave a new edge.
-      if (!self.roads[k]) self.roads[k] = { k: k, a: a, b: b, kind: 'learned', name: 'Learned shortcut · ' + self.D[e.from].name + ' → ' + self.D[e.to].name, uses: [], appearsAt: 0 };
-      self.roads[k].learned = true;
-      self.roads[k].weight = Math.max(self.roads[k].weight || 0, e.weight || 0);
+      var a = self.D[e.from], b = self.D[e.to];
+      if (!a || !b || a === b) return;
+      var r = seg(node(a.cx, a.cy), node(b.cx, b.cy), 'learned', 'Learned shortcut · ' + a.name + ' → ' + b.name);
+      if (!r) return;
+      r.learned = true;
+      r.weight = Math.max(r.weight || 0, e.weight || 0);
     });
 
-    add('filings-0', 'd:compliance', 'verify', 'Verification Route · 10-K Vault → Compliance');
-    var vk = ['filings-0', 'd:compliance'].sort().join('|');
-    // Demo-only: the verification route reveals at 4s. Absent on real traces,
-    // whose nodes differ — guard so build() never touches an undefined road.
-    if (this.roads[vk]) this.roads[vk].appearsAt = 4;
+    // ── islands + airport, locked until their tier unlocks ─────────────────
+    ISLANDS.forEach(function (isl) {
+      var entry = node(isl.entry[0], isl.entry[1]), gate = node(isl.cx - 9, isl.cy);
+      var br = seg(entry, gate, 'bridge', isl.name + ' Bridge', 0); if (br) br.locked = isl.tier;
+      var prev = gate;
+      isl.clusters.forEach(function (cl, cidx) {
+        var dx = cl[0], dy = cl[1], cname = cl[2], list = cl[3];
+        var cn = node(isl.cx + dx, isl.cy + dy);
+        var lr = seg(prev, cn, 'street', isl.name + ' · ' + cname + ' Loop', 0); if (lr) lr.locked = isl.tier;
+        prev = cn;
+        list.forEach(function (b, i) {
+          var key = isl.id + '-' + cidx + i;
+          var bx = isl.cx + dx + (i ? 2.1 : -2.1), by = isl.cy + dy + (i ? 1.1 : -1.1);
+          self.B[key] = {
+            id: key, label: b[0], kind: b[1], h: b[2], uses: 0, x: bx, y: by, dx: 0, dy: 0,
+            dist: isl.id, distName: isl.name + ' · ' + cname, tone: i ? 's' : 'a', locked: isl.tier
+          };
+          self.order.push(key);
+          var bn = node(bx, by); bn.bld = key; self.alias[key] = bn.id;
+          var dr = seg(cn, bn, 'drive', b[0] + ' Drive', 0); if (dr) dr.locked = isl.tier;
+        });
+      });
+    });
+    (function () {
+      var apEntry = node(AIRPORT.entry[0], AIRPORT.entry[1]), apNode = node(AIRPORT.x, AIRPORT.y);
+      var ar = seg(apEntry, apNode, 'street', 'Airport Approach', 0); if (ar) ar.locked = 'airport';
+      self.B['airport-0'] = {
+        id: 'airport-0', label: 'Evidence Airport', kind: 'd', h: 3, uses: 0,
+        x: AIRPORT.x + 2.6, y: AIRPORT.y - 1.2, dx: 0, dy: 0, dist: 'airport', distName: 'Evidence Airport', tone: 'n', locked: 'airport'
+      };
+      self.order.push('airport-0');
+      var bn = node(AIRPORT.x + 2.6, AIRPORT.y - 1.2); bn.bld = 'airport-0'; self.alias['airport-0'] = bn.id;
+      var tr = seg(apNode, bn, 'drive', 'Terminal Drive', 0); if (tr) tr.locked = 'airport';
+    })();
+    this.roadKeys = Object.keys(this.roads);
 
+    // ── routes: solve each authored hop through the graph ──────────────────
     this.paths = {};
     AG.forEach(function (a) {
-      var pts = [];
+      var pts = [], curId = null, cur = null;
       a.wp.forEach(function (w, i) {
-        var id = w[0], p;
-        if (id[0] === '@') { var parts = id.slice(1).split(',').map(Number); p = { x: parts[0], y: parts[1], raw: true }; }
-        else { var n = self.N[id]; if (!n) return; p = { x: n.x, y: n.y, id: id }; }
-        p.off = !!w[3]; p.at = w[2]; p.reason = w[1]; p.label = p.raw ? 'Open ground' : self.N[id].label;
-        // Route the hop through the road graph so the trail follows streets/highways
-        // instead of cutting across. Inserted nodes are transit-only (via:true).
-        if (ROAD_EXPAND && pts.length && !p.raw) {
-          var prev = pts[pts.length - 1];
-          if (!prev.raw && prev.id && p.id) {
-            var mids = self.roadPath(prev.id, p.id);
-            for (var m = 0; m < mids.length; m++) {
-              var nn = self.N[mids[m]];
-              pts.push({ x: nn.x, y: nn.y, id: mids[m], via: true, at: prev.at + (p.at - prev.at) * ((m + 1) / (mids.length + 1)), reason: '', label: self.N[mids[m]].label || '' });
-            }
-          }
+        var ref = w[0], reason = w[1], at = w[2], off = !!w[3], detail = w[4] || '';
+        var target, label;
+        if (ref.charAt(0) === '@') {
+          var parts = ref.slice(1).split(',').map(Number);
+          target = { x: parts[0], y: parts[1] }; label = 'Open ground';
+        } else {
+          var alias = self.alias[ref];
+          var nd = alias ? self.nodes[alias] : null;
+          if (!nd) return;                                   // unknown ref — skip the hop
+          target = { x: nd.x, y: nd.y, id: nd.id };
+          label = ref === 'hub' ? 'Question Hub' : (self.B[ref] ? self.B[ref].label : (self.D[ref.slice(2)] ? self.D[ref.slice(2)].name : ref));
         }
-        pts.push(p);
+        if (i === 0 || !pts.length) {
+          pts.push({ x: target.x, y: target.y, at: at, off: off, label: label, reason: reason, detail: detail, id: target.id });
+          curId = target.id || null; cur = target;
+          return;
+        }
+        var prevAt = pts[pts.length - 1].at;
+        var chain = (!off && ROAD_EXPAND && curId && target.id) ? self.solve(curId, target.id) : null;
+        if (chain && chain.length) {
+          // Distribute the hop's time along the solved chain by geometry, so the
+          // car moves at a constant speed rather than jumping between stops.
+          var px = cur.x, py = cur.y, total = 0;
+          var lens = chain.map(function (c) {
+            var nn = self.nodes[c.id], d = Math.hypot(nn.x - px, nn.y - py);
+            px = nn.x; py = nn.y; total += d; return d;
+          });
+          var acc = 0;
+          chain.forEach(function (c, j) {
+            var nn = self.nodes[c.id]; acc += lens[j];
+            var last = j === chain.length - 1;
+            pts.push({
+              x: nn.x, y: nn.y, id: nn.id, via: !last,
+              at: prevAt + (at - prevAt) * (total ? acc / total : 1),
+              off: false, label: last ? label : '', reason: last ? reason : '', detail: last ? detail : ''
+            });
+            var r = self.roads[c.k];
+            if (r) r.uses.push({ agent: a.id, why: reason, at: prevAt + (at - prevAt) * (total ? acc / total : 1) });
+          });
+          curId = target.id; cur = target;
+        } else {
+          pts.push({ x: target.x, y: target.y, at: at, off: off, label: label, reason: reason, detail: detail, id: target.id });
+          curId = target.id || null; cur = target;
+        }
       });
-      // Light the roads actually travelled (over the possibly-expanded path).
-      for (var j = 1; j < pts.length; j++) {
-        var pa = pts[j - 1], pb = pts[j];
-        if (pa.raw || pb.raw || !pa.id || !pb.id) continue;
-        var rk = [pa.id, pb.id].sort().join('|');
-        if (self.roads[rk]) self.roads[rk].uses.push({ agent: a.id, why: pb.reason || '', at: pb.at });
-      }
       self.paths[a.id] = pts;
     });
+
+    // ── decor ──────────────────────────────────────────────────────────────
+    var treeAt = function (x, y, s) { self.decor.push({ t: 'tree', x: x, y: y, s: s || 1 }); };
+    var scatter = [[-4.6, -4.6], [4.6, -4.6], [-4.6, 4.6], [4.6, 4.6], [0, -5.2], [0, 5.2], [-5.2, 0], [5.2, 0]];
+    Object.keys(this.D).forEach(function (id) {
+      var d = self.D[id];
+      scatter.forEach(function (o) {
+        if (rnd() < 0.72) treeAt(d.cx + o[0] + (rnd() - .5) * .5, d.cy + o[1] + (rnd() - .5) * .5, .8 + rnd() * .5);
+      });
+      if (id === 'macro' || id === 'news') self.decor.push({ t: 'field', x: d.cx + (id === 'macro' ? -1.6 : 1.6), y: d.cy + 4.4, w: 2.4, d: 1.2 });
+      if (id === 'clients') self.decor.push({ t: 'water', x: d.cx - 1.4, y: d.cy + 4.3, rx: 2.6, ry: 1.4 });
+      if (id === 'risk') self.decor.push({ t: 'water', x: d.cx + 1.6, y: d.cy - 4.4, rx: 2.2, ry: 1.2 });
+    });
+    this.decor.push({ t: 'plaza', x: this.hub.cx, y: this.hub.cy, r: 3.4 });
+    [[-4, -4], [4, -4], [-4, 4], [4, 4]].forEach(function (o) { treeAt(self.hub.cx + o[0], self.hub.cy + o[1], 1.1); });
+    // Perimeter forest — everything outside the built grid.
+    var halfW = cols * 6 + 1, halfH = rows * 6 + 1;
+    for (var t = 0; t < 190; t++) {
+      var tx = -(halfW + 9) + rnd() * (halfW + 9) * 2, ty = -(halfH + 9) + rnd() * (halfH + 9) * 2;
+      if (Math.abs(tx) <= halfW && Math.abs(ty) <= halfH) continue;
+      treeAt(tx, ty, .8 + rnd() * .7);
+    }
+
+    // A fog block that lifts during the race raises its building when it clears.
+    (FOG || []).forEach(function (fg) {
+      if (fg.clearsAt == null || !fg.grown) return;
+      var key = fg.id + '-0';
+      self.B[key] = {
+        id: key, label: fg.grown, kind: 'd', h: 3, uses: 1, x: fg.x, y: fg.y + 1, dx: 0, dy: 1,
+        dist: fg.id, distName: 'Newly paved', tone: 's', bornAt: fg.clearsAt
+      };
+      self.order.push(key);
+    });
+
+    this.placeRoster();
+  };
+
+  // Park every rostered agent that is NOT in the current run at its home
+  // district — or in the hub forecourt when its home district isn't on this map
+  // (Plato, whose only tool is generic; or a domain this run never touched).
+  // Recomputed on build() and whenever the roster arrives.
+  BrainModel.prototype.placeRoster = function () {
+    var self = this;
+    this.parked = [];
+    if (!ROSTER || !ROSTER.length) return;
+    var running = {};
+    AG.forEach(function (a) { running[a.id] = 1; });
+    var perCell = {};
+    ROSTER.forEach(function (r) {
+      if (running[r.id]) return;                       // it's driving — drawn as a car
+      var d = r.home && this.D ? this.D[r.home.id] : null;
+      var cx, cy, where;
+      if (d) { cx = d.cx; cy = d.cy; where = d.name; }
+      else { cx = this.hub.cx; cy = this.hub.cy + 4.2; where = 'Hub forecourt'; }
+      var key = cx + ',' + cy, n = perCell[key] || 0; perCell[key] = n + 1;
+      // fan them out so two agents sharing a home don't stack
+      var ring = [[-1.9, 1.6], [1.9, 1.6], [-1.9, -1.6], [1.9, -1.6], [0, 2.4]][n % 5];
+      self.parked.push({
+        id: r.id, name: r.name, role: r.role, color: r.color || '#c67139',
+        x: cx + ring[0], y: cy + ring[1], where: where, status: r.status, last: r.last,
+        homeMissing: !d
+      });
+    }, this);
+  };
+
+  // Fly the camera to whatever an unlocked tier added to the map.
+  BrainModel.prototype.gotoTier = function (id) {
+    var t = TIERS.filter(function (x) { return x.id === id; })[0];
+    if (!t || !this.unlocked(id)) return;
+    if (t.kind === 'island') {
+      var i = ISLANDS.filter(function (x) { return x.tier === id; })[0];
+      if (i) { this.z = .6; this.focus(i.cx, i.cy); }
+    } else if (id === 'airport') { this.z = .8; this.focus(AIRPORT.x, AIRPORT.y); }
+    else if (id === 'rail') { this.z = .5; this.focus(this.hub.cx, this.hub.cy); }
+    else {
+      var fg = (FOG || [])[0];
+      this.z = .8; this.focus(fg ? fg.x : this.hub.cx, fg ? fg.y : this.hub.cy);
+    }
+    this.render();
+  };
+
+  // Dijkstra between two graph nodes. Returns the chain of {id, k} steps after
+  // `from`, or null when the two are not connected (an off-road hop).
+  BrainModel.prototype.solve = function (from, to) {
+    if (from === to) return [];
+    var dist = {}, prev = {}, seen = {}, self = this;
+    var keys = Object.keys(this.nodes);
+    if (!this.nodes[from] || !this.nodes[to]) return null;
+    keys.forEach(function (k) { dist[k] = Infinity; });
+    dist[from] = 0;
+    for (;;) {
+      var u = null, bd = Infinity;
+      for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (!seen[k] && dist[k] < bd) { bd = dist[k]; u = k; } }
+      if (u == null || u === to) break;
+      seen[u] = 1;
+      this.nodes[u].adj.forEach(function (e) {
+        var r = self.roads[e.k];
+        if (r && r.locked && !self.unlocked(r.locked)) return;   // can't drive locked ground
+        var nd = dist[u] + e.w;
+        if (nd < dist[e.id]) { dist[e.id] = nd; prev[e.id] = { from: u, k: e.k }; }
+      });
+    }
+    var out = [], curk = to;
+    while (curk && curk !== from) {
+      var p = prev[curk]; if (!p) return null;
+      out.unshift({ id: curk, k: p.k }); curk = p.from;
+    }
+    return out;
+  };
+
+  // ── Atlas growth ─────────────────────────────────────────────────────────
+  BrainModel.prototype.unlocked = function (tier) {
+    if (!tier) return true;
+    var t = TIERS.filter(function (x) { return x.id === tier; })[0];
+    return !t || this.state.queries >= t.at;
+  };
+  BrainModel.prototype.unlockGrow = function (tier) {
+    if (!tier) return 1;
+    var ms = this.unlockMs[tier];
+    if (!ms) return this.unlocked(tier) ? 1 : 0;
+    return Math.min(1, (performance.now() - ms) / 1200);
+  };
+  // A new question builds new ground: a building goes up in the chosen district,
+  // a driveway is paved to it, and the query counter may trip an unlock tier.
+  BrainModel.prototype.addQuery = function () {
+    var S = this.state, label = (S.qText || '').trim();
+    if (!label) return;
+    var did = S.qDist || Object.keys(this.D)[0];
+    var cell = this.D[did]; if (!cell) return;
+    var self = this;
+    var taken = {};
+    this.order.forEach(function (k) { taken[self.B[k].x + ',' + self.B[k].y] = 1; });
+    var cand = [[0, -4.7], [4.7, 0], [0, 4.7], [-4.7, 0], [-2, -5.2], [5.2, 2], [2, 5.2], [-5.2, -2]];
+    var o = cand.filter(function (c) { return !taken[(cell.cx + c[0]) + ',' + (cell.cy + c[1])]; })[0] || [0, -4.7];
+    var key = cell.id + '-q' + Date.now().toString(36);
+    this.B[key] = {
+      id: key, label: label, kind: 'c', h: 2, uses: 1, x: cell.cx + o[0], y: cell.cy + o[1], dx: o[0], dy: o[1],
+      dist: cell.id, distName: cell.name, tone: cell.tone, bornMs: performance.now()
+    };
+    this.order.push(key); cell.keys.push(key);
+    var bn = this.mkNode(this.B[key].x, this.B[key].y); bn.bld = key; this.alias[key] = bn.id;
+    var near = null, nd = 1e9;
+    [[cell.cx, cell.cy], [cell.cx, cell.cy - 3.4], [cell.cx, cell.cy + 3.4], [cell.cx - 3.4, cell.cy], [cell.cx + 3.4, cell.cy]].forEach(function (p) {
+      var d = Math.hypot(p[0] - self.B[key].x, p[1] - self.B[key].y);
+      if (d < nd) { nd = d; near = p; }
+    });
+    this.mkSeg(this.mkNode(near[0], near[1]), bn, 'drive', label + ' Drive');
     this.roadKeys = Object.keys(this.roads);
+
+    var q = S.queries + 1;
+    var justUnlocked = TIERS.filter(function (t) { return t.at === q; });
+    justUnlocked.forEach(function (t) { self.unlockMs[t.id] = performance.now(); });
+    this.z = Math.max(this.z, .9); this.focus(this.B[key].x, this.B[key].y);
+    var cleared = Object.assign({}, S.clearedFog);
+    if (justUnlocked.some(function (t) { return t.id === 'fogclear'; })) cleared.fog1 = performance.now();
+    var isl = justUnlocked.filter(function (t) { return t.kind === 'island'; })[0];
+    if (isl) {
+      var island = ISLANDS.filter(function (i) { return i.tier === isl.id; })[0];
+      if (island) { this.z = .6; this.focus(island.cx, island.cy); }
+    }
+    this.setState({
+      queries: q, qText: '', composer: false, pop: key, tab: 'growth', clearedFog: cleared,
+      grown: [{ id: key, label: label, district: cell.name, when: 'just now' }].concat(S.grown)
+    });
+  };
+  // Dispatching an agent into fog: evidence arrives, the block is paved, and the
+  // thing we did not know becomes a source document on the map.
+  BrainModel.prototype.verifyFog = function (id) {
+    var fg = (FOG || []).filter(function (f) { return f.id === id; })[0];
+    if (!fg) return;
+    var cleared = Object.assign({}, this.state.clearedFog);
+    cleared[id] = performance.now();
+    var key = id + '-v';
+    if (!this.B[key]) {
+      this.B[key] = {
+        id: key, label: fg.grown || fg.name, kind: 'd', h: 3, uses: 1, x: fg.x, y: fg.y + 1, dx: 0, dy: 1,
+        dist: id, distName: 'Newly paved', tone: 's', bornMs: performance.now()
+      };
+      this.order.push(key);
+      var bn = this.mkNode(fg.x, fg.y + 1); bn.bld = key; this.alias[key] = bn.id;
+    }
+    this.z = Math.max(this.z, .8); this.focus(fg.x, fg.y);
+    this.setState({ clearedFog: cleared, queries: this.state.queries + 1, pop: key, tab: 'growth' });
   };
 
   BrainModel.prototype.mount = function () {
@@ -473,8 +894,19 @@
       if (self.t >= 1 && !self.state.playing) self.t = 0;
       self.setState({ playing: !self.state.playing });
     });
-    document.getElementById('bmZoomIn').addEventListener('click', function () { self.z = Math.min(2.6, self.z * 1.25); });
-    document.getElementById('bmZoomOut').addEventListener('click', function () { self.z = Math.max(0.36, self.z / 1.25); });
+    document.getElementById('bmZoomIn').addEventListener('click', function () { self.z = Math.min(2.4, self.z * 1.25); });
+    document.getElementById('bmZoomOut').addEventListener('click', function () { self.z = Math.max(0.34, self.z / 1.25); });
+
+    // Query composer — a new question builds new ground.
+    document.getElementById('bmComposeOpen').addEventListener('click', function () {
+      self.setState({ composer: true, qDist: self.state.qDist || Object.keys(self.D)[0] });
+      var el = document.getElementById('bmComposeText'); if (el) el.focus();
+    });
+    document.getElementById('bmComposeClose').addEventListener('click', function () { self.setState({ composer: false }); });
+    document.getElementById('bmComposeText').addEventListener('input', function (e) { self.state.qText = e.target.value; });
+    document.getElementById('bmComposeText').addEventListener('keydown', function (e) { if (e.key === 'Enter') self.addQuery(); });
+    document.getElementById('bmComposeDist').addEventListener('change', function (e) { self.state.qDist = e.target.value; });
+    document.getElementById('bmComposeSend').addEventListener('click', function () { self.addQuery(); });
     document.getElementById('bmReset').addEventListener('click', function () { self.fit(); });
     var search = document.getElementById('bmSearch');
     search.addEventListener('input', function (e) { self.setState({ search: e.target.value }); });
@@ -482,7 +914,7 @@
       if (e.key !== 'Enter') return;
       var qq = e.target.value.trim().toLowerCase(); if (!qq) return;
       var hit = self.order.map(function (k) { return self.B[k]; }).find(function (b) { return b.label.toLowerCase().indexOf(qq) >= 0; });
-      if (hit) { self.z = 1.25; self.focus(hit.x, hit.y); self.setState({ pop: hit.id }); }
+      if (hit) { self.z = Math.max(self.z, 1.15); self.focus(hit.x, hit.y); self.setState({ pop: hit.id, tab: 'place' }); }
     });
     document.getElementById('bmBudget').addEventListener('input', function (e) { self.setState({ budget: +e.target.value }); });
 
@@ -496,6 +928,20 @@
       else if (act === 'leg') self.onLeg(+el.getAttribute('data-i'));
       else if (act === 'log') { var at = +el.getAttribute('data-at'); self.t = at / DUR; self.setState({ playing: false }); }
       else if (act === 'fog') self.onFog(+el.getAttribute('data-i'));
+      else if (act === 'verify') self.verifyFog(el.getAttribute('data-id'));
+      else if (act === 'tier') self.gotoTier(el.getAttribute('data-id'));
+      else if (act === 'findagent') {
+        // Fly to wherever that agent is — its car if it's running, its parking spot if not.
+        var aid = el.getAttribute('data-id');
+        var live = AG.filter(function (a) { return a.id === aid; })[0];
+        if (live) { var c2 = self.posAt(live, self.t * DUR); self.z = Math.max(self.z, .95); self.focus(c2.pt.x, c2.pt.y); self.setState({ sel: aid, tab: 'route' }); return; }
+        var pk = (self.parked || []).filter(function (p) { return p.id === aid; })[0];
+        if (pk) { self.z = Math.max(self.z, .95); self.focus(pk.x, pk.y); self.render(); }
+      }
+      else if (act === 'grown') {
+        var b = self.B[el.getAttribute('data-id')];
+        if (b) { self.z = Math.max(self.z, 1); self.focus(b.x, b.y); self.setState({ pop: b.id, tab: 'place' }); }
+      }
     });
 
     document.getElementById('bmQuestion').textContent = (window.BM_QUESTION || DEFAULT_Q);
@@ -512,10 +958,18 @@
     var r = c.parentElement.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
     c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d);
     this.w = r.width; this.h = r.height; this.dpr = d;
+    // The first mount can run before layout settles, which would leave the camera
+    // at 0,0 with a clamped zoom. Re-fit once the canvas actually has a size.
+    if (!this.fitted && r.width > 1 && r.height > 1) { this.fitted = true; this.fit(); }
   };
-  BrainModel.prototype.fit = function () { this.z = 0.74; this.px = this.w / 2; this.py = this.h / 2 + 10; };
-  BrainModel.prototype.proj = function (x, y) { return [(x - y) * 30 * this.z + this.px, (x + y) * 15 * this.z + this.py]; };
-  BrainModel.prototype.focus = function (x, y) { this.px = this.w / 2 - (x - y) * 30 * this.z; this.py = this.h / 2 - (x + y) * 15 * this.z; };
+  BrainModel.prototype.fit = function () {
+    var span = Math.max(this.cols || 4, this.rows || 3) * 22;
+    var zx = (this.w - 40) / (span * TW), zy = (this.h - 40) / (span * TH);
+    this.z = Math.min(1.1, Math.max(0.3, Math.min(zx, zy)));
+    this.px = this.w / 2; this.py = this.h / 2;
+  };
+  BrainModel.prototype.proj = function (x, y) { return [(x - y) * TW * this.z + this.px, (x + y) * TH * this.z + this.py]; };
+  BrainModel.prototype.focus = function (x, y) { this.px = this.w / 2 - (x - y) * TW * this.z; this.py = this.h / 2 - (x + y) * TH * this.z; };
 
   BrainModel.prototype.onWheel = function (e) {
     e.preventDefault();
@@ -537,17 +991,19 @@
     this.drag = null; this.scrubbing = false;
   };
   BrainModel.prototype.pick = function (mx, my) {
-    var self = this, bb = null, bd = 24;
+    var self = this, bb = null, bd = 30 * this.z;
     this.order.forEach(function (k) {
-      var b = self.B[k], p = self.proj(b.x, b.y), ty = p[1] - b.h * 13 * self.z;
+      var b = self.B[k]; if (!self.unlocked(b.locked)) return;
+      var p = self.proj(b.x, b.y), ty = p[1] - b.h * 9 * self.z;
       var d = Math.hypot(mx - p[0], my - ty); if (d < bd) { bd = d; bb = k; }
     });
     if (bb) { this.setState({ pop: bb, road: null, tab: 'place' }); return; }
-    var br = null, brd = 11;
+    var br = null, brd = 10;
     this.roadKeys.forEach(function (k) {
       var r = self.roads[k];
-      if (r.appearsAt > self.t * DUR) return;
-      var p1 = self.proj(self.N[r.a].x, self.N[r.a].y), p2 = self.proj(self.N[r.b].x, self.N[r.b].y);
+      if (r.appearsAt > self.t * DUR || !self.unlocked(r.locked)) return;
+      var A = self.nodes[r.a], B = self.nodes[r.b]; if (!A || !B) return;
+      var p1 = self.proj(A.x, A.y), p2 = self.proj(B.x, B.y);
       var d = self.segDist(mx, my, p1[0], p1[1], p2[0], p2[1]); if (d < brd) { brd = d; br = k; }
     });
     this.setState({ road: br, pop: null, tab: br ? 'road' : this.state.tab });
@@ -559,16 +1015,20 @@
   };
 
   BrainModel.prototype.onLeg = function (i) {
-    var sel = AG.find(function (a) { return a.id === this.state.sel; }, this) || AG.find(function (a) { return a.id === this.state.sel; });
-    sel = AG.filter(function (a) { return a.id === this.state.sel; })[0] || AG[0];
-    var pts = this.paths[sel.id], p = pts[i], prev = pts[Math.max(0, i - 1)];
-    if (!p.raw && !prev.raw && p.id && prev.id) {
+    var selId = this.state.sel;
+    var sel = AG.filter(function (a) { return a.id === selId; })[0] || AG[0];
+    var pts = this.paths[sel.id] || []; if (!pts.length) return;
+    var p = pts[Math.min(i, pts.length - 1)], prev = pts[Math.max(0, Math.min(i, pts.length - 1) - 1)];
+    this.z = Math.max(this.z, .95); this.focus(p.x, p.y);
+    if (p.id && prev.id) {
       var k = [prev.id, p.id].sort().join('|');
-      if (this.roads[k]) { this.z = Math.max(this.z, .9); this.focus((p.x + prev.x) / 2, (p.y + prev.y) / 2); this.setState({ tab: 'road', road: k, pop: null }); return; }
+      if (this.roads[k]) { this.setState({ tab: 'road', road: k, pop: null }); return; }
     }
-    this.z = Math.max(this.z, 1); this.focus(p.x, p.y); this.setState({ tab: 'fog' });
+    // A stop with no road behind it is either open ground (fog) or a building.
+    var node = p.id ? this.nodes[p.id] : null;
+    this.setState({ tab: p.off ? 'fog' : (node && node.bld ? 'place' : 'route'), pop: node && node.bld ? node.bld : null });
   };
-  BrainModel.prototype.onFog = function (i) { var f = FOG[i]; this.z = Math.max(this.z, .95); this.focus(f.x, f.y); this.render(); };
+  BrainModel.prototype.onFog = function (i) { var f = FOG[i]; if (!f) return; this.z = Math.max(this.z, .85); this.focus(f.x, f.y); this.render(); };
 
   // ── Animation ──────────────────────────────────────────────────────────
   BrainModel.prototype.loop = function () {
@@ -591,222 +1051,442 @@
       if (secs <= pts[i].at || i === pts.length - 1) {
         var p0 = pts[i - 1], p1 = pts[i], span = Math.max(.001, p1.at - p0.at);
         var f = Math.max(0, Math.min(1, (secs - p0.at) / span));
-        return { pt: { x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f, off: p1.off && f > 0 }, idx: i, f: f };
+        return { pt: { x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f, off: p1.off && f > 0 }, idx: i, f: f, from: p0, to: p1 };
       }
     }
     return { pt: pts[pts.length - 1], idx: pts.length - 1, f: 1 };
   };
   BrainModel.prototype.fogAlpha = function (f, secs) {
     if (!f) return 0; // real traces may carry no fog — treat "no fog" as clear
+    var cl = this.state.clearedFog[f.id];
+    if (cl) return Math.max(0, 1 - (performance.now() - cl) / 1500);   // cleared by dispatching an agent
     if (f.clearsAt == null) return 1;
     if (secs < f.clearsAt) return 1;
-    return Math.max(0, 1 - (secs - f.clearsAt) / 1.6);
+    return Math.max(0, 1 - (secs - f.clearsAt) / 1.5);
+  };
+
+  // ── Sprites ──────────────────────────────────────────────────────────────
+  BrainModel.prototype.quad = function (g, pts, fill, stroke, lw) {
+    var self = this;
+    g.beginPath();
+    pts.forEach(function (p, i) { var s = self.proj(p[0], p[1]); i ? g.lineTo(s[0], s[1]) : g.moveTo(s[0], s[1]); });
+    g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+  };
+  BrainModel.prototype.roadQuad = function (g, r, width, fill) {
+    var A = this.nodes[r.a], B = this.nodes[r.b]; if (!A || !B) return;
+    var hw = width / 2, vert = Math.abs(A.x - B.x) < .001;
+    var pts = vert
+      ? [[A.x - hw, A.y], [A.x + hw, A.y], [B.x + hw, B.y], [B.x - hw, B.y]]
+      : [[A.x, A.y - hw], [A.x, A.y + hw], [B.x, B.y + hw], [B.x, B.y - hw]];
+    this.quad(g, pts, fill);
+  };
+  BrainModel.prototype.shade = function (hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;
+    if (f < 1) { r *= f; gg *= f; b *= f; } else { var k = f - 1; r += (255 - r) * k; gg += (255 - gg) * k; b += (255 - b) * k; }
+    return 'rgb(' + (r | 0) + ',' + (gg | 0) + ',' + (b | 0) + ')';
+  };
+  // One hip-roofed house. Returns the roof apex so the label can sit above it.
+  BrainModel.prototype.house = function (g, b, secs, sel, hit) {
+    var z = this.z, hw = 1.15, hd = 1.15, self = this;
+    var grow = 1;
+    if (b.bornAt != null) { if (secs < b.bornAt) return null; grow = Math.min(1, (secs - b.bornAt) / 1.4); }
+    if (b.bornMs != null) grow = Math.min(grow, Math.max(.12, (performance.now() - b.bornMs) / 1300));
+    if (b.locked) grow = Math.min(grow, Math.max(.12, this.unlockGrow(b.locked)));
+    var H = b.h * 9 * z * grow, R = 7 * z * grow;
+    var P = function (x, y, lift) { var s = self.proj(x, y); return [s[0], s[1] - (lift || 0)]; };
+    var n = P(b.x - hw, b.y - hd), e = P(b.x + hw, b.y - hd), s2 = P(b.x + hw, b.y + hd), w = P(b.x - hw, b.y + hd);
+    var N = P(b.x - hw, b.y - hd, H), E = P(b.x + hw, b.y - hd, H), S = P(b.x + hw, b.y + hd, H), W = P(b.x - hw, b.y + hd, H);
+    var con = b.kind === 'c';
+    var roof = con ? C.roofA : C.roofS, roofD = con ? C.roofADark : C.roofSDark;
+    g.save(); g.globalAlpha = .16; g.fillStyle = '#3a3a20';
+    g.beginPath();
+    [[b.x - hw - .3, b.y + hd + .3], [b.x + hw + .5, b.y + hd + .3], [b.x + hw + .5, b.y - hd + .2], [b.x - hw - .3, b.y - hd + .2]]
+      .forEach(function (p, i) { var q = self.proj(p[0], p[1]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); });
+    g.closePath(); g.fill(); g.restore();
+    var face = function (a, b2, c2, d2, fill) {
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b2[0], b2[1]); g.lineTo(c2[0], c2[1]); g.lineTo(d2[0], d2[1]); g.closePath();
+      g.fillStyle = fill; g.fill();
+    };
+    face(w, s2, S, W, C.wallDark);
+    face(s2, e, E, S, C.wall);
+    if (z > 0.7) {
+      g.fillStyle = 'rgba(90,120,130,.55)';
+      var rowsN = Math.max(1, b.h - 1);
+      for (var r2 = 0; r2 < rowsN; r2++) {
+        for (var c2 = 0; c2 < 2; c2++) {
+          var fx = -0.55 + c2 * 1.1, lift = H - (r2 + 1) * (H / (rowsN + 1)) - 2 * z;
+          var p1 = P(b.x + hw, b.y + fx * hd * .8, lift);
+          g.fillRect(p1[0] - 1, p1[1] - 4 * z, Math.max(3, 5 * z), Math.max(4, 6 * z));
+          var q1 = P(b.x + fx * hw * .8, b.y + hd, lift);
+          g.fillRect(q1[0] - 3 * z, q1[1] - 4 * z, Math.max(3, 5 * z), Math.max(4, 6 * z));
+        }
+      }
+    }
+    var R1 = [(N[0] + W[0]) / 2, (N[1] + W[1]) / 2 - R], R2 = [(E[0] + S[0]) / 2, (E[1] + S[1]) / 2 - R];
+    g.beginPath(); g.moveTo(N[0], N[1]); g.lineTo(W[0], W[1]); g.lineTo(R1[0], R1[1]); g.closePath(); g.fillStyle = roofD; g.fill();
+    g.beginPath(); g.moveTo(E[0], E[1]); g.lineTo(S[0], S[1]); g.lineTo(R2[0], R2[1]); g.closePath(); g.fillStyle = roofD; g.fill();
+    face(N, E, R2, R1, roof);
+    face(W, S, R2, R1, roofD);
+    if (sel || hit) {
+      g.strokeStyle = '#fff'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(W[0], W[1]); g.lineTo(R1[0], R1[1]); g.lineTo(R2[0], R2[1]); g.lineTo(S[0], S[1]); g.stroke();
+    }
+    if (b.kind === 'd' && z > 0.62) {   // source documents fly an aerial
+      g.strokeStyle = C.roofSDark; g.lineWidth = Math.max(1, 1.6 * z);
+      g.beginPath(); g.moveTo(R2[0], R2[1]); g.lineTo(R2[0], R2[1] - 12 * z); g.stroke();
+      g.fillStyle = C.roofS; g.beginPath(); g.arc(R2[0], R2[1] - 12 * z, Math.max(2, 3 * z), 0, 6.283); g.fill();
+    }
+    return { top: Math.min(R1[1], R2[1]), cx: (W[0] + S[0] + N[0] + E[0]) / 4 };
+  };
+  BrainModel.prototype.tree = function (g, d) {
+    var z = this.z, p = this.proj(d.x, d.y), sx = p[0], sy = p[1], sc = d.s * z;
+    g.save(); g.globalAlpha = .18; g.fillStyle = '#3a3a20';
+    g.beginPath(); g.ellipse(sx, sy, 9 * sc, 4.5 * sc, 0, 0, 6.283); g.fill(); g.restore();
+    g.strokeStyle = C.trunk; g.lineWidth = Math.max(1.4, 2.6 * sc); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, sy - 11 * sc); g.stroke();
+    g.fillStyle = C.treeDark; g.beginPath(); g.arc(sx, sy - 15 * sc, 8 * sc, 0, 6.283); g.fill();
+    g.fillStyle = C.tree; g.beginPath(); g.arc(sx - 2 * sc, sy - 18 * sc, 7 * sc, 0, 6.283); g.fill();
+    g.fillStyle = C.treeLight; g.beginPath(); g.arc(sx - 3 * sc, sy - 21 * sc, 4.4 * sc, 0, 6.283); g.fill();
+  };
+  // An agent is a car. In fog it goes grey and carries a question mark, because
+  // for that stretch nothing on the map supports where it is.
+  BrainModel.prototype.car = function (g, x, y, color, dir, inFog) {
+    var z = this.z, s = z, self = this;
+    var dl = Math.hypot(dir ? dir.x : 0, dir ? dir.y : 0);
+    var h = dl > .0001 ? { x: dir.x / dl, y: dir.y / dl } : { x: 1, y: 0 };
+    var p = { x: -h.y, y: h.x };
+    var P = function (l, w, lift) { var a = self.proj(x + h.x * l + p.x * w, y + h.y * l + p.y * w); return [a[0], a[1] - (lift || 0)]; };
+    var base = inFog ? '#8d8578' : color;
+    var dark = inFog ? '#6f685d' : this.shade(color, .68);
+    var lite = inFog ? '#a8a094' : this.shade(color, 1.22);
+    var poly = function (pts, fill) {
+      g.beginPath(); pts.forEach(function (q, i) { i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath();
+      if (fill) { g.fillStyle = fill; g.fill(); }
+    };
+    var LL = .62, WW = .3, BOT = 1.1 * s, MID = 3.4 * s, ROOF = 6 * s;
+    g.save(); g.globalAlpha = .2;
+    poly([P(-LL - .06, -WW - .06), P(LL + .06, -WW - .06), P(LL + .06, WW + .06), P(-LL - .06, WW + .06)], '#2c2a1c');
+    g.restore();
+    [[-.38, -.3], [.38, -.3], [-.38, .3], [.38, .3]].forEach(function (o) {
+      var wp = P(o[0], o[1], .7 * s);
+      g.fillStyle = '#25211c';
+      g.beginPath(); g.ellipse(wp[0], wp[1], 1.7 * s, 1.15 * s, 0, 0, 6.283); g.fill();
+    });
+    var depth = function (fp) {
+      return [[0, 1], [1, 2], [2, 3], [3, 0]].map(function (pair) {
+        var a = fp[pair[0]], b = fp[pair[1]];
+        var wA = { x: x + h.x * a[0] + p.x * a[1], y: y + h.y * a[0] + p.y * a[1] };
+        var wB = { x: x + h.x * b[0] + p.x * b[1], y: y + h.y * b[0] + p.y * b[1] };
+        return { i: pair[0], j: pair[1], d: (wA.x + wA.y + wB.x + wB.y) / 2 };
+      }).sort(function (a, b) { return a.d - b.d; });
+    };
+    var fp = [[-LL, -WW], [LL, -WW], [LL, WW], [-LL, WW]];
+    depth(fp).forEach(function (e) {
+      var a = fp[e.i], b = fp[e.j];
+      poly([P(a[0], a[1], BOT), P(b[0], b[1], BOT), P(b[0], b[1], MID), P(a[0], a[1], MID)], base);
+    });
+    poly(fp.map(function (q) { return P(q[0], q[1], MID); }), lite);
+    var cf = [[-.27, -.24], [.23, -.24], [.23, .24], [-.27, .24]];
+    depth(cf).forEach(function (e) {
+      var a = cf[e.i], b = cf[e.j];
+      poly([P(a[0], a[1], MID), P(b[0], b[1], MID), P(b[0], b[1], ROOF), P(a[0], a[1], ROOF)], inFog ? '#5d6a70' : '#46545c');
+    });
+    poly(cf.map(function (q) { return P(q[0], q[1], ROOF); }), dark);
+    var hl = P(LL - .01, -.17, 2.1 * s), hr = P(LL - .01, .17, 2.1 * s);
+    g.fillStyle = '#fdf3d8';
+    g.beginPath(); g.ellipse(hl[0], hl[1], .85 * s, .6 * s, 0, 0, 6.283); g.fill();
+    g.beginPath(); g.ellipse(hr[0], hr[1], .85 * s, .6 * s, 0, 0, 6.283); g.fill();
+    var tl = P(-LL + .01, -.17, 2.1 * s), tr = P(-LL + .01, .17, 2.1 * s);
+    g.fillStyle = '#c0503f';
+    g.beginPath(); g.ellipse(tl[0], tl[1], .7 * s, .5 * s, 0, 0, 6.283); g.fill();
+    g.beginPath(); g.ellipse(tr[0], tr[1], .7 * s, .5 * s, 0, 0, 6.283); g.fill();
+    if (inFog) {
+      var c0 = P(0, 0, ROOF + 3 * s);
+      g.fillStyle = '#f5ead8'; g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif';
+      g.textAlign = 'center'; g.fillText('?', c0[0], c0[1]);
+    }
+    return { top: P(0, 0, ROOF)[1] };
   };
 
   BrainModel.prototype.draw = function () {
     var c = this.canvas; if (!c) return;
     var g = c.getContext('2d'), z = this.z, secs = this.t * DUR, self = this;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    g.fillStyle = '#1c1815'; g.fillRect(0, 0, this.w, this.h);
+    g.fillStyle = C.grass; g.fillRect(0, 0, this.w, this.h);
     var q = (this.state.search || '').trim().toLowerCase();
+    var labels = [];
 
-    // graticule
-    g.strokeStyle = 'rgba(245,234,216,.05)'; g.lineWidth = 1;
-    for (var i = -32; i <= 32; i += 8) {
-      var p1 = this.proj(i, -32), p2 = this.proj(i, 32);
-      g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
-      p1 = this.proj(-32, i); p2 = this.proj(32, i);
-      g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
+    // grass mottling — a fixed seed so the ground never shimmers between frames
+    var sd = 4242;
+    var rnd = function () { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff; };
+    g.save();
+    for (var i = 0; i < 90; i++) {
+      var mx = -36 + rnd() * 72, my = -30 + rnd() * 60, mr = 2 + rnd() * 5;
+      var mp = this.proj(mx, my);
+      g.globalAlpha = .28; g.fillStyle = rnd() > .5 ? C.grassAlt : C.grassLight;
+      g.beginPath(); g.ellipse(mp[0], mp[1], mr * TW * z * .5, mr * TH * z * .5, 0, 0, 6.283); g.fill();
+    }
+    g.restore();
+
+    // ground features — plazas, crop fields, ponds
+    this.decor.forEach(function (d) {
+      if (d.t === 'plaza') {
+        self.quad(g, [[d.x - d.r, d.y - d.r], [d.x + d.r, d.y - d.r], [d.x + d.r, d.y + d.r], [d.x - d.r, d.y + d.r]], C.plaza);
+      } else if (d.t === 'field') {
+        self.quad(g, [[d.x - d.w, d.y - d.d], [d.x + d.w, d.y - d.d], [d.x + d.w, d.y + d.d], [d.x - d.w, d.y + d.d]], C.field);
+        g.strokeStyle = C.crop; g.lineWidth = Math.max(1, 1.8 * z);
+        for (var i2 = -d.d + .3; i2 < d.d; i2 += .45) {
+          var a1 = self.proj(d.x - d.w + .2, d.y + i2), a2 = self.proj(d.x + d.w - .2, d.y + i2);
+          g.beginPath(); g.moveTo(a1[0], a1[1]); g.lineTo(a2[0], a2[1]); g.stroke();
+        }
+      } else if (d.t === 'water') {
+        var wp = self.proj(d.x, d.y);
+        g.fillStyle = C.waterLight;
+        g.beginPath(); g.ellipse(wp[0], wp[1], d.rx * TW * z * .62, d.ry * TH * z * 1.35, 0, 0, 6.283); g.fill();
+        g.fillStyle = C.water;
+        g.beginPath(); g.ellipse(wp[0], wp[1], d.rx * TW * z * .55, d.ry * TH * z * 1.15, 0, 0, 6.283); g.fill();
+      }
+    });
+
+    // sea + islands, drawn under everything they carry
+    ISLANDS.forEach(function (isl) {
+      var gr = self.unlockGrow(isl.tier); if (gr <= 0) return;
+      var ip = self.proj(isl.cx, isl.cy);
+      g.save(); g.globalAlpha = gr;
+      [[17, 15, C.water], [15.4, 13.4, C.waterLight], [12.4, 10.6, '#e6d3a8'], [11.2, 9.5, C.grass]].forEach(function (ring) {
+        g.fillStyle = ring[2];
+        g.beginPath(); g.ellipse(ip[0], ip[1], ring[0] * TW * z * .62, ring[1] * TH * z * 1.25, 0, 0, 6.283); g.fill();
+      });
+      g.restore();
+    });
+    if (this.unlockGrow('airport') > 0) {
+      g.save(); g.globalAlpha = this.unlockGrow('airport');
+      this.quad(g, [[AIRPORT.x - 1.4, AIRPORT.y - 6], [AIRPORT.x + 1.4, AIRPORT.y - 6], [AIRPORT.x + 1.4, AIRPORT.y + 6], [AIRPORT.x - 1.4, AIRPORT.y + 6]], '#4a4740');
+      g.strokeStyle = '#f3ecdb'; g.lineWidth = Math.max(1, 1.4 * z); g.setLineDash([6 * z, 8 * z]);
+      var r1 = this.proj(AIRPORT.x, AIRPORT.y - 5.4), r2 = this.proj(AIRPORT.x, AIRPORT.y + 5.4);
+      g.beginPath(); g.moveTo(r1[0], r1[1]); g.lineTo(r2[0], r2[1]); g.stroke();
+      g.setLineDash([]); g.restore();
     }
 
-    // district ground
-    Object.keys(this.D).forEach(function (id) {
-      var d = self.D[id], p = self.proj(d.cx, d.cy);
-      // Ground alpha carries historical verified-yield: a district that reliably
-      // produces grounded evidence for this task glows warmer; a barren one fades.
-      var base = d.tone === 'a' ? [198, 113, 57] : d.tone === 's' ? [122, 138, 94] : [245, 234, 216];
-      var baseA = d.tone === 'n' ? 0.05 : 0.10;
-      var alpha = (typeof d.yield === 'number') ? (0.05 + 0.22 * Math.max(0, Math.min(1, d.yield))) : baseA;
-      var fill = 'rgba(' + base[0] + ',' + base[1] + ',' + base[2] + ',' + alpha.toFixed(3) + ')';
-      g.beginPath(); g.ellipse(p[0], p[1], 168 * z, 84 * z, 0, 0, 6.283);
-      g.fillStyle = fill; g.fill();
-      // A brighter rim on proven-productive ground so the yield reads at a glance.
-      var rim = (typeof d.yield === 'number' && d.yield >= 0.6) ? 'rgba(224,172,134,.28)' : 'rgba(245,234,216,.09)';
-      g.strokeStyle = rim; g.lineWidth = 1; g.stroke();
-    });
-
-    // roads: casing then surface, lit by traversal
-    var drawRoad = function (r) {
-      if (r.appearsAt > secs) return;
-      var pa = self.proj(self.N[r.a].x, self.N[r.a].y), pb = self.proj(self.N[r.b].x, self.N[r.b].y);
-      var x1 = pa[0], y1 = pa[1], x2 = pb[0], y2 = pb[1];
-      var isVerify = r.kind === 'verify';
-      var base = r.kind === 'highway' ? 13 : r.kind === 'ring' ? 10 : 7;
-      var first = r.uses.length ? Math.min.apply(null, r.uses.map(function (u) { return u.at; })) : null;
-      var lit = first != null && secs >= first;
-      var litAge = lit ? secs - first : 99;
-      var litAgent = lit ? AG.find(function (a) { return a.id === r.uses.find(function (u) { return u.at === first; }).agent; }) : null;
-      var glow = lit ? Math.max(.28, 1 - litAge / 2.2) : 0;
-      var selHit = self.state.road === r.k;
-      g.lineCap = 'round';
-      g.strokeStyle = '#100e0c'; g.lineWidth = base * z + 3.5 * z;
-      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-      g.strokeStyle = isVerify ? 'rgba(154,92,138,.85)' : 'rgba(245,234,216,.20)';
-      g.lineWidth = base * z;
-      g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-      if (lit && litAgent) {
-        g.save(); g.globalAlpha = glow; g.strokeStyle = litAgent.c; g.lineWidth = base * z;
-        g.shadowColor = litAgent.c; g.shadowBlur = 16 * z;
-        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
-      }
-      if (selHit) {
-        g.save(); g.strokeStyle = '#f5ead8'; g.lineWidth = 1.6 * z; g.setLineDash([6 * z, 5 * z]);
-        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
-      }
-      if (r.kind !== 'street' && z > 0.55) {
-        g.save(); g.setLineDash([9 * z, 9 * z]); g.strokeStyle = 'rgba(28,24,21,.75)'; g.lineWidth = Math.max(1, 1.6 * z);
-        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.restore();
-      }
+    // roads — pavement casing pass, then the surface
+    var vis = function (k) {
+      var r = self.roads[k];
+      return r.appearsAt <= secs && self.unlocked(r.locked) && r.kind !== 'learned';
     };
-    // Learned shortcut overlay — a paved amber edge glowing by learned weight,
-    // drawn on top of whatever base road (if any) shares the pair. This is the
-    // visible payoff of route optimization: roads the base map never had.
-    var drawLearned = function (r) {
-      var pa = self.proj(self.N[r.a].x, self.N[r.a].y), pb = self.proj(self.N[r.b].x, self.N[r.b].y);
-      var w = Math.max(0, Math.min(1, r.weight || 0));
-      g.save();
-      g.lineCap = 'round';
-      g.strokeStyle = 'rgba(224,172,134,' + (0.35 + 0.5 * w).toFixed(3) + ')';
-      g.lineWidth = (2 + 6 * w) * z;
-      g.shadowColor = 'rgba(224,138,68,.8)'; g.shadowBlur = (6 + 14 * w) * z;
-      g.setLineDash([10 * z, 7 * z]);
-      g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke();
-      g.restore();
-    };
-
-    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'street'; }).forEach(function (k) { drawRoad(self.roads[k]); });
-    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'ring'; }).forEach(function (k) { drawRoad(self.roads[k]); });
-    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'highway'; }).forEach(function (k) { drawRoad(self.roads[k]); });
-    this.roadKeys.filter(function (k) { return self.roads[k].kind === 'verify'; }).forEach(function (k) { drawRoad(self.roads[k]); });
-    if (SHOW_LEARNED) this.roadKeys.filter(function (k) { return self.roads[k].learned; }).forEach(function (k) { drawLearned(self.roads[k]); });
-
-    // hub
-    (function () {
-      var p = self.proj(0, 0), hx = p[0], hy = p[1], rr = 26 * z;
-      g.beginPath(); g.ellipse(hx, hy, rr * 1.55, rr * 0.86, 0, 0, 6.283);
-      g.fillStyle = 'rgba(245,234,216,.10)'; g.fill();
-      g.strokeStyle = 'rgba(245,234,216,.45)'; g.lineWidth = 1.5 * z; g.stroke();
-      g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif';
-      g.textAlign = 'center'; g.fillStyle = '#f5ead8';
-      g.fillText('QUESTION HUB', hx, hy + 4 * z);
-    })();
-
-    // fog — the signature behaviour
-    FOG.forEach(function (f) {
-      var al = self.fogAlpha(f, secs);
-      if (al <= 0.001) return;
-      var p = self.proj(f.x, f.y), sx = p[0], sy = p[1], rx = f.r * 34 * z, ry = f.r * 20 * z;
-      g.save();
-      g.globalAlpha = al;
-      var grd = g.createRadialGradient(sx, sy, rx * .1, sx, sy, rx);
-      grd.addColorStop(0, 'rgba(233,224,208,.60)'); grd.addColorStop(.6, 'rgba(210,199,182,.34)'); grd.addColorStop(1, 'rgba(190,180,164,0)');
-      g.fillStyle = grd;
-      g.beginPath();
-      for (var i = 0; i <= 46; i++) {
-        var th = i / 46 * 6.283;
-        var wob = 1 + Math.sin(th * 3 + f.x) * .12 + Math.cos(th * 5 - f.y) * .08;
-        var x = sx + Math.cos(th) * rx * wob, y = sy + Math.sin(th) * ry * wob;
-        i ? g.lineTo(x, y) : g.moveTo(x, y);
-      }
-      g.closePath(); g.fill();
-      g.setLineDash([7 * z, 6 * z]); g.strokeStyle = 'rgba(245,234,216,.5)'; g.lineWidth = 1.4 * z; g.stroke();
-      if (z > 0.5) {
-        g.setLineDash([]);
-        g.font = '700 ' + Math.max(10, 13 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif';
-        g.textAlign = 'center'; g.fillStyle = 'rgba(40,34,28,.72)';
-        g.fillText('UNKNOWN', sx, sy - 2 * z);
-        g.font = '600 ' + Math.max(8, 10 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif';
-        g.fillText('we don’t know enough here', sx, sy + 13 * z);
-      }
-      g.restore();
+    var WID = { avenue: 1.35, street: .8, drive: .34, verify: .8, bridge: 1.0 };
+    this.roadKeys.filter(vis).forEach(function (k) {
+      var r = self.roads[k]; if (r.kind === 'drive') return;
+      self.roadQuad(g, r, (WID[r.kind] || .8) + .3, C.walk);
     });
-
-    // buildings
-    var matches = 0;
-    var sorted = this.order.slice().sort(function (a, b) { return (self.B[a].x + self.B[a].y) - (self.B[b].x + self.B[b].y); });
-    sorted.forEach(function (k) {
-      var b = self.B[k], p = self.proj(b.x, b.y), sx = p[0], sy = p[1];
-      if (sx < -140 || sx > self.w + 140 || sy < -180 || sy > self.h + 140) return;
-      var bw = 24 * z, bh = 12 * z, up = b.h * 13 * z;
-      var hit = q && b.label.toLowerCase().indexOf(q) >= 0; if (hit) matches++;
-      var isSel = self.state.pop === k;
-      var contradiction = k === 'risk-1' && secs >= 3 && secs < 9.5;
-      var con = b.kind === 'c';
-      var left = con ? '#8f4c1e' : '#4f5c3a', right = con ? '#c67139' : '#7a8a5e', top = con ? '#e0ac86' : '#b6c69b';
-      g.fillStyle = left;
-      g.beginPath(); g.moveTo(sx - bw, sy - bh); g.lineTo(sx, sy); g.lineTo(sx, sy - up); g.lineTo(sx - bw, sy - bh - up); g.closePath(); g.fill();
-      g.fillStyle = right;
-      g.beginPath(); g.moveTo(sx + bw, sy - bh); g.lineTo(sx, sy); g.lineTo(sx, sy - up); g.lineTo(sx + bw, sy - bh - up); g.closePath(); g.fill();
-      g.fillStyle = top;
-      g.beginPath(); g.moveTo(sx, sy - up - bh * 2); g.lineTo(sx + bw, sy - up - bh); g.lineTo(sx, sy - up); g.lineTo(sx - bw, sy - up - bh); g.closePath(); g.fill();
-      g.strokeStyle = isSel || hit ? '#f5ead8' : 'rgba(28,24,21,.6)'; g.lineWidth = isSel || hit ? 2.2 * z : 1 * z; g.stroke();
-      if (b.kind === 'd' && z > 0.7) {
-        g.strokeStyle = '#b6c69b'; g.lineWidth = 1.6 * z;
-        g.beginPath(); g.moveTo(sx, sy - up - bh * 2); g.lineTo(sx, sy - up - bh * 2 - 12 * z); g.stroke();
-      }
-      if (contradiction) {
-        var pul = .45 + .55 * Math.abs(Math.sin(secs * 3.4));
-        g.save(); g.globalAlpha = pul;
-        g.strokeStyle = '#e08a44'; g.lineWidth = 2.4 * z;
-        g.beginPath(); g.moveTo(sx, sy - up - bh * 2 - 4 * z); g.lineTo(sx + bw + 4 * z, sy - up - bh); g.lineTo(sx, sy - up + 4 * z); g.lineTo(sx - bw - 4 * z, sy - up - bh); g.closePath(); g.stroke();
-        g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#e08a44';
-        g.fillText('⚠ CONTRADICTION', sx, sy - up - bh * 2 - 14 * z);
+    this.roadKeys.filter(vis).forEach(function (k) {
+      var r = self.roads[k];
+      self.roadQuad(g, r, WID[r.kind] || .8, r.kind === 'verify' ? 'rgba(154,92,138,.55)' : C.road);
+    });
+    // centre dashes on the avenues
+    if (z > .5) {
+      g.save(); g.strokeStyle = C.mark; g.lineWidth = Math.max(.8, 1.1 * z); g.setLineDash([6 * z, 6 * z]);
+      this.roadKeys.filter(function (k) { return vis(k) && self.roads[k].kind === 'avenue'; }).forEach(function (k) {
+        var r = self.roads[k], A = self.nodes[r.a], B = self.nodes[r.b];
+        var p1 = self.proj(A.x, A.y), p2 = self.proj(B.x, B.y);
+        g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
+      });
+      g.restore();
+    }
+    // Learned shortcut overlay — amber edges the optimizer paved from history,
+    // glowing by weight. The visible payoff of route optimization.
+    if (SHOW_LEARNED) {
+      this.roadKeys.filter(function (k) { return self.roads[k].learned; }).forEach(function (k) {
+        var r = self.roads[k], A = self.nodes[r.a], B = self.nodes[r.b]; if (!A || !B) return;
+        var pa = self.proj(A.x, A.y), pb = self.proj(B.x, B.y);
+        var w = Math.max(0, Math.min(1, r.weight || 0));
+        g.save(); g.lineCap = 'round';
+        g.strokeStyle = 'rgba(198,113,57,' + (0.4 + 0.45 * w).toFixed(3) + ')';
+        g.lineWidth = (2 + 6 * w) * z;
+        g.shadowColor = 'rgba(224,138,68,.8)'; g.shadowBlur = (6 + 14 * w) * z;
+        g.setLineDash([10 * z, 7 * z]);
+        g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke();
         g.restore();
-      }
-      if (z > 0.92) {
-        g.font = '600 ' + Math.max(10, 11 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center';
-        var w = g.measureText(b.label).width + 13 * z, ly = sy - up - bh * 2 - (contradiction ? 30 : b.kind === 'd' ? 22 : 11) * z;
-        g.fillStyle = 'rgba(18,16,14,.85)';
-        g.beginPath(); g.roundRect(sx - w / 2, ly - 14 * z, w, 19 * z, 9 * z); g.fill();
-        g.fillStyle = '#f5ead8'; g.fillText(b.label, sx, ly);
-      }
-    });
-    if (matches !== this.state.matches) { this.state.matches = matches; }
-
-    // district names
-    if (z < 1.5) {
-      Object.keys(this.D).forEach(function (id) {
-        var d = self.D[id], p = self.proj(d.cx, d.cy);
-        g.font = Math.max(13, Math.min(24, 19 * z)).toFixed(0) + 'px Caprasimo, serif';
-        g.textAlign = 'center'; g.fillStyle = d.tone === 's' ? 'rgba(182,198,155,.85)' : d.tone === 'a' ? 'rgba(224,172,134,.85)' : 'rgba(245,234,216,.6)';
-        g.fillText(d.name.toUpperCase(), p[0], p[1] + 74 * z);
       });
     }
 
-    // travelled trails + agents
+    // traversal glow — the trail an agent has actually driven, fading behind it
     AG.forEach(function (a) {
-      var pts = self.paths[a.id], cur = self.posAt(a, secs), on = self.state.sel === a.id;
-      g.save();
-      g.globalAlpha = on ? .95 : .4; g.strokeStyle = a.c; g.lineWidth = (on ? 3.4 : 2.2) * z; g.lineCap = 'round';
-      g.beginPath();
-      for (var i = 0; i <= cur.idx; i++) {
-        var pp = i === cur.idx ? cur.pt : pts[i], pr = self.proj(pp.x, pp.y);
-        i ? g.lineTo(pr[0], pr[1]) : g.moveTo(pr[0], pr[1]);
+      var pts = self.paths[a.id] || [], cur = self.posAt(a, secs);
+      g.save(); g.lineCap = 'round';
+      for (var i = 1; i <= cur.idx && i < pts.length; i++) {
+        var p0 = pts[i - 1], p1 = pts[i];
+        var age = secs - p1.at, on = self.state.sel === a.id;
+        g.globalAlpha = (on ? .8 : .32) * Math.max(.22, 1 - age / 3.5);
+        g.strokeStyle = p1.off ? '#c76b6b' : a.c;
+        g.lineWidth = (on ? 5 : 3) * z;
+        g.setLineDash(p1.off ? [6 * z, 5 * z] : []);
+        var q1 = self.proj(p0.x, p0.y), q2 = self.proj(p1.x, p1.y);
+        g.beginPath(); g.moveTo(q1[0], q1[1]); g.lineTo(q2[0], q2[1]); g.stroke();
       }
-      g.stroke();
       g.restore();
-      var pc = self.proj(cur.pt.x, cur.pt.y), sx = pc[0], sy = pc[1], r = Math.max(9, 12 * z);
-      var inFog = !!cur.pt.off && self.fogAlpha(FOG[0], secs) > 0.05;
+    });
+    if (this.state.road && this.roads[this.state.road]) {
+      var sr = this.roads[this.state.road], SA = this.nodes[sr.a], SB = this.nodes[sr.b];
+      if (SA && SB) {
+        g.save(); g.strokeStyle = '#2b2419'; g.lineWidth = 2; g.setLineDash([6, 5]);
+        var s1 = this.proj(SA.x, SA.y), s2 = this.proj(SB.x, SB.y);
+        g.beginPath(); g.moveTo(s1[0], s1[1]); g.lineTo(s2[0], s2[1]); g.stroke(); g.restore();
+      }
+    }
+
+    // air route + hyperloop — the two infrastructure unlocks
+    if (this.unlocked('airport') && this.unlocked('island1')) {
+      var isl0 = ISLANDS[0];
+      var f1 = this.proj(AIRPORT.x, AIRPORT.y - 3), f2 = this.proj(isl0.cx - 2, isl0.cy + 2);
+      var fmx = (f1[0] + f2[0]) / 2, fmy = (f1[1] + f2[1]) / 2 - 90 * z;
+      g.save(); g.strokeStyle = 'rgba(60,52,42,.45)'; g.lineWidth = Math.max(1, 1.5 * z); g.setLineDash([7 * z, 7 * z]);
+      g.beginPath(); g.moveTo(f1[0], f1[1]); g.quadraticCurveTo(fmx, fmy, f2[0], f2[1]); g.stroke(); g.setLineDash([]);
+      var tt = (performance.now() / 3400) % 1, u = 1 - tt;
+      var px2 = u * u * f1[0] + 2 * u * tt * fmx + tt * tt * f2[0];
+      var py2 = u * u * f1[1] + 2 * u * tt * fmy + tt * tt * f2[1];
+      g.translate(px2, py2);
+      g.fillStyle = '#f5ead8'; g.strokeStyle = '#5f5346'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(9 * z, 0); g.lineTo(-6 * z, 5 * z); g.lineTo(-3 * z, 0); g.lineTo(-6 * z, -5 * z); g.closePath(); g.fill(); g.stroke();
+      g.restore();
+    }
+    if (this.unlocked('rail')) {
+      var isl1 = ISLANDS[1], grr = this.unlockGrow('rail');
+      var h1 = this.proj(this.hub.cx, this.hub.cy), h2 = this.proj(isl1.cx + 8, isl1.cy - 2);
+      g.save(); g.globalAlpha = grr;
+      for (var pi = 0; pi <= 10; pi++) {
+        var fx = h1[0] + (h2[0] - h1[0]) * pi / 10, fy = h1[1] + (h2[1] - h1[1]) * pi / 10;
+        g.strokeStyle = 'rgba(90,80,66,.7)'; g.lineWidth = Math.max(1.5, 2.4 * z);
+        g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx, fy - 16 * z); g.stroke();
+      }
+      g.strokeStyle = '#b9b0a1'; g.lineWidth = Math.max(2, 4 * z);
+      g.beginPath(); g.moveTo(h1[0], h1[1] - 16 * z); g.lineTo(h2[0], h2[1] - 16 * z); g.stroke();
+      var rt = (performance.now() / 2600) % 1;
+      g.fillStyle = '#9a5c8a';
+      g.beginPath();
+      g.ellipse(h1[0] + (h2[0] - h1[0]) * rt, h1[1] + (h2[1] - h1[1]) * rt - 20 * z, 13 * z, 5 * z, Math.atan2(h2[1] - h1[1], h2[0] - h1[0]), 0, 6.283);
+      g.fill(); g.restore();
+    }
+
+    // hub plaza label
+    var hp = this.proj(this.hub.cx, this.hub.cy);
+    g.fillStyle = 'rgba(43,36,25,.85)';
+    g.font = '700 ' + Math.max(9, 11 * z).toFixed(0) + 'px Figtree, sans-serif';
+    g.textAlign = 'center'; g.fillText('QUESTION HUB', hp[0], hp[1] + 4);
+
+    // ── sprites, depth sorted so cars pass behind and in front of buildings ──
+    var sprites = [];
+    this.order.forEach(function (k) {
+      var b = self.B[k]; if (!self.unlocked(b.locked)) return;
+      sprites.push({ d: b.x + b.y, kind: 'b', b: b });
+    });
+    this.decor.filter(function (d) { return d.t === 'tree'; }).forEach(function (d) { sprites.push({ d: d.x + d.y, kind: 't', d: d }); });
+    AG.forEach(function (a) {
+      var cur = self.posAt(a, secs);
+      var dir = cur.from && cur.to ? { x: cur.to.x - cur.from.x, y: cur.to.y - cur.from.y } : { x: 1, y: 0 };
+      sprites.push({ d: cur.pt.x + cur.pt.y + .01, kind: 'a', a: a, pt: cur.pt, dir: dir });
+    });
+    (this.parked || []).forEach(function (p) { sprites.push({ d: p.x + p.y + .005, kind: 'p', p: p }); });
+    sprites.sort(function (p, r) { return p.d - r.d; });
+    var matches = 0;
+    sprites.forEach(function (sp) {
+      if (sp.kind === 't') { self.tree(g, sp.d); return; }
+      if (sp.kind === 'b') {
+        var b = sp.b, bp = self.proj(b.x, b.y);
+        if (bp[0] < -160 || bp[0] > self.w + 160 || bp[1] < -200 || bp[1] > self.h + 160) return;
+        var hit = q && b.label.toLowerCase().indexOf(q) >= 0; if (hit) matches++;
+        var isSel = self.state.pop === b.id;
+        var con = b.id === 'risk-1' && secs >= 3 && secs < 9.5;
+        var res = self.house(g, b, secs, isSel, hit);
+        if (!res) return;
+        if (z > .62 || isSel || hit || con) labels.push({ x: bp[0], y: res.top - 8, text: b.label, con: con, sel: isSel || hit });
+        return;
+      }
+      if (sp.kind === 'p') {
+        // Parked at home — dimmed, facing the district, labelled "· at <home>".
+        var pk = sp.p;
+        g.save(); g.globalAlpha = .62;
+        var pr = self.car(g, pk.x, pk.y, pk.color, { x: -1, y: 0 }, false);
+        g.restore();
+        labels.push({ x: self.proj(pk.x, pk.y)[0], y: pr.top - 8, text: pk.name + ' · idle', agent: pk.color, dim: true });
+        return;
+      }
+      var a = sp.a, inFog = !!sp.pt.off;
+      var rr = self.car(g, sp.pt.x, sp.pt.y, a.c, sp.dir, inFog);
+      labels.push({ x: self.proj(sp.pt.x, sp.pt.y)[0], y: rr.top - 8, text: a.name, agent: a.c, sel: self.state.sel === a.id });
+    });
+    if (matches !== this.state.matches) { this.state.matches = matches; }
+
+    // fog blocks — the signature behaviour
+    FOG.forEach(function (f) {
+      if (f.noBlob) return;
+      var al = self.fogAlpha(f, secs);
+      if (al <= .002) return;
+      var fp = self.proj(f.x, f.y), sx = fp[0], sy = fp[1];
+      var rx = (f.r || 6.6) * TW * z * .92, ry = (f.r || 6.6) * TH * z * 1.5;
+      g.save(); g.globalAlpha = al;
+      var grd = g.createRadialGradient(sx, sy, rx * .15, sx, sy, rx);
+      grd.addColorStop(0, 'rgba(246,241,232,.97)'); grd.addColorStop(.62, 'rgba(231,224,211,.88)'); grd.addColorStop(1, 'rgba(214,207,193,0)');
+      g.fillStyle = grd;
+      g.beginPath();
+      for (var i3 = 0; i3 <= 54; i3++) {
+        var th = i3 / 54 * 6.283;
+        var wob = 1 + Math.sin(th * 3 + f.x) * .1 + Math.cos(th * 5 - f.y) * .07 + Math.sin(secs * .6 + th * 2) * .015;
+        var fx2 = sx + Math.cos(th) * rx * wob, fy2 = sy + Math.sin(th) * ry * wob;
+        i3 ? g.lineTo(fx2, fy2) : g.moveTo(fx2, fy2);
+      }
+      g.closePath(); g.fill();
+      g.setLineDash([8 * z, 7 * z]); g.strokeStyle = 'rgba(120,110,96,.55)'; g.lineWidth = Math.max(1.2, 1.6 * z); g.stroke();
+      g.setLineDash([]);
+      g.textAlign = 'center';
+      g.font = '700 ' + Math.max(12, 16 * Math.min(1.4, z)).toFixed(0) + 'px Figtree, sans-serif';
+      g.fillStyle = 'rgba(60,52,42,.8)'; g.fillText('UNKNOWN', sx, sy - 2);
+      g.font = '600 ' + Math.max(9, 11 * Math.min(1.4, z)).toFixed(0) + 'px Figtree, sans-serif';
+      g.fillStyle = 'rgba(80,70,58,.75)'; g.fillText('we don’t know enough here', sx, sy + 15 * Math.min(1.4, z));
+      g.restore();
+    });
+
+    // district + island nameplates
+    var plate = function (label, x, y) {
+      g.font = Math.max(10, Math.min(17, 14 * z)).toFixed(0) + 'px Caprasimo, serif';
+      g.textAlign = 'center';
+      var w2 = g.measureText(label).width + 14 * z;
+      g.fillStyle = 'rgba(43,36,25,.66)';
+      g.beginPath(); g.roundRect(x - w2 / 2, y - 11 * z, w2, 18 * z, 9 * z); g.fill();
+      g.fillStyle = '#f5ead8'; g.fillText(label, x, y + 2 * z);
+    };
+    if (z <= 1.35) {
+      Object.keys(this.D).forEach(function (id) {
+        var d = self.D[id], dp = self.proj(d.cx, d.cy + 6.6);
+        plate(d.name.toUpperCase(), dp[0], dp[1]);
+      });
+      var hnp = this.proj(this.hub.cx, this.hub.cy + 6.6);
+      plate('HUB PLAZA', hnp[0], hnp[1]);
+      ISLANDS.concat([{ id: 'ap', tier: 'airport', name: 'Evidence Airport', cx: AIRPORT.x, cy: AIRPORT.y + 7 }]).forEach(function (isl) {
+        if (!self.unlocked(isl.tier)) return;
+        var np = self.proj(isl.cx, isl.cy + (isl.id === 'ap' ? 0 : 8));
+        plate(isl.name.toUpperCase(), np[0], np[1]);
+      });
+    }
+
+    // labels last, so nothing overdraws them
+    labels.forEach(function (l) {
       g.save();
-      g.globalAlpha = .2; g.fillStyle = a.c;
-      g.beginPath(); g.ellipse(sx, sy + 3, r * 1.5, r * .6, 0, 0, 6.283); g.fill();
-      g.globalAlpha = 1;
-      g.beginPath(); g.arc(sx, sy - r * .5, r, 0, 6.283); g.fillStyle = inFog ? 'rgba(120,110,98,.95)' : a.c; g.fill();
-      g.lineWidth = 2.4; g.strokeStyle = inFog ? '#f5ead8' : '#1c1815'; g.stroke();
-      g.font = '700 ' + (r * 1.05).toFixed(0) + 'px Figtree, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = '#fff'; g.fillText(inFog ? '?' : a.name[0], sx, sy - r * .5);
-      g.textBaseline = 'alphabetic';
-      if (on) { g.beginPath(); g.arc(sx, sy - r * .5, r + 5, 0, 6.283); g.strokeStyle = a.c; g.lineWidth = 1.8; g.stroke(); }
+      if (l.dim) g.globalAlpha = .72;
+      g.font = '700 ' + Math.max(9, 11 * Math.min(1.3, z)).toFixed(0) + 'px Figtree, sans-serif';
+      g.textAlign = 'center';
+      var w2 = g.measureText(l.text).width + 12;
+      g.fillStyle = l.agent ? l.agent : l.con ? '#c67139' : 'rgba(28,24,21,.82)';
+      g.beginPath(); g.roundRect(l.x - w2 / 2, l.y - 15, w2, 17, 8); g.fill();
+      if (l.sel) { g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke(); }
+      g.fillStyle = '#f5ead8'; g.fillText(l.text, l.x, l.y - 3);
+      if (l.con) {
+        g.font = '700 ' + Math.max(9, 10 * z).toFixed(0) + 'px Figtree, sans-serif';
+        g.fillStyle = '#c67139';
+        g.fillText('⚠ CONTRADICTION', l.x, l.y - 20);
+      }
       g.restore();
     });
   };
@@ -825,14 +1505,14 @@
   // ── DOM render ─────────────────────────────────────────────────────────
   BrainModel.prototype.renderLegend = function () {
     var legend = [
-      { label: 'Learned concept', color: '#e0ac86', r: '3px' },
-      { label: 'Source document', color: '#b6c69b', r: '3px' },
-      { label: 'Fog · we don’t know', color: 'rgba(233,224,208,.75)', r: '999px' },
+      { label: 'Learned concept', color: C.roofA, r: '3px' },
+      { label: 'Source document', color: C.roofS, r: '3px' },
+      { label: 'Fog · we don’t know', color: 'rgba(246,241,232,.9)', r: '999px' },
       { label: 'Verification route', color: '#9a5c8a', r: '2px' },
       { label: 'Contradiction', color: '#e08a44', r: '2px' }
     ];
     document.getElementById('bmLegend').innerHTML = legend.map(function (l) {
-      return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:var(--ink2); border:1px solid var(--line); font-size:10px; font-weight:500; color:var(--parch-dim);">' +
+      return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:rgba(28,24,21,.82); border:1px solid var(--line); font-size:10px; font-weight:500; color:var(--parch-dim); backdrop-filter:blur(3px); white-space:nowrap;">' +
         '<span style="width:8px; height:8px; border-radius:' + l.r + '; background:' + l.color + ';"></span>' + esc(l.label) + '</span>';
     }).join('');
   };
@@ -866,14 +1546,35 @@
     var lod = this.z < 0.55 ? 'Districts' : this.z < 0.95 ? 'Streets' : 'Buildings';
     document.getElementById('bmLod').textContent = lod;
     var anyFog = AG.some(function (a) { var c = self.paths ? self.posAt(a, secs) : null; return c && c.pt.off; });
+    var nextTier = TIERS.filter(function (t) { return S.queries < t.at; })[0];
+    var visible = this.order.filter(function (k) { return self.unlocked(self.B[k].locked); }).length;
     var tags = [
-      { label: (anyFog ? 'AGENT IN FOG · UNSOURCED' : secs >= DUR ? 'ANSWER VERIFIED' : 'RACE LIVE · ' + AG.length + (AG.length === 1 ? ' AGENT' : ' AGENTS')), bg: anyFog ? 'rgba(199,107,107,.18)' : 'var(--ink2)', border: anyFog ? 'rgba(199,107,107,.6)' : 'var(--line)', fg: anyFog ? '#e2a3a3' : 'var(--parch)', dot: anyFog ? '#c76b6b' : secs >= 11 ? '#93a56e' : 'var(--accent)' },
-      { label: F(this.z * 100, 0) + '% · ' + this.order.length + ' buildings', bg: 'var(--ink2)', border: 'var(--line)', fg: 'var(--parch-dim)', dot: 'rgba(245,234,216,.35)' }
+      { label: (anyFog ? 'AGENT IN FOG · UNSOURCED' : secs >= DUR ? 'ANSWER VERIFIED' : 'RACE LIVE · ' + AG.length + (AG.length === 1 ? ' AGENT' : ' AGENTS')), bg: anyFog ? 'rgba(199,107,107,.85)' : 'rgba(28,24,21,.82)', border: anyFog ? 'rgba(199,107,107,.6)' : 'var(--line)', fg: anyFog ? '#fff' : 'var(--parch)', dot: anyFog ? '#fff' : secs >= 11 ? '#93a56e' : 'var(--accent)' },
+      { label: S.queries + ' queries learned · ' + visible + ' buildings', bg: 'rgba(28,24,21,.82)', border: 'var(--line)', fg: 'var(--parch-dim)', dot: 'rgba(245,234,216,.35)' },
+      { label: nextTier ? 'NEXT: ' + nextTier.name.toUpperCase() + ' · ' + (nextTier.at - S.queries) + ' TO GO' : 'ATLAS FULLY UNLOCKED', bg: 'rgba(28,24,21,.82)', border: 'var(--line)', fg: 'var(--accent-300)', dot: 'var(--accent)' }
     ];
     document.getElementById('bmLiveTags').innerHTML = tags.map(function (gt) {
-      return '<span style="display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; background:' + gt.bg + '; border:1px solid ' + gt.border + '; font-size:11px; font-weight:700; color:' + gt.fg + ';">' +
+      return '<span style="display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; background:' + gt.bg + '; border:1px solid ' + gt.border + '; font-size:11px; font-weight:700; color:' + gt.fg + '; backdrop-filter:blur(3px); white-space:nowrap; flex-shrink:0;">' +
         '<span style="width:7px; height:7px; border-radius:999px; background:' + gt.dot + ';"></span>' + esc(gt.label) + '</span>';
     }).join('');
+
+    // composer — visible only when open; the district list follows the map
+    var comp = document.getElementById('bmComposer'), compOpen = document.getElementById('bmComposeOpen');
+    comp.style.display = S.composer ? 'block' : 'none';
+    compOpen.style.display = S.composer ? 'none' : 'inline-flex';
+    if (S.composer) {
+      var distIds = Object.keys(this.D);
+      var sel2 = document.getElementById('bmComposeDist');
+      var want = distIds.map(function (id) { return id + ':' + self.D[id].name; }).join('|');
+      if (sel2.getAttribute('data-sig') !== want) {
+        sel2.setAttribute('data-sig', want);
+        sel2.innerHTML = distIds.map(function (id) { return '<option value="' + esc(id) + '">' + esc(self.D[id].name) + '</option>'; }).join('');
+      }
+      if (S.qDist && sel2.value !== S.qDist) sel2.value = S.qDist;
+      var txt = document.getElementById('bmComposeText');
+      if (txt.value !== S.qText) txt.value = S.qText;
+      document.getElementById('bmComposeNote').textContent = nextTier ? nextTier.name + ' in ' + (nextTier.at - S.queries) + ' more' : 'Everything unlocked';
+    }
 
     // standings
     document.getElementById('bmCapLabel').textContent = 'cap ' + budget + 'k · enforced by Plato';
@@ -906,7 +1607,7 @@
     }).join('');
 
     // tabs
-    var tabDefs = [['route', 'Why this route'], ['road', 'Road decision'], ['place', 'Place'], ['log', 'Controller'], ['fog', 'Fog'], ['agent', 'Agent']];
+    var tabDefs = [['route', 'Why this route'], ['field', 'Field'], ['growth', 'Growth'], ['road', 'Road decision'], ['place', 'Place'], ['log', 'Controller'], ['fog', 'Fog'], ['agent', 'Agent']];
     document.getElementById('bmTabs').innerHTML = tabDefs.map(function (row) {
       var on = S.tab === row[0];
       return '<span class="bm-tab" data-act="tab" data-k="' + row[0] + '" style="padding:6px 11px; border-radius:999px; font-size:11px; font-weight:600; background:' + (on ? 'var(--accent)' : 'var(--ink3)') + '; color:' + (on ? '#fff' : 'var(--parch-dim)') + ';">' + row[1] + '</span>';
@@ -934,7 +1635,11 @@
         return '<div class="bm-row" data-act="leg" data-i="' + i + '" style="display:flex; gap:10px; padding:8px 9px; border-radius:11px; background:' + (secs >= p.at ? 'var(--ink3)' : 'transparent') + ';">' +
           '<span style="width:8px; height:8px; border-radius:' + (p.off ? '2px' : '999px') + '; background:' + dot + '; flex-shrink:0; margin-top:4px;"></span>' +
           '<div style="min-width:0;"><div style="font-size:12px; font-weight:700;">' + esc(p.label) + '</div>' +
-          '<div style="font-size:11px; line-height:1.5; color:var(--parch-dim);">' + esc(p.reason) + '</div></div>' +
+          // The reason it went. `detail` is what it actually asked for once there —
+          // kept separate so the input can never masquerade as a rationale.
+          '<div style="font-size:11px; line-height:1.5; color:var(--parch-dim);">' + esc(p.reason) + '</div>' +
+          (p.detail ? '<div style="font-size:10px; line-height:1.45; color:var(--parch-dim); opacity:.75; margin-top:3px; font-variant-numeric:tabular-nums;">asked: ' + esc(p.detail) + '</div>' : '') +
+          '</div>' +
           '<span style="margin-left:auto; font-size:10px; font-variant-numeric:tabular-nums; color:var(--parch-dim); flex-shrink:0;">' + F(p.at, 1) + 's</span>' +
         '</div>';
       }).join('');
@@ -952,22 +1657,95 @@
         '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">' + metrics.map(function (m) {
           return '<div style="background:var(--ink3); border-radius:11px; padding:8px 10px;"><div style="font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--parch-dim);">' + m.k + '</div><div style="font-size:14px; font-weight:700; margin-top:1px; color:' + m.tone + ';">' + esc(m.v) + '</div></div>';
         }).join('') + '</div>' +
-        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Legs travelled · click to see the road</div>' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Stops · click to drive there</div>' +
         '<div style="display:flex; flex-direction:column; gap:2px;">' + legs + '</div></div></div>';
+    }
+
+    // Field — every agent, where it lives, and whether it is out on a task.
+    // This is the "where is everyone" view; the map shows the same thing.
+    if (S.tab === 'field') {
+      var onRun = {}; AG.forEach(function (a) { onRun[a.id] = a; });
+      var roster = (ROSTER || []).slice().sort(function (x, y) {
+        return (onRun[y.id] ? 1 : 0) - (onRun[x.id] ? 1 : 0);
+      });
+      if (!roster.length) {
+        return '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">Sign in to see the field. Each agent is placed on the map at the district its own tool grant covers — Markets, Web &amp; Search, Portfolio and so on — and moves when it is dispatched.</div>';
+      }
+      var cards = roster.map(function (r) {
+        var live = !!onRun[r.id];
+        // Report where it ACTUALLY sits on this map, not just its nominal home —
+        // a run whose map has no Portfolio district parks Rasha at the hub, and
+        // the panel has to say so rather than pointing at a district that isn't there.
+        var pk = (self.parked || []).filter(function (p) { return p.id === r.id; })[0];
+        var where = live ? 'out on this task'
+          : pk ? (pk.homeMissing ? 'at the hub forecourt — no ' + (r.home ? r.home.name : 'home') + ' district on this map' : 'at ' + pk.where)
+          : (r.home ? 'at ' + r.home.name : 'at the hub forecourt');
+        var toolsLine = (r.districts || []).map(function (d) { return d.name + ' ×' + d.tools; }).join(' · ') || 'no domain tools';
+        var lastLine = r.last ? (r.last.goal || '').slice(0, 90) : '';
+        return '<div class="bm-row" data-act="findagent" data-id="' + esc(r.id) + '" style="padding:10px 12px; border-radius:13px; background:var(--ink3); border:1px solid ' + (live ? r.color : 'transparent') + ';">' +
+          '<div style="display:flex; align-items:center; gap:9px;">' +
+            '<span style="width:10px; height:10px; border-radius:999px; background:' + r.color + '; flex-shrink:0;"></span>' +
+            '<span style="font-size:12px; font-weight:700;">' + esc(r.name) + '</span>' +
+            '<span style="font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:var(--parch-dim);">' + esc(r.role) + '</span>' +
+            '<span style="margin-left:auto; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:' + (live ? 'rgba(224,138,68,.22)' : 'rgba(245,234,216,.1)') + '; color:' + (live ? '#e0ac86' : 'var(--parch-dim)') + ';">' + (live ? 'dispatched' : 'idle') + '</span>' +
+          '</div>' +
+          '<div style="font-size:11px; color:var(--parch); margin-top:5px;">' + esc(where) + '</div>' +
+          '<div style="font-size:10px; line-height:1.5; color:var(--parch-dim); margin-top:2px;">covers ' + esc(toolsLine) + '</div>' +
+          (lastLine ? '<div style="font-size:10px; line-height:1.5; color:var(--parch-dim); margin-top:4px; opacity:.8;">last task: ' + esc(lastLine) + '</div>' : '') +
+          '</div>';
+      }).join('');
+      return '<div style="display:flex; flex-direction:column; gap:12px;">' +
+        '<div style="display:flex; align-items:baseline; justify-content:space-between;">' +
+          '<span style="font-family:\'Caprasimo\',serif; font-size:15px;">The field</span>' +
+          '<span style="font-size:10px; color:var(--parch-dim);">' + roster.length + ' agents · ' + AG.length + ' on this task</span></div>' +
+        '<div style="display:flex; flex-direction:column; gap:6px;">' + cards + '</div>' +
+        '<div style="font-size:11px; line-height:1.65; color:var(--parch-dim);">An agent parks in the district its own tools cover, so where it sits is what it is equipped to answer. When Plato dispatches it, it drives from there — and every stop on the way carries the reason it went.</div></div>';
+    }
+
+    // Atlas growth — how many questions have been asked, what they built, and
+    // what the next unlock costs.
+    if (S.tab === 'growth') {
+      var tiers = TIERS.map(function (t) {
+        var done = S.queries >= t.at;
+        return '<div class="bm-row" data-act="tier" data-id="' + t.id + '" style="padding:10px 12px; border-radius:13px; background:' + (done ? 'rgba(147,165,110,.16)' : 'var(--ink3)') + '; border:1px solid ' + (done ? 'rgba(147,165,110,.5)' : 'transparent') + ';">' +
+          '<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">' +
+            '<span style="font-size:12px; font-weight:700;">' + esc(t.name) + '</span>' +
+            '<span style="margin-left:auto; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:' + (done ? 'rgba(147,165,110,.25)' : 'rgba(245,234,216,.1)') + '; color:' + (done ? '#b6c69b' : 'var(--parch-dim)') + '; white-space:nowrap;">' + (done ? 'unlocked' : (t.at - S.queries) + ' to go') + '</span>' +
+          '</div>' +
+          '<div style="font-size:11px; line-height:1.5; color:var(--parch-dim); margin-bottom:7px;">' + esc(t.note) + '</div>' +
+          '<div style="height:5px; border-radius:999px; background:rgba(245,234,216,.14); overflow:hidden;">' +
+            '<div style="height:100%; border-radius:999px; width:' + F(Math.min(100, S.queries / t.at * 100), 0) + '%; background:' + (done ? '#93a56e' : 'var(--accent)') + ';"></div>' +
+          '</div></div>';
+      }).join('');
+      var grown = S.grown.map(function (gx) {
+        return '<div class="bm-row" data-act="grown" data-id="' + esc(gx.id) + '" style="display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:11px; background:var(--ink3);">' +
+          '<span style="width:22px; height:22px; border-radius:7px; flex-shrink:0; background:#c67139;"></span>' +
+          '<div style="min-width:0;"><div style="font-size:12px; font-weight:700;">' + esc(gx.label) + '</div>' +
+          '<div style="font-size:10px; color:var(--parch-dim);">' + esc(gx.district) + ' · ' + esc(gx.when) + '</div></div></div>';
+      }).join('');
+      if (!S.grown.length) grown = '<div style="font-size:11px; line-height:1.6; color:var(--parch-dim);">Nothing yet. Ask a question at the bottom of the map — each one builds on the land and moves the atlas towards its next unlock.</div>';
+      return '<div style="display:flex; flex-direction:column; gap:12px;">' +
+        '<div style="display:flex; align-items:baseline; justify-content:space-between;">' +
+          '<span style="font-family:\'Caprasimo\',serif; font-size:15px;">Atlas growth</span>' +
+          '<span style="font-size:10px; color:var(--parch-dim);">' + S.queries + ' queries learned</span></div>' +
+        '<div style="display:flex; flex-direction:column; gap:6px;">' + tiers + '</div>' +
+        '<div><div style="font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--parch-dim); margin-bottom:7px;">Built from your queries</div>' +
+        '<div style="display:flex; flex-direction:column; gap:4px;">' + grown + '</div></div></div>';
     }
 
     if (S.tab === 'road') {
       var r = S.road && this.roads ? this.roads[S.road] : null;
       if (!r) return '<div style="font-size:12px; line-height:1.6; color:var(--parch-dim);">Click any road on the map. Every road carries the decision that made an agent take it — and what that choice cost.</div>';
-      var kindLabel = r.kind === 'highway' ? 'Hub highway' : r.kind === 'ring' ? 'Ring road' : r.kind === 'verify' ? 'Verification route · opened by Plato at 4.0s' : 'District street';
+      var KIND = { avenue: 'Avenue', street: 'District street', drive: 'Driveway', bridge: 'Island bridge', learned: 'Learned shortcut' };
+      var kindLabel = r.kind === 'verify' ? 'Verification route · opened by Plato at 4.0s' : (KIND[r.kind] || 'Road');
       var stats = [
-        { k: 'Traffic this race', v: r.uses.length + (r.uses.length === 1 ? ' agent' : ' agents') },
-        { k: 'Lifetime passes', v: (this.B[r.a] ? this.B[r.a].uses : this.B[r.b] ? this.B[r.b].uses : 148) },
-        { k: 'Length', v: F(Math.hypot(this.N[r.a].x - this.N[r.b].x, this.N[r.a].y - this.N[r.b].y), 1) + ' tiles' },
-        { k: 'Class', v: r.kind === 'street' ? 'Street' : r.kind === 'verify' ? 'Verify' : 'Highway' }
+        { k: 'Traffic this race', v: r.uses.length + (r.uses.length === 1 ? ' pass' : ' passes') },
+        { k: 'Length', v: F(r.len || 0, 1) + ' tiles' },
+        { k: 'Class', v: r.kind === 'verify' ? 'Verify' : (KIND[r.kind] || 'Road') },
+        { k: 'Opened', v: r.appearsAt ? F(r.appearsAt, 1) + 's' : 'earlier races' }
       ];
-      var decisions = r.uses.map(function (u) {
-        var a = AG.filter(function (x) { return x.id === u.agent; })[0];
+      var decisions = r.uses.slice(0, 6).map(function (u) {
+        var a = AG.filter(function (x) { return x.id === u.agent; })[0] || { c: '#c67139', name: u.agent || 'Agent', role: '' };
         return '<div style="padding:10px 12px; border-radius:13px; background:var(--ink3);">' +
           '<div style="display:flex; align-items:center; gap:7px; margin-bottom:4px;"><span style="width:8px; height:8px; border-radius:999px; background:' + a.c + ';"></span>' +
           '<span style="font-size:12px; font-weight:700;">' + esc(a.name + ' · ' + a.role) + '</span>' +
@@ -992,7 +1770,8 @@
         { k: 'Lifetime passes', v: pb.uses }, { k: 'Storeys', v: pb.h },
         { k: 'Tile', v: pb.x + ',' + pb.y }, { k: 'District', v: pb.distName }
       ];
-      var visitors = AG.filter(function (a) { return (self.paths[a.id] || []).some(function (p) { return p.id === S.pop; }); });
+      var popNode = this.alias[S.pop];
+      var visitors = AG.filter(function (a) { return (self.paths[a.id] || []).some(function (p) { return p.id && p.id === popNode; }); });
       var vis = visitors.map(function (a) {
         return '<span style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:12px; font-weight:600; background:var(--ink3);"><span style="width:8px; height:8px; border-radius:999px; background:' + a.c + ';"></span>' + esc(a.name) + '</span>';
       }).join('');
@@ -1025,17 +1804,22 @@
 
     if (S.tab === 'fog') {
       var rows2 = FOG.map(function (fog, i) {
-        var cleared = fog.clearsAt != null && secs >= fog.clearsAt + 1.6;
+        var byQuery = !!S.clearedFog[fog.id];
+        var cleared = byQuery || (fog.clearsAt != null && secs >= fog.clearsAt + 1.5);
         var clearing = fog.clearsAt != null && secs >= fog.clearsAt && !cleared;
         var state = cleared ? 'lifted' : clearing ? 'lifting' : 'unknown';
+        // fog with no ground to pave (data that simply ends) can't be verified
+        var canVerify = !cleared && !fog.noBlob;
         return '<div class="bm-row" data-act="fog" data-i="' + i + '" style="padding:11px 12px; border-radius:13px; background:var(--ink3); border:1px dashed ' + (cleared ? 'rgba(147,165,110,.5)' : 'rgba(245,234,216,.3)') + ';">' +
           '<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;"><span style="font-size:12px; font-weight:700; color:' + (cleared ? '#b6c69b' : 'var(--parch)') + ';">' + esc(fog.name) + '</span>' +
           '<span style="margin-left:auto; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:' + (cleared ? 'rgba(147,165,110,.22)' : 'rgba(245,234,216,.12)') + '; color:' + (cleared ? '#b6c69b' : 'var(--parch-dim)') + ';">' + state + '</span></div>' +
-          '<div style="font-size:11px; line-height:1.55; color:var(--parch-dim);">' + esc(fog.body) + '</div></div>';
+          '<div style="font-size:11px; line-height:1.55; color:var(--parch-dim);">' + esc(fog.body) + '</div>' +
+          (canVerify ? '<button class="bm-btn" data-act="verify" data-id="' + esc(fog.id) + '" style="margin-top:9px; padding:7px 13px; border-radius:999px; background:var(--accent); color:#fff; font-size:11px; font-weight:700;">Send an agent to find evidence</button>' : '') +
+          '</div>';
       }).join('');
       return '<div style="display:flex; flex-direction:column; gap:12px;"><span style="font-family:\'Caprasimo\',serif; font-size:15px;">Fog · what we don’t know</span>' +
         '<div style="display:flex; flex-direction:column; gap:7px;">' + rows2 + '</div>' +
-        '<div style="font-size:11px; line-height:1.65; color:var(--parch-dim);">Fog is the system saying we don’t know enough here. It is not decoration: an agent inside fog is asserting without a source. When another agent brings evidence, the fog lifts and the ground becomes paved.</div></div>';
+        '<div style="font-size:11px; line-height:1.65; color:var(--parch-dim);">Fog is the system saying we don’t know enough here — whole blocks with no roads and no buildings. An agent inside fog is asserting without a source. When another agent brings evidence, the fog lifts, the ground gets paved, and a building goes up.</div></div>';
     }
 
     // agent
@@ -1117,6 +1901,9 @@
   // before/after toggle. LEARNED feeds build() (paves the amber overlay roads).
   var LEARNED = [];
   var SHOW_LEARNED = true;
+  // Roster from GET /api/agents/locations — every agent's home district and
+  // whether it is currently out on a task. Empty when logged out (demo only).
+  var ROSTER = [];
   var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
@@ -1157,7 +1944,7 @@
     var wp = (tr.waypoints || []).map(function (w, i) {
       var loc = (w.buildingId && keyOf[w.buildingId]) ? keyOf[w.buildingId] : 'hub';
       var at = vt(w.atMs, i, wpn);
-      return w.offRoad ? [loc, w.reason || '', at, 1] : [loc, w.reason || '', at];
+      return [loc, w.reason || '', at, w.offRoad ? 1 : 0, w.detail || ''];
     });
     if (!wp.length || wp[0][0] !== 'hub') wp.unshift(['hub', 'Task received', 0]);
 
@@ -1214,7 +2001,7 @@
       var wp = a.waypoints.map(function (w, i) {
         var loc = (w.buildingId && keyOf[w.buildingId]) ? keyOf[w.buildingId] : 'hub';
         var at = vt(w.atMs, i, n);
-        return w.offRoad ? [loc, w.reason || '', at, 1] : [loc, w.reason || '', at];
+        return [loc, w.reason || '', at, w.offRoad ? 1 : 0, w.detail || ''];
       });
       if (!wp.length || wp[0][0] !== 'hub') wp.unshift(['hub', 'Task received', 0]);
       var lastAt = wp.length ? wp[wp.length - 1][2] : VDUR;
@@ -1257,30 +2044,6 @@
     this.build();
     this.t = 0; this.state.playing = false;
     this.render();
-  };
-
-  // The district a node belongs to: hub → null, 'd:web' → 'web', 'web-0' → 'web',
-  // 'kd:company-0' → 'kd:company' (district ids never contain '-').
-  BrainModel.prototype._districtOf = function (id) {
-    if (!id || id === 'hub') return null;
-    if (id.slice(0, 2) === 'd:') return id.slice(2);
-    var i = id.lastIndexOf('-');
-    return i > 0 ? id.slice(0, i) : id;
-  };
-  // The road-network nodes to pass through going from `a` to `b` (exclusive):
-  // building → its district junction → hub → next junction → building.
-  BrainModel.prototype.roadPath = function (a, b) {
-    var da = this._districtOf(a), db = this._districtOf(b), seq = [];
-    if (da !== null && a !== 'd:' + da) seq.push('d:' + da);      // step off a building to its junction
-    if (db === null) { if (da !== null) seq.push('hub'); }        // heading to the hub
-    else if (da === null) { seq.push('d:' + db); }                // leaving the hub
-    else if (da !== db) { seq.push('hub'); seq.push('d:' + db); } // cross-district via the hub
-    var out = [];
-    for (var i = 0; i < seq.length; i++) {
-      var m = seq[i];
-      if (m && this.N[m] && m !== a && m !== b && out[out.length - 1] !== m) out.push(m);
-    }
-    return out;
   };
 
   // ── API plumbing ─────────────────────────────────────────────────────────
@@ -1383,8 +2146,8 @@
       currentRace.events.push({ atMs: p.atMs, title: nm + ' → ' + lbl, body: fmtInput(p.input), kind: aid });
     } else if (p.type === 'tool_end') {
       ensureRaceBuilding(p.building);
-      ag.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (fmtInput(p.input) || ('Used ' + lbl)), atMs: p.atMs, offRoad: !!p.error });
-      currentRace.events.push({ atMs: p.atMs, title: nm + ' used ' + lbl, body: p.error ? ('Failed: ' + p.error) : fmtInput(p.input), kind: p.error ? 'fog' : aid });
+      ag.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input) || ('Used ' + lbl)), detail: fmtInput(p.input), atMs: p.atMs, offRoad: !!p.error });
+      currentRace.events.push({ atMs: p.atMs, title: nm + ' used ' + lbl, body: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input)), kind: p.error ? 'fog' : aid });
       if (p.error) { ag.errored++; currentRace.fog.push({ name: lbl + ' returned no ground', state: 'unknown', body: 'The ' + lbl + ' call failed for ' + nm + ' (' + p.error + ').' }); }
       if (p.fuel != null) ag.agent.fuel = p.fuel;
     } else if (p.type === 'step') {
@@ -1442,7 +2205,7 @@
     } else if (p.type === 'tool_end') {
       ensureLiveBuilding(p.building);
       var bId = p.building && p.building.buildingId;
-      live.waypoints.push({ buildingId: bId, reason: p.error ? ('Failed: ' + p.error) : (fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), atMs: p.atMs, offRoad: !!p.error });
+      live.waypoints.push({ buildingId: bId, reason: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), detail: fmtInput(p.input), atMs: p.atMs, offRoad: !!p.error });
       live.events.push({ atMs: p.atMs, title: live.agent.name + ' used ' + (p.building ? p.building.label : p.tool), body: p.error ? ('Failed: ' + p.error) : fmtInput(p.input), kind: p.error ? 'fog' : (live.agent.id || 'plato') });
       if (p.error) live.fog.push({ name: (p.building ? p.building.label : p.tool) + ' returned no ground', state: 'unknown', body: 'The ' + (p.building ? p.building.label : p.tool) + ' call failed (' + p.error + '). Anything downstream was asserted without that source.' });
       if (p.fuel != null) live.agent.fuel = p.fuel;
@@ -1708,11 +2471,27 @@
 
   function shortId(id) { return id && id.length > 14 ? id.slice(0, 6) + '…' + id.slice(-4) : (id || ''); }
 
+  // The roster: every agent, where it lives on the map, and whether it is out on
+  // a task. Agents not in the current run are parked at home so the map answers
+  // "where is everyone" and not just "where is the one that ran".
+  function loadRoster() {
+    var tok = getToken(); if (!tok) return;
+    fetch(apiBase() + '/api/agents/locations', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.agents) return;
+        ROSTER = d.agents;
+        if (window.__bm) { window.__bm.placeRoster(); window.__bm.render(); }
+      })
+      .catch(function () { /* roster is an enhancement — the map works without it */ });
+  }
+
   function init() {
     wirePicker();
     wireAsk();
     wireLeaderboard();
     wireProfiles();
+    loadRoster();
     var params = new URLSearchParams(location.search);
     var execId = params.get('execution') || params.get('exec');
     var start = function () { window.__bm = new BrainModel(); refreshChrome(); wireLiveStream(); };
