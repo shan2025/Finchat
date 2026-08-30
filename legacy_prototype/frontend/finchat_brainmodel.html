@@ -282,6 +282,7 @@
           <option value="plato">Plato — supervisor (auto-routes)</option>
           <option value="nova" selected>Nova — Research</option>
           <option value="aurelius">Aurelius — Finance</option>
+          <option value="atlas">Atlas — Portfolio</option>
           <option value="rasha">Rasha — Careers</option>
         </select>
         <label style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:rgba(245,234,216,.6); cursor:pointer;">
@@ -1906,7 +1907,7 @@
   // Roster from GET /api/agents/locations — every agent's home district and
   // whether it is currently out on a task. Empty when logged out (demo only).
   var ROSTER = [];
-  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', rasha: '#c76b6b' };
+  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', atlas: '#2f6f5e', rasha: '#c76b6b' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
   function applyScenario(s) {

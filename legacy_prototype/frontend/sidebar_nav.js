@@ -59,6 +59,23 @@
     plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png',
     rasha: 'rasha_avatar.png', nova: 'nova_avatar.png'
   };
+  // Agents with no PNG of their own. Without an entry here they fall through to
+  // the generic 🤖 bubble, which reads as "unknown sender" rather than as a
+  // named agent — so they get a coloured initial plate instead.
+  var AGENT_PLATES = {
+    atlas: { initial: 'A', bg: '#1f4a3f', fg: '#7fd1b9' }
+  };
+  function agentBubble(id) {
+    var base = 'width:24px; height:24px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;';
+    if (AGENT_AVATARS[id]) {
+      return '<span style="' + base + ' overflow:hidden; background:#efe8de;"><img src="' + AGENT_AVATARS[id] + '" style="width:100%;height:100%;object-fit:cover;"></span>';
+    }
+    var p = AGENT_PLATES[id];
+    if (p) {
+      return '<span style="' + base + ' background:' + p.bg + '; color:' + p.fg + '; font-size:12px; font-weight:700;">' + p.initial + '</span>';
+    }
+    return null;
+  }
 
   // The mascot head, at finchat_login.html's original coordinates — the viewBox
   // is just cropped to its bounding box. Inlined rather than <img src> because
@@ -475,9 +492,8 @@
     }
     {
       list.innerHTML = sessions.map(function (s) {
-          var av = AGENT_AVATARS[s.persona]
-            ? '<span style="width:24px; height:24px; border-radius:999px; overflow:hidden; flex-shrink:0; background:#efe8de; display:inline-flex;"><img src="' + AGENT_AVATARS[s.persona] + '" style="width:100%;height:100%;object-fit:cover;"></span>'
-            : '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(s.personaAvatar || '🤖') + '</span>';
+          var av = agentBubble(s.persona)
+            || '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(s.personaAvatar || '🤖') + '</span>';
           return '<a class="sbn-recent" data-sid="' + esc(s.session_id) + '" data-title="' + esc(s.title) + '" href="finchat_chat.html?session=' + encodeURIComponent(s.session_id) + '" title="' + esc(s.title) + ' — ' + esc(s.personaName || s.persona) + '">' +
             av + '<span class="sbn-truncate" style="flex:1; min-width:0;">' + esc(s.title) + '</span>' +
             '<span class="sbn-ract">' +
@@ -510,7 +526,7 @@
                   if (!d) return;
                   var text = (d.messages || []).map(function (m) {
                     var who = m.role === 'user' ? 'You' : ((d.persona && d.persona.name) || m.persona || 'Agent');
-                    return who + ': ' + (m.content || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
+                    return who + ': ' + (m.content || '').replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '');
                   }).join('\n\n');
                   copyTextSbn(text).then(function (ok) {
                     b.title = ok ? 'Copied!' : 'Copy failed';

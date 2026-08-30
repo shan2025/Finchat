@@ -22,7 +22,7 @@ function parseInput(input) {
   if (s.startsWith('{')) {
     try { return JSON.parse(s); } catch (e) { /* fall through */ }
   }
-  const m = s.match(/^(list|add|remove|value|update)\b\s*(.*)$/i);
+  const m = s.match(/^(list|add|remove|value|update|history)\b\s*(.*)$/i);
   if (m) return { action: m[1].toLowerCase(), symbol: m[2].trim() || undefined };
   return { action: 'value' };
 }
@@ -74,6 +74,62 @@ function view(r) {
     symbol: r.symbol, kind: r.kind, quantity: num(r.quantity),
     avgCost: num(r.avg_cost), currency: r.currency, note: r.note
   };
+}
+
+// ── The daily series ─────────────────────────────────────────────
+// A valuation is only meaningful against a baseline, so pricing the portfolio
+// also RECORDS it: one row per UTC day, rewritten in place. That keeps the
+// series one-point-per-day however often the portfolio is priced, and means a
+// user who never asks for history still accumulates one by using the tool.
+//
+// A snapshot must never be able to break a valuation — if the write fails the
+// user still gets their numbers, they just lose one day of history.
+async function writeSnapshot(userId, valuation) {
+  try {
+    await query(`
+      INSERT INTO portfolio_snapshots (
+        snapshot_id, user_id, captured_on, captured_at,
+        total_value_usd, total_cost_basis_usd, holdings_count, holdings, allocation)
+      VALUES ($1,$2,(now() AT TIME ZONE 'utc')::date,now(),$3,$4,$5,$6,$7)
+      ON CONFLICT (user_id, captured_on) DO UPDATE SET
+        captured_at          = now(),
+        total_value_usd      = EXCLUDED.total_value_usd,
+        total_cost_basis_usd = EXCLUDED.total_cost_basis_usd,
+        holdings_count       = EXCLUDED.holdings_count,
+        holdings             = EXCLUDED.holdings,
+        allocation           = EXCLUDED.allocation
+    `, [
+      uuidv4(), userId,
+      valuation.totalValueUsd, valuation.totalCostBasisUsd, valuation.holdingsCount,
+      JSON.stringify(valuation.holdings.map(h => ({
+        symbol: h.symbol, kind: h.kind, quantity: h.quantity,
+        price: h.price, marketValue: h.marketValue, weightPct: h.weightPct
+      }))),
+      JSON.stringify(valuation.allocation)
+    ]);
+  } catch (err) {
+    // Most likely cause is the migration not having run yet on this database.
+    console.warn('[portfolio] snapshot not recorded:', err.message);
+  }
+}
+
+// Change between two snapshots, as a signed absolute and a percent. Returns
+// null rather than 0 when there is nothing to compare against, so a report can
+// say "no baseline yet" instead of claiming a flat day.
+function delta(current, past) {
+  if (current == null || past == null || !isFinite(past) || past === 0) return null;
+  return { changeUsd: round(current - past), changePct: round(((current - past) / past) * 100) };
+}
+
+function pickOnOrBefore(series, daysAgo) {
+  const cutoff = new Date(Date.now() - daysAgo * 86400000);
+  // series is oldest-first; the last row at or before the cutoff is the
+  // fairest baseline when a day is missing (a weekend, or an unused day).
+  let best = null;
+  for (const s of series) {
+    if (new Date(s.capturedOn) <= cutoff) best = s; else break;
+  }
+  return best;
 }
 
 async function execute(input, context = {}) {
@@ -190,7 +246,7 @@ async function execute(input, context = {}) {
       flags.push(`${priced.length - costCovered} holding(s) have no cost basis recorded, so their P/L is unknown.`);
     }
 
-    return {
+    const valuation = {
       action: 'value',
       currency: 'USD',
       totalValueUsd: round(total),
@@ -203,9 +259,86 @@ async function execute(input, context = {}) {
       flags,
       guidance: 'Analyse allocation, concentration and the catalysts behind each position. Educational analysis only — not financial advice, and never instruct the user to buy or sell a specific amount of their own money.'
     };
+
+    await writeSnapshot(userId, valuation);
+    return valuation;
   }
 
-  throw new Error(`Unknown portfolio action "${action}". Use list, add, update, remove or value.`);
+  if (action === 'history') {
+    const days = Math.max(2, Math.min(365, Number(opts.days) || 90));
+    const res = await query(`
+      SELECT captured_on, captured_at, total_value_usd, total_cost_basis_usd,
+             holdings_count, holdings
+        FROM portfolio_snapshots
+       WHERE user_id = $1
+         AND captured_on >= (now() AT TIME ZONE 'utc')::date - $2::integer
+       ORDER BY captured_on ASC
+    `, [userId, days]);
+
+    const series = res.rows.map(r => ({
+      capturedOn: r.captured_on instanceof Date
+        ? r.captured_on.toISOString().slice(0, 10) : String(r.captured_on).slice(0, 10),
+      totalValueUsd: round(num(r.total_value_usd)),
+      totalCostBasisUsd: round(num(r.total_cost_basis_usd)),
+      holdingsCount: r.holdings_count
+    }));
+
+    if (series.length < 2) {
+      return {
+        action: 'history', points: series.length, series,
+        note: series.length === 0
+          ? 'No snapshots recorded yet. A snapshot is written every time the portfolio is priced, so run {"action":"value"} — then this becomes answerable from tomorrow onward. Do NOT invent a past performance figure.'
+          : 'Only one snapshot exists, so there is no baseline to measure growth against yet. Report today\'s value and say plainly that the trend starts building from now — do not estimate a past return.'
+      };
+    }
+
+    const latest = series[series.length - 1];
+    const prev = series[series.length - 2];
+    const first = series[0];
+
+    // Peak-to-date and the drawdown from it: the one risk number a daily watch
+    // owes the user that a single valuation can never show.
+    let peak = series[0];
+    for (const s of series) if ((s.totalValueUsd || 0) > (peak.totalValueUsd || 0)) peak = s;
+    const drawdownPct = peak.totalValueUsd
+      ? round(((latest.totalValueUsd - peak.totalValueUsd) / peak.totalValueUsd) * 100) : null;
+
+    // Which positions actually moved the total since the previous snapshot.
+    const prevRow = res.rows[res.rows.length - 2];
+    const latestRow = res.rows[res.rows.length - 1];
+    const parseHoldings = (v) => (typeof v === 'string' ? JSON.parse(v) : (v || []));
+    const prevBySymbol = {};
+    for (const h of parseHoldings(prevRow.holdings)) prevBySymbol[h.symbol] = h;
+    const movers = parseHoldings(latestRow.holdings).map(h => {
+      const p = prevBySymbol[h.symbol];
+      const d = p ? delta(h.marketValue, p.marketValue) : null;
+      return {
+        symbol: h.symbol, kind: h.kind,
+        marketValue: h.marketValue, weightPct: h.weightPct,
+        changeUsd: d ? d.changeUsd : null,
+        changePct: d ? d.changePct : null,
+        isNew: !p
+      };
+    }).sort((a, b) => Math.abs(b.changeUsd || 0) - Math.abs(a.changeUsd || 0));
+
+    return {
+      action: 'history',
+      points: series.length,
+      windowDays: days,
+      latest: { date: latest.capturedOn, totalValueUsd: latest.totalValueUsd },
+      sinceLast: { from: prev.capturedOn, ...(delta(latest.totalValueUsd, prev.totalValueUsd) || {}) },
+      since7d: (() => { const b = pickOnOrBefore(series, 7); return b ? { from: b.capturedOn, ...(delta(latest.totalValueUsd, b.totalValueUsd) || {}) } : null; })(),
+      since30d: (() => { const b = pickOnOrBefore(series, 30); return b ? { from: b.capturedOn, ...(delta(latest.totalValueUsd, b.totalValueUsd) || {}) } : null; })(),
+      sinceFirstSnapshot: { from: first.capturedOn, ...(delta(latest.totalValueUsd, first.totalValueUsd) || {}) },
+      peak: { date: peak.capturedOn, totalValueUsd: peak.totalValueUsd },
+      drawdownFromPeakPct: drawdownPct,
+      movers,
+      series,
+      guidance: 'This is the growth question answered from recorded history, not from memory. Lead with the change since the last snapshot and what drove it, then place it against the 7/30-day trend and the drawdown from peak. The series only covers days on which the portfolio was actually priced — say so if it is sparse, and never extrapolate a return beyond it.'
+    };
+  }
+
+  throw new Error(`Unknown portfolio action "${action}". Use list, add, update, remove, value or history.`);
 }
 
 module.exports = { execute, guessKind };

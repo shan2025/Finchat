@@ -36,7 +36,7 @@ const PROVIDERS = Object.keys(PROVIDER_META);
 // fallback for any task no key was assigned to.
 const ROLES = {
   everything: { label: 'Everything / General', agents: [] },
-  markets:    { label: 'Markets & trading',    agents: ['aurelius'] },
+  markets:    { label: 'Markets & trading',    agents: ['aurelius', 'atlas'] },
   jobs:       { label: 'Jobs & hiring',        agents: ['rasha'] },
   research:   { label: 'Research & tech',      agents: ['nova'] }
 };

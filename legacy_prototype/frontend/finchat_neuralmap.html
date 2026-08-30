@@ -423,6 +423,7 @@ const AGENT_FILTER = new URLSearchParams(location.search).get('agent') || null;
 // the consolidated brain of all agents together.
 const AGENT_TABS = [
  { id: 'aurelius', name: 'Aurelius' },
+ { id: 'atlas',    name: 'Atlas' },
  { id: 'rasha',    name: 'Rasha' },
  { id: 'nova',     name: 'Nova' }
 ];
@@ -722,7 +723,7 @@ function renderMapTabs() {
    </span>`;
  };
  // Per-agent brain tabs, sitting after the maps: System Map (consolidated) then
- // Aurelius / Rasha / Nova (each their own brain).
+ // Aurelius / Atlas / Rasha / Nova (each their own brain).
  const agentTab = (a) => {
   const on = AGENT_FILTER === a.id;
   return `

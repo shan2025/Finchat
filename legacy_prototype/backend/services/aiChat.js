@@ -19,7 +19,7 @@ const GREETING_RE = new RegExp(
   '^(?:h+i+|h+e+y+|h+e+l+o+|h+e+l+l+o+|hiya|yo|howdy|greetings|sup|namaste|hola|' +
   'good\\s+(?:morning|afternoon|evening|day))' +
   '(?:\\s+(?:there|again|all|team|everyone|folks|guys|bot|ai|agent|' +
-  'plato|aurelius|rasha|nova))*' +
+  'plato|aurelius|atlas|rasha|nova))*' +
   '[\\s!.,?~\\-]*$',
   'i'
 );

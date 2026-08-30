@@ -203,6 +203,20 @@
  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
 
  const AGENT_AVATARS = { plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png' };
+ // Agents with no PNG. The roster comes from the API, so an agent can appear in
+ // this UI before anyone draws a portrait for it — without a plate it renders as
+ // the generic robot glyph and reads as an unknown participant.
+ const AGENT_PLATES = { atlas: { initial: 'A', bg: '#1f4a3f', fg: '#7fd1b9' } };
+ // `px` is the rendered diameter. Sized inline rather than with Tailwind width
+ // classes because this file's Tailwind is PREBUILT — a class name assembled at
+ // runtime is not in the scanner's output and would render at zero size.
+ const agentFace = (id, px, extraStyle) => {
+  const box = `width:${px}px;height:${px}px;border-radius:9999px;flex-shrink:0;${extraStyle || ''}`;
+  if (AGENT_AVATARS[id]) return `<img src="${AGENT_AVATARS[id]}" style="${box}object-fit:cover;">`;
+  const p = AGENT_PLATES[id];
+  if (!p) return null;
+  return `<span style="${box}background:${p.bg};color:${p.fg};display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.round(px * 0.5)}px;">${p.initial}</span>`;
+ };
  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  // Agent replies are markdown — the bubbles render it, but the group list
  // preview is a single plain line, so the source has to be flattened first
@@ -302,9 +316,8 @@
   const agents = members.filter(m => m.member_type === 'agent');
   chips.innerHTML = agents.map(m => `
    <span class="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full text-[11px] font-semibold" style="background:var(--surface2); border:1px solid var(--border);">
-    ${AGENT_AVATARS[m.member_id]
-     ? `<img src="${AGENT_AVATARS[m.member_id]}" class="w-5 h-5 rounded-full object-cover">`
-     : '<span class="material-symbols-outlined text-[14px]">smart_toy</span>'}
+    ${agentFace(m.member_id, 20)
+     || '<span class="material-symbols-outlined text-[14px]">smart_toy</span>'}
     ${esc(m.name)}
     <button onclick="removeAgent('${m.member_id}')" title="Remove ${esc(m.name)}" class="ml-0.5 opacity-50 hover:opacity-100"><span class="material-symbols-outlined text-[13px]">close</span></button>
    </span>`).join('');
@@ -331,9 +344,8 @@
   const name = isUser ? 'You' : (agentMember ? agentMember.name : m.sender_id.toUpperCase());
   const avatar = isUser
    ? `<div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style="background:linear-gradient(135deg,#d67f48,#8c491a);">${esc((SESSION_USER.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>`
-   : (AGENT_AVATARS[m.sender_id]
-    ? `<img src="${AGENT_AVATARS[m.sender_id]}" class="w-8 h-8 rounded-full object-cover shrink-0" style="border:1px solid var(--border);">`
-    : `<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--surface2);"><span class="material-symbols-outlined text-[16px]">smart_toy</span></div>`);
+   : (agentFace(m.sender_id, 32, 'border:1px solid var(--border);')
+    || `<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style="background:var(--surface2);"><span class="material-symbols-outlined text-[16px]">smart_toy</span></div>`);
   const fallbackBadge = meta.fallback
    ? `<span title="Groq cloud was unreachable — this reply came from the local ${esc(meta.model || 'qwen')} model" class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold align-middle" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e;">⚠ local fallback · ${esc(meta.model || 'qwen')}</span>`
    : '';
@@ -455,9 +467,8 @@
   picker.innerHTML = allAgents.map(a => `
    <label class="flex items-center gap-3 px-3 py-2 rounded-2xl cursor-pointer" style="background:var(--surface2); border:1px solid var(--border);">
     <input type="checkbox" class="agent-check rounded" value="${a.agentId}" onchange="updateAgentCount()">
-    ${AGENT_AVATARS[a.agentId]
-     ? `<img src="${AGENT_AVATARS[a.agentId]}" class="w-7 h-7 rounded-full object-cover">`
-     : '<span class="material-symbols-outlined text-[18px]">smart_toy</span>'}
+    ${agentFace(a.agentId, 28)
+     || '<span class="material-symbols-outlined text-[18px]">smart_toy</span>'}
     <span class="flex-1">
      <span class="block text-[13px] font-bold">${esc(a.name)}</span>
      <span class="block text-[10px] truncate" style="color:var(--text3); max-width:230px;">${esc((a.capabilities || []).slice(0, 4).join(', ') || a.type)}</span>

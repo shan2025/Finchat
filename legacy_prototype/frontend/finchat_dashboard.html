@@ -325,6 +325,7 @@
             <span class="font-bold text-[#8c7a6b] uppercase tracking-wider text-[10px]">Panel:</span>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="aurelius" checked> Aurelius <span class="text-[#8c7a6b]">(finance)</span></label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="nova" checked> Nova <span class="text-[#8c7a6b]">(research)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="atlas"> Atlas <span class="text-[#8c7a6b]">(portfolio)</span></label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="rasha"> Rasha <span class="text-[#8c7a6b]">(career)</span></label>
             <span class="ml-auto font-mono text-[10px] text-[#d97706]" id="debateProgress"></span>
           </div>
@@ -474,8 +475,20 @@
     const colors = {
       plato: '#3a2e23',
       aurelius: '#2d3748',
+      atlas: '#1f4a3f',
       rasha: '#4a3828',
       nova: '#1e293b'
+    };
+
+    // Agents with no portrait of their own. The grid is driven by the API, so a
+    // new agent lands here before anyone draws one — and the old fallback was
+    // plato_avatar.png, which put the wrong agent's face on the card.
+    const plates = { atlas: { initial: 'A', fg: '#7fd1b9' } };
+    const agentFace = (id) => {
+      if (avatars[id]) return `<img src="${avatars[id]}" class="w-full h-full object-cover">`;
+      const p = plates[id];
+      if (p) return `<span style="color:${p.fg};font-weight:700;font-size:20px;">${p.initial}</span>`;
+      return `<span style="color:#efe8de;font-weight:700;font-size:20px;">${String(id || '?').charAt(0).toUpperCase()}</span>`;
     };
 
     data.agents.forEach(agent => {
@@ -525,7 +538,7 @@
             <div class="flex justify-between items-start">
               <div class="flex items-center gap-3">
                 <span class="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border border-border-color shrink-0" style="background-color: ${colors[agent.id] || '#3a2e23'}">
-                  <img src="${avatars[agent.id] || 'plato_avatar.png'}" class="w-full h-full object-cover">
+                  ${agentFace(agent.id)}
                 </span>
                 <div>
                   <h3 class="font-bold text-base text-[#3a2e23]">${agent.name}</h3>

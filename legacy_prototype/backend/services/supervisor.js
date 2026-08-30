@@ -82,6 +82,23 @@ Respond in JSON format:
  */
 function determineDelegationTarget(message) {
   const lower = message.toLowerCase();
+  // Atlas is checked before Aurelius on purpose: "review my investments" and
+  // "how are my holdings doing" both contain Aurelius triggers ("invest"), but
+  // a question about the user's OWN positions belongs to the steward who has
+  // their snapshot history, not to the market analyst.
+  if (
+    lower.includes('my portfolio') ||
+    lower.includes('my holdings') ||
+    lower.includes('my positions') ||
+    lower.includes('my investments') ||
+    lower.includes('my assets') ||
+    lower.includes('allocation') ||
+    lower.includes('drawdown') ||
+    lower.includes('rebalanc') ||
+    lower.includes('atlas')
+  ) {
+    return 'atlas';
+  }
   if (
     lower.includes('startup') ||
     lower.includes('seed') ||

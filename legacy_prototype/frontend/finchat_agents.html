@@ -217,6 +217,15 @@
             </div>
           </div>
 
+          <!-- Atlas -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-atlas" onclick="selectAgent('atlas')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#1f4a3f] text-[#7fd1b9] font-bold shrink-0 border border-outline-variant">A</span>
+            <div>
+              <div class="font-bold text-base">Atlas</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Portfolio Steward</div>
+            </div>
+          </div>
+
           <!-- Rasha -->
           <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-rasha" onclick="selectAgent('rasha')">
             <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[#4a3828] shrink-0 border border-outline-variant"><img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></span>
@@ -396,10 +405,13 @@
   // State
   let currentAgent = 'plato';
   let agentConfigs = JSON.parse(localStorage.getItem('finchat_agent_configs') || 'null');
-  if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato) {
+  if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato || !agentConfigs.atlas) {
     agentConfigs = {
       plato: { risk: 'High', formal: 85, brief: 20, serious: 90 },
       aurelius: { risk: 'Low', formal: 70, brief: 40, serious: 80 },
+      // A steward of someone's actual savings is the most conservative seat on
+      // the roster — low risk, plain-spoken, and serious about what it reports.
+      atlas: { risk: 'Low', formal: 70, brief: 35, serious: 90 },
       rasha: { risk: 'Low', formal: 65, brief: 30, serious: 75 },
       nova: { risk: 'Low', formal: 80, brief: 15, serious: 95 }
     };
@@ -410,7 +422,7 @@
   const LOCAL_BAL_KEY = 'finchat_persona_bal_' + (SESSION_USER.id || 'default');
   let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
   if (!personaBalances || !personaBalances.plato) {
-    personaBalances = { plato: 1000, aurelius: 1000, rasha: 1000, nova: 1000 };
+    personaBalances = { plato: 1000, aurelius: 1000, atlas: 1000, rasha: 1000, nova: 1000 };
   }
   // Guarded: this page has no #sidebarToken (the shared sidebar markup differs
   // per page, and sidebar_nav.js loads AFTER this script). An unguarded lookup
@@ -446,7 +458,7 @@
     document.getElementById('configTitle').textContent = `Agent Configuration: ${capitalized}`;
 
     // Update left card styles
-    ['plato', 'aurelius', 'rasha', 'nova'].forEach(a => {
+    ['plato', 'aurelius', 'atlas', 'rasha', 'nova'].forEach(a => {
       const card = document.getElementById('card-' + a);
       if (card) {
         if (a === agent) {

@@ -10,7 +10,7 @@ const { agentMeta } = require('./cognitive/ExecutionTrace');
 
 // The competitive roster. Other assigned_agents (system MemoryAgent, Sentinel)
 // do real work but are not racers, so they stay off the leaderboard.
-const ROSTER = new Set(['plato', 'nova', 'aurelius', 'rasha']);
+const ROSTER = new Set(['plato', 'nova', 'aurelius', 'rasha', 'atlas']);
 // Wall-clock (updated_at - created_at) includes time a run sat parked on a human
 // approval or was swept stale — not working time. Cap each run's counted
 // duration so one parked execution can't blow an agent's average latency.

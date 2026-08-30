@@ -946,10 +946,13 @@
     // ─────────────────────────────────
     const LOCAL_BAL_KEY = 'finchat_persona_bal_' + SESSION_USER.id;
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
-    if (!personaBalances || !personaBalances.plato || !personaBalances.aurelius) {
+    // Literal rather than derived from PERSONAS: this runs above that
+    // declaration, so reading it here would hit the temporal dead zone.
+    if (!personaBalances || !personaBalances.plato || !personaBalances.atlas) {
       personaBalances = {
         plato: 1000,
         aurelius: 1000,
+        atlas: 1000,
         rasha: 1000,
         nova: 1000
       };
@@ -1021,6 +1024,7 @@
     const PERSONAS = {
       plato: { name: 'Plato', avatar: '<img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Chief AI Officer & System Supervisor', color: '#6366f1' },
       aurelius: { name: 'Aurelius', avatar: '<img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Risk & Compliance Officer', color: '#4f46e5' },
+      atlas: { name: 'Atlas', avatar: '<div style="width:100%;height:100%;border-radius:50%;background:#1f4a3f;color:#7fd1b9;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;">A</div>', desc: 'Portfolio Steward & Daily Risk Watch', color: '#2f6f5e' },
       rasha: { name: 'Rasha', avatar: '<img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Executive Career Strategist', color: '#ec4899' },
       nova: { name: 'Nova', avatar: '<img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Frontier Science & Technology Researcher', color: '#059669' }
     };
@@ -1170,6 +1174,18 @@
             { icon: 'speed', title: 'Assess exposure', desc: 'Build a risk report and highlight the top concerns to watch.', prompt: 'Assess exposure. Build a risk report and highlight the top concerns to watch.' },
             { icon: 'flag', title: 'Flag violations', desc: 'Scan this action against our rules and surface any conflicts.', prompt: 'Flag violations. Scan this action against our rules and surface any conflicts.' },
             { icon: 'balance', title: 'Weigh a decision', desc: 'Lay out the risks and trade-offs of two options side by side.', prompt: 'Weigh a decision. Lay out the risks and trade-offs of two options side by side.' }
+          ]
+        },
+        atlas: {
+          title: 'How are your assets doing?',
+          subtitle: 'Ask about your holdings, what changed since yesterday, and what is putting them at risk.',
+          badgeBg: '#e6f2ed',
+          badgeText: '#1f4a3f',
+          cards: [
+            { icon: 'account_balance_wallet', title: 'Value my portfolio', desc: 'Price everything I own and show allocation, P/L and concentration risk.', prompt: 'Value my portfolio. Price everything I own and show allocation, unrealized P/L and any concentration risk.' },
+            { icon: 'trending_up', title: 'Am I actually growing?', desc: 'Compare today against my recorded history and explain what drove it.', prompt: 'Am I actually growing? Compare today against my recorded snapshot history and explain what drove the change.' },
+            { icon: 'add_chart', title: 'Record a holding', desc: 'Add what I own so the daily watch has something real to track.', prompt: 'Record a holding for me. Ask me for the symbol, quantity and average cost, then save it to my portfolio.' },
+            { icon: 'alarm', title: 'Watch this daily', desc: 'Set up a morning review of my portfolio with the catalysts behind each move.', prompt: 'Watch my portfolio daily. Create a standing task that values my portfolio every morning, compares it against the recorded history, explains the biggest movers with their catalysts, and flags any risk.' }
           ]
         },
         rasha: {
@@ -1463,7 +1479,8 @@
       if (mi) mi.placeholder = 'Message ' + p.name + '...';
     }
 
-    // Persona selector bar — lets you switch between Plato, Aurelius, Rasha, Nova.
+    // Persona selector bar — one pill per entry in PERSONAS, so adding an agent
+    // there is all it takes to make it switchable here.
     function renderPersonaBar() {
       const bar = document.getElementById('personaBar');
       if (!bar) return;
@@ -1531,9 +1548,9 @@
 
       messages.forEach(msg => {
         const rawContent = msg.content || '[message]';
-        const isBotMsg = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system' || msg.message_type === 'system' || /^\[(Plato|Aurelius|Rasha|Nova|System)\]/i.test(rawContent) || (msg.sender_id && msg.sender_id !== SESSION_USER.id);
+        const isBotMsg = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system' || msg.message_type === 'system' || /^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]/i.test(rawContent) || (msg.sender_id && msg.sender_id !== SESSION_USER.id);
         const isUser = !isBotMsg && msg.role === 'user';
-        const cleanContent = rawContent.replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
+        const cleanContent = rawContent.replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '');
 
         const wrapper = document.createElement('div');
         wrapper.className = `msg-group ${isUser ? 'user' : 'bot'}`;
@@ -1792,7 +1809,7 @@
         const data = await res.json();
         const text = (data.messages || []).map(m => {
           const who = m.role === 'user' ? 'You' : (data.persona?.name || m.persona || 'Agent');
-          return `${who}: ${(m.content || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '')}`;
+          return `${who}: ${(m.content || '').replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '')}`;
         }).join('\n\n');
         const ok = await copyText(text);
         showToast(ok ? 'Conversation copied to clipboard' : 'Copy failed', ok ? 'info' : 'warn');
@@ -2266,7 +2283,7 @@
       const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
       const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">⏳</span>`;
 
-      const cleanText = isUser ? (text || '') : (text || '').replace(/^\[(Plato|Aurelius|Rasha|Nova|System)\]\s*/i, '');
+      const cleanText = isUser ? (text || '') : (text || '').replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '');
 
       wrapper.innerHTML = `
     <div class="msg-row">
@@ -2569,7 +2586,7 @@
       currentAbortController = new AbortController();
       setSendButtonMode('stop');
 
-      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'rasha', 'nova'].includes(activePersona);
+      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'atlas', 'rasha', 'nova'].includes(activePersona);
 
       if (isPersonaChat) {
         // ── AI Persona Chat via Backend API ──
@@ -2796,7 +2813,7 @@
             applyTokens(-(data.tokenCost || 5), `AI chat with ${data.persona.name}`, 'neg');
             tokenBalance = data.tokenBalance;
             // keep the global (per-persona mirror) balance in step with the backend
-            personaBalances.plato = personaBalances.aurelius = personaBalances.rasha = personaBalances.nova = tokenBalance;
+            Object.keys(PERSONAS).forEach(function (id) { personaBalances[id] = tokenBalance; });
             savePersonaBalances();
 
             if (data.fraud && data.fraud.detected) {
@@ -3114,7 +3131,8 @@
         if (balOutcome.status === 'fulfilled') {
           const balData = balOutcome.value;
           const realBal = typeof balData.balance === 'number' ? balData.balance : (personaBalances[activePersona] || 1000);
-          personaBalances = { plato: realBal, aurelius: realBal, rasha: realBal, nova: realBal };
+          personaBalances = {};
+          Object.keys(PERSONAS).forEach(function (id) { personaBalances[id] = realBal; });
           savePersonaBalances();
           tokenBalance = realBal;
           updateTokenUI();

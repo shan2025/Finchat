@@ -33,7 +33,11 @@ const AGENT_SKIN = {
   plato: { color: '#9a5c8a', avatar: 'plato_avatar.png' },
   nova: { color: '#e08a44', avatar: 'nova_avatar.png' },
   aurelius: { color: '#93a56e', avatar: 'aurelius_avatar.png' },
-  rasha: { color: '#c76b6b', avatar: 'rasha_avatar.png' }
+  rasha: { color: '#c76b6b', avatar: 'rasha_avatar.png' },
+  // No PNG for Atlas yet. The map consumers all guard on a falsy avatar and
+  // fall back to the colour plate, so an empty string is the honest value —
+  // better than pointing at a file that would 404 on every frame.
+  atlas: { color: '#2f6f5e', avatar: '' }
 };
 const AGENT_META = Object.keys(AGENT_SKIN).reduce((acc, id) => {
   const p = personas[id] || {};

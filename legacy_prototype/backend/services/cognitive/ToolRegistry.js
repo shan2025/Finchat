@@ -188,11 +188,12 @@ const TOOLS = {
 
   portfolio: {
     name: 'portfolio',
-    description: 'The user\'s ACTUAL holdings, priced live — unlike "watchlist", which is only what they follow. {"action":"value"} is the full review: market value, cost basis, unrealized P/L, each position\'s weight, allocation by asset class, and concentration flags. Use it for any question about their holdings, allocation or "how am I doing". {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove". If it is empty, ask what they hold rather than reviewing a hypothetical portfolio as theirs. Records and prices only: it NEVER buys, sells or places an order.',
+    description: 'The user\'s ACTUAL holdings, priced live — unlike "watchlist", which is only what they follow. {"action":"value"} is the full review: market value, cost basis, unrealized P/L, each position\'s weight, allocation by asset class, and concentration flags. Use it for any question about their holdings, allocation or "how am I doing". {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove". {"action":"history","days":30} answers the GROWTH question from recorded daily snapshots: change since the last snapshot, over 7 and 30 days, the peak value, the drawdown from that peak, and which positions moved the total. Every "value" call records that day\'s snapshot, so call "value" first and "history" for the trend — never estimate past performance from memory. If it is empty, ask what they hold rather than reviewing a hypothetical portfolio as theirs. Records and prices only: it NEVER buys, sells or places an order.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', description: 'value | list | add | update | remove' },
+        action: { type: 'string', description: 'value | list | add | update | remove | history' },
+        days: { type: 'number', description: 'For history: how far back to read, default 90' },
         symbol: { type: 'string', description: 'Ticker or asset name, e.g. BTC, TSLA, gold' },
         kind: { type: 'string', description: 'crypto | stock | commodity | cash (auto-detected if omitted)' },
         quantity: { type: 'number', description: 'Units/shares/coins held — ask the user, never guess' },
@@ -208,7 +209,10 @@ const TOOLS = {
         totalUnrealizedPnlUsd: { type: 'number' },
         allocation: { type: 'object', description: 'Value and weight per asset class' },
         holdings: { type: 'array', description: 'Per-position price, value, weight and P/L' },
-        flags: { type: 'array', description: 'Concentration and data-gap warnings to report honestly' }
+        flags: { type: 'array', description: 'Concentration and data-gap warnings to report honestly' },
+        sinceLast: { type: 'object', description: 'For history: change since the previous snapshot' },
+        drawdownFromPeakPct: { type: 'number', description: 'For history: how far below the recorded peak' },
+        movers: { type: 'array', description: 'For history: positions ranked by how much they moved the total' }
       }
     },
     cacheTTLSeconds: 0, // stateful and priced live — never cache
