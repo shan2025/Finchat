@@ -127,6 +127,8 @@
     overflow:hidden; cursor:zoom-in; display:block; box-shadow:var(--shadow); line-height:0; }
   .img-bubble img { display:block; max-width:100%; max-height:220px; object-fit:cover; }
   .img-bubble-meta { font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:4px; }
+  .img-bubble-loading { font-size:10px; color:var(--text3); font-family:var(--mono); padding:14px 16px;
+    border:1px dashed var(--border); border-radius:12px; }
   .user .img-bubble { margin-left:auto; }
   .user .img-bubble-meta { text-align:right; }
   .user .file-bubble { background:#3d3c37; border-color:#4d4c44; }
@@ -1559,6 +1561,10 @@
           ${!isUser ? `<div class="msg-sender">${p.name}</div>` : ''}
           ${fraudNotice}
           <div class="bubble ${riskClass} markdown-body" data-msg-body></div>
+          ${(msg.attachments || []).map(a => `
+          <div class="img-bubble" data-att="${escHtml(a.id)}" data-att-name="${escHtml(a.name)}" data-att-size="${a.size}">
+            <div class="img-bubble-loading">Loading image…</div>
+          </div>`).join('')}
           <div class="msg-footer">
             <span class="msg-time">${time}</span>
             <span class="hash-tag" style="opacity:0.5">${msg.hash ? msg.hash.substring(0, 8) : 'history'}</span>
@@ -1572,6 +1578,7 @@
         // so a session that was only partly in Study Mode still renders right.
         renderMessageBody(wrapper.querySelector('[data-msg-body]'), cleanContent);
         container.appendChild(wrapper);
+        hydrateAttachments(wrapper);
       });
       container.scrollTop = 999999;
       personaHistories[personaId] = container.innerHTML;
@@ -2047,6 +2054,39 @@
       <button onclick="removeFile(${i})" title="Remove">✕</button>
     </div>`;
       }).join('');
+    }
+
+    // Images restored from history arrive as ids, not bytes: the endpoint that
+    // serves them requires the session token, and a token does not belong in an
+    // <img src> where it would be written to logs and referrers. So each one is
+    // fetched with the bearer header and shown as a blob instead.
+    const attachmentBlobs = new Map();   // attachment id → object URL, per page load
+    async function hydrateAttachments(scope) {
+      const slots = scope.querySelectorAll('.img-bubble[data-att]');
+      for (const slot of slots) {
+        const id = slot.dataset.att;
+        const caption = `${slot.dataset.attName} · ${formatBytes(Number(slot.dataset.attSize) || 0)}`;
+        try {
+          let url = attachmentBlobs.get(id);
+          if (!url) {
+            const r = await fetch(`${API_URL}/api/ai-chat/attachment/${id}`, {
+              headers: { 'Authorization': `Bearer ${_session?.token}` }
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            url = URL.createObjectURL(await r.blob());
+            attachmentBlobs.set(id, url);
+          }
+          slot.innerHTML = `
+        <button type="button" data-cap="${escHtml(caption)}" onclick="showImageLightbox('${url}', this.dataset.cap)" title="Preview ${escHtml(slot.dataset.attName)}">
+          <img src="${url}" alt="${escHtml(slot.dataset.attName)}">
+        </button>
+        <div class="img-bubble-meta">${escHtml(caption)}</div>`;
+        } catch (e) {
+          // Say so rather than leaving an empty frame — an attachment from
+          // before this feature existed genuinely has no bytes to serve.
+          slot.innerHTML = `<div class="img-bubble-meta">${escHtml(slot.dataset.attName)} — image unavailable</div>`;
+        }
+      }
     }
 
     // A sent image keeps its own object URL for the life of the page: the

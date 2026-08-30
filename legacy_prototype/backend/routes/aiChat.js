@@ -44,12 +44,55 @@ router.post('/upload', requireAuth, upload.array('files', 4), async (req, res) =
     for (const f of req.files) {
       persistUpload(f, req.user.id);
       const extracted = await extractFromUpload(f);
+      // Keep the bytes of an IMAGE so the conversation can show it again after
+      // a reload. Documents are already reduced to text above, so storing them
+      // twice would buy nothing. See migration 043 for why this is the DB and
+      // not the uploads/ directory.
+      const isImage = (f.mimetype || '').startsWith('image/');
+      const stored = await query(`
+        INSERT INTO chat_attachments (user_id, original_name, mime, size_bytes, kind, data)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING attachment_id
+      `, [req.user.id, f.originalname, f.mimetype || 'application/octet-stream',
+        f.size, extracted.kind, isImage ? f.buffer : null]);
+      extracted.id = stored.rows[0].attachment_id;
       attachments.push(extracted);
     }
     res.json({ attachments });
   } catch (err) {
     console.error('Attachment upload error:', err);
     res.status(500).json({ error: 'Failed to process attachments', details: err.message });
+  }
+});
+
+// ── GET /api/ai-chat/attachment/:id ────────────────────────────
+// Serve one stored image back to the person who uploaded it.
+//
+// Deliberately NOT a static file URL: `requireAuth` + the user_id match is the
+// whole point, so an attachment id leaking tells you nothing without that
+// user's session. The client fetches this with its bearer token and renders the
+// blob, rather than putting a token in an <img src> where it would land in logs
+// and referrers.
+router.get('/attachment/:id', requireAuth, async (req, res) => {
+  try {
+    const r = await query(`
+      SELECT original_name, mime, data FROM chat_attachments
+      WHERE attachment_id = $1 AND user_id = $2
+    `, [req.params.id, req.user.id]);
+    const row = r.rows[0];
+    // Same answer for "does not exist" and "is not yours" — the id space should
+    // not be probeable for what other people uploaded.
+    if (!row || !row.data) return res.status(404).json({ error: 'Attachment not found' });
+
+    res.set('Content-Type', row.mime || 'application/octet-stream');
+    // Private: this is one user's file, and it never changes once written.
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.set('Content-Disposition',
+      `inline; filename="${String(row.original_name || 'attachment').replace(/["\r\n]/g, '')}"`);
+    res.send(row.data);
+  } catch (err) {
+    console.error('Attachment fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch attachment' });
   }
 });
 
@@ -118,6 +161,19 @@ router.post('/send', requireAuth, async (req, res) => {
     `, [userMsgId, channelId, userId, storedMessage]);
 
     userProof = await createProof(userMsgId, userId, storedMessage, channelId);
+
+    // Bind the uploads to the message that carried them, so reopening the
+    // conversation can find and re-render them. Scoped by user_id: an id from
+    // someone else's upload matches nothing and is silently ignored.
+    if (hasAttachments) {
+      const ids = attachments.map(a => a && a.id).filter(Boolean);
+      if (ids.length) {
+        await query(`
+          UPDATE chat_attachments SET message_id = $1, session_id = $2
+          WHERE attachment_id = ANY($3::uuid[]) AND user_id = $4
+        `, [userMsgId, activeSession, ids, userId]);
+      }
+    }
 
     await query(`
       INSERT INTO ai_conversations (conversation_id, session_id, user_id, persona, role, content, message_id)
@@ -355,6 +411,36 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
       ORDER BY a.created_at ASC
     `, [req.params.sessionId, req.user.id]);
     const messages = resMsgs.rows;
+
+    // Re-attach the images a message was sent with. One query for the whole
+    // session rather than one per message — this route already runs on every
+    // conversation open. Bytes are NOT sent here; the client asks for each one
+    // it decides to display.
+    if (messages.length) {
+      const resAtt = await query(`
+        SELECT attachment_id AS id, message_id, original_name AS name, mime, size_bytes AS size, kind
+        FROM chat_attachments
+        WHERE session_id = $1 AND user_id = $2 AND data IS NOT NULL
+        ORDER BY created_at ASC
+      `, [req.params.sessionId, req.user.id]);
+      const byMessage = new Map();
+      for (const a of resAtt.rows) {
+        const { message_id: mid, ...rest } = a;
+        if (!byMessage.has(mid)) byMessage.set(mid, []);
+        byMessage.get(mid).push(rest);
+      }
+      // ai_conversations rows carry message_id; the SELECT above aliases the
+      // conversation id, so pull the join key explicitly.
+      const resIds = await query(`
+        SELECT conversation_id, message_id FROM ai_conversations
+        WHERE session_id = $1 AND user_id = $2
+      `, [req.params.sessionId, req.user.id]);
+      const msgIdByConv = new Map(resIds.rows.map(r => [r.conversation_id, r.message_id]));
+      for (const m of messages) {
+        const att = byMessage.get(msgIdByConv.get(m.id));
+        if (att && att.length) m.attachments = att;
+      }
+    }
 
     const persona = messages.length > 0 ? getPersona(messages[0].persona) : null;
 
