@@ -669,8 +669,8 @@ body.mm-body #navToggle { display:none; }
              white-space:nowrap;" id="mmDocTitle">Document</div>
         <div style="font-size:12px; color:var(--mm-muted); margin-top:2px;" id="mmDocMeta"></div>
       </div>
-      <a class="mm-btn" id="mmDocOpen" target="_blank" rel="noopener" style="text-decoration:none;">
-        <span class="material-symbols-outlined">open_in_new</span> Open original</a>
+      <button class="mm-btn" id="mmDocOpen" data-act="openOriginal" style="text-decoration:none;">
+        <span class="material-symbols-outlined">open_in_new</span> Open original</button>
       <button class="mm-icon-btn" data-act="closeDoc"><span class="material-symbols-outlined">close</span></button>
     </div>
     <div id="mmDocText">Loading…</div>
@@ -831,7 +831,10 @@ function normDoc(d) {
     size: Number(d.size != null ? d.size : d.size_bytes) || 0,
     kind: d.kind || 'document',
     chars: Number(d.chars != null ? d.chars : d.char_count) || 0,
-    url: d.url || (d.stored_name ? '/uploads/' + encodeURIComponent(d.stored_name) : null)
+    // Presence only — it decides whether the "open original" button shows. The
+    // file itself is fetched by docId through an authenticated route, so the
+    // old /uploads/<stored_name> guess is gone rather than kept as a fallback.
+    url: d.url || (d.stored_name ? `/api/mind-maps/docs/${encodeURIComponent(d.docId || d.doc_id)}/file` : null)
   };
 }
 
@@ -1873,9 +1876,9 @@ function renderNodeDocs(n) {
                <span class="material-symbols-outlined">edit</span></button>`
           : `<button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(d.docId)}" title="View extracted text">
                <span class="material-symbols-outlined">visibility</span></button>`}
-        ${d.url ? `<a class="mm-icon-btn" href="${esc(d.url)}"
-            target="_blank" rel="noopener" title="Open the original file">
-          <span class="material-symbols-outlined">open_in_new</span></a>` : ''}
+        ${d.url ? `<button class="mm-icon-btn" data-act="openOriginal" data-arg="${esc(d.docId)}"
+            title="Open the original file">
+          <span class="material-symbols-outlined">open_in_new</span></button>` : ''}
         <button class="mm-icon-btn" data-act="removeDoc" data-arg="${esc(d.docId)}" title="Remove">
           <span class="material-symbols-outlined">close</span></button>`)).join('')
     : '<div class="mm-empty-note">Nothing attached yet. A document you upload or a note you write here becomes the source the AI answers this node from.</div>';
@@ -1977,7 +1980,12 @@ async function viewDoc(docId) {
       [doc.mimetype, fmtSize(doc.size), doc.chars ? doc.chars.toLocaleString() + ' characters read' : 'no text extracted']
         .filter(Boolean).join(' · ');
     const open = document.getElementById('mmDocOpen');
-    if (doc.url) { open.href = doc.url; open.style.display = ''; }
+    if (doc.url) {
+      // The original is behind an authenticated route now, so this cannot be a
+      // plain href — see openOriginal().
+      open.dataset.arg = docId;
+      open.style.display = '';
+    }
     document.getElementById('mmDocText').textContent =
       doc.text || 'No text could be extracted from this file.';
   } catch (e) {
@@ -1985,6 +1993,40 @@ async function viewDoc(docId) {
   }
 }
 function closeDoc() { document.getElementById('mmDocModal').classList.remove('open'); }
+
+/**
+ * Open the original upload in a new tab.
+ *
+ * The file is served by an authenticated route, so the browser cannot fetch it
+ * from an href — the token lives in JS, and putting it in the URL would write
+ * it to logs and referrers. Fetch it with the header, then hand the tab a blob.
+ * The tab is opened SYNCHRONOUSLY, before the await, or the popup blocker
+ * treats it as unsolicited.
+ */
+const originalBlobs = new Map();   // docId → object URL, for the life of the page
+async function openOriginal(docId) {
+  if (!docId) return;
+  const tab = window.open('', '_blank');
+  try {
+    let url = originalBlobs.get(docId);
+    if (!url) {
+      const res = await fetch(API + '/api/mind-maps/docs/' + encodeURIComponent(docId) + '/file', {
+        headers: { Authorization: 'Bearer ' + TOKEN }
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || ('HTTP ' + res.status));
+      }
+      url = URL.createObjectURL(await res.blob());
+      originalBlobs.set(docId, url);
+    }
+    if (tab) tab.location = url;
+    else window.open(url, '_blank');   // blocker took the tab; try once more
+  } catch (e) {
+    if (tab) tab.close();
+    toast('Could not open the original: ' + e.message);
+  }
+}
 
 // drag & drop straight onto the node's source list
 (function () {
@@ -2942,6 +2984,7 @@ const MM_ACTIONS = {
   openEnrich, closeEnrich, submitEnrich,
   // documents
   pickNodeFiles, viewDoc: (el) => viewDoc(el.dataset.arg), closeDoc,
+  openOriginal: (el) => openOriginal(el.dataset.arg),
   removeDoc: (el) => removeDoc(el.dataset.arg), buildMapFromNodeDocs,
   // chat + gaps
   seedAsk, sendChat, composerToMap, dropChip: (el) => dropChip(el.dataset.arg),

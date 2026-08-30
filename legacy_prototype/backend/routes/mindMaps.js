@@ -35,7 +35,9 @@ const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const Engine = require('../services/cognitive/MindMapEngine');
-const { extractFromUpload, persistUpload } = require('../services/attachments');
+const { extractFromUpload, persistUpload, UPLOAD_DIR } = require('../services/attachments');
+const path = require('path');
+const fs = require('fs');
 
 const NODE_TYPES = ['root', 'branch', 'leaf', 'question', 'task'];
 const LAYOUTS = ['radial', 'tree', 'freeform'];
@@ -91,9 +93,11 @@ function docView(row, withText = false) {
     size: Number(row.size_bytes) || 0,
     kind: row.kind,
     chars: row.char_count,
-    // The blob is served by the existing /uploads static mount. NULL when the
-    // disk write failed — the extracted text still works, the original does not.
-    url: row.stored_name ? `/uploads/${encodeURIComponent(row.stored_name)}` : null,
+    // Authenticated and ownership-checked (see GET /docs/:docId/file). It is a
+    // fetch-with-token URL, not something an <img>/<a> can load on its own.
+    // NULL when the disk write failed — the extracted text still works, the
+    // original does not.
+    url: row.stored_name ? `/api/mind-maps/docs/${encodeURIComponent(row.doc_id)}/file` : null,
     createdAt: row.created_at
   };
   if (withText) view.text = row.extracted || '';
@@ -323,6 +327,45 @@ router.get('/docs/:docId', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Mind map doc read error:', err);
     res.status(500).json({ error: 'Failed to load document' });
+  }
+});
+
+// ── GET /docs/:docId/file ──────────────────────────────────────
+// The original upload, for the source list's "open the original" button.
+//
+// This replaces a /uploads/<stored_name> link. That mount is static and
+// unauthenticated, so the link worked for ANYONE who learned the filename —
+// which the owner's own browser was handed in the API response, and which is
+// predictable enough to guess (timestamp + user prefix + original name). Here
+// ownership is checked before a byte is read, and the same 404 covers "no such
+// document" and "not yours".
+router.get('/docs/:docId/file', requireAuth, async (req, res) => {
+  try {
+    const doc = await requireOwnedDoc(req, res);
+    if (!doc) return;
+    if (!doc.stored_name) return res.status(404).json({ error: 'Original file not stored' });
+
+    // stored_name comes from our own writer, but it reaches the filesystem here,
+    // so treat it as hostile: basename only, never a path that can climb out.
+    const safe = path.basename(String(doc.stored_name));
+    const full = path.join(UPLOAD_DIR, safe);
+    if (!full.startsWith(path.resolve(UPLOAD_DIR) + path.sep) && full !== path.resolve(UPLOAD_DIR)) {
+      return res.status(404).json({ error: 'Original file not stored' });
+    }
+    if (!fs.existsSync(full)) {
+      // Render's disk is ephemeral, so an original can outlive its bytes. Say
+      // that plainly instead of a bare 404 the UI would report as "missing".
+      return res.status(410).json({ error: 'The original file is no longer stored on the server' });
+    }
+
+    res.set('Content-Type', doc.mimetype || 'application/octet-stream');
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.set('Content-Disposition',
+      `inline; filename="${String(doc.filename || safe).replace(/["\r\n]/g, '')}"`);
+    fs.createReadStream(full).pipe(res);
+  } catch (err) {
+    console.error('Mind map doc file error:', err);
+    res.status(500).json({ error: 'Failed to read document' });
   }
 });
 

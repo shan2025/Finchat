@@ -184,8 +184,17 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Uploads are NOT served statically.
+//
+// They were, and that made every uploaded file world-readable to anyone who
+// learned its name — no session, no ownership check. The names are not secret
+// either: they are timestamp + user prefix + original filename, and the app
+// handed them to the browser in API responses.
+//
+// Each kind of upload now has an owner-checked route instead:
+//   • chat images     → GET /api/ai-chat/attachment/:id   (bytes in the DB)
+//   • mind map source → GET /api/mind-maps/docs/:docId/file
+// Both require a session and match user_id before reading anything.
 
 // Serve frontend statically.
 //
