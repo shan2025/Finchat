@@ -50,6 +50,12 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024, files: 6 }
 });
 
+// Ceiling on what gets kept as an original in the row. Multer's 15MB is what a
+// user may UPLOAD; this is what is worth storing twice and paying egress on
+// every time someone opens it. Above it the extracted text is kept and the
+// original is not — the same deal those files had before migration 045.
+const DOC_DB_MAX_BYTES = Number(process.env.MIND_MAP_DOC_DB_MAX_BYTES) || 8 * 1024 * 1024;
+
 // What the node chat ships to the model per document. Smaller than the
 // extraction cap on purpose: four sources at 8k each would crowd out the
 // conversation itself.
@@ -95,18 +101,28 @@ function docView(row, withText = false) {
     chars: row.char_count,
     // Authenticated and ownership-checked (see GET /docs/:docId/file). It is a
     // fetch-with-token URL, not something an <img>/<a> can load on its own.
-    // NULL when the disk write failed — the extracted text still works, the
-    // original does not.
-    url: row.stored_name ? `/api/mind-maps/docs/${encodeURIComponent(row.doc_id)}/file` : null,
+    // NULL when there is no original to serve: a typed note, or a file too big
+    // to keep. `has_data` is the durable copy (migration 045); `stored_name`
+    // covers rows written before it, whose bytes may or may not still be on
+    // disk — the route answers 410 when they are not.
+    url: (row.has_data || row.stored_name)
+      ? `/api/mind-maps/docs/${encodeURIComponent(row.doc_id)}/file` : null,
     createdAt: row.created_at
   };
   if (withText) view.text = row.extracted || '';
   return view;
 }
 
-/** Resolve a document the caller owns, or answer 404 and return null. */
-async function requireOwnedDoc(req, res) {
-  const r = await query('SELECT * FROM mind_map_docs WHERE doc_id = $1 AND user_id = $2',
+/**
+ * Resolve a document the caller owns, or answer 404 and return null.
+ *
+ * `data` (the original's bytes) is excluded unless asked for: every other
+ * caller — move, delete, read the text — would otherwise pull a whole PDF out
+ * of the database to look at its filename.
+ */
+async function requireOwnedDoc(req, res, { withData = false } = {}) {
+  const cols = withData ? `${Engine.DOC_COLS}, data` : Engine.DOC_COLS;
+  const r = await query(`SELECT ${cols} FROM mind_map_docs WHERE doc_id = $1 AND user_id = $2`,
     [req.params.docId, req.user.id]);
   const doc = r.rows[0];
   if (!doc) { res.status(404).json({ error: 'Document not found' }); return null; }
@@ -233,15 +249,23 @@ router.post('/docs', requireAuth, upload.array('files', 6), async (req, res) => 
       const extracted = await extractFromUpload(f);
       const docId = 'mmd_' + uuidv4();
       const text = String(extracted.text || '');
+      // The original goes in the row (migration 045). The disk copy is still
+      // written above for the audit trail, but it is no longer what the app
+      // reads back — Render wipes it on every deploy.
+      const keepBytes = f.buffer && f.buffer.length <= DOC_DB_MAX_BYTES ? f.buffer : null;
+      if (!keepBytes && f.buffer) {
+        console.warn(`⚠️ Mind map doc "${f.originalname}" is ${f.size} bytes — over ` +
+          `${DOC_DB_MAX_BYTES}, keeping its text but not the original.`);
+      }
       const r = await query(`
         INSERT INTO mind_map_docs
           (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
-           stored_name, kind, extracted, char_count)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           stored_name, kind, extracted, char_count, data)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         RETURNING *
       `, [docId, req.user.id, mapId, nodeId, clean(f.originalname, 200) || 'file',
           f.mimetype || '', f.size || 0, storedName, extracted.kind === 'image' ? 'image' : 'document',
-          text, text.length]);
+          text, text.length, keepBytes]);
       saved.push(docView(r.rows[0]));
     }
     if (mapId) await Engine.touchMap(mapId);
@@ -307,7 +331,7 @@ router.get('/docs', requireAuth, async (req, res) => {
   try {
     const onlyFree = req.query.unattached === '1';
     const r = await query(`
-      SELECT * FROM mind_map_docs
+      SELECT ${Engine.DOC_COLS} FROM mind_map_docs
        WHERE user_id = $1 ${onlyFree ? 'AND map_id IS NULL' : ''}
        ORDER BY created_at DESC LIMIT 100
     `, [req.user.id]);
@@ -341,8 +365,24 @@ router.get('/docs/:docId', requireAuth, async (req, res) => {
 // document" and "not yours".
 router.get('/docs/:docId/file', requireAuth, async (req, res) => {
   try {
-    const doc = await requireOwnedDoc(req, res);
+    const doc = await requireOwnedDoc(req, res, { withData: true });
     if (!doc) return;
+
+    const setHeaders = () => {
+      res.set('Content-Type', doc.mimetype || 'application/octet-stream');
+      res.set('Cache-Control', 'private, max-age=3600');
+      res.set('Content-Disposition',
+        `inline; filename="${String(doc.filename || 'document').replace(/["\r\n]/g, '')}"`);
+    };
+
+    // The row is the source of truth since migration 045.
+    if (doc.data) {
+      setHeaders();
+      return res.send(doc.data);
+    }
+
+    // Rows written before that still point at a disk file. On a host that has
+    // not redeployed since, those bytes are still there.
     if (!doc.stored_name) return res.status(404).json({ error: 'Original file not stored' });
 
     // stored_name comes from our own writer, but it reaches the filesystem here,
@@ -353,15 +393,14 @@ router.get('/docs/:docId/file', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Original file not stored' });
     }
     if (!fs.existsSync(full)) {
-      // Render's disk is ephemeral, so an original can outlive its bytes. Say
-      // that plainly instead of a bare 404 the UI would report as "missing".
-      return res.status(410).json({ error: 'The original file is no longer stored on the server' });
+      // Uploaded before migration 045 and since wiped by a deploy. Say that
+      // plainly instead of a bare 404 the UI would report as "missing".
+      return res.status(410).json({
+        error: 'This file was uploaded before originals were stored durably, and the server copy is gone. Re-upload it to keep the original.'
+      });
     }
 
-    res.set('Content-Type', doc.mimetype || 'application/octet-stream');
-    res.set('Cache-Control', 'private, max-age=3600');
-    res.set('Content-Disposition',
-      `inline; filename="${String(doc.filename || safe).replace(/["\r\n]/g, '')}"`);
+    setHeaders();
     fs.createReadStream(full).pipe(res);
   } catch (err) {
     console.error('Mind map doc file error:', err);

@@ -862,12 +862,24 @@ async function analyseGaps(mapId, opts = {}) {
 // Documents
 // ═══════════════════════════════════════════════════════════
 
+// Every column of mind_map_docs EXCEPT `data`, which holds the original file's
+// bytes (migration 045). `SELECT *` here would drag megabytes across the wire
+// for a list nobody asked to download — `has_data` is all a caller needs to know
+// that an original exists. Only the file-serving route reads `data` itself.
+const DOC_FIELDS = ['doc_id', 'user_id', 'map_id', 'node_id', 'filename', 'mimetype',
+  'size_bytes', 'stored_name', 'kind', 'extracted', 'char_count', 'created_at'];
+const docCols = (alias = '') => {
+  const p = alias ? `${alias}.` : '';
+  return `${DOC_FIELDS.map(c => p + c).join(', ')}, (${p}data IS NOT NULL) AS has_data`;
+};
+const DOC_COLS = docCols();
+
 /** The caller's own documents, by id. Ownership is part of the query, not a check after it. */
 async function docsByIds(userId, docIds) {
   const ids = (Array.isArray(docIds) ? docIds : []).filter(d => typeof d === 'string' && d);
   if (!ids.length) return [];
   const res = await query(
-    'SELECT * FROM mind_map_docs WHERE user_id = $1 AND doc_id = ANY($2::text[]) ORDER BY created_at ASC',
+    `SELECT ${DOC_COLS} FROM mind_map_docs WHERE user_id = $1 AND doc_id = ANY($2::text[]) ORDER BY created_at ASC`,
     [userId, ids]);
   return res.rows;
 }
@@ -930,9 +942,9 @@ async function inheritedDocs(nodeId) {
       SELECT n.node_id, n.parent_id, n.map_id, up.d + 1
         FROM mind_map_nodes n JOIN up ON up.parent_id = n.node_id
     )
-    SELECT d.*, up.d AS distance FROM mind_map_docs d JOIN up ON d.node_id = up.node_id
+    SELECT ${docCols('d')}, up.d AS distance FROM mind_map_docs d JOIN up ON d.node_id = up.node_id
     UNION ALL
-    SELECT d.*, 999 AS distance FROM mind_map_docs d
+    SELECT ${docCols('d')}, 999 AS distance FROM mind_map_docs d
      WHERE d.node_id IS NULL
        AND d.map_id = (SELECT map_id FROM mind_map_nodes WHERE node_id = $1)
     ORDER BY distance ASC, created_at ASC
@@ -961,13 +973,17 @@ async function adoptDocs(mapId, userId, docs) {
   }
 
   for (const d of bound) {
+    // Copied INSIDE the database: the original's bytes (migration 045) ride
+    // along without a round trip through Node, and cannot be dropped by a
+    // caller whose row was selected without the `data` column.
     await query(`
       INSERT INTO mind_map_docs
         (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
-         stored_name, kind, extracted, char_count)
-      VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,$10)
-    `, ['mmd_' + uuidv4(), userId, mapId, d.filename, d.mimetype, d.size_bytes,
-        d.stored_name, d.kind, d.extracted, d.char_count]);
+         stored_name, kind, extracted, char_count, data)
+      SELECT $1, $2, $3, NULL, filename, mimetype, size_bytes,
+             stored_name, kind, extracted, char_count, data
+        FROM mind_map_docs WHERE doc_id = $4 AND user_id = $2
+    `, ['mmd_' + uuidv4(), userId, mapId, d.doc_id]);
   }
 }
 
@@ -975,7 +991,7 @@ async function adoptDocs(mapId, userId, docs) {
 async function mapDocs(mapId) {
   const res = await query(`
     SELECT doc_id, map_id, node_id, filename, mimetype, size_bytes, stored_name,
-           kind, char_count, created_at
+           kind, char_count, created_at, (data IS NOT NULL) AS has_data
       FROM mind_map_docs WHERE map_id = $1 ORDER BY created_at ASC
   `, [mapId]);
   return res.rows;
@@ -1112,6 +1128,9 @@ module.exports = {
   touchMap,
   // documents
   docsByIds,
+  // The route layer reads documents too, and must exclude `data` the same way.
+  DOC_COLS,
+  docCols,
   addTextNote,
   updateTextNote,
   inheritedDocs,
