@@ -121,6 +121,14 @@
   .file-info { min-width:0; }
   .file-name { font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
   .file-size { font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:1px; }
+  /* Sent images render as the picture itself, not a grey card. */
+  .img-bubble { max-width:260px; }
+  .img-bubble button { padding:0; border:1px solid var(--border); background:var(--surface2); border-radius:12px;
+    overflow:hidden; cursor:zoom-in; display:block; box-shadow:var(--shadow); line-height:0; }
+  .img-bubble img { display:block; max-width:100%; max-height:220px; object-fit:cover; }
+  .img-bubble-meta { font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:4px; }
+  .user .img-bubble { margin-left:auto; }
+  .user .img-bubble-meta { text-align:right; }
   .user .file-bubble { background:#3d3c37; border-color:#4d4c44; }
   .user .file-icon { background:#4d4c44; }
 
@@ -2041,12 +2049,26 @@
       }).join('');
     }
 
+    // A sent image keeps its own object URL for the life of the page: the
+    // composer's copy is revoked on send, and the transcript still needs one.
+    // Only live File objects qualify — a message replayed from history carries
+    // name and size but no bytes, so it keeps the plain file card.
+    function registerSentImage(f) {
+      if (!f || typeof Blob === 'undefined' || !(f instanceof Blob)) return null;
+      if (!String(f.type || '').startsWith('image/')) return null;
+      return URL.createObjectURL(f);
+    }
+
     // Full-size preview of a staged image — you paste a screenshot, you want to
     // confirm it is the right one before sending it.
     function openAttachPreview(idx) {
       const f = pendingFiles[idx];
       const url = f && attachThumb(f);
       if (!url) return;
+      showImageLightbox(url, `${f.name} · ${formatBytes(f.size)}`);
+    }
+
+    function showImageLightbox(url, caption) {
       let box = document.getElementById('attLightbox');
       if (!box) {
         box = document.createElement('div');
@@ -2060,7 +2082,7 @@
         document.body.appendChild(box);
       }
       document.getElementById('attLightboxImg').src = url;
-      document.getElementById('attLightboxCap').textContent = `${f.name} · ${formatBytes(f.size)}`;
+      document.getElementById('attLightboxCap').textContent = caption || '';
       box.classList.add('show');
     }
 
@@ -2169,15 +2191,33 @@
 
       let filesHTML = '';
       if (files && files.length) {
-        filesHTML = files.map(f => `
+        filesHTML = files.map(f => {
+          // A sent screenshot stays visible in the transcript instead of
+          // collapsing into an anonymous grey file card. The bubble owns its own
+          // object URL (see registerSentImage) rather than borrowing the
+          // composer's, which is revoked the moment the message is sent.
+          const url = registerSentImage(f);
+          if (url) {
+            return `
+      <div class="img-bubble">
+        <button type="button" data-cap="${escHtml(f.name)} · ${formatBytes(f.size)}"
+          onclick="showImageLightbox('${url}', this.dataset.cap)" title="Preview ${escHtml(f.name)}">
+          <img src="${url}" alt="${escHtml(f.name)}">
+        </button>
+        <div class="img-bubble-meta">${escHtml(f.name)} · ${formatBytes(f.size)}</div>
+      </div>
+    `;
+          }
+          return `
       <div class="file-bubble" style="max-width:240px">
         <div class="file-icon">${fileIcon(f.name)}</div>
         <div class="file-info">
-          <div class="file-name">${f.name}</div>
+          <div class="file-name">${escHtml(f.name)}</div>
           <div class="file-size">${formatBytes(f.size)}</div>
         </div>
       </div>
-    `).join('');
+    `;
+        }).join('');
       }
 
       const userAvatarHTML = `<div class="avatar user-avatar" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
