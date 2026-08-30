@@ -154,6 +154,22 @@
   .attach-chip { display:flex; align-items:center; gap:6px; padding:4px 8px; background:var(--surface); border:1px solid var(--border); border-radius:6px; font-size:11px; color:var(--text2); }
   .attach-chip button { background:none; border:none; cursor:pointer; color:var(--text3); font-size:12px; padding:0; line-height:1; display:flex; align-items:center; }
   .attach-chip button:hover { color:var(--accent-red); }
+  /* The image part of a chip opens the lightbox; the ✕ still just removes. */
+  .attach-chip .attach-open { display:flex; align-items:center; gap:6px; background:none; border:none; padding:0; margin:0;
+    font:inherit; color:inherit; cursor:zoom-in; max-width:190px; }
+  .attach-chip .attach-open:hover { color:var(--text); }
+  .attach-chip .attach-open span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Attachment lightbox */
+  .att-light { position:fixed; inset:0; z-index:120; display:none; align-items:center; justify-content:center;
+    background:rgba(32,30,29,.72); backdrop-filter:blur(3px); padding:40px 24px; }
+  .att-light.show { display:flex; }
+  .att-light figure { margin:0; max-width:100%; max-height:100%; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .att-light img { max-width:100%; max-height:calc(100vh - 150px); border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.45); background:#fff; }
+  .att-light figcaption { color:#f5ead8; font-size:12px; font-family:var(--mono); letter-spacing:.02em; }
+  .att-light .att-close { position:absolute; top:18px; right:22px; width:38px; height:38px; border-radius:999px; border:none;
+    background:rgba(255,255,255,.14); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .att-light .att-close:hover { background:rgba(255,255,255,.26); }
 
   /* ── Right Panel Components (JS-generated) ── */
   .proof-card { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-family:var(--mono); font-size:10px; line-height:1.8; }
@@ -1977,27 +1993,141 @@
     // ─────────────────────────────────
     // FILE HANDLING
     // ─────────────────────────────────
+    // The upload route caps a request at 4 files of 10MB each; enforce it here
+    // so an over-eager paste fails in the composer instead of at the server.
+    const MAX_ATTACHMENTS = 4, MAX_ATTACH_BYTES = 10 * 1024 * 1024;
     function handleFiles(files) {
-      for (const f of files) pendingFiles.push(f);
+      let added = 0;
+      for (const f of files) {
+        if (pendingFiles.length >= MAX_ATTACHMENTS) {
+          showToast(`Up to ${MAX_ATTACHMENTS} attachments per message`, 'warn');
+          break;
+        }
+        if (f.size > MAX_ATTACH_BYTES) { showToast(`${f.name} is over 10MB`, 'warn'); continue; }
+        pendingFiles.push(f);
+        added++;
+      }
       renderAttachPreview();
+      return added;
+    }
+
+    // Thumbnails for image attachments. Keyed off the File object so the blob
+    // URL survives re-renders and is revoked only when the file is dropped.
+    const attachThumbs = new Map();
+    function attachThumb(f) {
+      if (!f.type.startsWith('image/')) return null;
+      if (!attachThumbs.has(f)) attachThumbs.set(f, URL.createObjectURL(f));
+      return attachThumbs.get(f);
     }
 
     function renderAttachPreview() {
       const preview = document.getElementById('attachPreview');
-      if (!pendingFiles.length) { preview.classList.remove('show'); return; }
+      if (!pendingFiles.length) { preview.classList.remove('show'); preview.innerHTML = ''; return; }
       preview.classList.add('show');
-      preview.innerHTML = pendingFiles.map((f, i) =>
-        `<div class="attach-chip">
-      📄 <span>${f.name.length > 20 ? f.name.substring(0, 18) + '…' : f.name}</span>
-      <button onclick="removeFile(${i})">✕</button>
-    </div>`
-      ).join('');
+      preview.innerHTML = pendingFiles.map((f, i) => {
+        const thumb = attachThumb(f);
+        const label = `<span>${escHtml(f.name.length > 20 ? f.name.substring(0, 18) + '…' : f.name)}</span>`;
+        // Images get a clickable body that opens the lightbox; other files are
+        // inert, since there is nothing to show until the agent reads them.
+        const body = thumb
+          ? `<button type="button" class="attach-open" onclick="openAttachPreview(${i})" title="Preview ${escHtml(f.name)}">
+        <img src="${thumb}" alt="" style="width:26px; height:26px; border-radius:4px; object-fit:cover; display:block;">${label}
+      </button>`
+          : `📄 ${label}`;
+        return `<div class="attach-chip">
+      ${body}
+      <button onclick="removeFile(${i})" title="Remove">✕</button>
+    </div>`;
+      }).join('');
     }
 
+    // Full-size preview of a staged image — you paste a screenshot, you want to
+    // confirm it is the right one before sending it.
+    function openAttachPreview(idx) {
+      const f = pendingFiles[idx];
+      const url = f && attachThumb(f);
+      if (!url) return;
+      let box = document.getElementById('attLightbox');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'attLightbox';
+        box.className = 'att-light';
+        box.innerHTML = `<button type="button" class="att-close" onclick="closeAttachPreview()" title="Close">
+        <span class="material-symbols-outlined text-[20px]">close</span></button>
+      <figure><img id="attLightboxImg" alt=""><figcaption id="attLightboxCap"></figcaption></figure>`;
+        // Clicking the backdrop closes; clicking the image itself must not.
+        box.addEventListener('click', (e) => { if (e.target === box) closeAttachPreview(); });
+        document.body.appendChild(box);
+      }
+      document.getElementById('attLightboxImg').src = url;
+      document.getElementById('attLightboxCap').textContent = `${f.name} · ${formatBytes(f.size)}`;
+      box.classList.add('show');
+    }
+
+    function closeAttachPreview() {
+      const box = document.getElementById('attLightbox');
+      if (box) box.classList.remove('show');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const box = document.getElementById('attLightbox');
+      if (box && box.classList.contains('show')) { e.stopPropagation(); closeAttachPreview(); }
+    }, true);
+
     function removeFile(idx) {
+      const f = pendingFiles[idx];
+      // The lightbox may be showing the very blob about to be revoked.
+      closeAttachPreview();
+      if (f && attachThumbs.has(f)) { URL.revokeObjectURL(attachThumbs.get(f)); attachThumbs.delete(f); }
       pendingFiles.splice(idx, 1);
       renderAttachPreview();
     }
+
+    // Ctrl+V a screenshot straight into the composer, the way ChatGPT/Claude do.
+    // Clipboard images arrive with a useless name ("image.png") or none at all,
+    // so stamp them so multiple pastes stay distinguishable in the chip list.
+    let pastedImageCount = 0;
+    function filesFromClipboard(dt) {
+      if (!dt) return [];
+      const out = [];
+      for (const item of dt.items || []) {
+        if (item.kind !== 'file') continue;
+        const f = item.getAsFile();
+        if (!f || !f.type.startsWith('image/')) continue;
+        const ext = (f.type.split('/')[1] || 'png').split('+')[0];
+        out.push(new File([f], `screenshot-${++pastedImageCount}.${ext}`, { type: f.type }));
+      }
+      return out;
+    }
+
+    document.addEventListener('paste', (e) => {
+      const imgs = filesFromClipboard(e.clipboardData);
+      if (!imgs.length) return;          // plain text pastes behave as before
+      e.preventDefault();
+      const added = handleFiles(imgs);
+      const input = document.getElementById('msgInput');
+      if (input) input.focus();
+      // Silent when nothing was added — handleFiles already explained why.
+      if (added) showToast(added === 1 ? 'Screenshot attached' : `${added} images attached`, 'info');
+    });
+
+    // Drag-and-drop lands in the same place as a paste.
+    (function enableComposerDrop() {
+      const box = document.getElementById('composerBox');
+      if (!box) return;
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+      ['dragenter', 'dragover'].forEach(ev => box.addEventListener(ev, (e) => {
+        stop(e); box.style.borderColor = '#8a7d6a';
+      }));
+      ['dragleave', 'drop'].forEach(ev => box.addEventListener(ev, (e) => {
+        stop(e); box.style.borderColor = '';
+      }));
+      box.addEventListener('drop', (e) => {
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) handleFiles(files);
+      });
+    })();
 
     function fileIcon(name) {
       const ext = name.split('.').pop().toLowerCase();
@@ -2352,6 +2482,9 @@
       input.value = '';
       input.style.height = '40px';
       pendingFiles = [];
+      closeAttachPreview();
+      attachThumbs.forEach(url => URL.revokeObjectURL(url));
+      attachThumbs.clear();
       renderAttachPreview();
       currentAbortController = new AbortController();
       setSendButtonMode('stop');

@@ -98,6 +98,12 @@ const PROVIDERS = [
     // gemini-2.5-flash is deliberately absent: Google now answers 404 for it on
     // new keys ("no longer available to new users").
     models: (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-3.5-flash')
+      .split(',').map(s => s.trim()).filter(Boolean),
+    // Image work leads with the pinned model instead. gemini-flash-latest times
+    // out (45s) on an inline image before falling through, and a chat attachment
+    // has someone watching it upload — measured 51s vs 6s per description on
+    // 2026-08-30.
+    visionModels: (process.env.GEMINI_VISION_MODELS || 'gemini-3.5-flash,gemini-flash-latest')
       .split(',').map(s => s.trim()).filter(Boolean)
   },
   {
@@ -206,6 +212,16 @@ const WORKLOAD_ROUTES = {
   extraction: (process.env.INFERENCE_ROUTE_TRIVIAL || 'groq,mistral,deepseek,gemini')
     .split(',').map(s => s.trim()).filter(Boolean),
   'gap-detection': (process.env.INFERENCE_ROUTE_TRIVIAL || 'groq,mistral,deepseek,gemini')
+    .split(',').map(s => s.trim()).filter(Boolean),
+
+  // Describing an attached image is the one workload where the fallback chain is
+  // actively harmful: a text-only model does not reject an image, it answers
+  // confidently about a prompt it cannot see. Only providers whose model can
+  // actually look at pixels belong here. Gemini leads because it is the one on
+  // the bench with a working multimodal model — Groq's key carries no vision
+  // model at all since llama-4-scout was decommissioned (probed 2026-08-30), so
+  // adding Groq here would only spend calls to 404.
+  vision: (process.env.INFERENCE_ROUTE_VISION || 'gemini')
     .split(',').map(s => s.trim()).filter(Boolean)
 };
 
@@ -427,16 +443,46 @@ async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperat
  * a message with role "system"; a system message left in the contents array is
  * rejected. Both are normalised here.
  */
+/**
+ * Message content is usually a string, but a multimodal turn (an image the user
+ * pasted into chat) is an OpenAI-style array of parts. `String(content)` on that
+ * array yields "[object Object],[object Object]" — which is not an error anyone
+ * sees, because the model dutifully answers a question about that literal text.
+ * That is exactly what happened to pasted screenshots before these two helpers.
+ */
+function _plainText(content) {
+  if (Array.isArray(content)) {
+    return content.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n');
+  }
+  return String(content || '');
+}
+
+/** OpenAI-style content → Gemini `parts`, carrying data-URL images as inline_data. */
+function _geminiParts(content) {
+  if (!Array.isArray(content)) return [{ text: String(content || '') }];
+  const parts = [];
+  for (const p of content) {
+    if (!p) continue;
+    if (p.type === 'text') { parts.push({ text: p.text || '' }); continue; }
+    const url = p.type === 'image_url' && p.image_url ? p.image_url.url : null;
+    const m = url && /^data:([^;,]+);base64,(.+)$/s.exec(url);
+    if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+    // A remote image URL is dropped rather than sent: Gemini cannot fetch it,
+    // and a silent partial prompt beats a 400 on the whole turn.
+  }
+  return parts.length ? parts : [{ text: '' }];
+}
+
 async function _callGemini({ baseUrl, apiKey, model, messages, temperature, jsonMode }) {
   const systemText = messages
     .filter(m => m.role === 'system')
-    .map(m => String(m.content || '')).join('\n\n');
+    .map(m => _plainText(m.content)).join('\n\n');
 
   const contents = messages
     .filter(m => m.role !== 'system')
     .map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: String(m.content || '') }]
+      parts: _geminiParts(m.content)
     }));
 
   const body = {
@@ -729,6 +775,14 @@ async function runInference({
   let route = _providersFor(effectiveWorkload);
   // Key validation restricts the whole run to the one provider being tested.
   if (onlyProvider) route = route.filter(cfg => cfg.name === onlyProvider);
+  // Every other route is an ORDER, not an exclusion — _providersFor appends the
+  // remaining providers as a tail so a spent primary still gets an answer. Image
+  // work is the exception: a text-only model cannot see the attachment and does
+  // not say so, it answers about the serialized payload. Here the tail is a
+  // liability, so the route is a hard whitelist of providers that declare a
+  // vision model. If none is configured, the caller gets a failure it can be
+  // honest about.
+  if (effectiveWorkload === 'vision') route = route.filter(cfg => cfg.visionModels);
   // Move the user's role-assigned provider to the front so their chosen key
   // serves this work; everything else keeps its order as fallback.
   if (preferredProvider) {
@@ -761,9 +815,12 @@ async function runInference({
 
     // An explicit `model` argument names a Groq model, so it leads Groq's list
     // and is withheld from the others, where it would 400 every candidate.
-    const models = (cfg.acceptsModelOverride && effectiveModel)
-      ? [effectiveModel, ...cfg.models]
+    const baseModels = (effectiveWorkload === 'vision' && cfg.visionModels)
+      ? cfg.visionModels
       : cfg.models;
+    const models = (cfg.acceptsModelOverride && effectiveModel)
+      ? [effectiveModel, ...baseModels]
+      : baseModels;
 
     attempted.push(cfg.name);
 
@@ -808,6 +865,13 @@ async function runInference({
   // has the unsatisfying answer that from Render's point of view there isn't
   // one. Reaching a desktop Ollama from the cloud needs OLLAMA_URL set to a
   // publicly reachable tunnel, and that desktop to be awake.
+  //
+  // Skipped for image work: this posts OpenAI-shaped `messages`, and a local
+  // text model would answer about an image it never received. The attachment
+  // service has its own Ollama step that speaks the native `images` field.
+  if (effectiveWorkload === 'vision') {
+    throw new Error('No vision-capable provider available (route: vision)');
+  }
   try {
     const response = await axios.post(
       `${OLLAMA_URL}/api/chat`,
