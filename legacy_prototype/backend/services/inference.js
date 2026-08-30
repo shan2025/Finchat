@@ -930,6 +930,63 @@ function providerOrderFor(workload) {
   return _providersFor(workload).map(p => p.name);
 }
 
+/**
+ * Which providers this deployment can actually reach, and (optionally) whether
+ * their keys still answer.
+ *
+ * Exists because "is the Gemini key set on Render?" had no answer short of the
+ * dashboard: a missing key is silent here by design — the provider resolves to
+ * an empty credential pool and is skipped. That is right for serving traffic and
+ * useless for operating the thing. `live` spends a handful of tokens per
+ * provider to tell a configured key from a working one, and `vision` sends a
+ * 1x1 PNG so the image path is proven end to end rather than assumed from the
+ * text path working.
+ */
+async function probeProviders({ live = false, vision = false } = {}) {
+  // A 64x64 PNG (black square on white). Deliberately not a 1x1 pixel: Gemini
+  // rejects that outright with "Unable to process input image" (400), which
+  // would make a healthy key look broken — the canary has to be an image a
+  // vision model would actually accept.
+  const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAEDSURBVHhe7ZAxCgNAEITu/59OelvBEGYFmy1k2PcZ5/Gwxj2AhzXuATyscQ/gYY17AA9r3AN4WOMewMMa9wAe1tAPeO/9VIsucFCtRRc4qNaiCxxUa9EFDqq16AIH1Vp0gYNqLbrAQbUWXeCgWosucFCtRRc4qNaiCxxUa9EFDqq16AIH1Vp0gYNqLbrAQbUWXeCgWosucFCtRRc4qNaiCxxUa9EFDqq16AIH1Vp0gYNqLbrAQbUWXeCgWosucFCtRRc4qNaiCxxUa9EFDqq16AIH1Vp0gYNqLbrAQbUWX/hz7gE8rHEP4GGNewAPa9wDeFjjHsDDGvcAHta4B/CwxvwDvks7zv7mSmbzAAAAAElFTkSuQmCC';
+  const out = [];
+  for (const cfg of PROVIDERS) {
+    const creds = quota.resolveCredentials(cfg.name, { allowSystem: true });
+    const row = {
+      provider: cfg.name,
+      configured: creds.length > 0,
+      // Never the key itself — this endpoint is reachable with the cron secret.
+      credentials: creds.map(c => c.id),
+      models: cfg.models,
+      visionModels: cfg.visionModels || null
+    };
+    if (live && row.configured) {
+      const wantsImage = vision && !!cfg.visionModels;
+      const content = wantsImage
+        ? [{ type: 'text', text: 'Reply with the single word: ok' },
+           { type: 'image_url', image_url: { url: `data:image/png;base64,${PIXEL}` } }]
+        : 'Reply with the single word: ok';
+      const startedAt = Date.now();
+      try {
+        const r = await runInference({
+          messages: [{ role: 'user', content }],
+          workload: wantsImage ? 'vision' : 'probe',
+          feature: 'probe',
+          onlyProvider: cfg.name,
+          byokKey: creds[0].key,       // onlyProvider uses the supplied key alone
+          byokProvider: cfg.name,
+          temperature: 0
+        });
+        row.live = { ok: true, model: r.model || null, ms: Date.now() - startedAt, sawImage: wantsImage };
+      } catch (err) {
+        row.live = { ok: false, error: err.message, ms: Date.now() - startedAt, sawImage: wantsImage };
+      }
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 module.exports = {
-  runInference, providerOrderFor, WORKLOAD_ROUTES, WORKLOAD_MODEL_HINTS, IMPATIENT_WORKLOADS
+  runInference, providerOrderFor, probeProviders,
+  WORKLOAD_ROUTES, WORKLOAD_MODEL_HINTS, IMPATIENT_WORKLOADS
 };

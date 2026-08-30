@@ -200,6 +200,27 @@ router.all('/route-learning', async (req, res) => {
   }
 });
 
+/**
+ * Which AI providers this deployment can actually use.
+ *
+ * Answers "is the Gemini key set on Render?" without the dashboard. Default is a
+ * pure config read (no calls, no tokens). `?live=1` sends a one-word prompt to
+ * each configured provider to tell a key that EXISTS from a key that WORKS, and
+ * `?vision=1` adds a 1x1 PNG so the image path — the one chat attachments depend
+ * on — is proven rather than inferred from text working.
+ */
+router.all('/provider-check', async (req, res) => {
+  const { probeProviders } = require('../services/inference');
+  const live = req.query.live === '1' || req.query.live === 'true';
+  const vision = req.query.vision === '1' || req.query.vision === 'true';
+  try {
+    const providers = await probeProviders({ live, vision: vision && live });
+    res.json({ ok: true, live, vision: vision && live, providers });
+  } catch (err) {
+    res.status(503).json({ ok: false, error: err.message });
+  }
+});
+
 /** Cheap authenticated no-op, so you can verify the secret without side effects. */
 router.all('/ping', (req, res) => {
   res.json({ ok: true, service: 'FinChat cron', time: new Date().toISOString() });
