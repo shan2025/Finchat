@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Neural Space</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/assets/favicon.svg">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Caprasimo&display=swap" rel="stylesheet">
+<style>
+  /* ── FinChat NEURAL SPACE ─────────────────────────────────────────────────
+     A spatial operating environment where every object carries meaning:
+
+       core     Plato — the orchestration field the whole system hangs from
+       planet   a DEPARTMENT (Finance, Research, Operations, Platform)
+       moons    the people of that department — one HEAD (a real agent) and
+                its ASSISTANTS, drawn hollow because no agent sits in the seat.
+                A hollow seat is one of two things, and the panel says which:
+                state:'service' (the capability ships today, just as plumbing
+                rather than as something that reasons) or planned (not built).
+       meteor   a real run arriving from the outside world — one per execution,
+                green when it completed, amber when it failed
+       nebula   how much this department actually knows (its cortex volume)
+       fog      distance — everything fades into the void as it recedes
+
+     Every destination in the sidebar is also reachable from here: the dock
+     along the bottom, or ⌘K / Ctrl-K for the jump palette. All tokens are
+     scoped to .ns-app so this dark palette never leaks into the espresso rail.
+     ─────────────────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #05070d; color: #dbe4f0; overflow: hidden; -webkit-font-smoothing: antialiased; }
+
+  .ns-app {
+    --ground:#05070d; --panel:#0b0f17; --edge:#1e2839; --edge-hi:#2c3a52;
+    --text:#dbe4f0; --dim:#8494a8; --mute:#5a6a80;
+    --blue:#54a6ff; --core:#8fd4ff; --amber:#e0a04a; --green:#5fce9b;
+    position: fixed; inset: 0; background: var(--ground); color: var(--text); overflow: hidden;
+  }
+  .ns-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .ns-canvas.ns-drag { cursor: grabbing; }
+  .ns-canvas.ns-point { cursor: pointer; }
+
+  .ns-hud { position: absolute; z-index: 5; }
+
+  /* Brand + breadcrumb (top-left) */
+  .ns-brand { top: 22px; left: 26px; pointer-events: none; }
+  .ns-brand h1 { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .42em; color: var(--text); text-indent: .42em; margin: 0; }
+  .ns-brand .ns-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .26em; color: var(--dim); margin-top: 5px; text-transform: uppercase; }
+  .ns-crumb { margin-top: 14px; display: flex; align-items: center; gap: 9px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .12em; pointer-events: auto; }
+  .ns-crumb button { background: none; border: none; color: var(--dim); font: inherit; cursor: pointer; letter-spacing: inherit; padding: 0; transition: color .2s; }
+  .ns-crumb button:hover { color: var(--text); }
+  .ns-crumb .ns-cur { color: var(--blue); }
+  .ns-crumb .ns-sep { color: var(--edge); }
+  .ns-live { margin-top: 12px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--mute); }
+  .ns-livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }
+  .ns-live.ns-on { color: var(--green); }
+  .ns-live.ns-on .ns-livedot { background: var(--green); box-shadow: 0 0 8px rgba(95,206,155,.7); }
+  .ns-live.ns-off { color: var(--amber); }
+  .ns-live.ns-off .ns-livedot { background: var(--amber); }
+
+  /* Top-right controls */
+  .ns-tools { top: 20px; right: 20px; z-index: 62; display: flex; gap: 8px; }
+  .ns-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 999px;
+    background: rgba(15,21,33,.72); backdrop-filter: blur(8px); border: 1px solid var(--edge); color: var(--dim); cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .1em; transition: .18s; }
+  .ns-btn:hover { border-color: var(--blue); color: var(--text); background: rgba(26,38,60,.85); }
+  .ns-btn.ns-icon { width: 38px; padding: 0; }
+  .ns-kbd { font-family: 'IBM Plex Mono', monospace; font-size: 9px; padding: 2px 5px; border: 1px solid var(--edge-hi); border-radius: 3px; color: var(--mute); }
+
+  /* Key / legend — collapsed to a single chip until asked for */
+  .ns-key { bottom: 92px; left: 26px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); }
+  .ns-key summary { list-style: none; cursor: pointer; letter-spacing: .16em; text-transform: uppercase; color: var(--mute); padding: 5px 10px; border: 1px solid var(--edge); border-radius: 999px; display: inline-block; background: rgba(15,21,33,.6); transition: .18s; }
+  .ns-key summary::-webkit-details-marker { display: none; }
+  .ns-key summary:hover { color: var(--text); border-color: var(--edge-hi); }
+  .ns-key[open] summary { margin-bottom: 10px; color: var(--text); }
+  .ns-key .ns-row { display: flex; align-items: center; gap: 9px; line-height: 1.95; }
+  .ns-key .ns-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .ns-key .ns-sq { width: 8px; height: 8px; flex: none; transform: rotate(45deg); }
+  /* The two hollow-seat swatches mirror how the canvas draws them: a service seat
+     closes its ring around a lit core, a planned seat is a broken ring and empty. */
+  .ns-key .ns-d-svc  { border: 1px solid rgba(126,152,186,.62);
+                       background: radial-gradient(circle, rgba(132,158,192,.9) 0 1.6px, #182030 1.6px); }
+  .ns-key .ns-d-plan { background: #182030; border: 1px dashed rgba(150,170,200,.6); }
+
+  /* Ticker — narrates the meteor that just landed */
+  .ns-ticker { bottom: 92px; left: 50%; transform: translateX(-50%); max-width: 62vw; text-align: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .08em; color: var(--dim);
+    opacity: 0; transition: opacity .5s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ns-ticker.ns-show { opacity: 1; }
+  .ns-ticker b { font-weight: 500; color: var(--text); }
+  .ns-ticker .ns-ok { color: var(--green); }
+  .ns-ticker .ns-bad { color: var(--amber); }
+
+  /* Dock — every sidebar destination, reachable without leaving the field */
+  .ns-dock { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 20;
+    display: flex; align-items: center; gap: 3px; padding: 6px; border-radius: 999px;
+    background: rgba(11,15,23,.78); backdrop-filter: blur(12px); border: 1px solid var(--edge);
+    box-shadow: 0 18px 50px rgba(0,0,0,.5); transition: transform .45s cubic-bezier(.16,.84,.3,1); }
+  .ns-dock button { position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border: none; background: transparent; border-radius: 999px; color: var(--dim); cursor: pointer; transition: .16s; }
+  .ns-dock button:hover { background: rgba(84,166,255,.14); color: #fff; transform: translateY(-2px); }
+  .ns-dock button::after { content: attr(data-label); position: absolute; bottom: 46px; left: 50%; transform: translateX(-50%);
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .08em; white-space: nowrap; padding: 4px 8px;
+    background: rgba(11,15,23,.95); border: 1px solid var(--edge); border-radius: 4px; color: var(--text);
+    opacity: 0; pointer-events: none; transition: opacity .16s; }
+  .ns-dock button:hover::after { opacity: 1; }
+  .ns-dock .ns-dsep { width: 1px; height: 22px; background: var(--edge); margin: 0 5px; flex: none; }
+  @media (min-width: 900px) { .ns-app.ns-open .ns-dock { transform: translateX(calc(-50% - 170px)); } }
+  @media (max-width: 620px) { .ns-dock { max-width: 94vw; overflow-x: auto; } .ns-dock button::after { display: none; } }
+
+  /* Hover tooltip over canvas objects */
+  .ns-tip { position: absolute; z-index: 12; pointer-events: none; padding: 7px 10px; border-radius: 5px;
+    background: rgba(9,13,21,.94); border: 1px solid var(--edge-hi); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text); white-space: nowrap;
+    opacity: 0; transition: opacity .14s; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  .ns-tip.ns-show { opacity: 1; }
+  .ns-tip .ns-t2 { display: block; margin-top: 3px; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+
+  /* Detail panel */
+  .ns-panel { position: absolute; top: 0; right: 0; height: 100%; width: 352px; z-index: 8;
+    background: linear-gradient(200deg, rgba(13,18,28,.96), rgba(7,10,16,.98));
+    border-left: 1px solid var(--edge); backdrop-filter: blur(10px);
+    transform: translateX(102%); transition: transform .5s cubic-bezier(.16,.84,.3,1);
+    padding: 28px 26px 26px; overflow-y: auto; }
+  .ns-panel.ns-open { transform: translateX(0); }
+  @media (max-width: 640px) { .ns-panel { width: 100%; } }
+  .ns-p-close { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--dim); font-size: 22px; cursor: pointer; line-height: 1; }
+  .ns-p-close:hover { color: var(--text); }
+  .ns-kick { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .24em; color: var(--blue); text-transform: uppercase; }
+  .ns-name { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 30px; letter-spacing: .03em; line-height: 1.05; margin-top: 3px; }
+  .ns-p-head { display: flex; align-items: center; gap: 13px; }
+  .ns-face { width: 46px; height: 46px; border-radius: 999px; flex: none; overflow: hidden; background: rgba(84,166,255,.1); border: 1px solid var(--edge-hi); display: flex; align-items: center; justify-content: center; }
+  .ns-face img { width: 100%; height: 100%; object-fit: cover; }
+  .ns-stat { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); }
+  .ns-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: nspulse 2s infinite; flex: none; }
+  @keyframes nspulse { 0% { box-shadow: 0 0 0 0 rgba(84,166,255,.5); } 70% { box-shadow: 0 0 0 7px rgba(84,166,255,0); } 100% { box-shadow: 0 0 0 0 rgba(84,166,255,0); } }
+  .ns-stat.ns-idle .ns-pulse { background: var(--mute); animation: none; }
+  .ns-blk { border-top: 1px solid var(--edge); padding-top: 14px; margin-top: 18px; }
+  .ns-lab { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; margin-bottom: 9px; }
+  .ns-body { font-size: 13.5px; line-height: 1.55; color: var(--text); }
+  .ns-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ns-chip { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; padding: 4px 9px; border: 1px solid var(--edge); border-radius: 2px; color: var(--text); background: rgba(84,166,255,.05); }
+  .ns-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ns-v { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .ns-k { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; margin-top: 2px; }
+  /* Roster rows — the department's people */
+  .ns-person { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 9px 10px; margin-bottom: 4px;
+    background: rgba(84,166,255,.03); border: 1px solid var(--edge); border-radius: 4px; color: var(--text); cursor: pointer; transition: .16s; font: inherit; }
+  .ns-person:hover { border-color: var(--blue); background: rgba(84,166,255,.1); }
+  .ns-person .ns-pf { width: 30px; height: 30px; border-radius: 999px; flex: none; overflow: hidden; background: rgba(84,166,255,.1); border: 1px solid var(--edge-hi); display: flex; align-items: center; justify-content: center; font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 13px; color: var(--dim); }
+  .ns-person .ns-pf img { width: 100%; height: 100%; object-fit: cover; }
+  .ns-person .ns-pn { display: block; font-size: 13.5px; font-weight: 600; }
+  .ns-person .ns-pr { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .1em; color: var(--dim); text-transform: uppercase; margin-top: 3px; }
+  .ns-person.ns-planned { opacity: .62; }
+  .ns-person.ns-planned:hover { border-color: var(--edge-hi); background: rgba(84,166,255,.04); }
+  .ns-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .ns-acts button { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em; text-align: left; padding: 11px 13px;
+    background: rgba(84,166,255,.04); border: 1px solid var(--edge); color: var(--text); cursor: pointer; text-transform: uppercase; transition: .18s; border-radius: 3px; }
+  .ns-acts button:hover { border-color: var(--blue); background: rgba(84,166,255,.13); color: #fff; }
+  .ns-app :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  /* Jump palette — lives outside .ns-app so it can sit above the rail, so it
+     carries its own copy of the tokens rather than inheriting them. */
+  .ns-pal { --edge:#1e2839; --edge-hi:#2c3a52; --text:#dbe4f0; --mute:#5a6a80; --blue:#54a6ff;
+    position: fixed; inset: 0; z-index: 90; display: none; align-items: flex-start; justify-content: center; background: rgba(3,5,10,.72); backdrop-filter: blur(4px); padding-top: 14vh; }
+  .ns-pal.ns-show { display: flex; }
+  .ns-palbox { width: min(560px, 92vw); background: rgba(11,16,25,.98); border: 1px solid var(--edge-hi); border-radius: 8px; box-shadow: 0 30px 80px rgba(0,0,0,.6); overflow: hidden; }
+  .ns-palbox input { width: 100%; padding: 17px 20px; background: transparent; border: none; border-bottom: 1px solid var(--edge);
+    color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 14px; outline: none; }
+  .ns-palbox input::placeholder { color: var(--mute); }
+  .ns-pallist { max-height: 46vh; overflow-y: auto; padding: 6px; }
+  .ns-pallist, .ns-panel { scrollbar-width: thin; scrollbar-color: var(--edge-hi) transparent; }
+  .ns-pallist::-webkit-scrollbar, .ns-panel::-webkit-scrollbar { width: 8px; }
+  .ns-pallist::-webkit-scrollbar-track, .ns-panel::-webkit-scrollbar-track { background: transparent; }
+  .ns-pallist::-webkit-scrollbar-thumb, .ns-panel::-webkit-scrollbar-thumb { background: var(--edge-hi); border-radius: 999px; }
+  .ns-palrow { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 13px; border: none; background: transparent; border-radius: 5px;
+    color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+  .ns-palrow .ns-pgrp { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+  .ns-palrow.ns-sel, .ns-palrow:hover { background: rgba(84,166,255,.14); }
+  .ns-palempty { padding: 22px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--mute); }
+
+  /* Immersive rail: an overlay drawer at every width so the field owns the screen.
+     Higher specificity + !important beats sidebar_nav's desktop transform reset. */
+  #sideNav { transition: transform .25s ease; }
+  body.ns-immersive #sideNav.sbn { left: -280px !important; transition: left .28s cubic-bezier(.16,.84,.3,1); z-index: 80; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+  body.ns-immersive #sideNav.sbn.open { left: 0 !important; }
+</style>
+<script>
+/* file:// fallback — route root-relative "/api/…" fetches to the local backend
+   when this page is opened directly from disk. No-op when served over http. */
+(function(){ if(location.protocol==='file:'){ var _f=window.fetch.bind(window);
+ window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
+</script>
+</head>
+
+<body class="ns-immersive">
+
+<div id="navBackdrop" style="display:none; position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.45);"></div>
+<nav id="sideNav" style="position:fixed; left:0; top:0; height:100%; width:256px; z-index:40;"></nav>
+
+<div class="ns-app" id="nsApp">
+  <canvas id="nsCanvas" class="ns-canvas"></canvas>
+
+  <div class="ns-hud ns-tools">
+    <button class="ns-btn" id="nsSearch" title="Jump to anything">
+      <span class="material-symbols-outlined" style="font-size:17px;">search</span>
+      <span class="ns-kbd">⌘K</span>
+    </button>
+    <button class="ns-btn ns-icon" id="nsMenu" title="Sidebar" aria-label="Sidebar">
+      <span class="material-symbols-outlined" style="font-size:20px;">menu</span>
+    </button>
+  </div>
+
+  <div class="ns-hud ns-brand">
+    <h1>FINCHAT</h1>
+    <div class="ns-sub">Neural Space</div>
+    <nav class="ns-crumb" id="nsCrumb"></nav>
+    <div class="ns-live" id="nsLive"><span class="ns-livedot"></span><span id="nsLiveT">connecting…</span></div>
+  </div>
+
+  <details class="ns-hud ns-key">
+    <summary>What am I looking at?</summary>
+    <div class="ns-row"><span class="ns-dot" style="background:#8fd4ff"></span>Core · Plato, the orchestration field</div>
+    <div class="ns-row"><span class="ns-dot" style="background:#96b9e1"></span>Planet · a department</div>
+    <div class="ns-row"><span class="ns-dot" style="background:#54a6ff"></span>Moon · department head, live agent</div>
+    <div class="ns-row"><span class="ns-dot ns-d-svc"></span>Ringed moon, lit core · a seat that ships today as a service, not an agent</div>
+    <div class="ns-row"><span class="ns-dot ns-d-plan"></span>Dashed moon, empty · a seat still on the roadmap</div>
+    <div class="ns-row"><span class="ns-sq" style="background:#5fce9b"></span>Meteor · a run that completed</div>
+    <div class="ns-row"><span class="ns-sq" style="background:#e0a04a"></span>Meteor · a run that failed</div>
+    <div class="ns-row"><span class="ns-dot" style="background:rgba(84,166,255,.22)"></span>Nebula · what the department knows</div>
+  </details>
+
+  <div class="ns-hud ns-ticker" id="nsTicker"></div>
+  <div class="ns-tip" id="nsTip"></div>
+
+  <div class="ns-dock" id="nsDock"></div>
+
+  <aside class="ns-panel" id="nsPanel">
+    <button class="ns-p-close" id="nsPClose" aria-label="Close">&times;</button>
+    <div id="nsPBody"></div>
+  </aside>
+</div>
+
+<div class="ns-pal" id="nsPal">
+  <div class="ns-palbox">
+    <input id="nsPalIn" placeholder="Jump to a page, a department, an agent…" autocomplete="off" spellcheck="false">
+    <div class="ns-pallist" id="nsPalList"></div>
+  </div>
+</div>
+
+<script src="sidebar_nav.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function fmtNum(n) { return (n == null) ? '—' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+  // A run's `goal` is the raw prompt — first line, markdown and emoji stripped,
+  // so a meteor reads as a headline instead of leaking "**Crypto Brief**".
+  // How old a run is, in words. The meteor feed is the last 24 executions with
+  // no time bound, so a two-day-old failure can otherwise read as "failing now"
+  // — every meteor states its age for exactly that reason.
+  function ago(iso) {
+    var d = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (!isFinite(d) || d < 0) return '';
+    if (d < 3600) return Math.max(1, Math.round(d / 60)) + 'm ago';
+    if (d < 86400) return Math.round(d / 3600) + 'h ago';
+    return Math.round(d / 86400) + 'd ago';
+  }
+  function cleanGoal(s) {
+    return String(s || '')
+      .split('\n')[0]
+      .replace(/[*_`#>]/g, '')
+      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // ── destinations: every sidebar page, reachable from inside the field ──────
+  var DEST = [
+    { href:'finchat_chat.html',       icon:'chat',            label:'Chat' },
+    { href:'finchat_groupchat.html',  icon:'forum',           label:'Group Chat' },
+    { href:'finchat_agents.html',     icon:'smart_toy',       label:'Agents' },
+    { href:'finchat_dashboard.html',  icon:'dashboard',       label:'Operations' },
+    { href:'finchat_neuralmap.html',  icon:'hub',             label:'Neural Map' },
+    { href:'finchat_brainmodel.html', icon:'travel_explore',  label:'Agent Map' },
+    { href:'finchat_mindmap.html',    icon:'schema',          label:'Mind Maps' },
+    { href:'finchat_reports.html',    icon:'assessment',      label:'Reports' },
+    { href:'finchat_knowledge.html',  icon:'menu_book',       label:'Knowledge' },
+    { href:'finchat_settings.html',   icon:'settings',        label:'Settings' }
+  ];
+
+  // ── the org, as departments ───────────────────────────────────────────────
+  // Each department is a planet with a HEAD (one of the three real backend
+  // personas, hydrated live) and ASSISTANTS, which are never shown as live.
+  // An assistant carrying state:'service' + a note already runs in production
+  // as plumbing; one without either is genuinely still on the roadmap. Saying
+  // "not built yet" about a shipping service is the bug this distinction fixes.
+  // PLATFORM's head seat is deliberately vacant for the same reason: that whole
+  // department is services today, not agents.
+  // No entry for Atlas: he has no portrait yet, and face() already falls back to
+  // the initial rather than borrowing another agent's face.
+  var AVATARS = { plato:'plato_avatar.png', aurelius:'aurelius_avatar.png', rasha:'rasha_avatar.png', nova:'nova_avatar.png' };
+
+  var DEPTS = [
+    { id:'finance', name:'FINANCE', tag:'Markets & Capital',
+      charter:'Watches the markets, hunts catalysts before they are priced in, and scores the risk on anything that moves money.',
+      head: { id:'aurelius', name:'Aurelius', title:'Department Head', role:'Finance & Investment Strategist',
+              caps:['Catalyst hunting','Risk scoring','Market analysis','Synthesis'],
+              tools:['News','SEC EDGAR','Market Data','Crypto','Knowledge Graph'] },
+      staff: [
+        { name:'Risk Analyst',       title:'Assistant', caps:['Exposure','Stress tests'],        tools:['SQL','Market Data'] },
+        // Shipped 2026-08-30, so this seat carries a real agent id rather than a
+        // planned label: Atlas is the Portfolio Aide the roadmap described, built.
+        { id:'atlas', name:'Atlas', title:'Portfolio Steward', role:'Portfolio Steward & Daily Risk Watch',
+          caps:['Daily valuation','Growth vs. snapshot history','Drawdown','Concentration risk'],
+          tools:['Portfolio','Snapshots','Market Data','Signal','News','Missions'] },
+        { name:'Compliance Clerk',   title:'Assistant', caps:['Rule checks','Disclosure'],       tools:['Knowledge Graph','SQL'] },
+        { name:'Signal Engine',      title:'Assistant', caps:['Scoring','Ranking'],              tools:['SQL','Python'] }
+      ]},
+    { id:'research', name:'RESEARCH', tag:'Science & Frontier',
+      charter:'Reads the frontier — papers, filings, the open web — and reports what actually matters, with the sources attached.',
+      head: { id:'nova', name:'Nova', title:'Department Head', role:'Frontier Science & Technology Researcher',
+              caps:['Literature review','Synthesis','Significance framing'],
+              tools:['Papers','Search','Wikipedia','Fetch','Reddit'] },
+      staff: [
+        { name:'Market Scout',       title:'Assistant', caps:['Sentiment','Trend spotting'],     tools:['News','Reddit','Search'] },
+        { name:'Knowledge Curator',  title:'Assistant', caps:['Entity extraction','Dedup'],      tools:['Knowledge Graph','SQL'] },
+        { name:'Memory Keeper',      title:'Assistant', caps:['Recall','Compaction'],            tools:['Vector store','SQL'] },
+        { name:'RAG Retriever',      title:'Assistant', caps:['Semantic search','Rerank'],       tools:['pgvector','SQL'] }
+      ]},
+    { id:'operations', name:'OPERATIONS', tag:'Career & Execution',
+      charter:'Runs the standing work — sourcing roles, tailoring applications, dispatching missions and getting the results to you.',
+      head: { id:'rasha', name:'Rasha', title:'Department Head', role:'Executive Career Strategist',
+              caps:['Job sourcing','Resume tailoring','Outreach drafting'],
+              tools:['Adzuna','Gmail','Search','Missions'] },
+      staff: [
+        { name:'Mission Scheduler',  title:'Assistant', caps:['Scheduling','Dispatch','Retry'],  tools:['Cron','SQL'],
+          state:'service', note:'Running today as a service, not as an agent — a pg_cron job ticks every 15 minutes and dispatches any mission whose next_run_at has come due.' },
+        { name:'Outreach Writer',    title:'Assistant', caps:['Drafting','Follow-up'],           tools:['Gmail','Templates'] },
+        { name:'Notifier',           title:'Assistant', caps:['Multi-channel delivery'],         tools:['Telegram','SMTP','WhatsApp'],
+          state:'service', note:'Running today as a service, not as an agent — Telegram and email deliver live; WhatsApp is built and waiting on credentials.' },
+        { name:'Report Builder',     title:'Assistant', caps:['Synthesis','Charting'],           tools:['SQL','Markdown'],
+          state:'service', note:'Running today as a service, not as an agent — the Reports engine renders on demand, and synthesis happens inside the mission run itself.' }
+      ]},
+    { id:'platform', name:'PLATFORM', tag:'Runtime & Trust',
+      charter:'Keeps the system honest — provider routing, token budgets, permission scoping and the audit trail behind every run.',
+      head: null, headNote:'Head seat vacant — this work runs as services today, not as an agent.',
+      staff: [
+        { name:'Context Builder',    title:'Assistant', caps:['Prompt assembly','Caching'],      tools:['SQL'],
+          state:'service', note:'Running today as a service — assembles every prompt stable-part-first so provider prefix caching can hit, and records what it saved.' },
+        { name:'Inference Router',   title:'Assistant', caps:['Provider routing','Fallback'],    tools:['SQL'],
+          state:'service', note:'Running today as a service — routes each workload to a primary provider with a deliberately diverging fallback tail.' },
+        { name:'Quota Manager',      title:'Assistant', caps:['Credential pools','Budgets'],     tools:['SQL'],
+          state:'service', note:'Running today as a service — resolves credentials user → agent → system and remembers which allowances are spent until UTC midnight.' },
+        { name:'Permission Gate',    title:'Assistant', caps:['Scoping','Approval'],             tools:['SQL'],
+          state:'service', note:'Running today as a service — scopes each agent to its own tool domain before the catalogue is ever built.' },
+        { name:'Audit Log',          title:'Assistant', caps:['Ledger','Trace'],                 tools:['SQL','Blockchain'],
+          state:'service', note:'Running today as a service — every run lands in the ledger with its proof chain, scoped to the account that owns it.' }
+      ]}
+  ];
+
+  // Plato is the core, not a peer — it gets its own node with no department.
+  var CORE = {
+    id:'plato', isCore:true, name:'Plato', title:'System Core', role:'Chief AI Officer & Supervisor',
+    statusLabel:'Supervising', active:false,
+    task:'Routing work across the departments and supervising every run.',
+    caps:['Delegation','Routing','Supervision','Synthesis'],
+    tools:['All departments','Missions','Knowledge Graph'],
+    pos:[0,0,0], tasks:null
+  };
+
+  // Wire the object graph: every member knows its department, real ones get an id.
+  var REAL = [], MEMBERS = [];
+  DEPTS.forEach(function (d, i) {
+    var a = (i / DEPTS.length) * Math.PI * 2 + 0.35;
+    d.pos = [Math.cos(a) * 620, Math.sin(a * 1.7) * 120, Math.sin(a) * 620];
+    d.people = [];
+    if (d.head) {
+      d.head.dept = d; d.head.isHead = true;
+      // Orbits are deliberately slow: fast enough that the space is alive, slow
+      // enough that a moon is never a moving target you have to chase to click.
+      d.head._orb = { r: 150, y: 8, ang: a * 2, spd: 0.026 };
+      d.people.push(d.head); REAL.push(d.head);
+    }
+    d.staff.forEach(function (m, j) {
+      m.dept = d; m.title = m.title || 'Assistant';
+      // `planned` is the roadmap flag; a staff member carrying a real agent id
+      // is a shipped agent sitting under a head, not a proposal, and has to
+      // join REAL so executions can be attributed to it like any other agent.
+      if (m.id) REAL.push(m); else m.planned = true;
+      m._orb = { r: 205 + (j % 2) * 34, y: (j % 3 - 1) * 30, ang: a + j * 1.45, spd: 0.012 + j * 0.003 };
+      d.people.push(m);
+    });
+    d.people.forEach(function (m) { m._pulse = Math.random() * Math.PI * 2; MEMBERS.push(m); });
+  });
+  function isReal(m) { return !!(m && m.id); }
+  function deptById(id) { return DEPTS.find(function (d) { return d.id === id; }); }
+  function agentById(id) { return REAL.find(function (m) { return m.id === id; }); }
+
+  // ── canvas + math ─────────────────────────────────────────────────────────
+  var canvas = $('nsCanvas'), ctx = canvas.getContext('2d');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    measureHud();
+  }
+  window.addEventListener('resize', resize);
+
+  var sub = function (a,b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; };
+  var add = function (a,b) { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; };
+  var scl = function (a,s) { return [a[0]*s, a[1]*s, a[2]*s]; };
+  var dot = function (a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; };
+  var cross = function (a,b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; };
+  var len = function (a) { return Math.hypot(a[0],a[1],a[2]); };
+  var norm = function (a) { var l = len(a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+  var lerp3 = function (a,b,t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; };
+
+  // Live orbital position of a department member — the moons actually move.
+  var clock = 0;
+  function memberPos(m) {
+    var o = m._orb, a = o.ang + clock * o.spd;
+    return [ m.dept.pos[0] + Math.cos(a) * o.r,
+             m.dept.pos[1] + o.y + Math.sin(a * 0.9) * 20,
+             m.dept.pos[2] + Math.sin(a) * o.r ];
+  }
+
+  // ── background fabric ─────────────────────────────────────────────────────
+  var FIELD = [], FTW = [];
+  for (var i = 0; i < 2000; i++) {
+    var th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    var rad = 780 + Math.random() * 1700;
+    FIELD.push([Math.sin(ph)*Math.cos(th)*rad, (Math.random()*2-1)*600, Math.sin(ph)*Math.sin(th)*rad]);
+    FTW.push(Math.random() * Math.PI * 2);
+  }
+  var FLINK = [];
+  for (var k = 0; k < 120; k++) {
+    var pa = FIELD[(Math.random()*FIELD.length)|0], pb = FIELD[(Math.random()*FIELD.length)|0];
+    if (len(sub(pa, pb)) < 420) FLINK.push([pa, pb]);
+  }
+
+  // ── camera ────────────────────────────────────────────────────────────────
+  var cam = { eye:[0,300,1480], target:[0,0,0], dEye:[0,300,1480], dTarget:[0,0,0], f:900 };
+  var level = 0, focusDept = null, focusMember = null, camOff = null;
+  var lastInteract = performance.now();
+
+  function fog(z) { var f = (z - 300) / 2400; return f <= 0 ? 1 : (f >= 1 ? 0.04 : 1 - f * 0.96); }
+
+  function goSpace() {
+    level = 0; focusDept = null; focusMember = null; camOff = null;
+    cam.dEye = [0,300,1480]; cam.dTarget = [0,0,0];
+    closePanel(); updateCrumb();
+  }
+  function goDept(d) {
+    level = 1; focusDept = d; focusMember = null; camOff = null;
+    var back = norm(sub(d.pos, [0,0,0]));
+    cam.dTarget = d.pos.slice();
+    cam.dEye = add(d.pos, add(scl(back, 540), [0, 230, 0]));
+    openPanel(d, 'dept'); updateCrumb();
+    if (d.head) loadCortex(d.head);
+  }
+  function goMember(m) {
+    level = 2; focusDept = m.dept; focusMember = m;
+    var p = memberPos(m);
+    camOff = add(norm(sub(p, m.dept.pos)).map(function (v) { return v * 210; }), [40, 110, 40]);
+    openPanel(m, 'member'); updateCrumb();
+    if (isReal(m)) loadCortex(m);
+  }
+  function goCore() {
+    level = 0; focusDept = null; focusMember = null; camOff = null;
+    cam.dEye = [0,150,780]; cam.dTarget = [0,0,0];
+    openPanel(CORE, 'core'); updateCrumb();
+  }
+
+  // ── projection + hit list ─────────────────────────────────────────────────
+  var basis = { r:[1,0,0], u:[0,1,0], f:[0,0,-1] };
+  function computeBasis() {
+    var f = norm(sub(cam.target, cam.eye));
+    var r = norm(cross(f, [0,1,0]));
+    basis = { r:r, u:cross(r, f), f:f };
+  }
+  // The detail panel eats the right edge, so the vanishing point slides left
+  // while it is open — whatever you focused stays centred in what you can see.
+  var CX = 0;
+  function project(p) {
+    var d = sub(p, cam.eye), cz = dot(d, basis.f);
+    if (cz <= 1) return null;
+    var s = cam.f / cz;
+    return { x: CX + dot(d, basis.r)*s, y: H/2 - dot(d, basis.u)*s, s: s, z: cz };
+  }
+
+  // Labels are collected during the draw pass and painted last, largest claim
+  // first — anything that would collide with an already-placed label is dropped
+  // rather than overlapping it.
+  var labels = [];
+  function label(text, x, y, font, fill, align, prio, flex) {
+    labels.push({ t:text, x:x, y:y, f:font, c:fill, a:align || 'center', p:prio, flex:flex !== false });
+  }
+  // Labels that can move try a few nudges before giving up; the fixed ones
+  // (department names, the core) always win their spot.
+  var NUDGE = [0, 15, -15, 30, -30, 46];
+  // The HTML chrome sits on top of the canvas, so its boxes are reserved before
+  // any label is placed — no department name ever prints under the breadcrumb.
+  var hudBoxes = [];
+  function measureHud() {
+    hudBoxes = [];
+    ['.ns-brand', '.ns-key', '.ns-tools', '.ns-dock', '.ns-ticker', '.ns-panel.ns-open'].forEach(function (sel) {
+      var el = document.querySelector(sel); if (!el) return;
+      var r = el.getBoundingClientRect();
+      if (r.width && r.height) hudBoxes.push([r.left - 8, r.top - 6, r.right + 8, r.bottom + 6]);
+    });
+  }
+  function paintLabels() {
+    labels.sort(function (a, b) { return b.p - a.p; });
+    var boxes = hudBoxes.slice();
+    function free(bx) {
+      for (var j = 0; j < boxes.length; j++) {
+        var b = boxes[j];
+        if (bx[0] < b[2] && bx[2] > b[0] && bx[1] < b[3] && bx[3] > b[1]) return false;
+      }
+      return true;
+    }
+    for (var i = 0; i < labels.length; i++) {
+      var L = labels[i];
+      ctx.font = L.f;
+      var w = ctx.measureText(L.t).width, h = 13;
+      var x0 = L.a === 'center' ? L.x - w/2 : L.x;
+      var tries = L.flex ? NUDGE : [0], placed = null;
+      for (var n = 0; n < tries.length; n++) {
+        var y = L.y + tries[n];
+        var bx = [x0 - 5, y - h, x0 + w + 5, y + 4];
+        if (free(bx)) { placed = { y:y, bx:bx }; break; }
+      }
+      if (!placed) continue;
+      boxes.push(placed.bx);
+      ctx.textAlign = L.a; ctx.fillStyle = L.c; ctx.fillText(L.t, L.x, placed.y);
+    }
+  }
+  // Rebuilt every frame: everything the pointer can touch, nearest-first on click.
+  var hits = [];
+  function hit(kind, ref, sp, r, tip, sub2) { hits.push({ kind:kind, ref:ref, x:sp.x, y:sp.y, r:r, tip:tip, sub:sub2 }); }
+  function pick(px, py) {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < hits.length; i++) {
+      var h = hits[i], dx = h.x - px, dy = h.y - py, dd = dx*dx + dy*dy;
+      if (dd < h.r*h.r && dd < bd) { bd = dd; best = h; }
+    }
+    return best;
+  }
+
+  // ── pointer ───────────────────────────────────────────────────────────────
+  var drag = null, hover = null;
+  canvas.addEventListener('mousedown', function (e) { drag = { x:e.clientX, y:e.clientY, moved:0 }; canvas.classList.add('ns-drag'); });
+  window.addEventListener('mouseup', function (e) {
+    if (drag && drag.moved < 5) onClick(e.clientX, e.clientY);
+    drag = null; canvas.classList.remove('ns-drag');
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (drag) {
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
+      orbit(dx, dy); hideTip(); return;
+    }
+    var rect = canvas.getBoundingClientRect();
+    var h = pick(e.clientX - rect.left, e.clientY - rect.top);
+    hover = h;
+    canvas.classList.toggle('ns-point', !!h);
+    if (h) showTip(h, e.clientX, e.clientY); else hideTip();
+  });
+  canvas.addEventListener('touchstart', function (e) { var t = e.touches[0]; drag = { x:t.clientX, y:t.clientY, moved:0 }; }, { passive:true });
+  canvas.addEventListener('touchmove', function (e) {
+    if (!drag) return; var t = e.touches[0];
+    var dx = t.clientX-drag.x, dy = t.clientY-drag.y;
+    drag.moved += Math.abs(dx)+Math.abs(dy); drag.x = t.clientX; drag.y = t.clientY; orbit(dx, dy);
+  }, { passive:true });
+  canvas.addEventListener('touchend', function (e) {
+    if (drag && drag.moved < 8) { var t = e.changedTouches[0]; onClick(t.clientX, t.clientY); }
+    drag = null;
+  });
+
+  function orbit(dx, dy) {
+    lastInteract = performance.now();
+    var t = cam.dTarget, off = sub(cam.dEye, t);
+    var ay = -dx * 0.005, ca = Math.cos(ay), sa = Math.sin(ay);
+    off = [off[0]*ca - off[2]*sa, off[1], off[0]*sa + off[2]*ca];
+    var pitch = Math.atan2(off[1], Math.hypot(off[0], off[2])) + dy * 0.004;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch));
+    var flat = Math.hypot(off[0], off[2]) || 1, L = len(off), hor = Math.cos(pitch) * L;
+    off = [off[0]/flat*hor, Math.sin(pitch)*L, off[2]/flat*hor];
+    cam.dEye = add(t, off);
+    if (focusMember) camOff = off;   // keep following the moon from the new angle
+  }
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault(); lastInteract = performance.now();
+    var off = sub(cam.dEye, cam.dTarget);
+    var L = Math.max(150, Math.min(2900, len(off) * (1 + (e.deltaY > 0 ? 0.09 : -0.09))));
+    var no = scl(norm(off), L);
+    cam.dEye = add(cam.dTarget, no);
+    if (focusMember) camOff = no;
+  }, { passive:false });
+
+  function onClick(cx, cy) {
+    var rect = canvas.getBoundingClientRect();
+    var h = pick(cx - rect.left, cy - rect.top);
+    if (!h) return;
+    if (h.kind === 'core') goCore();
+    else if (h.kind === 'dept') goDept(h.ref);
+    else if (h.kind === 'member') goMember(h.ref);
+    else if (h.kind === 'brain' && isReal(h.ref)) openBrain(h.ref);
+    else if (h.kind === 'meteor') openRun(h.ref);
+    hideTip();
+  }
+
+  var tip = $('nsTip');
+  function showTip(h, cx, cy) {
+    tip.innerHTML = esc(h.tip) + (h.sub ? '<span class="ns-t2">' + esc(h.sub) + '</span>' : '');
+    tip.classList.add('ns-show');
+    var w = tip.offsetWidth, ht = tip.offsetHeight;
+    tip.style.left = Math.min(W - w - 12, Math.max(12, cx + 16)) + 'px';
+    tip.style.top  = Math.min(H - ht - 12, Math.max(12, cy + 16)) + 'px';
+  }
+  function hideTip() { tip.classList.remove('ns-show'); }
+
+  // ── panel ─────────────────────────────────────────────────────────────────
+  var panel = $('nsPanel'), pbody = $('nsPBody'), app = $('nsApp');
+  var shown = null;
+
+  function face(id, fallback) {
+    return AVATARS[id]
+      ? '<img src="' + AVATARS[id] + '" alt="">'
+      : esc(String(fallback || '·').charAt(0).toUpperCase());
+  }
+  function chips(arr) {
+    return '<div class="ns-chips">' + (arr || []).map(function (x) { return '<span class="ns-chip">' + esc(x) + '</span>'; }).join('') + '</div>';
+  }
+  function personRow(m, idx) {
+    return '<button class="ns-person' + (isReal(m) ? '' : ' ns-planned') + '" data-act="member" data-i="' + idx + '">' +
+      '<span class="ns-pf">' + face(m.id, m.name) + '</span>' +
+      '<span style="flex:1;min-width:0;"><span class="ns-pn">' + esc(m.name) + '</span>' +
+      '<span class="ns-pr">' + esc(m.title) + (isReal(m) ? '' : m.state === 'service' ? ' · service' : ' · planned') + '</span></span>' +
+      '<span class="material-symbols-outlined" style="font-size:17px;color:var(--mute);">chevron_right</span></button>';
+  }
+
+  function openPanel(obj, kind) {
+    shown = { obj:obj, kind:kind };
+    var html = '';
+    if (kind === 'dept') {
+      var d = obj;
+      html += '<div class="ns-kick">DEPARTMENT</div><div class="ns-name">' + esc(d.name) + '</div>' +
+              '<div class="ns-stat ns-idle"><span class="ns-pulse"></span>' + esc(d.tag) + '</div>' +
+              '<div class="ns-blk"><div class="ns-lab">Charter</div><div class="ns-body">' + esc(d.charter) + '</div></div>';
+      var head = d.head;
+      html += '<div class="ns-blk"><div class="ns-lab">Head</div>';
+      html += head ? personRow(head, d.people.indexOf(head))
+                   : '<div class="ns-body" style="color:var(--dim);font-size:13px;">' + esc(d.headNote || 'Vacant.') + '</div>';
+      html += '</div>';
+      html += '<div class="ns-blk"><div class="ns-lab">Assistants · ' + d.staff.length + '</div>' +
+              d.staff.map(function (m) { return personRow(m, d.people.indexOf(m)); }).join('') + '</div>';
+      html += '<div class="ns-blk ns-metrics">' +
+              '<div><div class="ns-v">' + fmtNum(head ? head.tasks : null) + '</div><div class="ns-k">Runs</div></div>' +
+              '<div><div class="ns-v">' + fmtNum(head ? head.brainCount : null) + '</div><div class="ns-k">Known</div></div></div>';
+      if (head) html += '<div class="ns-acts">' +
+              '<button data-act="brain">› Open ' + esc(head.name) + '’s brain</button>' +
+              '<button data-act="talk">› Talk to ' + esc(head.name) + '</button></div>';
+    } else if (kind === 'core') {
+      html += '<div class="ns-kick">SYSTEM CORE</div>' +
+              '<div class="ns-p-head" style="margin-top:6px;"><span class="ns-face">' + face('plato','P') + '</span>' +
+              '<div><div class="ns-name" style="font-size:26px;">Plato</div>' +
+              '<div class="ns-k" style="margin-top:4px;">' + esc(CORE.role) + '</div></div></div>' +
+              '<div class="ns-stat' + (CORE.active ? '' : ' ns-idle') + '"><span class="ns-pulse"></span>' + esc(CORE.statusLabel) + '</div>' +
+              '<div class="ns-blk"><div class="ns-lab">Right now</div><div class="ns-body">' + esc(CORE.task) + '</div></div>' +
+              '<div class="ns-blk"><div class="ns-lab">Responsibilities</div>' + chips(CORE.caps) + '</div>' +
+              '<div class="ns-blk"><div class="ns-lab">Reach</div>' + chips(CORE.tools) + '</div>' +
+              '<div class="ns-blk ns-metrics">' +
+              '<div><div class="ns-v">' + fmtNum(CORE.tasks) + '</div><div class="ns-k">Tasks routed</div></div>' +
+              '<div><div class="ns-v">' + DEPTS.length + '</div><div class="ns-k">Departments</div></div></div>' +
+              '<div class="ns-blk"><div class="ns-lab">Departments</div>' +
+              DEPTS.map(function (d, i) {
+                return '<button class="ns-person" data-act="dept" data-i="' + i + '">' +
+                  '<span class="ns-pf">' + (d.head ? face(d.head.id, d.name) : esc(d.name.charAt(0))) + '</span>' +
+                  '<span style="flex:1;min-width:0;"><span class="ns-pn">' + esc(d.name) + '</span>' +
+                  '<span class="ns-pr">' + esc(d.head ? d.head.name + ' · head' : 'head vacant') + '</span></span>' +
+                  '<span class="material-symbols-outlined" style="font-size:17px;color:var(--mute);">chevron_right</span></button>';
+              }).join('') + '</div>' +
+              '<div class="ns-acts"><button data-act="talkcore">› Talk to Plato</button></div>';
+    } else {
+      var m = obj, real = isReal(m), svc = !real && m.state === 'service';
+      html += '<div class="ns-kick">' + esc(m.dept.name) + ' · ' + (real ? 'LIVE' : svc ? 'SERVICE' : 'PLANNED') + '</div>' +
+              '<div class="ns-p-head" style="margin-top:6px;"><span class="ns-face">' + face(m.id, m.name) + '</span>' +
+              '<div><div class="ns-name" style="font-size:26px;">' + esc(m.name) + '</div>' +
+              '<div class="ns-k" style="margin-top:4px;">' + esc(m.title) + (m.role ? ' · ' + esc(m.role) : '') + '</div></div></div>';
+      if (real) html += '<div class="ns-stat' + (m.active ? '' : ' ns-idle') + '"><span class="ns-pulse"></span>' + esc(m.statusLabel || (m.active ? 'Working' : 'Idle')) + '</div>';
+      html += '<div class="ns-blk"><div class="ns-lab">' + (real ? 'Current task' : 'Status') + '</div><div class="ns-body">' +
+              (real ? esc(m.task || '—')
+                    : svc ? esc(m.note)
+                    : 'Not built yet. This seat is on the roadmap — its remit below is the intended design, and ' +
+                      esc(m.dept.head ? m.dept.head.name : 'the department head') + ' covers the work today.') +
+              '</div></div>' +
+              '<div class="ns-blk"><div class="ns-lab">Remit</div>' + chips(m.caps) + '</div>' +
+              '<div class="ns-blk"><div class="ns-lab">Tools</div>' + chips(m.tools) + '</div>';
+      if (real) html += '<div class="ns-blk ns-metrics">' +
+              '<div><div class="ns-v">' + fmtNum(m.tasks) + '</div><div class="ns-k">Runs</div></div>' +
+              '<div><div class="ns-v">' + fmtNum(m.brainCount) + '</div><div class="ns-k">Brain nodes</div></div></div>';
+      if (!m.isHead) html += '<div class="ns-blk"><div class="ns-lab">Reports to</div>' +
+              (m.dept.head ? personRow(m.dept.head, m.dept.people.indexOf(m.dept.head))
+                           : '<div class="ns-body" style="color:var(--dim);font-size:13px;">' + esc(m.dept.headNote || 'Vacant.') + '</div>') + '</div>';
+      html += '<div class="ns-acts">' +
+              (real ? '<button data-act="brain">› Open brain map</button>' +
+                      '<button data-act="talk">› Talk to ' + esc(m.name) + '</button>' +
+                      '<button data-act="assign">› Assign a standing task</button>' : '') +
+              '<button data-act="up">› Back to ' + esc(m.dept.name) + '</button></div>';
+    }
+    pbody.innerHTML = html;
+    panel.classList.add('ns-open'); app.classList.add('ns-open');
+    measureHud(); setTimeout(measureHud, 560);   // again once it has slid in
+  }
+  function closePanel() {
+    panel.classList.remove('ns-open'); app.classList.remove('ns-open'); shown = null;
+    measureHud(); setTimeout(measureHud, 560);
+  }
+  $('nsPClose').onclick = function () { closePanel(); };
+
+  // One delegated handler for every button the panel can render.
+  pbody.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var act = b.getAttribute('data-act');
+    var subject = shown && shown.obj;
+    if (act === 'member') {
+      var d = shown.kind === 'dept' ? shown.obj : subject.dept;
+      goMember(d.people[+b.getAttribute('data-i')]);
+    } else if (act === 'dept') { goDept(DEPTS[+b.getAttribute('data-i')]); }
+    else if (act === 'up') { goDept(subject.dept); }
+    else if (act === 'brain') { openBrain(shown.kind === 'dept' ? subject.head : subject); }
+    else if (act === 'talk') { openChat(shown.kind === 'dept' ? subject.head : subject); }
+    else if (act === 'talkcore') { openChat(CORE); }
+    else if (act === 'assign') { openChat(subject, 'Set up a recurring mission for me — '); }
+  });
+
+  function openBrain(m) {
+    if (isReal(m)) location.href = 'finchat_neuralmap.html?mapId=system&agent=' + encodeURIComponent(m.id);
+  }
+  function openChat(m, draft) {
+    if (!isReal(m)) return;
+    location.href = 'finchat_chat.html?persona=' + encodeURIComponent(m.id) +
+      (draft ? '&draft=' + encodeURIComponent(draft) : '');
+  }
+  function openRun(mt) {
+    // A meteor is a real execution — send the user to the run it stands for.
+    if (mt && mt.execId) location.href = 'finchat_brainmodel.html?execution=' + encodeURIComponent(mt.execId);
+  }
+
+  function updateCrumb() {
+    var c = $('nsCrumb'); c.innerHTML = '';
+    var parts = [['Neural Space', goSpace, level === 0]];
+    if (focusDept) parts.push([focusDept.name, function () { goDept(focusDept); }, level === 1]);
+    if (focusMember) parts.push([focusMember.name, function () {}, level === 2]);
+    parts.forEach(function (p, i2) {
+      if (i2) c.insertAdjacentHTML('beforeend', '<span class="ns-sep">/</span>');
+      var b = document.createElement('button');
+      b.textContent = p[0]; if (p[2]) b.className = 'ns-cur'; b.onclick = p[1];
+      c.appendChild(b);
+    });
+    measureHud();   // the crumb changes the HUD block's width
+  }
+  updateCrumb();
+
+  // ── dock ──────────────────────────────────────────────────────────────────
+  (function buildDock() {
+    var dock = $('nsDock');
+    dock.innerHTML =
+      // Labelled for what it does: this resets the camera to the whole field
+      // (goSpace), it does not navigate anywhere. Calling it "Home" implied
+      // Neural Space was the app's front door — it is one module among many.
+      '<button data-label="Overview · reset view" data-go="overview"><span class="material-symbols-outlined" style="font-size:20px;">scatter_plot</span></button>' +
+      '<span class="ns-dsep"></span>' +
+      DEST.map(function (d) {
+        return '<button data-label="' + esc(d.label) + '" data-href="' + esc(d.href) + '">' +
+          '<span class="material-symbols-outlined" style="font-size:20px;">' + d.icon + '</span></button>';
+      }).join('');
+    dock.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      if (b.getAttribute('data-go') === 'overview') { goSpace(); return; }
+      var href = b.getAttribute('data-href'); if (href) location.href = href;
+    });
+  })();
+
+  // ── jump palette (⌘K) ─────────────────────────────────────────────────────
+  var pal = $('nsPal'), palIn = $('nsPalIn'), palList = $('nsPalList'), palSel = 0, palRows = [];
+  function palEntries() {
+    var out = DEST.map(function (d) { return { label:d.label, grp:'Page', run:function () { location.href = d.href; } }; });
+    DEPTS.forEach(function (d) { out.push({ label:d.name + ' department', grp:'Space', run:function () { closePal(); goDept(d); } }); });
+    out.push({ label:'Plato · system core', grp:'Space', run:function () { closePal(); goCore(); } });
+    REAL.forEach(function (m) {
+      out.push({ label:'Talk to ' + m.name, grp:'Agent', run:function () { openChat(m); } });
+      out.push({ label:m.name + '’s brain map', grp:'Agent', run:function () { openBrain(m); } });
+    });
+    return out;
+  }
+  var PAL = palEntries();
+  function renderPal() {
+    var q = palIn.value.trim().toLowerCase();
+    palRows = PAL.filter(function (e) { return !q || e.label.toLowerCase().indexOf(q) >= 0; });
+    if (palSel >= palRows.length) palSel = 0;
+    palList.innerHTML = palRows.length
+      ? palRows.map(function (e, i2) {
+          return '<button class="ns-palrow' + (i2 === palSel ? ' ns-sel' : '') + '" data-i="' + i2 + '">' +
+            esc(e.label) + '<span class="ns-pgrp">' + esc(e.grp) + '</span></button>';
+        }).join('')
+      : '<div class="ns-palempty">Nothing matches that.</div>';
+  }
+  function openPal() { pal.classList.add('ns-show'); palIn.value = ''; palSel = 0; renderPal(); palIn.focus(); }
+  function closePal() { pal.classList.remove('ns-show'); }
+  palIn.addEventListener('input', function () { palSel = 0; renderPal(); });
+  palIn.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { palSel = Math.min(palRows.length - 1, palSel + 1); renderPal(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { palSel = Math.max(0, palSel - 1); renderPal(); e.preventDefault(); }
+    else if (e.key === 'Enter') { if (palRows[palSel]) palRows[palSel].run(); e.preventDefault(); }
+    else if (e.key === 'Escape') { closePal(); }
+  });
+  palList.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-i]'); if (b && palRows[+b.getAttribute('data-i')]) palRows[+b.getAttribute('data-i')].run();
+  });
+  pal.addEventListener('click', function (e) { if (e.target === pal) closePal(); });
+  $('nsSearch').onclick = openPal;
+
+  // ── keyboard ──────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', function (e) {
+    // Escape closes the palette from anywhere, not just from inside its input.
+    if (pal.classList.contains('ns-show')) { if (e.key === 'Escape') closePal(); return; }
+    var typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement && document.activeElement.tagName);
+    if (typing) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPal(); return; }
+    if (e.key === '/') { e.preventDefault(); openPal(); return; }
+    if (e.key === 'Escape') {
+      if (level === 2) goDept(focusDept); else if (level === 1) goSpace(); else closePanel();
+      return;
+    }
+    if (e.key >= '1' && e.key <= String(DEPTS.length)) { goDept(DEPTS[+e.key - 1]); return; }
+    if (e.key.toLowerCase() === 'h') goSpace();
+    if (e.key.toLowerCase() === 'c') goCore();
+  });
+
+  // Sidebar drawer
+  var backdrop = $('navBackdrop');
+  $('nsMenu').addEventListener('click', function () {
+    var nav = $('sideNav'); if (!nav) return;
+    var open = nav.classList.toggle('open');
+    backdrop.style.display = open ? 'block' : 'none';
+  });
+  backdrop.addEventListener('click', function () {
+    var nav = $('sideNav'); if (nav) nav.classList.remove('open');
+    backdrop.style.display = 'none';
+  });
+
+  // ── live data ─────────────────────────────────────────────────────────────
+  var workingId = null, liveTimer = 0, cortexCache = {};
+  function getToken() {
+    try {
+      var raw = sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session');
+      var s = raw ? JSON.parse(raw) : null;
+      return s && s.token;
+    } catch (e) { return null; }
+  }
+  function setLive(cls, txt) {
+    var el = $('nsLive'); if (!el) return;
+    el.className = 'ns-live' + (cls ? ' ' + cls : '');
+    $('nsLiveT').textContent = txt;
+  }
+  function refreshPanel() {
+    if (shown) openPanel(shown.obj, shown.kind);
+  }
+
+  function hydrateStatus(data) {
+    var byId = {};
+    (data.agents || []).forEach(function (a) { byId[a.id] = a; });
+    workingId = null;
+    REAL.forEach(function (m) {
+      var a = byId[m.id]; if (!a) return;
+      var st = (a.status || 'IDLE').toUpperCase();
+      m.active = (st === 'WORKING' || st === 'WAITING');
+      m.statusLabel = st === 'WORKING' ? 'Working' : st === 'WAITING' ? 'Waiting' : 'Idle';
+      m.task = (a.activeTask && a.activeTask.goal) ? a.activeTask.goal
+             : (st === 'IDLE' ? 'Idle — nothing running right now.' : '—');
+      m.tasks = a.burn && a.burn.tasks != null ? a.burn.tasks : m.tasks;
+      m.role = a.role || m.role;
+      if (st === 'WORKING' && !workingId) workingId = m.id;
+    });
+    var pl = byId['plato'];
+    if (pl) {
+      var pst = (pl.status || 'IDLE').toUpperCase();
+      CORE.active = (pst === 'WORKING' || pst === 'WAITING');
+      CORE.statusLabel = pst === 'WORKING' ? 'Orchestrating' : pst === 'WAITING' ? 'Waiting' : 'Supervising';
+      CORE.task = (pl.activeTask && pl.activeTask.goal) ? pl.activeTask.goal
+        : 'Routing work across the departments and supervising every run.';
+      CORE.tasks = pl.burn ? pl.burn.tasks : CORE.tasks;
+    }
+    refreshPanel();
+  }
+
+  // Each real agent's brain is ITS OWN subgraph — the entities it owns, scoped
+  // to this user. Drives both the panel count and the department's nebula size.
+  function loadCortex(m) {
+    if (!isReal(m)) return;
+    var token = getToken(); if (!token) return;
+    if (cortexCache[m.id]) { applyCortex(m, cortexCache[m.id]); return; }
+    fetch('/api/knowledge/cortex/' + encodeURIComponent(m.id), { headers:{ 'Authorization':'Bearer ' + token } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        var c = {
+          brain: (d.nodes || []).slice(0, 8).map(function (n) { return { name: n.canonical_name }; }),
+          count: d.nodeCount != null ? d.nodeCount : (d.nodes || []).length
+        };
+        cortexCache[m.id] = c; applyCortex(m, c);
+      }).catch(function () {});
+  }
+  function applyCortex(m, c) {
+    m.brain = c.brain.length ? c.brain : null;
+    m.brainCount = c.count;
+    if (m.dept) m.dept.knowN = c.count;
+    refreshPanel();
+  }
+
+  // Meteors = real executions. Each one arrives from outside and lands on the
+  // department that ran it: green when it completed naturally, amber when not.
+  var runQueue = [], runIdx = 0, meteors = [], nextSpawn = 0;
+  function loadRuns(token) {
+    fetch('/api/executions/list/recent?limit=24', { headers:{ 'Authorization':'Bearer ' + token } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.executions) return;
+        runQueue = d.executions.map(function (x) {
+          var a = agentById(x.assigned_agent);
+          return {
+            execId: x.execution_id,
+            agent: x.assigned_agent || 'plato',
+            dept: a ? a.dept : null,
+            ok: x.completion_reason === 'natural',
+            goal: clip(cleanGoal(x.goal) || 'Untitled run', 68),
+            when: x.created_at
+          };
+        });
+        // Keep our place in the rotation. Resetting to 0 on every 45s refresh
+        // meant the tail of the list never got its turn — and since failures are
+        // the oldest runs, the amber meteors could literally never appear.
+        runIdx = runQueue.length ? (runIdx % runQueue.length) : 0;
+      }).catch(function () {});
+  }
+  function spawnMeteor() {
+    if (!runQueue.length) return;
+    var r = runQueue[runIdx % runQueue.length]; runIdx++;
+    var target = r.dept ? r.dept.pos : [0,0,0];
+    // Come in from deep space on the far side, so it reads as arriving.
+    var a = Math.random() * Math.PI * 2;
+    var from = [ target[0] + Math.cos(a)*1750, target[1] + (Math.random()*2-1)*700 + 420, target[2] + Math.sin(a)*1750 ];
+    meteors.push({ run:r, from:from, to:target, t:0, spd:0.11 + Math.random()*0.05 });
+    if (meteors.length > 7) meteors.shift();
+    tick(r);
+  }
+  var tickEl = $('nsTicker'), tickTimer = 0;
+  function tick(r) {
+    var age = ago(r.when);
+    tickEl.innerHTML = '<b>' + esc(r.agent) + '</b> · ' + esc(r.goal) +
+      ' · <span class="' + (r.ok ? 'ns-ok' : 'ns-bad') + '">' + (r.ok ? 'completed' : 'did not complete') + '</span>' +
+      (age ? ' <span style="color:var(--mute)">· ' + esc(age) + '</span>' : '');
+    tickEl.classList.add('ns-show');
+    clearTimeout(tickTimer);
+    tickTimer = setTimeout(function () { tickEl.classList.remove('ns-show'); }, 5200);
+  }
+
+  function loadLive() {
+    var token = getToken();
+    if (!token) { setLive('ns-off', 'signed out · demo field'); return; }
+    var H2 = { headers:{ 'Authorization':'Bearer ' + token } };
+    fetch('/api/agents/status', H2)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) {
+        if (s) { hydrateStatus(s); setLive('ns-on', 'live'); } else setLive('ns-off', 'offline · demo field');
+      })
+      .catch(function () { setLive('ns-off', 'offline · demo field'); });
+    loadRuns(token);
+    REAL.forEach(loadCortex);   // nebula density needs every department, not just the open one
+  }
+  function scheduleLive() {
+    if (document.visibilityState === 'visible') loadLive();
+    liveTimer = setTimeout(scheduleLive, 45000);
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') loadLive(); });
+  loadLive();
+  liveTimer = setTimeout(scheduleLive, 45000);
+
+  // ── render ────────────────────────────────────────────────────────────────
+  var rafId = 0;
+  function frame(now) {
+    clock = now * 0.001;
+    if (!reduced && level === 0 && (now - lastInteract) > 5000) {
+      var it = cam.dTarget, io = sub(cam.dEye, it), ia = 0.00055, ic = Math.cos(ia), is2 = Math.sin(ia);
+      cam.dEye = add(it, [io[0]*ic - io[2]*is2, io[1], io[0]*is2 + io[2]*ic]);
+    }
+    if (focusMember && camOff) {                      // the camera rides the orbiting moon
+      cam.dTarget = memberPos(focusMember);
+      cam.dEye = add(cam.dTarget, camOff);
+    }
+    var kk = reduced ? 1 : 0.08;
+    cam.eye = lerp3(cam.eye, cam.dEye, kk);
+    cam.target = lerp3(cam.target, cam.dTarget, kk);
+    computeBasis();
+    hits = []; labels = [];
+    CX = W/2 - (W > 900 && panel.classList.contains('ns-open') ? 176 : 0);
+
+    ctx.clearRect(0, 0, W, H);
+    var g0 = ctx.createRadialGradient(W/2, H*0.42, 0, W/2, H*0.42, Math.max(W,H)*0.75);
+    g0.addColorStop(0, 'rgba(18,26,42,0.55)'); g0.addColorStop(1, 'rgba(5,7,13,0)');
+    ctx.fillStyle = g0; ctx.fillRect(0, 0, W, H);
+
+    // background fabric, faded by depth
+    for (var fi = 0; fi < FLINK.length; fi++) {
+      var la = project(FLINK[fi][0]), lb = project(FLINK[fi][1]); if (!la || !lb) continue;
+      ctx.strokeStyle = 'rgba(60,80,110,' + (0.06 * fog((la.z + lb.z) * 0.5)) + ')';
+      ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(la.x, la.y); ctx.lineTo(lb.x, lb.y); ctx.stroke();
+    }
+    for (var pi = 0; pi < FIELD.length; pi++) {
+      var sp = project(FIELD[pi]); if (!sp) continue;
+      var vis = fog(sp.z); if (vis < 0.05) continue;
+      var tw = 0.55 + 0.45 * Math.sin(clock * 1.4 + FTW[pi]);
+      ctx.fillStyle = 'rgba(150,180,220,' + (Math.min(0.5, sp.s*0.7) * vis * tw * 0.55) + ')';
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, Math.max(0.4, sp.s*0.9), 0, 7); ctx.fill();
+    }
+
+    // nebulae — a department's knowledge volume, drawn behind everything solid
+    DEPTS.forEach(function (d) {
+      var s = project(d.pos); if (!s) return;
+      var n = d.knowN || 0;
+      var rr = (150 + Math.min(260, Math.sqrt(n) * 26)) * s.s;
+      if (rr < 4) return;
+      var neb = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rr);
+      var al = 0.05 + Math.min(0.09, n / 900);
+      neb.addColorStop(0, 'rgba(84,166,255,' + (al * fog(s.z)) + ')');
+      neb.addColorStop(1, 'rgba(84,166,255,0)');
+      ctx.fillStyle = neb; ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, 7); ctx.fill();
+    });
+
+    // core
+    var pc = project([0,0,0]);
+    if (pc) {
+      var coreHot = hover && hover.kind === 'core';
+      for (var ri = 1; ri <= 3; ri++) {
+        var cr = (70 + ri * 46) * pc.s;
+        ctx.strokeStyle = 'rgba(143,212,255,' + ((coreHot ? 0.2 : 0.1) / ri) + ')'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(pc.x, pc.y, cr, cr*0.34, clock*0.05*(ri%2?1:-1), 0, 7); ctx.stroke();
+      }
+      var halo = ctx.createRadialGradient(pc.x, pc.y, 0, pc.x, pc.y, 220*pc.s);
+      halo.addColorStop(0, 'rgba(143,212,255,' + (coreHot ? 0.16 : 0.10) + ')'); halo.addColorStop(1, 'rgba(143,212,255,0)');
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(pc.x, pc.y, 220*pc.s, 0, 7); ctx.fill();
+      var gr = ctx.createRadialGradient(pc.x, pc.y, 0, pc.x, pc.y, 80*pc.s);
+      gr.addColorStop(0, 'rgba(143,212,255,0.36)'); gr.addColorStop(0.4, 'rgba(143,212,255,0.09)'); gr.addColorStop(1, 'rgba(143,212,255,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(pc.x, pc.y, 80*pc.s, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(143,212,255,0.92)'; ctx.beginPath(); ctx.arc(pc.x, pc.y, Math.max(2.5, 3.4*pc.s), 0, 7); ctx.fill();
+      label('P L A T O', pc.x, pc.y + 62*pc.s,
+            '600 ' + Math.max(11, 13*Math.min(1.4, pc.s)) + 'px Rajdhani, sans-serif',
+            'rgba(180,225,255,' + (coreHot ? 0.95 : 0.78) + ')', 'center', 95, false);
+      label('system core', pc.x, pc.y + 62*pc.s + 19, '9px "IBM Plex Mono", monospace', 'rgba(143,212,255,0.42)', 'center', 52, false);
+      hit('core', CORE, pc, Math.max(34, 44*pc.s), 'Plato · system core', CORE.statusLabel);
+    }
+
+    // core → department spines
+    DEPTS.forEach(function (d) {
+      var a0 = project([0,0,0]), b0 = project(d.pos); if (!a0 || !b0) return;
+      var lit = (focusDept === d) || (hover && hover.ref === d);
+      ctx.strokeStyle = lit ? 'rgba(143,212,255,0.22)' : 'rgba(143,212,255,0.06)';
+      ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a0.x, a0.y); ctx.lineTo(b0.x, b0.y); ctx.stroke();
+      // Tether the head to its planet at every level, so the name never reads as
+      // a stray dot floating next to the department.
+      if (d.head) {
+        var hs = project(memberPos(d.head));
+        if (hs) {
+          ctx.strokeStyle = lit ? 'rgba(120,170,225,0.3)' : 'rgba(110,140,180,0.14)';
+          ctx.beginPath(); ctx.moveTo(b0.x, b0.y); ctx.lineTo(hs.x, hs.y); ctx.stroke();
+        }
+      }
+    });
+
+    // departments + their people, depth sorted so near objects paint last
+    var draw = [];
+    DEPTS.forEach(function (d) {
+      var s = project(d.pos); if (s) draw.push({ t:'dept', d:d, s:s });
+      // heads are visible from anywhere (the org's three real faces); assistants
+      // only surface once you're inside their department.
+      d.people.forEach(function (m) {
+        var showIt = m.isHead || focusDept === d;
+        if (!showIt) return;
+        var mp = memberPos(m), ms = project(mp); if (!ms) return;
+        draw.push({ t:'member', m:m, d:d, s:ms, p:mp });
+      });
+    });
+    draw.sort(function (a, b) { return b.s.z - a.s.z; });
+
+    // orbit rings + tethers for the focused department, under the nodes
+    if (focusDept) {
+      var ds = project(focusDept.pos);
+      focusDept.people.forEach(function (m) {
+        var a = project(focusDept.pos), b = project(memberPos(m)); if (!a || !b) return;
+        ctx.strokeStyle = m.isHead ? 'rgba(120,170,225,0.24)' : 'rgba(90,110,140,0.12)';
+        ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      });
+      if (ds) {
+        ctx.strokeStyle = 'rgba(84,166,255,0.10)'; ctx.lineWidth = 1;
+        [150, 240, 284].forEach(function (r2) {
+          ctx.beginPath(); ctx.ellipse(ds.x, ds.y, r2*ds.s, r2*ds.s*0.36, 0, 0, 7); ctx.stroke();
+        });
+      }
+    }
+
+    draw.forEach(function (it) {
+      if (it.t === 'dept') {
+        var s = it.s, d = it.d;
+        var isFoc = focusDept === d, isHov = hover && hover.ref === d;
+        var rr = Math.max(5, 17 * s.s);
+        var glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rr*2.8);
+        glow.addColorStop(0, 'rgba(84,166,255,' + (isFoc || isHov ? 0.32 : 0.14) + ')');
+        glow.addColorStop(1, 'rgba(84,166,255,0)');
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(s.x, s.y, rr*2.8, 0, 7); ctx.fill();
+        ctx.fillStyle = isFoc || isHov ? 'rgba(206,229,255,0.96)' : 'rgba(150,185,225,0.8)';
+        ctx.beginPath(); ctx.arc(s.x, s.y, rr, 0, 7); ctx.fill();
+        // planetary ring — the department's own plane
+        ctx.strokeStyle = 'rgba(84,166,255,' + (isFoc || isHov ? 0.6 : 0.34) + ')'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(s.x, s.y, rr*2.1, rr*0.72, 0.5, 0, 7); ctx.stroke();
+        var fs = Math.max(12, Math.min(21, 17*s.s));
+        label(d.name.split('').join(' '), s.x, s.y - rr - 16, '600 ' + fs + 'px Rajdhani, sans-serif',
+              isFoc || isHov ? 'rgba(238,246,255,0.96)' : 'rgba(190,210,235,0.7)', 'center', 100, false);
+        if (isFoc || isHov) {
+          label(d.head ? d.head.name + ' · head · ' + d.staff.length + ' assistants'
+                       : 'head vacant · ' + d.staff.length + ' assistants',
+                s.x, s.y - rr - 2, '9.5px "IBM Plex Mono", monospace', 'rgba(143,190,240,0.55)', 'center', 62, false);
+        }
+        hit('dept', d, s, Math.max(24, rr*2.2),
+            d.name + ' department',
+            (d.head ? d.head.name + ' · head' : 'head vacant') + ' · ' + d.staff.length + ' assistants');
+      } else {
+        var s2 = it.s, m = it.m, real = isReal(m);
+        var isSel = focusMember === m, isHov2 = hover && hover.ref === m;
+        var pulse = m.active ? (0.55 + 0.45*Math.sin(clock*2 + m._pulse)) : 0;
+        var rr2 = Math.max(real ? 2.6 : 2, (real ? 8 : 5.5) * s2.s);
+        if (m.active) {
+          var gl = ctx.createRadialGradient(s2.x, s2.y, 0, s2.x, s2.y, rr2*(3+pulse));
+          gl.addColorStop(0, 'rgba(84,166,255,' + (0.30 + 0.25*pulse) + ')'); gl.addColorStop(1, 'rgba(84,166,255,0)');
+          ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(s2.x, s2.y, rr2*(3+pulse), 0, 7); ctx.fill();
+        }
+        if (!real) {
+          // No agent sits in this seat, so it is drawn hollow either way — but the
+          // two hollow kinds must not look alike. A SERVICE seat closes its ring and
+          // keeps a lit core: the capability is there, running as plumbing. A PLANNED
+          // seat breaks its ring into dashes and stays empty: nothing occupies it yet.
+          var isSvc = m.state === 'service';
+          ctx.fillStyle = 'rgba(24,32,46,0.85)';
+          ctx.beginPath(); ctx.arc(s2.x, s2.y, rr2, 0, 7); ctx.fill();
+          ctx.strokeStyle = isHov2 ? 'rgba(140,170,210,0.8)'
+                          : isSvc  ? 'rgba(126,152,186,0.62)'
+                                   : 'rgba(96,114,140,0.38)';
+          ctx.lineWidth = isSvc ? 1.3 : 1.1;
+          // Dashes scale with the moon so they stay readable as it recedes into fog.
+          if (!isSvc) ctx.setLineDash([Math.max(1.6, rr2*0.62), Math.max(1.4, rr2*0.52)]);
+          ctx.beginPath(); ctx.arc(s2.x, s2.y, rr2, 0, 7); ctx.stroke();
+          ctx.setLineDash([]);
+          if (isSvc) {
+            ctx.fillStyle = isHov2 ? 'rgba(190,214,242,0.95)' : 'rgba(132,158,192,0.7)';
+            ctx.beginPath(); ctx.arc(s2.x, s2.y, Math.max(0.9, rr2*0.34), 0, 7); ctx.fill();
+          }
+        } else {
+          ctx.fillStyle = isSel || isHov2 ? 'rgba(238,246,255,1)'
+                        : (m.active ? 'rgba(150,200,255,0.95)' : 'rgba(120,142,172,0.9)');
+          ctx.beginPath(); ctx.arc(s2.x, s2.y, rr2, 0, 7); ctx.fill();
+        }
+        if (isSel) { ctx.strokeStyle = 'rgba(84,166,255,0.9)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(s2.x, s2.y, rr2+7, 0, 7); ctx.stroke(); }
+        if (focusDept === m.dept || isSel || isHov2 || m.isHead) {
+          var fs2 = Math.max(9, Math.min(13.5, 11*s2.s));
+          label(m.name, s2.x + rr2 + 8, s2.y + fs2*0.35, '500 ' + fs2 + 'px "IBM Plex Mono", monospace',
+                real ? (m.active ? 'rgba(202,226,255,0.92)' : 'rgba(164,184,212,0.72)')
+                     : (m.state === 'service' ? 'rgba(138,158,188,0.66)' : 'rgba(112,128,154,0.46)'),
+                'left', isSel || isHov2 ? 92 : (m.isHead ? 80 : 40));
+        }
+        hit('member', m, s2, Math.max(19, rr2*2.2),
+            m.name + (real ? '' : m.state === 'service' ? ' · service' : ' · planned'),
+            m.title + ' · ' + m.dept.name);
+      }
+    });
+
+    // the selected real agent's brain — its own memory, reachable in one click
+    if (focusMember && isReal(focusMember) && focusMember.brain) {
+      var ap = memberPos(focusMember), prev = ap;
+      focusMember.brain.slice(0, 6).forEach(function (kn, i2) {
+        var ang = i2*1.15 + clock*0.1;
+        var kp = add(ap, [Math.cos(ang)*(95+i2*46), Math.sin(ang*0.7)*(40+i2*20), Math.sin(ang)*(95+i2*46)]);
+        var a = project(prev), b = project(kp);
+        if (a && b) {
+          ctx.strokeStyle = 'rgba(84,166,255,' + (0.4 - i2*0.05) + ')'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          var hot = hover && hover.kind === 'brain' && hover.tip === kn.name;
+          ctx.fillStyle = 'rgba(160,205,255,' + (hot ? 0.95 : 0.7 - i2*0.08) + ')';
+          ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(2, (hot ? 4.5 : 3)*b.s), 0, 7); ctx.fill();
+          label(clip(kn.name, 24), b.x + 7, b.y + 3, '9.5px "IBM Plex Mono", monospace',
+                'rgba(150,190,235,' + (0.62 - i2*0.07) + ')', 'left', 70 - i2);
+          hit('brain', focusMember, b, 15, kn.name, 'Open ' + focusMember.name + '’s brain map');
+        }
+        prev = kp;
+      });
+    }
+
+    // meteors — one per real run, arriving on the department that ran it
+    if (!reduced) {
+      if (now > nextSpawn && runQueue.length) { spawnMeteor(); nextSpawn = now + 2600 + Math.random()*1800; }
+      for (var mi = meteors.length - 1; mi >= 0; mi--) {
+        var mt = meteors[mi];
+        mt.t += mt.spd * 0.016;
+        if (mt.t >= 1) { meteors.splice(mi, 1); continue; }
+        var col = mt.run.ok ? '95,206,155' : '224,160,74';
+        var head = null;
+        for (var ti = 19; ti >= 0; ti--) {                 // tail first, head last
+          var tt = mt.t - ti*0.009; if (tt < 0) continue;
+          var mp2 = project(lerp3(mt.from, mt.to, tt*tt)); if (!mp2) continue;
+          if (ti === 0) { head = mp2; continue; }
+          // Overlapping samples so the tail reads as one tapered streak, not dots.
+          ctx.fillStyle = 'rgba(' + col + ',' + Math.max(0.04, 0.42 - ti*0.021) + ')';
+          ctx.beginPath(); ctx.arc(mp2.x, mp2.y, Math.max(0.8, (3.6 - ti*0.15)*mp2.s), 0, 7); ctx.fill();
+        }
+        if (head) {
+          // A bright, haloed head so an arriving run is unmistakable against the field.
+          var hr = Math.min(38, Math.max(16, 26 * head.s));   // capped so a near meteor stays a spark, not a blob
+          var mg = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, hr);
+          mg.addColorStop(0, 'rgba(' + col + ',0.5)'); mg.addColorStop(1, 'rgba(' + col + ',0)');
+          ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(head.x, head.y, hr, 0, 7); ctx.fill();
+          ctx.fillStyle = 'rgba(' + col + ',1)';
+          ctx.beginPath(); ctx.arc(head.x, head.y, Math.max(2.4, 4.4*head.s), 0, 7); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.beginPath(); ctx.arc(head.x, head.y, Math.max(1, 1.8*head.s), 0, 7); ctx.fill();
+          hit('meteor', mt.run, head, 18, mt.run.goal,
+              mt.run.agent + ' · ' + (mt.run.ok ? 'completed' : 'did not complete') +
+              (ago(mt.run.when) ? ' · ' + ago(mt.run.when) : ''));
+        }
+      }
+    }
+
+    // live task: a bright pulse running core → the working agent
+    if (!reduced && workingId) {
+      var wa = agentById(workingId);
+      if (wa) {
+        var wp = memberPos(wa), segT = (clock*0.35) % 1;
+        for (var wk = 0; wk < 5; wk++) {
+          var wt = segT - wk*0.05; if (wt < 0) continue;
+          var wsp = project(lerp3([0,0,0], wp, wt)); if (!wsp) continue;
+          ctx.fillStyle = 'rgba(143,212,255,' + (0.7 - wk*0.12) + ')';
+          ctx.beginPath(); ctx.arc(wsp.x, wsp.y, Math.max(1, (3 - wk*0.4)*wsp.s), 0, 7); ctx.fill();
+        }
+      }
+    }
+
+    paintLabels();   // all text last, de-collided
+
+    // vignette last — the frame reads as looking into a deep space
+    var vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.35, W/2, H/2, Math.max(W,H)*0.72);
+    vg.addColorStop(0, 'rgba(5,7,13,0)'); vg.addColorStop(1, 'rgba(3,4,9,0.55)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+    rafId = requestAnimationFrame(frame);
+  }
+
+  resize(); computeBasis();
+  // The key panel and the crumb change height as you move around, so re-measure
+  // whenever they can have changed.
+  var keyEl = document.querySelector('.ns-key');
+  if (keyEl) keyEl.addEventListener('toggle', measureHud);
+  setTimeout(measureHud, 400);   // after webfonts settle the HUD's real size
+  rafId = requestAnimationFrame(frame);
+
+  if (window.fcView && typeof window.fcView.onTeardown === 'function') {
+    window.fcView.onTeardown(function () {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (liveTimer) clearTimeout(liveTimer);
+    });
+  }
+})();
+</script>
+</body>
+</html>

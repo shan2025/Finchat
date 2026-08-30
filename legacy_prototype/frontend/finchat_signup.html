@@ -605,6 +605,9 @@
       // A brand-new account on this browser is a device the user just chose to
       // sign up on, so persist it; they can switch it off from the login page.
       window.fcAuth.persist(user, data.token, true, data.user.email);
+      // Land new users in chat. A brand-new account has an empty graph and no
+      // executions, so Neural Space would greet them with an empty field —
+      // it earns its place once there is work to look at.
       window.location.href = 'finchat_chat.html';
     }
 

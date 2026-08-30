@@ -255,9 +255,11 @@
 
     nav.innerHTML =
       '<div class="sbn-head">' +
-        '<div class="sbn-logo" title="Home — Neural Space" onclick="location.href=\'finchat_neuralspace.html\'">' + MASCOT_HEAD + '</div>' +
+        // The brand goes home to chat. Neural Space is a module in the list
+        // below like every other page, not the front door.
+        '<div class="sbn-logo" title="Home — Chat" onclick="location.href=\'finchat_chat.html\'">' + MASCOT_HEAD + '</div>' +
         '<div style="flex:1; min-width:0;">' +
-          '<div class="sbn-serif sbn-brand" style="cursor:pointer;" title="Home — Neural Space" onclick="location.href=\'finchat_neuralspace.html\'">FinChat</div>' +
+          '<div class="sbn-serif sbn-brand" style="cursor:pointer;" title="Home — Chat" onclick="location.href=\'finchat_chat.html\'">FinChat</div>' +
           '<div class="sbn-brandsub">AI Operating System</div>' +
         '</div>' +
         '<button class="sbn-themebtn" id="sbnThemeBtn" title="Switch nav theme (espresso / cream)">' +

@@ -572,6 +572,9 @@
         method: data.user.auth_method || 'password'
       };
       window.fcAuth.persist(user, data.token, remember, identifier || data.user.email);
+      // Land in chat: it is where the work actually happens. Neural Space is a
+      // lens over that work, reachable from the rail like any other module —
+      // not the front door you have to travel through to reach the thing.
       window.location.href = 'finchat_chat.html';
     }
 
