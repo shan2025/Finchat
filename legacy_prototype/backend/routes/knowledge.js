@@ -14,6 +14,9 @@ const router = express.Router();
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { dream, detectGaps, ingestDocument } = require('../services/cognitive/MemoryEngine');
+// Read-through cache in front of the polled aggregate endpoints. See
+// services/QueryCache.js for why this is a query cache and not an HTTP one.
+const cache = require('../services/QueryCache');
 
 // ── GET /api/knowledge/nodes/:entityId ─────────────────────
 // Everything known about one node: identity, vitals, connections (with the
@@ -103,8 +106,12 @@ router.get('/nodes/:entityId', requireAuth, async (req, res) => {
 router.get('/activity', requireAuth, async (req, res) => {
   try {
     const since = Math.max(5, Math.min(3600, parseInt(req.query.sinceSeconds) || 90));
-    // Grouped by (entity, source) so the map can animate nodes that were
-    // activated TOGETHER (same retrieval / same chat turn) as one thinking path.
+    // 20s cache against a 45s poll. The window is deliberately shorter than the
+    // poll rather than equal to it: this is the animation feed for the neural
+    // map, so the cache is here to absorb multiple open tabs and the burst on
+    // page load, not to slow the feed down. `since` is part of the key because
+    // two windows are two different questions.
+    const payload = await cache.through(`knowledge:activity:${req.user.id}:${since}`, 20_000, async () => {
     const q = await query(`
       SELECT ne.entity_id, ne.source_id, MAX(ne.created_at) AS at, COUNT(*)::int AS hits,
              MAX(ne.agent_id) AS agent_id, e.canonical_name AS name
@@ -115,7 +122,9 @@ router.get('/activity', requireAuth, async (req, res) => {
       GROUP BY ne.entity_id, ne.source_id, e.canonical_name
       ORDER BY at DESC LIMIT 50
     `, [String(since)]);
-    res.json({ activations: q.rows });
+      return { activations: q.rows };
+    });
+    res.json(payload);
   } catch (err) {
     console.error('Knowledge activity error:', err);
     res.status(500).json({ error: 'Failed to load activity' });
@@ -232,10 +241,17 @@ router.post('/ingest-document', requireAuth, async (req, res) => {
 
 // ── GET /api/knowledge/cortex/:agentId ─────────────────────
 // Per-agent subgraph: nodes owned by this agent + their top connections.
+// Cached for 120s. The Neural Space draws one nebula per agent, so a single
+// page load fans this out to one request per agent and then repeats the set on
+// every poll — the heaviest read-amplification pattern in the app.
 router.get('/cortex/:agentId', requireAuth, async (req, res) => {
   try {
     const { agentId } = req.params;
-    const [nodesQ, topQ] = await Promise.all([
+    const payload = await cache.through(`knowledge:cortex:${req.user.id}:${agentId}`, 120_000, async () => {
+    // nodeCount is the agent's TRUE cortex size, counted separately — deriving
+    // it from nodesQ.rows.length just reported the LIMIT back (every agent with
+    // 50+ entities looked identical, which made the Neural Space nebulae lie).
+    const [nodesQ, topQ, countQ] = await Promise.all([
       query(`
         SELECT entity_id, canonical_name, entity_type, importance, confidence,
                activation_count, last_activated_at, mention_count
@@ -253,14 +269,21 @@ router.get('/cortex/:agentId', requireAuth, async (req, res) => {
         GROUP BY e.canonical_name
         ORDER BY total_weight DESC
         LIMIT 10
+      `, [agentId, req.user.id]),
+      query(`
+        SELECT COUNT(*)::int AS n
+        FROM entities
+        WHERE owner_agent = $1 AND status = 'active' AND user_id = $2
       `, [agentId, req.user.id])
     ]);
-    res.json({
-      agentId,
-      nodeCount: nodesQ.rows.length,
-      nodes: nodesQ.rows,
-      mostConnected: topQ.rows
+      return {
+        agentId,
+        nodeCount: countQ.rows[0] ? countQ.rows[0].n : nodesQ.rows.length,
+        nodes: nodesQ.rows,
+        mostConnected: topQ.rows
+      };
     });
+    res.json(payload);
   } catch (err) {
     console.error('Cortex subgraph error:', err);
     res.status(500).json({ error: 'Failed to load agent cortex', details: err.message });
@@ -271,6 +294,12 @@ router.get('/cortex/:agentId', requireAuth, async (req, res) => {
 router.post('/dream', requireAuth, async (req, res) => {
   try {
     const report = await dream({ userId: req.user.id });
+    // A dream cycle rewrites the graph, so the cached vitals it feeds are now
+    // wrong. Dropping them here is what lets "Consolidate now" show its own
+    // result immediately instead of appearing to do nothing for two minutes.
+    cache.invalidate(`knowledge:stats:${req.user.id}`);
+    cache.invalidate(`knowledge:cortex:${req.user.id}`);
+    cache.invalidate(`knowledge:patterns:${req.user.id}`);
     res.json({ ok: true, report });
   } catch (err) {
     console.error('Dream cycle error:', err);
@@ -296,6 +325,7 @@ router.post('/dream/digest', requireAuth, async (req, res) => {
 router.post('/gaps', requireAuth, async (req, res) => {
   try {
     const gaps = await detectGaps({ userId: req.user.id });
+    cache.invalidate(`knowledge:stats:${req.user.id}`);
     res.json({ ok: true, gaps });
   } catch (err) {
     console.error('Gap detection error:', err);
@@ -349,8 +379,13 @@ router.post('/communities/detect', requireAuth, async (req, res) => {
 });
 
 // ── GET /api/knowledge/stats ───────────────────────────────
+// Cached for 60s: this is five COUNT/LIMIT queries behind a dashboard tile that
+// polls on a timer, so without a cache every open tab pays all five every
+// minute forever. Counts that lag by under a minute are indistinguishable from
+// live to the person reading them.
 router.get('/stats', requireAuth, async (req, res) => {
   try {
+    const payload = await cache.through(`knowledge:stats:${req.user.id}`, 60_000, async () => {
     const [nodesQ, edgesQ, eventsQ, hotQ, freshQ] = await Promise.all([
       query(`SELECT COUNT(*)::int AS n FROM entities WHERE status = 'active' AND user_id = $1`, [req.user.id]),
       query(`SELECT COUNT(*)::int AS n FROM entity_edges WHERE user_id = $1`, [req.user.id]),
@@ -365,13 +400,15 @@ router.get('/stats', requireAuth, async (req, res) => {
         WHERE status = 'active' AND user_id = $1 ORDER BY created_at DESC LIMIT 5
       `, [req.user.id])
     ]);
-    res.json({
-      nodes: nodesQ.rows[0].n,
-      edges: edgesQ.rows[0].n,
-      events: eventsQ.rows[0].n,
-      mostActive: hotQ.rows,
-      recentlyLearned: freshQ.rows
+      return {
+        nodes: nodesQ.rows[0].n,
+        edges: edgesQ.rows[0].n,
+        events: eventsQ.rows[0].n,
+        mostActive: hotQ.rows,
+        recentlyLearned: freshQ.rows
+      };
     });
+    res.json(payload);
   } catch (err) {
     console.error('Knowledge stats error:', err);
     res.status(500).json({ error: 'Failed to load stats' });
@@ -670,6 +707,9 @@ router.get('/patterns', requireAuth, async (req, res) => {
     // '' means "every agent"; the value is only ever compared, never interpolated.
     const agent = String(req.query.agent || '').trim().toLowerCase();
 
+    // 120s: preferences are grown by the dream cycle, which runs every 6 hours.
+    // Anything shorter is polling for a change that cannot have happened.
+    const payload = await cache.through(`knowledge:patterns:${req.user.id}:${agent}`, 120_000, async () => {
     const [q, roster] = await Promise.all([
       query(`
         SELECT f.canonical_name AS from_name, t.canonical_name AS to_name,
@@ -702,12 +742,14 @@ router.get('/patterns', requireAuth, async (req, res) => {
       `, [req.user.id])
     ]);
 
-    res.json({
-      patterns: q.rows,
-      agents: roster.rows,
-      total: roster.rows.reduce((s, a) => s + a.count, 0),
-      agent: agent || null
+      return {
+        patterns: q.rows,
+        agents: roster.rows,
+        total: roster.rows.reduce((s, a) => s + a.count, 0),
+        agent: agent || null
+      };
     });
+    res.json(payload);
   } catch (err) {
     console.error('Patterns error:', err);
     res.status(500).json({ error: 'Failed to load patterns' });

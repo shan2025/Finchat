@@ -7,6 +7,7 @@ const { listPersonas } = require('../services/personas');
 const { runDebate } = require('../services/agents/DebateOrchestrator');
 const { refreshRegistry, getAgentConfig } = require('../services/agents/AgentRegistry');
 const { getLeaderboard, getAgentProfiles } = require('../services/AgentLeaderboard');
+const cache = require('../services/QueryCache');
 
 const VALID_RISK = ['Low', 'Medium', 'High'];
 // Optional per-agent model override — any Groq-supported model string, plus '' meaning "use default".
@@ -415,21 +416,26 @@ router.get('/:agentId/audit', requireAuth, async (req, res) => {
  * GET /api/agents/memory-graph — quick counts for the Operations "Knowledge Memory" tile.
  * Surfaces the Sprint 5C Graph-RAG state so users can see it's populating over time.
  */
+// 120s cache against a 300s dashboard poll. Four aggregate queries behind a
+// stat strip that nobody watches change in real time.
 router.get('/memory-graph', requireAuth, async (req, res) => {
   try {
+    const payload = await cache.through(`agents:memory-graph:${req.user.id}`, 120_000, async () => {
     const [ents, edges, recipes, topEnts] = await Promise.all([
       query(`SELECT COUNT(*)::int AS c FROM entities WHERE user_id = $1`, [req.user.id]),
       query(`SELECT COUNT(*)::int AS c FROM entity_edges WHERE user_id = $1`, [req.user.id]),
       query(`SELECT COUNT(*)::int AS c, COALESCE(SUM(times_reused),0)::int AS reuses FROM skill_recipes`),
       query(`SELECT canonical_name, entity_type, mention_count FROM entities WHERE user_id = $1 ORDER BY mention_count DESC LIMIT 6`, [req.user.id])
     ]);
-    res.json({
-      entities: ents.rows[0].c,
-      edges: edges.rows[0].c,
-      recipes: recipes.rows[0].c,
-      recipeReuses: recipes.rows[0].reuses,
-      topEntities: topEnts.rows
+      return {
+        entities: ents.rows[0].c,
+        edges: edges.rows[0].c,
+        recipes: recipes.rows[0].c,
+        recipeReuses: recipes.rows[0].reuses,
+        topEntities: topEnts.rows
+      };
     });
+    res.json(payload);
   } catch (err) {
     console.error('Memory-graph route error:', err);
     res.status(500).json({ error: 'Failed to load memory graph summary' });

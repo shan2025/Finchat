@@ -85,6 +85,10 @@ async function query(text, params = []) {
       if (duration >= slowMs) {
         console.warn(`🐢 Slow query (${duration}ms):`, text.replace(/\s+/g, ' ').trim().slice(0, 120));
       }
+      // Egress accounting. Supabase bills the bytes that leave Postgres for this
+      // process, and this is the only place they all pass through. Wrapped
+      // because instrumentation must never be able to fail a real query.
+      try { require('./services/EgressMeter').record(text, res.rows); } catch { /* metering is best-effort */ }
       return res;
     } catch (err) {
       if (attempt === 0 && isFatalError(err)) {

@@ -1924,7 +1924,12 @@ async function pollActivity() {
   }
  } catch (e) { /* map still works without the pulse feed */ }
 }
-setInterval(pollActivity, 15000); // 15s; pollActivity already no-ops when the tab is hidden
+// 45s, raised from 15s on 2026-08-30. At 15s an open map cost 5,760 queries a
+// day per tab against a node_events table that only changes when an agent runs
+// — three quarters of those polls could not have found anything new. The server
+// also caches this for 20s now, so the effective floor is set there.
+// pollActivity already no-ops when the tab is hidden.
+setInterval(pollActivity, 45000);
 
 const KIND_META = {
  gap: { icon: 'extension', label: 'Knowledge gap', color: 'var(--cat-tool)' },

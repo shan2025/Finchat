@@ -8,6 +8,33 @@ const { generateUnblockProof, verifyUnblockProof, verifyZKProof, getUnblockProof
 
 router.use(requireAuth, requireRole('admin'));
 
+// ── GET /api/admin/egress ────────────────────────────────────
+// Which SQL statements are actually spending the Supabase egress quota, ranked
+// by bytes. Admin-only because the fingerprints expose the schema.
+//
+// This exists because the 2026-08 overrun (12.892 GB against a 5 GB cap) had to
+// be diagnosed by inferring bytes from pg_stat_user_tables row counts, which
+// cannot distinguish a 40-byte row from a 40KB one. `projectedMonthlyGB` is the
+// number to watch: it must stay under 5.
+//
+// ?reset=1 zeroes the counters, so a fix can be measured against a clean window
+// rather than against an average that includes the behaviour it removed.
+router.get('/egress', async (req, res) => {
+  try {
+    const meter = require('../services/EgressMeter');
+    const cache = require('../services/QueryCache');
+    const payload = {
+      egress: meter.report(Math.min(100, parseInt(req.query.limit) || 25)),
+      cache: cache.stats()
+    };
+    if (req.query.reset === '1') meter.reset();
+    res.json(payload);
+  } catch (err) {
+    console.error('Egress report error:', err);
+    res.status(500).json({ error: 'Failed to build egress report' });
+  }
+});
+
 // ── GET /api/admin/users ─────────────────────────────────────
 router.get('/users', async (req, res) => {
   try {

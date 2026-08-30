@@ -815,10 +815,17 @@
   loadIntegrity();
   loadMemoryGraph();
   // Egress guard: poll only while the tab is visible; a backgrounded dashboard
-  // tab makes zero requests. Intervals raised from 5s/20s to 30s/60s.
-  statusInterval = setInterval(() => { if (!document.hidden) fetchStatus(); }, 30000);
-  integrityInterval = setInterval(() => { if (!document.hidden) loadIntegrity(); }, 60000);
-  memGraphInterval = setInterval(() => { if (!document.hidden) loadMemoryGraph(); }, 60000);
+  // tab makes zero requests. Intervals raised from 5s/20s to 30s/60s, then
+  // again on 2026-08-30 to 60s/300s/300s after the Supabase egress overrun.
+  //
+  // The visibility guard was doing less than it looked like it was: a dashboard
+  // left open on a second monitor is *visible* all day, and that is the normal
+  // way this page is used. Interval length is the only lever that touches that
+  // case. Integrity and the memory graph move on the timescale of an agent run,
+  // so a 5-minute refresh loses nothing a human would notice.
+  statusInterval = setInterval(() => { if (!document.hidden) fetchStatus(); }, 60000);
+  integrityInterval = setInterval(() => { if (!document.hidden) loadIntegrity(); }, 300000);
+  memGraphInterval = setInterval(() => { if (!document.hidden) loadMemoryGraph(); }, 300000);
 </script>
 <script>
   // Drawer nav on narrow screens.
