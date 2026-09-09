@@ -57,14 +57,12 @@
 
   var AGENT_AVATARS = {
     plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png',
-    rasha: 'rasha_avatar.png', nova: 'nova_avatar.png'
+    atlas: 'atlas_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png'
   };
   // Agents with no PNG of their own. Without an entry here they fall through to
   // the generic 🤖 bubble, which reads as "unknown sender" rather than as a
   // named agent — so they get a coloured initial plate instead.
-  var AGENT_PLATES = {
-    atlas: { initial: 'A', bg: '#1f4a3f', fg: '#7fd1b9' }
-  };
+  var AGENT_PLATES = {};
   function agentBubble(id) {
     var base = 'width:24px; height:24px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;';
     if (AGENT_AVATARS[id]) {

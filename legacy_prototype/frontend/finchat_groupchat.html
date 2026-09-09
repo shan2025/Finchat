@@ -202,11 +202,11 @@
  const AUTH = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000';
 
- const AGENT_AVATARS = { plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png' };
+ const AGENT_AVATARS = { plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png', atlas: 'atlas_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png' };
  // Agents with no PNG. The roster comes from the API, so an agent can appear in
  // this UI before anyone draws a portrait for it — without a plate it renders as
  // the generic robot glyph and reads as an unknown participant.
- const AGENT_PLATES = { atlas: { initial: 'A', bg: '#1f4a3f', fg: '#7fd1b9' } };
+ const AGENT_PLATES = {};
  // `px` is the rendered diameter. Sized inline rather than with Tailwind width
  // classes because this file's Tailwind is PREBUILT — a class name assembled at
  // runtime is not in the scanner's output and would render at zero size.

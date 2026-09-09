@@ -307,9 +307,9 @@
   // "not built yet" about a shipping service is the bug this distinction fixes.
   // PLATFORM's head seat is deliberately vacant for the same reason: that whole
   // department is services today, not agents.
-  // No entry for Atlas: he has no portrait yet, and face() already falls back to
-  // the initial rather than borrowing another agent's face.
-  var AVATARS = { plato:'plato_avatar.png', aurelius:'aurelius_avatar.png', rasha:'rasha_avatar.png', nova:'nova_avatar.png' };
+  // An agent with no portrait falls through to face()'s initial rather than
+  // borrowing another agent's face.
+  var AVATARS = { plato:'plato_avatar.png', aurelius:'aurelius_avatar.png', atlas:'atlas_avatar.png', rasha:'rasha_avatar.png', nova:'nova_avatar.png' };
 
   var DEPTS = [
     { id:'finance', name:'FINANCE', tag:'Markets & Capital',

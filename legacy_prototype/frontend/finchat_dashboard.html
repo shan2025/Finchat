@@ -468,6 +468,7 @@
     const avatars = {
       plato: 'plato_avatar.png',
       aurelius: 'aurelius_avatar.png',
+      atlas: 'atlas_avatar.png',
       rasha: 'rasha_avatar.png',
       nova: 'nova_avatar.png'
     };
@@ -483,7 +484,7 @@
     // Agents with no portrait of their own. The grid is driven by the API, so a
     // new agent lands here before anyone draws one — and the old fallback was
     // plato_avatar.png, which put the wrong agent's face on the card.
-    const plates = { atlas: { initial: 'A', fg: '#7fd1b9' } };
+    const plates = {};
     const agentFace = (id) => {
       if (avatars[id]) return `<img src="${avatars[id]}" class="w-full h-full object-cover">`;
       const p = plates[id];
