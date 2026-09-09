@@ -8,9 +8,52 @@ const FRAUD_TAG = '[FRAUD_DETECTED]';
 // ── Greeting fast path ─────────────────────────────────────────
 // "hi" used to take the full cognitive loop — a routing decision, a model call
 // and several seconds — to produce whatever pleasantry the model felt like that
-// day. A bare greeting carries no goal, so it is answered here, identically
-// every time, before any of that starts.
-const GREETING_REPLY = 'Welcome to our system! How can we help you today?';
+// day. A bare greeting carries no goal, so it is answered here, before any of
+// that starts. The reply is still canned, but it is canned *in character*: each
+// agent has its own pool, so the greeting sounds like the desk you walked up to
+// and doesn't repeat itself word-for-word every session.
+const GREETING_REPLIES = {
+  plato: [
+    "I'm the switchboard here — tell me the goal and I'll put the right desk on it.",
+    "Good to see you. What are we solving? I'll route it to whoever's best at it.",
+    "The floor's quiet and everyone's free. What do you want to get done?",
+    "Supervisor on deck. Give me a messy problem and I'll break it into clean pieces."
+  ],
+  aurelius: [
+    "Markets never sleep and neither do I. What are we looking at — a ticker, a sector, or a headline?",
+    "Name a company and I'll tell you what's actually moving it, not what the chyron says.",
+    "I hunt catalysts: policy, macro, money flows. Point me at something.",
+    "Ready when you are. Give me a symbol or a story and I'll dig for the why."
+  ],
+  atlas: [
+    "Your portfolio's where you left it. Want today's read, or are we digging into a position?",
+    "I watch the holdings so you don't have to refresh. Ask me how things are sitting.",
+    "Steward reporting in. I can walk your risk, your drift, or your growth since you started.",
+    "No trades from me, ever — just an honest look at what you own. Where do we start?"
+  ],
+  rasha: [
+    "Career desk. Are we hunting roles today, sharpening the resume, or prepping for a conversation?",
+    "Tell me the job you want and I'll tell you the gap between here and there.",
+    "I read job posts so you don't have to scroll. What kind of role are we after?",
+    "Ready to work on the next move. Applications, positioning, or interviews?"
+  ],
+  nova: [
+    "Research bench is open. What should I go read for you?",
+    "Papers, patents, preprints — give me a topic and I'll come back with the state of it.",
+    "I like the questions nobody's answered yet. Got one?",
+    "Point me at a frontier — AI, bio, energy, space — and I'll map what's real versus hype."
+  ],
+  _default: [
+    "I'm here and ready. What are we working on?",
+    "Good to see you. Give me something to chew on.",
+    "All set on my end. What do you need?"
+  ]
+};
+
+function greetingFor(personaId) {
+  const pool = GREETING_REPLIES[String(personaId || '').toLowerCase()] || GREETING_REPLIES._default;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 // Matches a message that is ONLY a greeting: "hi", "helloo", "hey there",
 // "good morning", "hello Plato 👋". Anything with an actual request attached
@@ -50,11 +93,17 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
   }
 
   if (isGreeting(userMessage)) {
+    // "@nova hi" greets Nova even if the chat is pointed at someone else.
+    const mention = String(userMessage || '').match(/^@([a-zA-Z0-9_-]+)\s/);
+    const greeter = (mention && GREETING_REPLIES[mention[1].toLowerCase()])
+      ? mention[1].toLowerCase()
+      : (personaId || 'plato');
+    const reply = greetingFor(greeter);
     return {
-      response: GREETING_REPLY,
-      cleanResponse: GREETING_REPLY,
+      response: reply,
+      cleanResponse: reply,
       fraudDetected: false,
-      delegatedAgent: personaId || 'plato',
+      delegatedAgent: greeter,
       provider: 'system',
       model: 'greeting',
       sources: []
