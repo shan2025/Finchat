@@ -2,6 +2,7 @@
 const { route } = require('./agents/PlatoOrchestrator');
 const { getAgentConfig } = require('./agents/AgentRegistry');
 const { SentinelAgent, classifyFraudSeverity } = require('./agents/SentinelAgent');
+const Sayings = require('./Sayings');
 
 const FRAUD_TAG = '[FRAUD_DETECTED]';
 
@@ -172,7 +173,21 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
     const greeter = (mention && GREETING_REPLIES[mention[1].toLowerCase()])
       ? mention[1].toLowerCase()
       : (personaId || 'plato');
-    const reply = greetingFor(greeter);
+    let reply = greetingFor(greeter);
+
+    // Roughly one greeting in three also carries a saying the user has not
+    // heard from this agent — its own field wisdom, or something it read for
+    // them earlier. pickSaying spends the line permanently, so it is only
+    // called when the greeting is actually going to use one.
+    if (Math.random() < 0.34) {
+      const saying = await Sayings.pickSaying({
+        agentId: greeter,
+        userId: options.userId
+      });
+      const formatted = Sayings.formatSaying(saying);
+      if (formatted) reply = `${formatted}\n\n${reply}`;
+    }
+
     return {
       response: reply,
       cleanResponse: reply,
@@ -253,7 +268,37 @@ async function chatWithPersona(personaId, userMessage, history = [], options = {
     const rawResp = result.response || result.cleanResponse || '';
     const safeResponse = typeof rawResp === 'string' ? rawResp : String(rawResp);
     const fraudDetected = safeResponse.includes(FRAUD_TAG);
-    const cleanResponse = safeResponse.replace(FRAUD_TAG, '').trim();
+    let cleanResponse = safeResponse.replace(FRAUD_TAG, '').trim();
+
+    const answeringAgent = result.delegatedTo || 'plato';
+    const runSources = Array.isArray(result.sources) ? result.sources : [];
+
+    if (!fraudDetected) {
+      // The callback: something this agent read for this user earlier, on this
+      // topic, surfaced before the new answer. Picked against the GOAL rather
+      // than the response, and picked before learning from this run, so an
+      // agent can never quote the sentence it just finished writing.
+      try {
+        const callback = await Sayings.pickSaying({
+          agentId: answeringAgent,
+          userId: options.userId,
+          topic: goal
+        });
+        const formatted = Sayings.formatSaying(callback);
+        if (formatted) {
+          cleanResponse = `_Last time I looked into this:_ ${formatted}\n\n${cleanResponse}`;
+        }
+      } catch (_) { /* a saying is never worth failing an answer over */ }
+
+      // Bank one checkable line from this run for next time.
+      Sayings.learnFromRun({
+        agentId: answeringAgent,
+        userId: options.userId,
+        goal,
+        response: safeResponse,
+        sources: runSources
+      }).catch(() => {});
+    }
 
     return {
       response: safeResponse,
