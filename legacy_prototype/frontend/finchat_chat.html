@@ -1530,12 +1530,36 @@
       }
     }
 
+    // The user's avatar as it appears beside a message bubble.
+    //
+    // The topbar, the sidebar card and the settings panel all honoured
+    // SESSION_USER.avatar_url; the two message renderers did not, so an
+    // uploaded picture showed everywhere on the page EXCEPT next to the things
+    // the user actually said. Both renderers now come through here, and the
+    // `data-user-avatar` hook lets an upload restyle bubbles already on screen
+    // without a reload.
+    function userAvatarMarkup() {
+      const initials = (SESSION_USER.name || 'User')
+        .split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+      const inner = SESSION_USER.avatar_url
+        ? `<img src="${SESSION_USER.avatar_url}" alt="${escHtml(SESSION_USER.name || 'You')}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+        : initials;
+      return `<div class="avatar user-avatar" data-user-avatar style="width:32px;height:32px;font-size:12px">${inner}</div>`;
+    }
+
+    // Repaint every user avatar already rendered in the transcript.
+    function refreshUserAvatars() {
+      const markup = userAvatarMarkup();
+      document.querySelectorAll('[data-user-avatar]').forEach(el => {
+        el.outerHTML = markup;
+      });
+    }
+
     function renderHistoryMessages(messages, personaId) {
       if (!messages || !messages.length) return;
       const p = PERSONAS[personaId];
       if (!p) return;
 
-      const initials = SESSION_USER.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
       const container = document.getElementById('messages');
       if (!container) return;
 
@@ -1565,7 +1589,7 @@
           fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
         }
 
-        const userAv = `<div class="avatar user-avatar" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
+        const userAv = userAvatarMarkup();
         const botAv = `<div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div>`;
 
         const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2229,7 +2253,6 @@
     function renderMessage(sender, text, proof, fraud, files) {
       const isUser = sender === 'USER';
       const p = PERSONAS[activePersona];
-      const initials = SESSION_USER.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
       const wrapper = document.createElement('div');
       wrapper.className = `msg-group ${isUser ? 'user' : 'bot'}`;
 
@@ -2278,7 +2301,7 @@
         }).join('');
       }
 
-      const userAvatarHTML = `<div class="avatar user-avatar" style="width:32px;height:32px;font-size:12px">${initials}</div>`;
+      const userAvatarHTML = userAvatarMarkup();
       const botAvatarHTML = `<div class="avatar" style="width:32px;height:32px;background:#efe8de;display:flex;align-items:center;justify-content:center;border-radius:50%;overflow:hidden;border:1px solid var(--border);flex-shrink:0">${p.avatar}</div>`;
 
       const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
@@ -3071,6 +3094,10 @@
             if (sb) sb.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
             const tb = document.getElementById('topbarUserIcon');
             if (tb) tb.innerHTML = img;
+            // Bubbles are usually already on screen by the time this resolves,
+            // so they need repainting too or the picture appears everywhere
+            // except beside the user's own messages.
+            refreshUserAvatars();
           }
         } catch (e) { /* offline — keep cached session rendering */ }
       })();
@@ -3318,6 +3345,7 @@
           if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
           const topbarUserIcon = document.getElementById('topbarUserIcon');
           if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+          refreshUserAvatars();
 
           showToast('Profile photo updated successfully!', 'success');
         } catch (err) {
