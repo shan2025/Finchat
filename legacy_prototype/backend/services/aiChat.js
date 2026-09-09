@@ -17,42 +17,116 @@ const GREETING_REPLIES = {
     "I'm the switchboard here — tell me the goal and I'll put the right desk on it.",
     "Good to see you. What are we solving? I'll route it to whoever's best at it.",
     "The floor's quiet and everyone's free. What do you want to get done?",
-    "Supervisor on deck. Give me a messy problem and I'll break it into clean pieces."
+    "Supervisor on deck. Give me a messy problem and I'll break it into clean pieces.",
+    "Four specialists downstairs, all idle. Give me something worth waking them for.",
+    "You don't have to know which agent you need — that's my job. Just say the goal.",
+    "I've got Aurelius on markets, Atlas on your portfolio, Rasha on careers, Nova on research. Pick a lane or describe the problem.",
+    "Think of me as the front desk with opinions. What's on your mind?",
+    "Big question or small one, I'll find it a home. Go ahead.",
+    "Ready to delegate. What's the thing you've been putting off?",
+    "Tell me what 'done' looks like and I'll work backwards from there.",
+    "At your service. Vague is fine — I'll ask the follow-ups."
   ],
   aurelius: [
     "Markets never sleep and neither do I. What are we looking at — a ticker, a sector, or a headline?",
     "Name a company and I'll tell you what's actually moving it, not what the chyron says.",
     "I hunt catalysts: policy, macro, money flows. Point me at something.",
-    "Ready when you are. Give me a symbol or a story and I'll dig for the why."
+    "Ready when you are. Give me a symbol or a story and I'll dig for the why.",
+    "Price is the last thing to know and the first thing everyone quotes. What do you actually want understood?",
+    "Give me a ticker. I'll come back with the catalyst, not the cheerleading.",
+    "Regulation, rates, geopolitics, or someone famous tweeting — every move has an author. Whose move are we reading?",
+    "I don't do hot tips and I don't do advice. I do evidence. What's the question?",
+    "Something rattling your watchlist today, or are we exploring?",
+    "Happy to argue with the consensus if you bring me a name.",
+    "Sector, stock, or macro — where do you want me to start digging?",
+    "The interesting story is usually two layers under the headline. Hand me a headline."
   ],
   atlas: [
     "Your portfolio's where you left it. Want today's read, or are we digging into a position?",
     "I watch the holdings so you don't have to refresh. Ask me how things are sitting.",
     "Steward reporting in. I can walk your risk, your drift, or your growth since you started.",
-    "No trades from me, ever — just an honest look at what you own. Where do we start?"
+    "No trades from me, ever — just an honest look at what you own. Where do we start?",
+    "I keep a daily snapshot, so 'am I actually growing' is a question I can answer with numbers instead of vibes.",
+    "Want the calm version or the concentrated-risk version? Both are true.",
+    "I'm the one who notices when a single position quietly becomes half your book.",
+    "Checking in on the holdings, or is something specific bothering you?",
+    "I can show you what changed since yesterday, since last week, or since day one.",
+    "Boring is a compliment in my line of work. Want to see how boring things look today?",
+    "Ask me what you own, what it's doing, or what's drifted out of shape.",
+    "On watch as always. What would you like me to look at?"
   ],
   rasha: [
     "Career desk. Are we hunting roles today, sharpening the resume, or prepping for a conversation?",
     "Tell me the job you want and I'll tell you the gap between here and there.",
     "I read job posts so you don't have to scroll. What kind of role are we after?",
-    "Ready to work on the next move. Applications, positioning, or interviews?"
+    "Ready to work on the next move. Applications, positioning, or interviews?",
+    "Product, BA, project management — say the title and the city and I'll go looking.",
+    "A resume is an argument, not a list. Want to sharpen yours?",
+    "I can search fresh postings, tailor your CV to one, or draft the note that goes with it.",
+    "Your next role probably exists already — it's just badly titled. Let's go find it.",
+    "Want me to check the job alerts sitting in your inbox?",
+    "Applications, interview prep, or the awkward salary conversation? I do all three.",
+    "Tell me where you are and where you'd rather be. I'll map the distance.",
+    "Nothing gets sent without your say-so — I only ever draft. So, what are we working on?"
   ],
   nova: [
     "Research bench is open. What should I go read for you?",
     "Papers, patents, preprints — give me a topic and I'll come back with the state of it.",
     "I like the questions nobody's answered yet. Got one?",
-    "Point me at a frontier — AI, bio, energy, space — and I'll map what's real versus hype."
+    "Point me at a frontier — AI, bio, energy, space — and I'll map what's real versus hype.",
+    "Ask me something you'd normally give up on after three tabs.",
+    "I'll read the paper so you can read the summary. What's the topic?",
+    "Half of what's announced this week won't replicate. Want help telling which half?",
+    "Curiosity is the whole job description. What are you curious about?",
+    "Give me a technology and I'll tell you where it actually is, not where the press release says.",
+    "I can go shallow and fast or deep and slow. Your call — what's the subject?",
+    "New field, old question, or something you read and didn't believe?",
+    "The bench is clear and the coffee's fresh. What are we investigating?"
   ],
   _default: [
     "I'm here and ready. What are we working on?",
     "Good to see you. Give me something to chew on.",
-    "All set on my end. What do you need?"
+    "All set on my end. What do you need?",
+    "Ready when you are — what's the task?",
+    "Say the word and I'll get started."
   ]
 };
 
-function greetingFor(personaId) {
+// A greeting sent at 2am shouldn't read the same as one sent over breakfast.
+// These are prepended to the persona line often enough to feel alive, rarely
+// enough that they don't become their own tic.
+const TIME_OPENERS = {
+  night:   ['Up late.', 'Burning the midnight oil, I see.', 'Late one tonight.'],
+  morning: ['Morning.', 'Good morning.', 'Early start.'],
+  evening: ['Evening.', 'Good evening.']
+};
+
+// Render runs in UTC, so the server clock says "morning" in the middle of the
+// user's afternoon. Cadence elsewhere in the system defaults to IST; this does
+// the same rather than greeting people in the wrong half of their day.
+const IST_OFFSET_MIN = 5 * 60 + 30;
+
+function timeBucket(date) {
+  const h = Math.floor(
+    (((date.getTime() / 60000) + IST_OFFSET_MIN) % 1440 + 1440) % 1440 / 60
+  );
+  if (h < 5) return 'night';
+  if (h < 12) return 'morning';
+  if (h >= 18) return 'evening';
+  return null;               // plain daytime gets no preamble
+}
+
+function pick(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function greetingFor(personaId, now = new Date()) {
   const pool = GREETING_REPLIES[String(personaId || '').toLowerCase()] || GREETING_REPLIES._default;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const line = pick(pool);
+  const bucket = timeBucket(now);
+  // Roughly one greeting in three picks up the time-of-day nod.
+  if (bucket && Math.random() < 0.34) return `${pick(TIME_OPENERS[bucket])} ${line}`;
+  return line;
 }
 
 // Matches a message that is ONLY a greeting: "hi", "helloo", "hey there",

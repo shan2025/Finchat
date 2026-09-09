@@ -94,7 +94,6 @@
   .fraud-notice { display:flex; align-items:center; gap:6px; font-size:11px; padding:5px 10px; border-radius:6px; margin-bottom:4px; font-weight:500; }
   .fraud-notice.high { background:#2d1215; color:#fca5a5; border:1px solid #7f1d1d; }
   .fraud-notice.medium { background:#2d2305; color:#fcd34d; border:1px solid #78350f; }
-  .fraud-notice.low { background:#052e16; color:#86efac; border:1px solid #14532d; }
 
   .msg-footer { display:flex; align-items:center; gap:6px; padding:0 4px; }
   .msg-group.user .msg-footer { justify-content:flex-end; }
@@ -2242,9 +2241,11 @@
         const icon = fraud.risk === 'HIGH' ? '🚨' : '⚠️';
         const label = fraud.risk === 'HIGH' ? 'Quarantined — High fraud risk' : 'Flagged — Suspicious content';
         fraudNotice = `<div class="fraud-notice ${cls}">${icon} ${label}</div>`;
-      } else if (isUser) {
-        fraudNotice = `<div class="fraud-notice low">✓ Verified clean</div>`;
       }
+      // Nothing is shown when Sentinel finds nothing. A green "Verified clean"
+      // badge used to sit under every message the user sent, which meant it
+      // carried no information and taught the eye to skip the row the flagged
+      // and quarantined notices appear in.
 
       let filesHTML = '';
       if (files && files.length) {
