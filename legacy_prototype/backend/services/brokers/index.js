@@ -63,16 +63,28 @@ function credsOf(row) {
 async function saveRow(userId, broker, { creds, label, status, error, holdingsCount }) {
   const existing = await getRow(userId, broker);
   const merged = { ...(credsOf(existing) || {}), ...(creds || {}) };
+  // holdings_count is NOT NULL with a default of 0, and a DEFAULT never applies
+  // to an explicitly supplied NULL — so the column has to be coalesced here.
+  // Connecting an account calls this before anything has been synced and passes
+  // no count at all, which is how the very first Connect press failed with
+  // "null value in column holdings_count violates not-null constraint".
+  //
+  // The two branches differ on purpose. On INSERT an unknown count is 0, because
+  // nothing has been fetched yet. On UPDATE it must fall back to the count
+  // ALREADY STORED, not to 0 — a later save that happens not to carry a count
+  // (recording an error, say) would otherwise report the portfolio as empty.
+  // That is why the SET clause reads $8 directly rather than EXCLUDED, which
+  // would already have been coalesced to 0 by the VALUES clause.
   await query(`
     INSERT INTO broker_connections
       (connection_id, user_id, broker, credentials_enc, account_label, status, last_error, holdings_count)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8, 0))
     ON CONFLICT (user_id, broker) DO UPDATE SET
       credentials_enc = EXCLUDED.credentials_enc,
       account_label   = COALESCE(EXCLUDED.account_label, broker_connections.account_label),
       status          = EXCLUDED.status,
       last_error      = EXCLUDED.last_error,
-      holdings_count  = COALESCE(EXCLUDED.holdings_count, broker_connections.holdings_count),
+      holdings_count  = COALESCE($8, broker_connections.holdings_count),
       updated_at      = now()
   `, [uuidv4(), userId, broker, seal(JSON.stringify(merged)), label || null,
     status || 'connected', error || null, holdingsCount ?? null]);

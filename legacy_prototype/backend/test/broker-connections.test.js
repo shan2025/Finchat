@@ -83,6 +83,30 @@ describe('a Binance key that can act on the account is refused', () => {
   });
 });
 
+describe('saving a connection', () => {
+  // The first Connect press in production failed with:
+  //   null value in column "holdings_count" of relation "broker_connections"
+  //   violates not-null constraint
+  // holdings_count is NOT NULL DEFAULT 0, and a DEFAULT does not apply to an
+  // explicitly supplied NULL — which is exactly what connecting sends, because
+  // nothing has been synced yet.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'services/brokers/index.js'), 'utf8');
+
+  test('an unknown holdings count inserts as 0 rather than NULL', () => {
+    assert.match(src, /VALUES \([^)]*COALESCE\(\$8, 0\)\)/,
+      'the INSERT must coalesce holdings_count — a NOT NULL column cannot take an explicit NULL');
+  });
+
+  test('a re-save with no count keeps the count already stored', () => {
+    // Must read $8, not EXCLUDED: the VALUES clause has already turned an
+    // unknown count into 0, so EXCLUDED would reset a synced portfolio to empty
+    // every time a connection is saved for some other reason (recording an
+    // error, refreshing a token).
+    assert.match(src, /holdings_count\s*=\s*COALESCE\(\$8, broker_connections\.holdings_count\)/,
+      'the UPDATE branch must fall back to the stored count, via the parameter rather than EXCLUDED');
+  });
+});
+
 describe('the Zerodha login round-trip', () => {
   test('the checksum is sha256(api_key + request_token + api_secret)', () => {
     // Kite rejects the exchange outright if this is wrong, and the failure
