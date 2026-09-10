@@ -63,7 +63,7 @@ async function extractEntities(text, { userId = null, agentId = null } = {}) {
  * catch below stays as a safety net (e.g. anon rows with a NULL user_id, which
  * the composite constraint treats as distinct).
  */
-async function upsertEntity({ name, type, userId = null }) {
+async function upsertEntity({ name, type, userId = null, ownerAgent = null }) {
   const canonical = name.trim();
   const t = (type || 'topic').toLowerCase();
   // The id MUST include the owner. It used to be derived from name+type alone, so
@@ -76,13 +76,16 @@ async function upsertEntity({ name, type, userId = null }) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await query(`
-        INSERT INTO entities (entity_id, canonical_name, entity_type, user_id, mention_count, last_seen_at)
-        VALUES ($1, $2, $3, $4, 1, now())
+        INSERT INTO entities (entity_id, canonical_name, entity_type, user_id, owner_agent, mention_count, last_seen_at)
+        VALUES ($1, $2, $3, $4, $5, 1, now())
         ON CONFLICT (user_id, canonical_name, entity_type) DO UPDATE
           SET mention_count = entities.mention_count + 1,
-              last_seen_at = now()
+              last_seen_at = now(),
+              -- First agent to learn a node owns it; a later agent touching the
+              -- same node must not steal it (matches MemoryEngine's COALESCE).
+              owner_agent = COALESCE(entities.owner_agent, EXCLUDED.owner_agent)
         RETURNING entity_id
-      `, [id, canonical, t, userId]);
+      `, [id, canonical, t, userId, ownerAgent]);
 
       return res.rows[0]?.entity_id || id; // the id that actually survived the upsert
     } catch (err) {
@@ -142,16 +145,17 @@ async function ingestExecution(execution) {
   // The execution knows who it belongs to; everything it produces is theirs —
   // including the tokens spent extracting it.
   const userId = execution.user_id || execution.userId || null;
-  const raw = await extractEntities(text, {
-    userId,
-    agentId: execution.assigned_agent || execution.agentId || null
-  });
+  // The agent that ran this execution owns whatever it learned — so the node
+  // lands in THAT agent's cortex (owner_agent), not as an unowned NULL row that
+  // no agent's brain can see.
+  const ownerAgent = execution.assigned_agent || execution.agentId || null;
+  const raw = await extractEntities(text, { userId, agentId: ownerAgent });
   if (raw.length === 0) return [];
 
   const ids = [];
   for (const e of raw) {
     try {
-      const id = await upsertEntity({ ...e, userId });
+      const id = await upsertEntity({ ...e, userId, ownerAgent });
       if (id) ids.push(id);
     } catch (err) {
       console.warn(`⚠️ EntityGraph upsertEntity failed for "${e.name}": ${err.message}`);

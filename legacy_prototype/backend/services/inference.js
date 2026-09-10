@@ -10,6 +10,9 @@ const quota = require('./QuotaManager');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+// Whether a local model is actually reachable from THIS host. See the `ollama`
+// entry in PROVIDERS for why this is opt-in rather than inferred.
+const OLLAMA_ENABLED = String(process.env.OLLAMA_ENABLED || '').toLowerCase() === 'true';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 // Groq enforces its free-tier token allowance PER MODEL PER DAY, so when the
@@ -145,7 +148,42 @@ const PROVIDERS = [
     baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions',
     models: (process.env.OPENROUTER_MODELS || 'meta-llama/llama-3.3-70b-instruct:free')
       .split(',').map(s => s.trim()).filter(Boolean)
-  }
+  },
+  // Ollama — a model running on the operator's OWN machine, reached through its
+  // OpenAI-compatible /v1 endpoint so it needs no new call path.
+  //
+  // Opt-in by design. OLLAMA_URL defaults to localhost, which on a cloud host is
+  // the app's own container and not any machine running Ollama, so routing to it
+  // unconditionally would spend a connection attempt per call on every deploy
+  // that has no local model. OLLAMA_ENABLED is the operator saying "there really
+  // is one here" — which is only ever true in local development, or with
+  // OLLAMA_URL pointed at a tunnel to a desktop that is awake.
+  //
+  // It sits LAST in every route below rather than leading: a 3B local model is a
+  // safety net under the cloud providers, not a replacement for them. An agent
+  // that genuinely wants to run locally pins itself with
+  // `runtime_settings.provider` (see CognitiveCore), which fronts it for that
+  // agent alone.
+  ...(OLLAMA_ENABLED ? [{
+    name: 'ollama',
+    style: 'openai',
+    baseUrl: `${OLLAMA_URL}/v1/chat/completions`,
+    models: (process.env.OLLAMA_MODELS || OLLAMA_MODEL)
+      .split(',').map(s => s.trim()).filter(Boolean),
+    // Nothing authenticates against a local daemon. Without this the credential
+    // pool resolves empty and the provider is skipped exactly like one with no
+    // API key — see `keyless` in the routing loop.
+    keyless: true,
+    // Local hardware is slower than a datacenter, and the ceiling that fits a
+    // cloud provider truncates a CPU-bound local run mid-answer. This is the
+    // same 120s the legacy fallback below already allowed.
+    timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS) || 120000,
+    // Deliberately NOT acceptsModelOverride. The `model` argument and the
+    // trivial-workload hints both carry GROQ model ids ("openai/gpt-oss-20b"),
+    // which a local daemon answers 404 for. Ollama serves what OLLAMA_MODELS
+    // names and nothing else.
+    acceptsModelOverride: false
+  }] : [])
 ];
 
 // (Key usability now lives in QuotaManager, which owns credential resolution —
@@ -411,7 +449,7 @@ function _trimMessages(messages, maxCharsPerMessage) {
  * trim and fallback logic below is written once and reused for all of them —
  * only the base URL, key and model name differ.
  */
-async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperature, jsonMode, style }) {
+async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperature, jsonMode, style, timeoutMs = 45000 }) {
   if (style === 'gemini') return _callGemini({ baseUrl, apiKey, model, messages, temperature, jsonMode });
 
   const response = await axios.post(
@@ -427,7 +465,9 @@ async function _callChatCompletions({ baseUrl, apiKey, model, messages, temperat
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      timeout: 45000
+      // Per-provider, because a model on the operator's own CPU is far slower
+      // than a datacenter one and the cloud-shaped ceiling truncates it.
+      timeout: timeoutMs
     }
   );
   return response;
@@ -534,7 +574,7 @@ async function _callGemini({ baseUrl, apiKey, model, messages, temperature, json
 async function _runProviderChain({
   providerName, baseUrl, apiKey, credentialId, models, messages, temperature, jsonMode,
   feature, agentId, userId, startedAt, rateLimited = false, style = 'openai',
-  patient = true
+  patient = true, timeoutMs = 45000
 }) {
   const distinct = models.filter((m, i, arr) => m && arr.indexOf(m) === i);
 
@@ -595,7 +635,8 @@ async function _runProviderChain({
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const response = await _callChatCompletions({
-          baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode, style
+          baseUrl, apiKey, model: gModel, messages: payload, temperature, jsonMode, style,
+          timeoutMs
         });
         const gUsage = response.data.usage || {};
         const cachedTokens = _cachedTokensFrom(gUsage);
@@ -731,7 +772,7 @@ async function _runProviderChain({
 async function runInference({
   messages, provider = 'groq', model, temperature = 0.7, jsonMode = false,
   byokKey, byokProvider = 'groq', feature = 'chat', workload = null,
-  agentId = null, userId = null, onlyProvider = null
+  agentId = null, userId = null, onlyProvider = null, preferProvider = null
 }) {
   const _startedAt = Date.now();
 
@@ -785,9 +826,18 @@ async function runInference({
   if (effectiveWorkload === 'vision') route = route.filter(cfg => cfg.visionModels);
   // Move the user's role-assigned provider to the front so their chosen key
   // serves this work; everything else keeps its order as fallback.
-  if (preferredProvider) {
-    const lead = route.filter(cfg => cfg.name === preferredProvider);
-    if (lead.length) route = [...lead, ...route.filter(cfg => cfg.name !== preferredProvider)];
+  //
+  // The AGENT's own pin (`runtime_settings.provider`) is applied second, so it
+  // ends up in front of the user's. That order is deliberate and is not a
+  // ranking of whose preference matters more: a user's role assignment says
+  // which of their KEYS should pay, while an agent's pin is part of what the
+  // agent IS — an agent configured to keep its work on a local model stops
+  // being that agent the moment a cloud provider answers for it. Both remain
+  // orders rather than exclusions, so neither can strand a run with no answer.
+  for (const preferred of [preferredProvider, preferProvider]) {
+    if (!preferred) continue;
+    const lead = route.filter(cfg => cfg.name === preferred);
+    if (lead.length) route = [...lead, ...route.filter(cfg => cfg.name !== preferred)];
   }
   const patient = !IMPATIENT_WORKLOADS.has(effectiveWorkload);
   // A caller that named a model always wins; the hint only fills the gap for
@@ -810,7 +860,24 @@ async function runInference({
     // spent their allowance — see UserKeys / QuotaManager.
     const userKey = userKeys[cfg.name] ||
       ((byokKey && cfg.name === byokProvider) ? byokKey : null);
-    const credentials = quota.resolveCredentials(cfg.name, { agentId, userKey, allowSystem });
+    // A keyless provider (a local Ollama daemon) has no credential to resolve,
+    // so it gets a synthetic one — otherwise an empty pool would skip it exactly
+    // like a provider with no API key configured.
+    //
+    // It is deliberately sourced as `system`, and therefore deliberately subject
+    // to `allowSystem`. Local compute is a resource the OPERATOR provides, which
+    // makes it the shared pool by another name: without this, enabling Ollama on
+    // a hosted deployment would silently retire the BYOK cap below, because a
+    // capped user would always find one provider still willing to answer.
+    //
+    // `onlyProvider` re-admits it despite setting allowSystem=false: that flag
+    // exists so a BYOK key being validated cannot be answered by a shared key
+    // standing in for it, and a keyless local daemon has no key to stand in for.
+    // Without this, probeProviders could never reach Ollama at all.
+    const credentials = cfg.keyless
+      ? ((allowSystem || onlyProvider === cfg.name)
+          ? [{ id: 'local:ollama', key: 'ollama', source: 'system' }] : [])
+      : quota.resolveCredentials(cfg.name, { agentId, userKey, allowSystem });
     if (credentials.length === 0) continue;
 
     // An explicit `model` argument names a Groq model, so it leads Groq's list
@@ -839,7 +906,8 @@ async function runInference({
         messages, temperature, jsonMode, feature, agentId, userId,
         startedAt: _startedAt,
         rateLimited: !!cfg.rateLimited,
-        patient
+        patient,
+        timeoutMs: cfg.timeoutMs
       });
       if (result) return result;
     }
@@ -872,53 +940,71 @@ async function runInference({
   if (effectiveWorkload === 'vision') {
     throw new Error('No vision-capable provider available (route: vision)');
   }
-  try {
-    const response = await axios.post(
-      `${OLLAMA_URL}/api/chat`,
-      {
-        model: model || OLLAMA_MODEL,
-        messages,
-        stream: false,
-        format: jsonMode ? 'json' : undefined,
-        options: {
-          temperature
-        }
-      },
-      { timeout: 120000 }
-    );
-    const oPrompt = response.data.prompt_eval_count || 0;
-    const oCompletion = response.data.eval_count || 0;
-    const oModel = model || OLLAMA_MODEL;
-    recordInferenceMetric({
-      provider: 'ollama', model: oModel, feature,
-      promptTokens: oPrompt, completionTokens: oCompletion,
-      latencyMs: Date.now() - _startedAt, agentId, userId
-    });
-    return {
-      content: response.data.message?.content || '',
-      provider: 'ollama',
-      model: oModel,
-      tokens: oPrompt + oCompletion,
-      promptTokens: oPrompt,
-      completionTokens: oCompletion
-    };
-  } catch (err) {
-    // Name the providers actually tried. The old message claimed "across
-    // providers" while Groq was the only one configured, which sent every
-    // investigation of this failure off in the wrong direction.
-    const tried = attempted.length ? attempted.join(', ') : 'none configured';
-    const unconfigured = PROVIDERS
-      .filter(c => quota.resolveCredentials(c.name, { agentId }).length === 0)
-      .map(c => c.name);
-    // Naming what is currently rate-limited-out matters as much as what has no
-    // key: "tried: groq, gemini" reads like an outage when the real answer is
-    // that both allowances are spent until midnight.
-    const spent = quota.listSpent();
-    console.error(`❌ All AI inference providers failed (tried: ${tried}; ollama: ${err.message})` +
-      (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : '') +
-      (spent.length ? ` — allowance spent: ${spent.map(s => `${s.provider}/${s.model}`).join(', ')}` : ''));
-    throw new Error(`AI Inference unavailable across providers (tried: ${tried}).`);
+  // With OLLAMA_ENABLED the local daemon is a first-class provider and has
+  // already had its turn in the loop above, with the retry, trimming and
+  // dead-model handling every other provider gets. Falling through to this
+  // legacy path as well would call the same daemon a second time, bare — and on
+  // a 120s timeout that is two minutes of dead air to reach the same failure.
+  //
+  // Why this legacy path survives at all rather than being deleted now that
+  // `ollama` is a registered provider: it speaks Ollama's NATIVE /api/chat, and
+  // it runs with no OLLAMA_ENABLED and no configuration of any kind. That is
+  // what makes a fresh local checkout with a running daemon work on the first
+  // try. The registered provider is the deliberate, routable version of the same
+  // thing; this is the accident that rescues a developer who set nothing up.
+  let localErr = null;
+  if (!attempted.includes('ollama')) {
+    try {
+      const response = await axios.post(
+        `${OLLAMA_URL}/api/chat`,
+        {
+          model: model || OLLAMA_MODEL,
+          messages,
+          stream: false,
+          format: jsonMode ? 'json' : undefined,
+          options: {
+            temperature
+          }
+        },
+        { timeout: 120000 }
+      );
+      const oPrompt = response.data.prompt_eval_count || 0;
+      const oCompletion = response.data.eval_count || 0;
+      const oModel = model || OLLAMA_MODEL;
+      recordInferenceMetric({
+        provider: 'ollama', model: oModel, feature,
+        promptTokens: oPrompt, completionTokens: oCompletion,
+        latencyMs: Date.now() - _startedAt, agentId, userId
+      });
+      return {
+        content: response.data.message?.content || '',
+        provider: 'ollama',
+        model: oModel,
+        tokens: oPrompt + oCompletion,
+        promptTokens: oPrompt,
+        completionTokens: oCompletion
+      };
+    } catch (err) {
+      localErr = err;
+    }
   }
+
+  // Name the providers actually tried. The old message claimed "across
+  // providers" while Groq was the only one configured, which sent every
+  // investigation of this failure off in the wrong direction.
+  const tried = attempted.length ? attempted.join(', ') : 'none configured';
+  const unconfigured = PROVIDERS
+    .filter(c => !c.keyless && quota.resolveCredentials(c.name, { agentId }).length === 0)
+    .map(c => c.name);
+  // Naming what is currently rate-limited-out matters as much as what has no
+  // key: "tried: groq, gemini" reads like an outage when the real answer is
+  // that both allowances are spent until midnight.
+  const spent = quota.listSpent();
+  console.error(`❌ All AI inference providers failed (tried: ${tried}` +
+    (localErr ? `; ollama: ${localErr.message}` : '') + ')' +
+    (unconfigured.length ? ` — no API key set for: ${unconfigured.join(', ')}` : '') +
+    (spent.length ? ` — allowance spent: ${spent.map(s => `${s.provider}/${s.model}`).join(', ')}` : ''));
+  throw new Error(`AI Inference unavailable across providers (tried: ${tried}).`);
 }
 
 /**
@@ -953,7 +1039,11 @@ async function probeProviders({ live = false, vision = false } = {}) {
     const creds = quota.resolveCredentials(cfg.name, { allowSystem: true });
     const row = {
       provider: cfg.name,
-      configured: creds.length > 0,
+      // A keyless provider is configured by being ENABLED, not by holding a key —
+      // reporting Ollama as unconfigured because it has no credential would be
+      // the exact opposite of what an operator reading this needs to know.
+      configured: cfg.keyless ? true : creds.length > 0,
+      keyless: !!cfg.keyless,
       // Never the key itself — this endpoint is reachable with the cron secret.
       credentials: creds.map(c => c.id),
       models: cfg.models,
@@ -972,7 +1062,9 @@ async function probeProviders({ live = false, vision = false } = {}) {
           workload: wantsImage ? 'vision' : 'probe',
           feature: 'probe',
           onlyProvider: cfg.name,
-          byokKey: creds[0].key,       // onlyProvider uses the supplied key alone
+          // onlyProvider uses the supplied key alone. A keyless provider has
+          // none to supply and resolves its own synthetic credential instead.
+          byokKey: creds[0] ? creds[0].key : undefined,
           byokProvider: cfg.name,
           temperature: 0
         });

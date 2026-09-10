@@ -947,13 +947,21 @@
     let personaBalances = JSON.parse(localStorage.getItem(LOCAL_BAL_KEY) || 'null');
     // Literal rather than derived from PERSONAS: this runs above that
     // declaration, so reading it here would hit the temporal dead zone.
-    if (!personaBalances || !personaBalances.plato || !personaBalances.atlas) {
+    // The `hopper` check is what re-seeds a browser holding a balance map from
+    // before that agent existed — without it a returning user keeps the old
+    // five-key object and the new agent shows an undefined balance forever.
+    if (!personaBalances || !personaBalances.plato || !personaBalances.atlas
+        || !personaBalances.hopper) {
       personaBalances = {
         plato: 1000,
         aurelius: 1000,
         atlas: 1000,
         rasha: 1000,
-        nova: 1000
+        nova: 1000,
+        hopper: 1000,
+        // Preserve whatever the browser already had, so re-seeding for a new
+        // agent does not reset the balances of the existing ones.
+        ...(personaBalances || {})
       };
       localStorage.setItem(LOCAL_BAL_KEY, JSON.stringify(personaBalances));
     }
@@ -1025,8 +1033,22 @@
       aurelius: { name: 'Aurelius', avatar: '<img src="aurelius_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Risk & Compliance Officer', color: '#4f46e5' },
       atlas: { name: 'Atlas', avatar: '<img src="atlas_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Portfolio Steward & Daily Risk Watch', color: '#2f6f5e' },
       rasha: { name: 'Rasha', avatar: '<img src="rasha_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Executive Career Strategist', color: '#ec4899' },
-      nova: { name: 'Nova', avatar: '<img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Frontier Science & Technology Researcher', color: '#059669' }
+      nova: { name: 'Nova', avatar: '<img src="nova_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">', desc: 'Frontier Science & Technology Researcher', color: '#059669' },
+      // Inline SVG rather than a PNG like the others: there is no hopper_avatar.png,
+      // and a missing <img> renders as a broken-image icon in the rail instead of
+      // an avatar. Matches the SVG in backend/services/personas.js.
+      hopper: { name: 'Hopper', avatar: '<svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#232b34"/><path d="M32 34 L20 50 L32 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 34 L80 50 L68 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="58" y1="28" x2="42" y2="72" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/></svg>', desc: 'Systems Diagnostician', color: '#8fb8de' }
     };
+    // The "[Agent] " prefix the backend puts in front of a stored reply.
+    //
+    // Derived from PERSONAS because the roster was previously written out as a
+    // literal alternation in four separate places. Adding an agent meant editing
+    // all four, and missing one does not throw — it leaves that agent's replies
+    // showing a raw "[Hopper] " prefix in one view and clean in another, which
+    // reads as a formatting glitch rather than a stale list.
+    const PERSONA_PREFIX_RE = new RegExp(
+      '^\\[(' + [...Object.keys(PERSONAS), 'System'].join('|') + ')\\]\\s*', 'i');
+
     let activePersona = 'plato';
     let personaSessions = {};   // { personaId: sessionId }
     let personaHistories = {};  // { personaId: [messagesHTML] }
@@ -1186,6 +1208,18 @@
             { icon: 'hub', title: 'Map technology dependencies', desc: 'Trace architectural vectors across AI and decentralized protocols.', prompt: 'Map technology dependencies. Trace architectural vectors across AI and decentralized protocols.' },
             { icon: 'biotech', title: 'Evaluate technical feasibility', desc: 'Analyze algorithmic complexity and hardware constraints.', prompt: 'Evaluate technical feasibility. Analyze algorithmic complexity and hardware constraints.' },
             { icon: 'biotech', title: 'Run literature review', desc: 'Gather comparative benchmarks across modern consensus mechanisms.', prompt: 'Run literature review. Gather comparative benchmarks across modern consensus mechanisms.' }
+          ]
+        },
+        hopper: {
+          title: 'What is misbehaving?',
+          subtitle: 'Ask what broke, how often, and why — answered from the system\'s own failure record, not from memory.',
+          badgeBg: '#e4ecf4',
+          badgeText: '#37536e',
+          cards: [
+            { icon: 'bug_report', title: 'What is failing?', desc: 'Cluster the last two weeks of failures and rank them by how often they happen.', prompt: 'What is failing? Read the diagnostics for the last 14 days, cluster the failures by error pattern, and tell me which one to fix first and why.' },
+            { icon: 'monitor_heart', title: 'Is everything working?', desc: 'Check every agent for real: configured, able to deliver, and completing runs.', prompt: 'Is everything working? Check the system status of every agent and report honestly — do not describe an agent by what it is designed to do.' },
+            { icon: 'troubleshoot', title: 'Diagnose one failure', desc: 'Take the biggest cluster, read the run in full, and trace it into the code.', prompt: 'Take the largest failure cluster from the last 14 days, read one of its executions in full, then read the code it points at and tell me the root cause with the file and line.' },
+            { icon: 'speed', title: 'Why is it slow?', desc: 'Check provider latency and which models are carrying the load.', prompt: 'Why is the system slow? Check inference provider latency and volume for the last 14 days and tell me where the time is actually going.' }
           ]
         }
       };
@@ -1548,9 +1582,9 @@
 
       messages.forEach(msg => {
         const rawContent = msg.content || '[message]';
-        const isBotMsg = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system' || msg.message_type === 'system' || /^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]/i.test(rawContent) || (msg.sender_id && msg.sender_id !== SESSION_USER.id);
+        const isBotMsg = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system' || msg.message_type === 'system' || PERSONA_PREFIX_RE.test(rawContent) || (msg.sender_id && msg.sender_id !== SESSION_USER.id);
         const isUser = !isBotMsg && msg.role === 'user';
-        const cleanContent = rawContent.replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '');
+        const cleanContent = rawContent.replace(PERSONA_PREFIX_RE, '');
 
         const wrapper = document.createElement('div');
         wrapper.className = `msg-group ${isUser ? 'user' : 'bot'}`;
@@ -1809,7 +1843,7 @@
         const data = await res.json();
         const text = (data.messages || []).map(m => {
           const who = m.role === 'user' ? 'You' : (data.persona?.name || m.persona || 'Agent');
-          return `${who}: ${(m.content || '').replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '')}`;
+          return `${who}: ${(m.content || '').replace(PERSONA_PREFIX_RE, '')}`;
         }).join('\n\n');
         const ok = await copyText(text);
         showToast(ok ? 'Conversation copied to clipboard' : 'Copy failed', ok ? 'info' : 'warn');
@@ -2267,7 +2301,7 @@
       const readReceipt = isUser ? `<span class="read-receipt" id="read-${proof.height}">✓</span>` : '';
       const chainStatus = `<span class="chain-status pending" id="msg-chain-${proof.height}">⏳</span>`;
 
-      const cleanText = isUser ? (text || '') : (text || '').replace(/^\[(Plato|Aurelius|Atlas|Rasha|Nova|System)\]\s*/i, '');
+      const cleanText = isUser ? (text || '') : (text || '').replace(PERSONA_PREFIX_RE, '');
 
       wrapper.innerHTML = `
     <div class="msg-row">
@@ -2578,7 +2612,9 @@
       // which could only ever have surfaced as an agent appearing to lose its
       // mind. The names susheel/sona/vishnu are retired personas kept here only
       // so an old deep link cannot fall through to nothing.
-      const isPersonaChat = ['susheel', 'sona', 'vishnu', 'plato', 'aurelius', 'atlas', 'rasha', 'nova'].includes(activePersona);
+      // The legacy demo personas plus every real agent, taken from PERSONAS so a
+      // new agent is not silently excluded from the persona chat path.
+      const isPersonaChat = ['susheel', 'sona', 'vishnu', ...Object.keys(PERSONAS)].includes(activePersona);
 
       if (isPersonaChat) {
         // ── AI Persona Chat via Backend API ──

@@ -244,6 +244,17 @@
             </div>
           </div>
 
+          <!-- Hopper -->
+          <!-- Inline SVG rather than a PNG: there is no hopper_avatar.png, and a
+               missing <img> renders as a broken-image icon rather than an avatar. -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-hopper" onclick="selectAgent('hopper')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant"><svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#232b34"/><path d="M32 34 L20 50 L32 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 34 L80 50 L68 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="58" y1="28" x2="42" y2="72" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/></svg></span>
+            <div>
+              <div class="font-bold text-base">Hopper</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Systems Diagnostician</div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -405,7 +416,11 @@
   // State
   let currentAgent = 'plato';
   let agentConfigs = JSON.parse(localStorage.getItem('finchat_agent_configs') || 'null');
-  if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato || !agentConfigs.atlas) {
+  // Each new agent adds its own key to this guard, so a browser holding a config
+  // map from before that agent existed is re-seeded rather than left with an
+  // undefined entry the sliders then read as NaN.
+  if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato || !agentConfigs.atlas
+      || !agentConfigs.hopper) {
     agentConfigs = {
       plato: { risk: 'High', formal: 85, brief: 20, serious: 90 },
       aurelius: { risk: 'Low', formal: 70, brief: 40, serious: 80 },
@@ -413,7 +428,14 @@
       // the roster — low risk, plain-spoken, and serious about what it reports.
       atlas: { risk: 'Low', formal: 70, brief: 35, serious: 90 },
       rasha: { risk: 'Low', formal: 65, brief: 30, serious: 75 },
-      nova: { risk: 'Low', formal: 80, brief: 15, serious: 95 }
+      nova: { risk: 'Low', formal: 80, brief: 15, serious: 95 },
+      // Diagnosis is the one job here where inventiveness is the failure mode,
+      // so: lowest risk, terse, and entirely serious. Mirrors runtime_settings
+      // in migration 047.
+      hopper: { risk: 'Low', formal: 60, brief: 55, serious: 95 },
+      // Spread LAST so re-seeding for a new agent adds the missing key without
+      // discarding sliders the user has already tuned for the existing ones.
+      ...(agentConfigs || {})
     };
     localStorage.setItem('finchat_agent_configs', JSON.stringify(agentConfigs));
   }
@@ -457,8 +479,10 @@
     const capitalized = agent.charAt(0).toUpperCase() + agent.slice(1);
     document.getElementById('configTitle').textContent = `Agent Configuration: ${capitalized}`;
 
-    // Update left card styles
-    ['plato', 'aurelius', 'atlas', 'rasha', 'nova'].forEach(a => {
+    // Update left card styles. Taken from the config map rather than written out
+    // again, so the highlight follows the roster instead of needing its own edit
+    // — a card left off this list stays visually unselected when clicked.
+    Object.keys(agentConfigs).forEach(a => {
       const card = document.getElementById('card-' + a);
       if (card) {
         if (a === agent) {

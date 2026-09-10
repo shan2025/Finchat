@@ -201,6 +201,7 @@ async function _runWithinStallClock({
   let agentTraits = null;
   let agentTemperature = 0.7;
   let agentModel = null;
+  let agentProvider = null;
   let agentBudget = {};
   // This agent's tool domain, so the prompt advertises the tools it is actually
   // for rather than all 18. Read from the same config load, not a second query.
@@ -214,6 +215,14 @@ async function _runWithinStallClock({
       const RISK_TEMP = { Low: 0.3, Medium: 0.7, High: 1.0 };
       if (RISK_TEMP[agentTraits.risk] != null) agentTemperature = RISK_TEMP[agentTraits.risk];
       if (typeof agentTraits.model === 'string' && agentTraits.model.trim()) agentModel = agentTraits.model.trim();
+      // An agent that must run on a particular provider — the local-model case,
+      // where routing the work to a cloud vendor defeats the point of the agent.
+      // A PREFERENCE, not a lock: inference.js fronts it and keeps the rest of
+      // the route as fallback, so a pinned agent still answers when its provider
+      // is down rather than going dark.
+      if (typeof agentTraits.provider === 'string' && agentTraits.provider.trim()) {
+        agentProvider = agentTraits.provider.trim();
+      }
       if (agentTraits.budget && typeof agentTraits.budget === 'object') agentBudget = agentTraits.budget;
     }
   } catch (cfgErr) {
@@ -505,6 +514,7 @@ async function _runWithinStallClock({
       // unattributed row is invisible to the person who actually paid for it.
       const result = await reason({
         messages, temperature: agentTemperature, model: agentModel, workload,
+        preferProvider: agentProvider,
         userId, agentId: agentName
       });
       lastProvider = result.provider || lastProvider;

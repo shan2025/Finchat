@@ -248,27 +248,53 @@ router.get('/', requireAuth, async (req, res) => {
     // starts blank so it's yours to build.
     const isSystem = mapId === SYSTEM_MAP;
 
+    // Optional agent scope: /api/neural-map?agent=rasha returns ONLY that agent's
+    // own knowledge (owner_agent), UNCAPPED — powers the Universe "Open Brain"
+    // per-agent map so its node count reflects the agent's whole cortex, not the
+    // top-120 System Map slice. Only meaningful on the system map (custom maps
+    // carry no derived entities). Still user-scoped, so it can never leak.
+    const agentScope = (isSystem && typeof req.query.agent === 'string' && req.query.agent.trim())
+      ? req.query.agent.trim() : null;
+
+    const entCols = `entity_id, canonical_name, entity_type, mention_count,
+                     summary, importance, confidence, activation_count, last_activated_at, owner_agent, community_id`;
+    const entsSql = agentScope
+      ? `SELECT ${entCols} FROM entities
+         WHERE status = 'active' AND user_id = $1 AND owner_agent = $2
+         ORDER BY importance DESC, mention_count DESC LIMIT 1000`
+      : `SELECT ${entCols} FROM entities
+         WHERE status = 'active' AND user_id = $1
+         ORDER BY importance DESC, mention_count DESC LIMIT 120`;
+    const entsParams = agentScope ? [userId, agentScope] : [userId];
+
+    const edgesSql = agentScope
+      ? `SELECT ee.from_entity_id, ee.to_entity_id, ee.edge_type, ee.weight, ee.strength, ee.reason, ee.source
+         FROM entity_edges ee
+         JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1 AND ef.owner_agent = $2
+         JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1 AND et.owner_agent = $2
+         ORDER BY ee.strength DESC, ee.weight DESC LIMIT 2000`
+      : `SELECT ee.from_entity_id, ee.to_entity_id, ee.edge_type, ee.weight, ee.strength, ee.reason, ee.source
+         FROM entity_edges ee
+         JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1
+         JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1
+         ORDER BY ee.strength DESC, ee.weight DESC LIMIT 400`;
+    const edgesParams = agentScope ? [userId, agentScope] : [userId];
+
     const [agentsQ, entsQ, entEdgesQ, chainQ, customNodesQ, customEdgesQ, nodeMetaQ, edgeMetaQ, userQ] =
       await Promise.all([
         query(`SELECT ac.agent_id, a.name, ac.capabilities, ac.tools, ac.runtime_settings, ac.memory_namespace
                FROM agent_configs ac JOIN agents a ON a.agent_id = ac.agent_id
                ORDER BY ac.agent_id`),
-        // The knowledge layer is PER USER. This used to select every active entity
-        // with no owner filter, which is why every account opened the identical
-        // "master" map and saw topics mined from other people's chats. Rows with a
-        // NULL user_id are pre-ownership legacy data and belong to nobody, so they
-        // stay hidden rather than being shown to everyone.
-        query(`SELECT entity_id, canonical_name, entity_type, mention_count,
-                      summary, importance, confidence, activation_count, last_activated_at, owner_agent, community_id
-               FROM entities WHERE status = 'active' AND user_id = $1
-               ORDER BY importance DESC, mention_count DESC LIMIT 120`, [userId]),
-        // Edges are constrained to those whose BOTH endpoints belong to this user,
-        // so a legacy cross-user edge cannot drag a foreign node onto the map.
-        query(`SELECT ee.from_entity_id, ee.to_entity_id, ee.edge_type, ee.weight, ee.strength, ee.reason, ee.source
-               FROM entity_edges ee
-               JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1
-               JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1
-               ORDER BY ee.strength DESC, ee.weight DESC LIMIT 400`, [userId]),
+        // The knowledge layer is PER USER (and optionally PER AGENT — see
+        // agentScope above). This used to select every active entity with no owner
+        // filter, which is why every account opened the identical "master" map and
+        // saw topics mined from other people's chats. NULL user_id rows are
+        // pre-ownership legacy data and belong to nobody, so they stay hidden.
+        query(entsSql, entsParams),
+        // Edges are constrained to those whose BOTH endpoints belong to this user
+        // (and, when agent-scoped, to this agent), so a legacy cross-user edge
+        // cannot drag a foreign node onto the map.
+        query(edgesSql, edgesParams),
         query(`SELECT COUNT(*)::int AS total_blocks,
                       COUNT(*) FILTER (WHERE solana_confirmed = 1)::int AS anchored,
                       COALESCE(MAX(chain_height), 0) AS max_height
@@ -409,6 +435,10 @@ router.get('/', requireAuth, async (req, res) => {
         type: 'entity',
         note: e.summary || `Learned from your conversations. Mentioned ${e.mention_count} time${e.mention_count === 1 ? '' : 's'}.`,
         meta,
+        // First-class owner so the client can filter to one agent's brain
+        // (the Universe → "Open Brain" agent-scoped view). Also drives the
+        // "curated by <agent>" label.
+        ownerAgent: e.owner_agent || null,
         apis: [],
         derived: true,
         // Living-node payload for the Cognitive Memory Engine UI

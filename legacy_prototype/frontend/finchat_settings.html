@@ -270,6 +270,7 @@
    dirty: false,
    prefs: {}, serverChannels: {}, waStatus: {}, deliveries: [],
    gStatus: {},
+   brokers: null, // { available, connections, zerodhaRedirectUri }
    chain: null, blocks: [],
    providers: null, // { catalogue, keys, access, referral }
    addKeyRows: 1,   // how many blank "add a key" rows are showing
@@ -602,6 +603,7 @@
    return `
    <div class="set-sec-head"><h2>Connected accounts</h2><p>Outside services FinChat may read on your behalf. Each one states exactly what it can see; you can disconnect at any time.</p></div>
    ${gmailCard}
+   ${secBrokers()}
    <div>
      <h3 style="font-family:var(--serif); font-size:17px; margin:0 0 12px; color:var(--text);">Available</h3>
      <div style="display:flex; flex-direction:column; gap:10px;">
@@ -610,6 +612,112 @@
            <div class="rc"><div class="rt">${name}</div><div class="rd">${desc}</div></div>
            <button class="sb sb-secondary" data-connect="${esc(name)}">${state.connectRequested[name] ? 'Requested' : 'Connect'}</button>
          </div>`).join('')}
+     </div>
+   </div>`;
+ }
+
+ // ── Brokerage accounts ──
+ // Atlas can only watch what he can see. These two cards are the difference
+ // between a portfolio someone maintains by hand (which nobody does) and their
+ // actual positions.
+ //
+ // The honesty in this UI is deliberate and load-bearing: each card states what
+ // FinChat can and cannot do with the account, and the Zerodha card says plainly
+ // that its data goes stale every morning — because that is a property of the
+ // broker, and finding out later feels like the app lying.
+ function brokerCard(b, conn) {
+   const stale = conn && conn.lastSyncedAt
+     ? Math.round((Date.now() - new Date(conn.lastSyncedAt).getTime()) / 36e5) : null;
+   const tag = !conn ? ''
+     : conn.status === 'connected' ? '<span class="stag stag-on">connected</span>'
+       : conn.status === 'needs_login' ? '<span class="stag stag-warn">needs daily login</span>'
+         : '<span class="stag stag-danger">error</span>';
+
+   const meta = conn ? `
+     <div style="display:flex; gap:26px; margin-top:16px; font-size:12px; color:var(--text-3); flex-wrap:wrap;">
+       ${conn.account ? `<span>Account <b style="color:var(--text); font-weight:600;">${esc(conn.account)}</b></span>` : ''}
+       <span>Positions <b style="color:var(--text); font-weight:600;">${conn.holdingsCount || 0}</b></span>
+       <span>Last synced <b style="color:var(--text); font-weight:600;">${conn.lastSyncedAt ? fmtTime(conn.lastSyncedAt) + (stale != null && stale >= 1 ? ` · ${stale}h ago` : '') : 'never'}</b></span>
+     </div>
+     ${conn.lastError ? `<div class="rd" style="margin-top:10px; color:var(--danger);">${esc(conn.lastError)}</div>` : ''}` : '';
+
+   const can = b.broker === 'binance'
+     ? ['Read your spot balances.', 'Trade, withdraw, transfer or place any order. The key is rejected at connect time if it can.']
+     : ['Read your equity holdings.', 'Place orders, or refresh itself — Zerodha clears the session every morning and only you can log back in.'];
+
+   const permissions = `
+     <div class="set-grid2" style="margin-top:18px;">
+       <div style="background:rgba(79,138,82,.1); border-radius:var(--radius); padding:13px 16px;">
+         <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ok); margin-bottom:5px;">Can</div>
+         <div style="font-size:12.5px; color:var(--text);">${can[0]}</div>
+       </div>
+       <div style="background:rgba(176,71,46,.09); border-radius:var(--radius); padding:13px 16px;">
+         <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--danger); margin-bottom:5px;">Cannot</div>
+         <div style="font-size:12.5px; color:var(--text);">${can[1]}</div>
+       </div>
+     </div>`;
+
+   if (conn) {
+     return `
+     <div class="set-card" style="padding:22px;">
+       <div style="display:flex; align-items:flex-start; gap:14px;">
+         <div style="flex:1; min-width:0;">
+           <div style="display:flex; align-items:center; gap:10px;">
+             <span style="font-size:16px; font-weight:700; color:var(--text);">${esc(b.label)}</span>${tag}
+           </div>
+           <div style="font-size:13px; color:var(--text-2); margin-top:4px;">${esc(b.note || '')}</div>
+         </div>
+         <div style="display:flex; gap:8px; flex-shrink:0;">
+           ${b.broker === 'zerodha' ? '<button class="sb sb-primary" data-broker-login="zerodha">Log in for today</button>' : ''}
+           <button class="sb sb-secondary" data-broker-sync="${esc(b.broker)}">Sync now</button>
+           <button class="sb sb-danger" data-broker-del="${esc(b.broker)}">Disconnect</button>
+         </div>
+       </div>
+       ${permissions}
+       ${meta}
+     </div>`;
+   }
+
+   const form = b.broker === 'binance' ? `
+     <div class="set-grid2" style="margin-top:14px;">
+       <input class="set-input" id="bnKey" placeholder="API key" autocomplete="off" spellcheck="false">
+       <input class="set-input" id="bnSecret" type="password" placeholder="API secret" autocomplete="off" spellcheck="false">
+     </div>
+     <div class="rd" style="margin-top:10px;">
+       Create the key at <b>Binance → API Management</b> with <b>Enable Reading</b> only, and no IP restriction
+       (FinChat runs on shared hosting with no fixed outbound address). A key with trading or withdrawal permission is refused.
+     </div>
+     <button class="sb sb-primary" data-broker-connect="binance" style="margin-top:14px;">Connect Binance</button>` : `
+     <div class="set-grid2" style="margin-top:14px;">
+       <input class="set-input" id="kiteKey" placeholder="Kite API key" autocomplete="off" spellcheck="false">
+       <input class="set-input" id="kiteSecret" type="password" placeholder="Kite API secret" autocomplete="off" spellcheck="false">
+     </div>
+     <div class="rd" style="margin-top:10px;">
+       Create a free <b>Personal</b> app at <b>developers.kite.trade</b> — it covers holdings at no cost — and set its redirect URL to
+       <span style="font-family:var(--mono); color:var(--accent-warm);">${esc(state.brokers && state.brokers.zerodhaRedirectUri || '')}</span>.
+       Zerodha then asks you to log in once a day; until you do, your equity holdings stay at their last synced values and Atlas will say so.
+     </div>
+     <button class="sb sb-primary" data-broker-connect="zerodha" style="margin-top:14px;">Connect Zerodha</button>`;
+
+   return `
+   <div class="set-card" style="border-style:dashed; padding:20px;">
+     <div style="font-size:14.5px; font-weight:600; color:var(--text);">${esc(b.label)}</div>
+     <div style="font-size:12.5px; color:var(--text-3); margin-top:2px;">Not connected. ${esc(b.note || '')}</div>
+     ${form}
+   </div>`;
+ }
+
+ function secBrokers() {
+   const d = state.brokers;
+   if (!d) return '<div class="set-card" style="padding:20px;"><div class="rd">Loading brokerage accounts…</div></div>';
+   const byId = {};
+   for (const c of (d.connections || [])) byId[c.broker] = c;
+   return `
+   <div style="margin-top:26px;">
+     <h3 style="font-family:var(--serif); font-size:17px; margin:0 0 6px; color:var(--text);">Brokerage accounts</h3>
+     <div class="rd" style="margin-bottom:12px;">Read-only links to where your money actually sits. Atlas prices these every day; nothing here can place a trade.</div>
+     <div style="display:flex; flex-direction:column; gap:12px;">
+       ${(d.available || []).map(b => brokerCard(b, byId[b.broker])).join('')}
      </div>
    </div>`;
  }
@@ -863,6 +971,71 @@
    } catch (e) { state.gStatus = { configured: false }; }
    if (state.section === 'connections') renderSection();
  }
+ async function loadBrokers() {
+   try {
+     const r = await fetch(API + '/api/brokers', { headers: AUTH });
+     state.brokers = r.ok ? await r.json() : { available: [], connections: [] };
+   } catch (e) { state.brokers = { available: [], connections: [] }; }
+   if (state.section === 'connections') renderSection();
+ }
+
+ // ── Brokerage actions ──
+ async function connectBroker(broker) {
+   if (broker === 'binance') {
+     const apiKey = ($('bnKey') || {}).value, apiSecret = ($('bnSecret') || {}).value;
+     if (!apiKey || !apiSecret) return showToast('Paste both the API key and the secret');
+     showToast('Checking the key is read-only…');
+     try {
+       const r = await fetch(API + '/api/brokers/binance', {
+         method: 'POST', headers: AUTH, body: JSON.stringify({ apiKey: apiKey.trim(), apiSecret: apiSecret.trim() })
+       });
+       const d = await r.json();
+       if (!r.ok) throw new Error(d.error || 'failed');
+       showToast(`Binance connected — ${(d.sync && d.sync.holdings) || 0} position(s) synced.`);
+       await loadBrokers();
+     } catch (e) { showToast(e.message); }
+     return;
+   }
+   // Zerodha: store the app credentials, then hand the browser to Kite for the
+   // login. The session that comes back is only good until tomorrow morning.
+   const apiKey = ($('kiteKey') || {}).value, apiSecret = ($('kiteSecret') || {}).value;
+   if (!apiKey || !apiSecret) return showToast('Paste both the Kite API key and the secret');
+   try {
+     const r = await fetch(API + '/api/brokers/zerodha/app', {
+       method: 'POST', headers: AUTH, body: JSON.stringify({ apiKey: apiKey.trim(), apiSecret: apiSecret.trim() })
+     });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'failed');
+     window.location.href = d.loginUrl;
+   } catch (e) { showToast(e.message); }
+ }
+
+ async function zerodhaLogin() {
+   try {
+     const d = await (await fetch(API + '/api/brokers/zerodha/login', { headers: AUTH })).json();
+     if (!d.loginUrl) throw new Error(d.error || 'could not build the login link');
+     window.location.href = d.loginUrl;
+   } catch (e) { showToast(e.message); }
+ }
+
+ async function syncBroker(broker) {
+   showToast('Refreshing positions…');
+   try {
+     const d = await (await fetch(API + `/api/brokers/${broker}/sync`, { method: 'POST', headers: AUTH })).json();
+     showToast(d.ok ? `Synced ${d.holdings} position(s).`
+       : (d.reason === 'needs_login' ? 'Zerodha needs today\'s login before it can refresh.' : (d.message || 'Sync failed')));
+     await loadBrokers();
+   } catch (e) { showToast(e.message); }
+ }
+
+ async function disconnectBroker(broker) {
+   try {
+     const d = await (await fetch(API + '/api/brokers/' + broker, { method: 'DELETE', headers: AUTH })).json();
+     showToast(`Disconnected — ${d.holdingsRemoved || 0} position(s) removed from your portfolio.`);
+     await loadBrokers();
+   } catch (e) { showToast(e.message); }
+ }
+
  async function loadChain() {
    try {
      const [s, b] = await Promise.all([
@@ -1093,10 +1266,18 @@
  }
  function reportOAuthOutcome() {
    const q = new URLSearchParams(location.search);
-   const g = q.get('google'); if (!g) return;
+   const g = q.get('google');
+   const z = q.get('zerodha');
+   if (!g && !z) return;
    if (g === 'connected') showToast('Gmail connected' + (q.get('account') ? ' — ' + q.get('account') : ''));
    else if (g === 'cancelled') showToast('Gmail connection cancelled');
-   else showToast('Gmail connection failed: ' + (q.get('reason') || 'unknown error'));
+   else if (g) showToast('Gmail connection failed: ' + (q.get('reason') || 'unknown error'));
+
+   // Kite sends the browser back here after the daily login.
+   if (z === 'connected') showToast(`Zerodha connected — ${q.get('holdings') || 0} holding(s) synced. Kite clears the session each morning, so you'll log in again tomorrow.`);
+   else if (z === 'cancelled') showToast('Zerodha login cancelled');
+   else if (z) showToast('Zerodha login failed: ' + (q.get('reason') || 'unknown error'));
+
    history.replaceState({}, '', location.pathname);
    state.section = 'connections';
  }
@@ -1148,6 +1329,10 @@
    if (t.id === 'testBtn' || t.closest('#testBtn')) return sendTest();
    if (t.id === 'logoutBtn' || t.closest('#logoutBtn')) return logout();
    if ((el = t.closest('[data-gmail]'))) return el.dataset.gmail === 'connect' ? connectGoogle() : askDisconnectGmail();
+   if ((el = t.closest('[data-broker-connect]'))) return connectBroker(el.dataset.brokerConnect);
+   if ((el = t.closest('[data-broker-login]'))) return zerodhaLogin();
+   if ((el = t.closest('[data-broker-sync]'))) return syncBroker(el.dataset.brokerSync);
+   if ((el = t.closest('[data-broker-del]'))) return disconnectBroker(el.dataset.brokerDel);
    if ((el = t.closest('[data-ai-save]'))) return saveProviderKey(el.dataset.aiSave);
    if ((el = t.closest('[data-ai-addrow]'))) return addKeyRow();
    if ((el = t.closest('[data-ai-rmrow]'))) return removeKeyRow();
@@ -1201,6 +1386,7 @@
  refreshUser();
  loadPrefs();
  loadIntegrations();
+ loadBrokers();
  loadChain();
  loadProviders();
 </script>

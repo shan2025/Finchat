@@ -638,15 +638,15 @@ async function detectGaps({ userId = null } = {}) {
 // ═══════════════════════════════════════════════════════════
 
 /** Merge duplicate nodes that share a name across types (keeps the most-mentioned). */
-async function mergeDuplicates() {
+async function mergeDuplicates(userId = null) {
   // Grouping must include user_id. Without it this would treat two DIFFERENT
   // users' same-named nodes as duplicates and merge one person's memory into
   // another's — the most destructive form of the cross-user bug.
   const dupes = await query(`
     SELECT LOWER(canonical_name) AS lname, array_agg(entity_id ORDER BY mention_count DESC, created_at ASC) AS ids
-    FROM entities WHERE status = 'active'
+    FROM entities WHERE status = 'active' AND ($1::text IS NULL OR user_id = $1)
     GROUP BY user_id, LOWER(canonical_name) HAVING COUNT(*) > 1
-  `);
+  `, [userId]);
   const merged = [];
   for (const row of dupes.rows) {
     const [survivor, ...losers] = row.ids;
@@ -739,26 +739,34 @@ async function mergeEntityPair(survivor, loser) {
  * The graph-wide half of a dream cycle: merge duplicate nodes, fade stale
  * edges, strengthen recently-replayed ones.
  *
- * Split out from dream() so a sweep over every user runs it once rather than
- * once per user — merging is idempotent and the two UPDATEs are unfiltered
- * table sweeps, so repeating them per user is pure waste. See dreamAllUsers().
+ * Split out from dream() so the nightly sweep over every user runs it once
+ * rather than once per user — merging is idempotent and an unscoped run is a
+ * whole-table sweep, so repeating it per user is pure waste. See
+ * dreamAllUsers(), which is the only caller that leaves userId null.
+ *
+ * Pass a userId for anything a person triggered. "Consolidate now" on the
+ * Knowledge page is one user asking to tidy THEIR graph: unscoped, it faded
+ * thousands of edges belonging to other accounts and then reported that count
+ * back as if it were theirs.
  */
-async function consolidateGraph() {
-  const merged = await mergeDuplicates();
+async function consolidateGraph(userId = null) {
+  const merged = await mergeDuplicates(userId);
 
   // Edges untouched for 14+ days slowly fade (never below 0.05 — memories dim, not vanish)
   const decayed = await query(`
     UPDATE entity_edges SET strength = GREATEST(0.05, strength * 0.9)
     WHERE COALESCE(last_activated_at, updated_at) < now() - interval '14 days' AND strength > 0.05
+      AND ($1::text IS NULL OR user_id = $1)
     RETURNING edge_id
-  `);
+  `, [userId]);
 
   // Edges activated in the last day consolidate (like sleep replay)
   const strengthened = await query(`
     UPDATE entity_edges SET strength = LEAST(1.0, strength + 0.05)
     WHERE last_activated_at > now() - interval '1 day'
+      AND ($1::text IS NULL OR user_id = $1)
     RETURNING edge_id
-  `);
+  `, [userId]);
 
   return {
     merged,
@@ -791,7 +799,7 @@ async function consolidateGraph() {
 async function dream({ userId = null, consolidation = null, nameCommunities = true } = {}) {
   const startedAt = new Date().toISOString();
 
-  const { merged, edgesDecayed, edgesStrengthened } = consolidation || await consolidateGraph();
+  const { merged, edgesDecayed, edgesStrengthened } = consolidation || await consolidateGraph(userId);
 
   const gaps = await detectGaps({ userId });
 

@@ -19,7 +19,8 @@ const fs = require('fs');
 const path = require('path');
 
 const {
-  listTools, getToolNames, ADVANCED_SYSTEM_TOOLS, ADMIN_AGENT_ID
+  listTools, getToolNames, ADVANCED_SYSTEM_TOOLS, ADMIN_AGENT_ID,
+  HOST_ACCESS_TOOLS, systemToolsFor, DIAGNOSTIC_AGENT_ID, HOPPER_HOST_TOOLS
 } = require('../services/cognitive/ToolRegistry');
 
 const RESTRICTED = [...ADVANCED_SYSTEM_TOOLS];
@@ -105,5 +106,50 @@ describe('permission is checked before approval is requested', () => {
       'bash must remain an advanced system tool');
     assert.strictEqual(ADMIN_AGENT_ID, 'plato',
       'the admin agent id must match migration 026');
+  });
+});
+
+// The diagnostician is the first agent to hold any ADVANCED_SYSTEM_TOOL other
+// than the admin, so the boundary of that grant is worth pinning down: reading
+// code is the whole job, changing the host is emphatically not.
+describe('the diagnostician reads code but does not touch the host', () => {
+  const hopperTools = () => listTools({ agentId: DIAGNOSTIC_AGENT_ID }).map(t => t.name);
+
+  test('it is offered the reading pair', () => {
+    const names = hopperTools();
+    for (const tool of ['file_read', 'glob']) {
+      assert.ok(names.includes(tool),
+        `"${tool}" must be available to ${DIAGNOSTIC_AGENT_ID} — a diagnosis it cannot ` +
+        'read the code for is a guess');
+    }
+  });
+
+  test('host-access tools stay off unless an operator opted in', () => {
+    const granted = systemToolsFor(DIAGNOSTIC_AGENT_ID);
+    for (const tool of HOST_ACCESS_TOOLS) {
+      assert.strictEqual(granted.has(tool), HOPPER_HOST_TOOLS,
+        `"${tool}" must follow HOPPER_HOST_TOOLS exactly — it is unsandboxed host ` +
+        'access, and on an ephemeral filesystem a write also silently disappears');
+    }
+  });
+
+  test('the grant does not leak to any other agent', () => {
+    for (const agentId of ['nova', 'aurelius', 'rasha', 'atlas']) {
+      const granted = systemToolsFor(agentId);
+      assert.strictEqual(granted.size, 0,
+        `"${agentId}" must hold no advanced system tools`);
+    }
+  });
+
+  test('it stays scoped to its own domain — the grant is not admin status', () => {
+    // Reaching into ADVANCED_SYSTEM_TOOLS must not also buy the orchestrator's
+    // exemption from per-agent tool scoping.
+    const names = listTools({
+      agentId: DIAGNOSTIC_AGENT_ID,
+      agentTools: ['diagnostics', 'file_read', 'glob']
+    }).map(t => t.name);
+    assert.ok(!names.includes('portfolio'),
+      'a scoped diagnostician must not be shown tools outside its domain');
+    assert.ok(names.includes('diagnostics'), 'its own domain must survive scoping');
   });
 });

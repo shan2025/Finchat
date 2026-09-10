@@ -2,7 +2,8 @@
 const { query } = require('../../database');
 const { cacheGet, cacheSet, redisCommand } = require('../redis');
 const {
-  getToolMeta, ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID
+  getToolMeta, ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID,
+  systemToolsFor
 } = require('./ToolRegistry');
 
 // Tool implementation map — maps tool names to their execute() functions
@@ -32,6 +33,8 @@ const TOOL_IMPLEMENTATIONS = {
   gmail: require('../../tools/GmailTool'),
   notifications: require('../../tools/NotificationsTool'),
   neural_map: require('../../tools/NeuralMapTool'),
+  system_status: require('../../tools/SystemStatusTool'),
+  diagnostics: require('../../tools/DiagnosticsTool'),
   apply_draft: require('../../tools/ApplyDraftTool'),
   bash: require('../../tools/BashTool'),
   file_read: require('../../tools/FileReadTool'),
@@ -79,8 +82,13 @@ async function checkPermission(agentId, toolName) {
   // to check, so it is denied rather than waved through as a system-level call.
   if (!agentId) return !hostAccess;
 
-  // Hardcode restriction: Only the admin agent can use advanced system tools for now
-  if (ADVANCED_SYSTEM_TOOLS.has(toolName) && agentId !== ADMIN_AGENT_ID) {
+  // Advanced system tools are granted per agent — the admin holds all of them,
+  // the diagnostician holds the read-only pair (and the writing ones only where
+  // an operator opted in), everyone else holds none. Asking ToolRegistry rather
+  // than re-deriving the rule keeps this in step with what listTools SHOWS an
+  // agent; the two drifting apart is what produced approval cards for calls that
+  // could never have run.
+  if (ADVANCED_SYSTEM_TOOLS.has(toolName) && !systemToolsFor(agentId).has(toolName)) {
     return false;
   }
 

@@ -148,7 +148,7 @@ function parseActionResponse(rawContent) {
  * @returns {Promise<{ action: object, raw: string, provider: string, model: string, retried: boolean, fallback: boolean }>}
  */
 async function reason({ messages, temperature = 0.7, model = null, workload = 'chat',
-                       userId = null, agentId = null }) {
+                       userId = null, agentId = null, preferProvider = null }) {
   // First attempt: call LLM with JSON mode
   let firstResult;
   try {
@@ -161,6 +161,8 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
       // and interactive chat draw on different pools. See WORKLOAD_ROUTES.
       workload,
       feature: workload,
+      // The agent's pinned provider, if it has one, fronts that route.
+      preferProvider,
       userId,
       agentId
     });
@@ -174,6 +176,7 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
         model,
         workload,
         feature: workload,
+        preferProvider,
         userId,
         agentId
       });
@@ -235,6 +238,7 @@ async function reason({ messages, temperature = 0.7, model = null, workload = 'c
       model,
       workload,
       feature: workload,
+      preferProvider,
       userId,
       agentId
     });

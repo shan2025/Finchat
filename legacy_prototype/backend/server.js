@@ -250,6 +250,7 @@ app.use('/api/search', require('./routes/search'));
 app.use('/api/missions', require('./routes/missions'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/integrations', require('./routes/integrations'));
+app.use('/api/brokers', require('./routes/brokers'));
 app.use('/api/group-chat', require('./routes/groupChat'));
 app.use('/api/blockchain', require('./routes/blockchain'));
 app.use('/api/knowledge', require('./routes/knowledge'));
@@ -466,8 +467,20 @@ server.listen(PORT, async () => {
     console.error('Note: could not ensure avatar_url column:', err.message);
   }
 
-  // Ensure system persona rows exist to satisfy foreign key constraints on messages table
-  const personasToSeed = ['PLATO', 'AURELIUS', 'RASHA', 'NOVA', 'SYSTEM', 'plato', 'aurelius', 'rasha', 'nova', 'system'];
+  // Ensure system persona rows exist to satisfy foreign key constraints on messages table.
+  //
+  // Derived from the persona roster, NOT a hand-written list. That list was
+  // written when there were four agents and never updated: Atlas shipped with a
+  // config row, a prompt and working tools, but no users row — so every reply he
+  // produced died on messages_sender_id_fkey when routes/aiChat.js stored it as
+  // sender 'ATLAS'. The user's question was already committed by then, so the
+  // chat showed the question with no answer and no error, while the execution
+  // record said the run had completed naturally. Adding an agent must never
+  // again require remembering this line.
+  const { personas } = require('./services/personas');
+  const personasToSeed = [...Object.keys(personas), 'system']
+    .flatMap(id => [id.toLowerCase(), id.toUpperCase()]);
+  const seedFailures = [];
   for (const pid of personasToSeed) {
     try {
       await query(`
@@ -475,7 +488,14 @@ server.listen(PORT, async () => {
         VALUES ($1, $2, $3, 'system', 999999)
         ON CONFLICT (user_id) DO NOTHING
       `, [pid, `${pid}_${Date.now()}_sys@system.finchat.local`, pid.toUpperCase()]);
-    } catch (e) {}
+    } catch (e) {
+      seedFailures.push(`${pid}: ${e.message}`);
+    }
+  }
+  // Loudly, because the symptom of a missing row is an agent that looks healthy
+  // and silently swallows every answer it writes.
+  if (seedFailures.length) {
+    console.error(`❌ Persona identity rows could not be seeded — those agents cannot deliver messages:\n   ${seedFailures.join('\n   ')}`);
   }
 
   // Init Solana devnet connection + auto-airdrop

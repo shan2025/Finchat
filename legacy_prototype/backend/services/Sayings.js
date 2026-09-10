@@ -17,7 +17,12 @@
 
 const { query } = require('../database');
 
-const AGENTS = new Set(['plato', 'aurelius', 'atlas', 'rasha', 'nova']);
+// Derived from the persona roster rather than hand-written. The hand-written
+// version was correct for exactly as long as the roster it was copied from:
+// adding an agent left it out silently, and a saying that is silently never
+// picked looks like a feature nobody uses rather than a list nobody updated.
+// This is the same trap server.js documents for the `users` identity rows.
+const AGENTS = new Set(Object.keys(require('./personas').personas));
 
 // Words too common to mean anything as a topic key. Matching on these would
 // make every learned line "relevant" to every question, which is the same as

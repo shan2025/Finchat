@@ -82,6 +82,34 @@ Respond in JSON format:
  */
 function determineDelegationTarget(message) {
   const lower = message.toLowerCase();
+  // Hopper is checked FIRST, ahead of every domain specialist, because a
+  // question about a FAULT usually names the domain it broke in: "why is my
+  // stock alert failing" contains an Aurelius trigger, "my job mission errored"
+  // contains a Rasha one, and both would be answered by a specialist that has no
+  // way to look at the failure — which is the exact shape of the bug this agent
+  // exists to end (an agent describing what it is FOR when asked why it broke).
+  //
+  // Kept narrow to earn that position: these are words about something being
+  // wrong, not words about code. "How do I write a mission" stays with Plato.
+  if (
+    lower.includes('hopper') ||
+    lower.includes('broken') ||
+    lower.includes('not working') ||
+    lower.includes('stopped working') ||
+    // 'fail' rather than 'failing'/'failed' as separate entries: the stem covers
+    // fail, fails, failed, failing and failure in one, and the two-word version
+    // missed the plainest phrasing of all — "why did my mission fail".
+    lower.includes('fail') ||
+    lower.includes('error') ||
+    lower.includes('crash') ||
+    lower.includes('debug') ||
+    lower.includes('diagnose') ||
+    lower.includes('root cause') ||
+    lower.includes('what went wrong') ||
+    lower.includes('why did it fail')
+  ) {
+    return 'hopper';
+  }
   // Atlas is checked before Aurelius on purpose: "review my investments" and
   // "how are my holdings doing" both contain Aurelius triggers ("invest"), but
   // a question about the user's OWN positions belongs to the steward who has

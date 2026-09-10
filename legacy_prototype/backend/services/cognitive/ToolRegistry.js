@@ -188,11 +188,11 @@ const TOOLS = {
 
   portfolio: {
     name: 'portfolio',
-    description: 'The user\'s ACTUAL holdings, priced live — unlike "watchlist", which is only what they follow. {"action":"value"} is the full review: market value, cost basis, unrealized P/L, each position\'s weight, allocation by asset class, and concentration flags. Use it for any question about their holdings, allocation or "how am I doing". {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove". {"action":"history","days":30} answers the GROWTH question from recorded daily snapshots: change since the last snapshot, over 7 and 30 days, the peak value, the drawdown from that peak, and which positions moved the total. Every "value" call records that day\'s snapshot, so call "value" first and "history" for the trend — never estimate past performance from memory. If it is empty, ask what they hold rather than reviewing a hypothetical portfolio as theirs. Records and prices only: it NEVER buys, sells or places an order.',
+    description: 'The user\'s ACTUAL holdings, priced live and reported in INR (₹) — unlike "watchlist", which is only what they follow. Positions come from their CONNECTED BROKERAGE ACCOUNTS (Binance, Zerodha) as well as anything recorded by hand; each holding carries "heldAt" saying which, and the result carries a "sources" list with how fresh each account is. {"action":"value"} is the full review: it refreshes the accounts that can refresh unattended, then returns market value, cost basis, unrealized P/L, each position\'s weight, allocation by asset class, concentration flags and the freshness of every source. Use it for any question about their holdings, allocation or "how am I doing", and REPORT STALENESS whenever the flags mention it — Zerodha can only be refreshed by the user logging in, so its numbers are often from the last sync. {"action":"sync"} forces a refresh of every connected account and reports per-broker outcomes, including which need the user to log in again. {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove" (manual entries only; a broker-reported position cannot be deleted by hand). {"action":"history","days":30} answers the GROWTH question from recorded daily snapshots: change since the last snapshot, over 7 and 30 days, the peak value, the drawdown from that peak, and which positions moved the total — always read its "currency" field rather than assuming. Every "value" call records that day\'s snapshot, so call "value" first and "history" for the trend — never estimate past performance from memory. If it is empty and nothing is connected, tell the user they can connect an account in Settings or give you their holdings; never review a hypothetical portfolio as theirs. Reads and records only: it NEVER buys, sells or places an order, and the stored Binance key is verified incapable of trading.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', description: 'value | list | add | update | remove | history' },
+        action: { type: 'string', description: 'value | list | add | update | remove | history | sync' },
         days: { type: 'number', description: 'For history: how far back to read, default 90' },
         symbol: { type: 'string', description: 'Ticker or asset name, e.g. BTC, TSLA, gold' },
         kind: { type: 'string', description: 'crypto | stock | commodity | cash (auto-detected if omitted)' },
@@ -205,11 +205,14 @@ const TOOLS = {
     outputSchema: {
       type: 'object',
       properties: {
+        totalValueInr: { type: 'number', description: 'The headline number, in rupees' },
         totalValueUsd: { type: 'number' },
-        totalUnrealizedPnlUsd: { type: 'number' },
+        fxUsdInr: { type: 'number', description: 'The USD→INR rate used for this valuation' },
+        totalUnrealizedPnlInr: { type: 'number' },
         allocation: { type: 'object', description: 'Value and weight per asset class' },
-        holdings: { type: 'array', description: 'Per-position price, value, weight and P/L' },
-        flags: { type: 'array', description: 'Concentration and data-gap warnings to report honestly' },
+        holdings: { type: 'array', description: 'Per-position price, value, weight, P/L, and which account holds it' },
+        sources: { type: 'array', description: 'Per connected broker: status, last sync time, age in hours, and whether the user must log in again' },
+        flags: { type: 'array', description: 'Concentration, staleness and data-gap warnings to report honestly' },
         sinceLast: { type: 'object', description: 'For history: change since the previous snapshot' },
         drawdownFromPeakPct: { type: 'number', description: 'For history: how far below the recorded peak' },
         movers: { type: 'array', description: 'For history: positions ranked by how much they moved the total' }
@@ -396,6 +399,27 @@ const TOOLS = {
       }
     },
     cacheTTLSeconds: 0, // per-user, changes anytime — never cache
+    rateLimitPerMinute: 20
+  },
+
+  system_status: {
+    name: 'system_status',
+    description: 'Check whether the FinChat agents are ACTUALLY working, from live system state — not from what you remember about them. Returns, per agent: whether it is configured and addressable, whether it can deliver a reply at all, its recent runs and how many completed naturally, when it last answered this user in chat, and its standing tasks. Each agent carries a status of healthy | degraded | untested | broken with the specific problems behind it. Use this WHENEVER the user asks whether an agent or the system is working, why an agent did not answer, what the roster can do right now, or reports something as broken — the roster in your prompt describes what the agents are FOR, and says nothing about whether they are running. Input: {} for the whole roster, or {"agent":"atlas"} for one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent: { type: 'string', description: 'Optional: one agent id to check, e.g. "atlas", "aurelius", "rasha", "nova", "plato". Omit for all.' }
+      },
+      required: []
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        agents: { type: 'array', description: 'Per agent: status, problems[], configured, canDeliver, tools, runs, lastRun, chat, standingTasks' },
+        summary: { type: 'object', description: 'Agent ids grouped into broken / degraded / healthy / untested' }
+      }
+    },
+    cacheTTLSeconds: 0, // a health check that answers from cache is not a health check
     rateLimitPerMinute: 20
   },
 
@@ -612,6 +636,25 @@ const TOOLS = {
     rateLimitPerMinute: 4
   },
 
+  diagnostics: {
+    name: 'diagnostics',
+    description: 'Read the system\'s own failure record: runs clustered by error, budget breaches, failing tools, failing standing tasks, and provider latency. Read-only — it diagnoses, it does not repair. Input: {"scope":"failures"|"providers"|"tools"|"execution","days":7,"agent":"nova","execution_id":"exec_..."}. Start with "failures", then drill into one execution_id.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scope: {
+          type: 'string',
+          description: '"failures" (default: runs clustered by error), "providers" (inference latency and volume), "tools" (tool errors clustered), "execution" (one run in full — needs execution_id)'
+        },
+        days: { type: 'number', description: 'Look-back window in days, 1-90 (default 7)' },
+        agent: { type: 'string', description: 'Optional: restrict to one agent id' },
+        execution_id: { type: 'string', description: 'Required for scope "execution"' }
+      }
+    },
+    cacheTTLSeconds: 30,
+    rateLimitPerMinute: 20
+  },
+
   bash: {
     name: 'bash',
     // NOT sandboxed — the previous wording claimed a Docker container that does not
@@ -724,6 +767,45 @@ const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
 /** The one agent permitted to hold host-access tools. Must match migration 026. */
 const ADMIN_AGENT_ID = 'plato';
 
+// ── The diagnostician's narrower grant ───────────────────────────
+//
+// Hopper's job is to explain a failure and propose the patch, which needs to
+// READ code — file_read and glob — and nothing more. Those two are in
+// ADVANCED_SYSTEM_TOOLS (admin-only) but deliberately NOT in HOST_ACCESS_TOOLS:
+// they open files, they do not change the machine. Granting the pair is what
+// separates a diagnosis from a guess.
+//
+// The writing half stays off. On Render the filesystem is ephemeral and there is
+// no git or PR tool here, so a file_edit applied in production is written into a
+// container that is replaced on the next deploy and never reaches the repo — a
+// "fix" that reports success and silently disappears. Locally it is a real
+// workflow, so HOPPER_HOST_TOOLS=true opts in, and only there.
+const DIAGNOSTIC_AGENT_ID = 'hopper';
+const DIAGNOSTIC_READ_TOOLS = new Set(['file_read', 'glob']);
+const HOPPER_HOST_TOOLS =
+  String(process.env.HOPPER_HOST_TOOLS || '').toLowerCase() === 'true';
+
+/**
+ * Which ADVANCED_SYSTEM_TOOLS this agent may hold.
+ *
+ * A function rather than a constant because the answer is now per-agent: the
+ * admin holds all of them, the diagnostician holds the reading pair (plus the
+ * writing ones only where an operator has opted in), everyone else holds none.
+ * Both listTools (to hide) and ToolManager.checkPermission (to enforce) ask
+ * this, so the prompt an agent sees and the calls it may make cannot drift
+ * apart — which they did before, when agents were shown bash and then refused
+ * it mid-plan.
+ */
+function systemToolsFor(agentId) {
+  if (agentId === ADMIN_AGENT_ID) return ADVANCED_SYSTEM_TOOLS;
+  if (agentId === DIAGNOSTIC_AGENT_ID) {
+    return HOPPER_HOST_TOOLS
+      ? new Set([...DIAGNOSTIC_READ_TOOLS, ...HOST_ACCESS_TOOLS])
+      : DIAGNOSTIC_READ_TOOLS;
+  }
+  return new Set();
+}
+
 // Tools every agent keeps regardless of its configured domain.
 //
 // These are not a convenience: the RULES block in ContextBuilder ORDERS the
@@ -783,9 +865,15 @@ function listTools({ allowWeb = true, agentId = null, agentTools = null } = {}) 
     ? new Set([...agentTools, ...ALWAYS_AVAILABLE_TOOLS])
     : null;
 
+  // The system tools THIS agent may hold. Note this is separate from `isAdmin`
+  // above: the diagnostician earns file_read and glob without also inheriting
+  // the orchestrator's exemption from domain scoping — it stays scoped to its
+  // own tools like every other specialist.
+  const systemTools = systemToolsFor(agentId);
+
   return Object.values(TOOLS)
     .filter(t => allowWeb || !t.web)
-    .filter(t => isAdmin || !ADVANCED_SYSTEM_TOOLS.has(t.name))
+    .filter(t => !ADVANCED_SYSTEM_TOOLS.has(t.name) || systemTools.has(t.name))
     .filter(t => !scoped || scoped.has(t.name))
     .map(t => ({
       name: t.name,
@@ -804,5 +892,6 @@ function getToolNames() {
 
 module.exports = {
   TOOLS, getToolMeta, listTools, getToolNames,
-  ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID, ALWAYS_AVAILABLE_TOOLS
+  ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID, ALWAYS_AVAILABLE_TOOLS,
+  systemToolsFor, DIAGNOSTIC_AGENT_ID, DIAGNOSTIC_READ_TOOLS, HOPPER_HOST_TOOLS
 };
