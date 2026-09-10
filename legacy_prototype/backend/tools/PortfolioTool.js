@@ -362,6 +362,18 @@ async function execute(input, context = {}) {
       return null; // an unexpected currency is not silently treated as dollars
     };
 
+    // Every field here is re-sent to the model on each reasoning iteration, so
+    // the ones that are always null, always identical, or trivially derivable
+    // are pure cost. An 11-coin portfolio was spending ~1,000 tokens per turn on
+    // this array, which is what tipped a run over its budget mid-answer.
+    // Anything omitted is either stated once elsewhere (syncedAt lives on
+    // `sources`) or absent because it genuinely is not known.
+    const drop = (obj) => {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) if (v !== null && v !== undefined) out[k] = v;
+      return out;
+    };
+
     const priced = await Promise.all(all.map(async (h) => {
       const p = await priceHolding(h);
       const qty = num(h.quantity) || 0;
@@ -370,27 +382,30 @@ async function execute(input, context = {}) {
       const currency = (p.currency || h.currency || 'USD').toUpperCase();
       const value = p.price != null ? qty * p.price : null;
       const cost = h.avg_cost != null ? qty * num(h.avg_cost) : null;
-      return {
+      const source = h.source || 'manual';
+      return drop({
         symbol: h.symbol, kind: h.kind, quantity: qty,
         currency,
         price: round(p.price, p.price != null && p.price < 10 ? 4 : 2),
         change24hPct: p.changePercent != null ? round(p.changePercent) : null,
-        marketValue: round(value),
+        // The rupee value is the one every total is built from. The native
+        // figure is only worth spelling out when it is a different number.
+        marketValue: currency === BASE_CURRENCY ? null : round(value),
         marketValueInr: round(toInr(value, currency)),
-        costBasis: round(cost),
         costBasisInr: round(toInr(cost, currency)),
-        unrealizedPnl: value != null && cost != null ? round(value - cost) : null,
+        unrealizedPnlInr: value != null && cost != null ? round(toInr(value - cost, currency)) : null,
         unrealizedPnlPct: value != null && cost ? round(((value - cost) / cost) * 100) : null,
-        // Where the POSITION came from, and how old it is. Distinct from the
-        // price source below — a Zerodha holding priced live off Yahoo is a
-        // different claim from one carrying the broker's last-sync price.
-        heldAt: h.source || 'manual',
-        exchange: h.exchange || null,
-        syncedAt: h.synced_at || null,
-        priceSource: p.source,
-        priceStale: p.stale === true ? { asOf: p.asOf } : undefined,
+        // Which account holds it. `exchange` is only informative when it says
+        // something the source does not — NSE vs BSE matters, "BINANCE" under
+        // heldAt: binance does not.
+        heldAt: source,
+        exchange: h.exchange && h.exchange.toLowerCase() !== source.toLowerCase() ? h.exchange : null,
+        // Named only when it is NOT an ordinary live quote: a broker's
+        // last-sync price is a weaker claim and the agent must be able to see
+        // the difference.
+        priceStale: p.stale === true ? { source: p.source, asOf: p.asOf } : null,
         priceError: p.error
-      };
+      });
     }));
 
     const valued = priced.filter(p => p.marketValueInr != null);
