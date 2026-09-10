@@ -75,11 +75,59 @@ describe('a Binance key that can act on the account is refused', () => {
     }
   });
 
-  test('nothing in the Binance connector can place an order', () => {
+  test('nothing in the Binance connector can place an order or move funds', () => {
+    // This used to assert "GETs only", which was a proxy for the real rule and
+    // broke the moment reading the FUNDING wallet turned out to need a POST
+    // (/sapi/v1/asset/get-funding-asset is a read that Binance exposes as POST).
+    // A proxy that fails on a safe change trains people to weaken it, so the
+    // invariant is now stated directly: every endpoint this file touches must be
+    // on the read allowlist, and the dangerous paths must appear nowhere.
     const src = fs.readFileSync(path.join(__dirname, '..', 'services/brokers/binance.js'), 'utf8');
-    assert.equal(/axios\.post|axios\.delete|axios\.put/.test(src), false,
-      'the read-only connector must only ever issue GETs');
-    assert.equal(/\/api\/v3\/order/.test(src), false, 'no order endpoint may appear in this file');
+
+    const ALLOWED = [
+      '/api/v3/time',
+      '/api/v3/account',
+      '/sapi/v1/account/apiRestrictions',
+      '/sapi/v1/asset/get-funding-asset',
+      '/sapi/v1/simple-earn/flexible/position',
+      '/sapi/v1/simple-earn/locked/position'
+    ];
+    const used = [...src.matchAll(/['"`](\/(?:api|sapi)\/v\d\/[^'"`]*)['"`]/g)].map(m => m[1]);
+    for (const path_ of used) {
+      assert.ok(ALLOWED.includes(path_),
+        `"${path_}" is not on the read-only allowlist — adding an endpoint here is a deliberate decision, not an edit`);
+    }
+
+    for (const forbidden of ['/order', '/withdraw', '/transfer', '/redeem', '/subscribe', '/borrow', '/repay']) {
+      assert.equal(src.includes(forbidden), false,
+        `"${forbidden}" must not appear — this connector observes, it does not act`);
+    }
+  });
+});
+
+describe('every Binance wallet is counted, not just spot', () => {
+  // Reading only /api/v3/account under-reported the first real portfolio by 43%:
+  // 15.78 of 16.12 ADA sat in Earn and the whole BNB position in Funding, while
+  // Binance's own headline showed the total across wallets. The user sees one
+  // number in the app and a smaller one here, which reads as the tool lying.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'services/brokers/binance.js'), 'utf8');
+
+  test('funding and both Earn wallets are read', () => {
+    for (const ep of [
+      '/sapi/v1/asset/get-funding-asset',
+      '/sapi/v1/simple-earn/flexible/position',
+      '/sapi/v1/simple-earn/locked/position'
+    ]) {
+      assert.ok(src.includes(ep), `${ep} must be part of a balance read`);
+    }
+  });
+
+  test('a wallet that fails to load does not fail the whole sync', () => {
+    assert.match(src, /Promise\.allSettled/,
+      'losing one wallet should cost that wallet and a flag, not the portfolio — '
+      + 'an IP ban can strike part-way through the sequence');
+    assert.match(src, /walletsUnread|partial/,
+      'and the gap must be reported rather than silently producing a low total');
   });
 });
 

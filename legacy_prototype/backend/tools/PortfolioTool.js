@@ -400,6 +400,11 @@ async function execute(input, context = {}) {
         // heldAt: binance does not.
         heldAt: source,
         exchange: h.exchange && h.exchange.toLowerCase() !== source.toLowerCase() ? h.exchange : null,
+        // Present only when a position is split across a broker's wallets, e.g.
+        // "spot 0.333 + earn-locked 15.784". Worth its few characters: a coin
+        // locked in Earn cannot be sold today, which is exactly the kind of
+        // thing a daily risk watch owes the user.
+        wallets: h.note || null,
         // Named only when it is NOT an ordinary live quote: a broker's
         // last-sync price is a weaker claim and the agent must be able to see
         // the difference.

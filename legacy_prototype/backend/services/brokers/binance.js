@@ -197,41 +197,111 @@ async function verify(creds) {
   };
 }
 
+/** A signed POST. Only used to READ the funding wallet, which Binance exposes as POST. */
+async function signedPost(path, { apiKey, apiSecret }, extra = {}) {
+  if (banRemainingMs() > 0) throw rateLimitError();
+  await syncClock();
+  const qs = sign({ ...extra, recvWindow: RECV_WINDOW_MS, timestamp: Date.now() + Math.round(_clockSkewMs) }, apiSecret);
+  const res = await axios.post(`${BASE}${path}?${qs}`, null, {
+    headers: { 'X-MBX-APIKEY': apiKey }, timeout: TIMEOUT_MS
+  });
+  return res.data;
+}
+
 /**
- * Current spot balances, as holdings.
+ * Everything the user owns on Binance, across wallets.
  *
- * free + locked, because a coin sitting in an open order is still owned — a
- * portfolio review that silently drops it understates what the user has.
+ * Spot alone is NOT the account. Binance's own headline "Est. Total Value" sums
+ * Spot, Funding, Earn, Margin and Futures, and reading only /api/v3/account
+ * under-reported this project's first real portfolio by 43% — 15.78 of 16.12
+ * ADA was sitting in Earn, and the whole BNB position in Funding. The user sees
+ * one number in the app and a smaller one here, which reads as the tool being
+ * wrong. It was.
+ *
+ * So: spot + funding + Simple Earn (flexible and locked), summed per asset.
+ * Verified against the app to the eighth decimal.
+ *
+ * The extra wallets are fetched with allSettled and NEVER fail the sync. Losing
+ * the Earn call should cost the Earn balances and a flag saying so, not the
+ * whole portfolio — especially with an IP ban able to strike mid-sequence.
+ * Margin and Futures are deliberately not read: this key cannot hold those
+ * permissions (assertReadOnly refuses them), so those wallets are always empty
+ * for a key FinChat would accept.
  */
 async function fetchHoldings(creds) {
+  // Spot first and un-caught: if the credentials or the IP are the problem, that
+  // is a real failure and the caller must see it.
   const account = await signedGet('/api/v3/account', creds, { omitZeroBalances: 'true' });
-  const balances = Array.isArray(account.balances) ? account.balances : [];
+
+  const [funding, flexible, locked] = await Promise.allSettled([
+    signedPost('/sapi/v1/asset/get-funding-asset', creds),
+    signedGet('/sapi/v1/simple-earn/flexible/position', creds, { size: 100 }),
+    signedGet('/sapi/v1/simple-earn/locked/position', creds, { size: 100 })
+  ]);
+
+  // asset -> { total, illiquid, where[] }
+  const byAsset = new Map();
+  const add = (asset, qty, wallet, { illiquid = false } = {}) => {
+    const n = Number(qty);
+    if (!isFinite(n) || n <= 0) return;
+    const key = String(asset).toUpperCase();
+    const e = byAsset.get(key) || { total: 0, illiquid: 0, where: [] };
+    e.total += n;
+    if (illiquid) e.illiquid += n;
+    e.where.push(`${wallet} ${n}`);
+    byAsset.set(key, e);
+  };
+
+  for (const b of (Array.isArray(account.balances) ? account.balances : [])) {
+    // free + locked: a coin reserved by an open order is still owned.
+    add(b.asset, Number(b.free || 0) + Number(b.locked || 0), 'spot');
+  }
+
+  const missing = [];
+  if (funding.status === 'fulfilled') {
+    for (const a of (Array.isArray(funding.value) ? funding.value : [])) {
+      add(a.asset, Number(a.free || 0) + Number(a.locked || 0) + Number(a.freeze || 0), 'funding');
+    }
+  } else missing.push('Funding');
+
+  if (flexible.status === 'fulfilled') {
+    for (const p of ((flexible.value && flexible.value.rows) || [])) add(p.asset, p.totalAmount, 'earn-flexible');
+  } else missing.push('Earn (flexible)');
+
+  if (locked.status === 'fulfilled') {
+    // Locked Earn cannot be sold today. Tracked separately so a risk watch can
+    // say what share of a position is actually reachable.
+    for (const p of ((locked.value && locked.value.rows) || [])) add(p.asset, p.amount, 'earn-locked', { illiquid: true });
+  } else missing.push('Earn (locked)');
 
   let dust = 0;
   const holdings = [];
-  for (const b of balances) {
-    const qty = Number(b.free || 0) + Number(b.locked || 0);
-    if (!isFinite(qty) || qty <= 0) continue;
-    if (qty < DUST_THRESHOLD) { dust++; continue; }
+  for (const [symbol, e] of byAsset) {
+    if (e.total < DUST_THRESHOLD) { dust++; continue; }
     holdings.push({
-      symbol: String(b.asset).toUpperCase(),
+      symbol,
       kind: 'crypto',
-      quantity: qty,
+      quantity: e.total,
       // Binance does not report what you paid — cost basis would need the whole
       // trade history per asset, and a wrong cost basis is worse than none
       // because it turns into a fabricated P/L. Left null, reported as unknown.
       avgCost: null,
       currency: 'USD',
-      exchange: 'BINANCE'
+      exchange: 'BINANCE',
+      // Only when it is split across wallets; one wallet needs no explanation.
+      note: e.where.length > 1 ? e.where.join(' + ') : null,
+      illiquidQuantity: e.illiquid > 0 ? e.illiquid : null
     });
   }
 
   return {
     holdings,
     dustSkipped: dust,
-    accountType: account.accountType || null,
-    canTrade: account.canTrade === true,
-    canWithdraw: account.canWithdraw === true
+    walletsUnread: missing.length ? missing : undefined,
+    partial: missing.length
+      ? `Could not read ${missing.join(' and ')}, so the total may be lower than what Binance shows. Say so rather than presenting it as complete.`
+      : undefined,
+    accountType: account.accountType || null
   };
 }
 

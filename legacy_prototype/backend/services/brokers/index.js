@@ -213,8 +213,8 @@ async function writeHoldings(userId, source, holdings) {
     await query(`
       INSERT INTO portfolio_holdings
         (holding_id, user_id, symbol, kind, quantity, avg_cost, currency, source, exchange,
-         synced_at, broker_price, broker_price_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         synced_at, broker_price, broker_price_at, note)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       ON CONFLICT (user_id, symbol, kind, source) DO UPDATE SET
         quantity        = EXCLUDED.quantity,
         -- COALESCE, not overwrite: Binance does not report what you paid, and a
@@ -225,10 +225,14 @@ async function writeHoldings(userId, source, holdings) {
         synced_at       = EXCLUDED.synced_at,
         broker_price    = EXCLUDED.broker_price,
         broker_price_at = EXCLUDED.broker_price_at,
+        -- Overwritten, not coalesced: for a broker row the note IS the wallet
+        -- breakdown, and a stale one would claim a position is still staked
+        -- after it has been unstaked.
+        note            = EXCLUDED.note,
         updated_at      = now()
     `, [uuidv4(), userId, h.symbol, h.kind, h.quantity, h.avgCost ?? null,
       (h.currency || 'USD').toUpperCase(), source, h.exchange || null,
-      now, h.lastPrice ?? null, h.lastPrice != null ? now : null]);
+      now, h.lastPrice ?? null, h.lastPrice != null ? now : null, h.note || null]);
   }
 
   // Anything this source used to report and no longer does has been sold or
