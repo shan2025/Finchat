@@ -430,6 +430,7 @@ async function execute(input, context = {}) {
     }
     for (const s of sources) {
       if (s.needsUserAction) flags.push(s.needsUserAction);
+      else if (s.temporaryOutage) flags.push(s.temporaryOutage);
       else if (s.stale && s.lastSyncedAt) {
         flags.push(`${s.label} positions were last refreshed ${s.ageHours}h ago — say so before treating them as current.`);
       }

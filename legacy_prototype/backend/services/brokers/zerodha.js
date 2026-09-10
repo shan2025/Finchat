@@ -102,17 +102,36 @@ function readState(state) {
 }
 
 /**
- * The redirect URL the user must register in their Kite Connect app. Derived
- * from this deployment's own origin, same reasoning as googleOAuth.redirectUri:
- * the backend serves the frontend, so staying on the request's origin lands the
- * user back where they actually are.
+ * The redirect URL the user must register in their Kite Connect app.
+ *
+ * Preference order matters, and is not the same as googleOAuth's. The REQUEST's
+ * own origin comes first, because it is the only source that is always right:
+ * this backend serves the frontend, so whatever host the browser used to reach
+ * Settings is the host Kite must send it back to.
+ *
+ * Env vars are the fallback, and `FRONTEND_URL` is deliberately NOT trusted
+ * ahead of the request — on the deployed instance it was still set to a
+ * `http://localhost:5500` dev value, so the Settings page told the user to
+ * register a redirect URL pointing at their own laptop. A wrong value here is
+ * particularly costly: it is copied by hand into a form at Zerodha, and the
+ * mismatch only shows up as a rejected login much later.
+ *
+ * @param {string} [origin] e.g. "https://finchat-sg.onrender.com", from the request
  */
-function redirectUri() {
+function redirectUri(origin) {
   const explicit = (process.env.ZERODHA_REDIRECT_URI || '').trim();
   if (explicit) return explicit;
-  const origin = (process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000')
+  const base = (origin || process.env.RENDER_EXTERNAL_URL || process.env.FRONTEND_URL || 'http://localhost:3000')
     .trim().replace(/\/+$/, '');
-  return `${origin}/api/brokers/zerodha/callback`;
+  return `${base}/api/brokers/zerodha/callback`;
+}
+
+/** The origin the browser actually used, honouring Render's proxy headers. */
+function originOf(req) {
+  if (!req || typeof req.get !== 'function') return null;
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  return host ? `${String(proto).split(',')[0].trim()}://${host}` : null;
 }
 
 function loginUrl(apiKey, userId) {
@@ -223,6 +242,6 @@ async function verify(creds) {
 }
 
 module.exports = {
-  loginUrl, redirectUri, makeState, readState, exchangeRequestToken,
+  loginUrl, redirectUri, originOf, makeState, readState, exchangeRequestToken,
   fetchHoldings, verify, invalidate, API
 };

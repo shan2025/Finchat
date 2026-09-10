@@ -628,10 +628,15 @@
  function brokerCard(b, conn) {
    const stale = conn && conn.lastSyncedAt
      ? Math.round((Date.now() - new Date(conn.lastSyncedAt).getTime()) / 36e5) : null;
+   // "rate limited" is amber, not red, and deliberately so: the connection is
+   // healthy, the broker is throttling a shared hosting IP, and there is nothing
+   // for the user to fix. Showing it as an error sends people to re-make a key
+   // that was never the problem.
    const tag = !conn ? ''
      : conn.status === 'connected' ? '<span class="stag stag-on">connected</span>'
        : conn.status === 'needs_login' ? '<span class="stag stag-warn">needs daily login</span>'
-         : '<span class="stag stag-danger">error</span>';
+         : conn.status === 'rate_limited' ? '<span class="stag stag-warn">rate limited</span>'
+           : '<span class="stag stag-danger">error</span>';
 
    const meta = conn ? `
      <div style="display:flex; gap:26px; margin-top:16px; font-size:12px; color:var(--text-3); flex-wrap:wrap;">
@@ -639,7 +644,7 @@
        <span>Positions <b style="color:var(--text); font-weight:600;">${conn.holdingsCount || 0}</b></span>
        <span>Last synced <b style="color:var(--text); font-weight:600;">${conn.lastSyncedAt ? fmtTime(conn.lastSyncedAt) + (stale != null && stale >= 1 ? ` · ${stale}h ago` : '') : 'never'}</b></span>
      </div>
-     ${conn.lastError ? `<div class="rd" style="margin-top:10px; color:var(--danger);">${esc(conn.lastError)}</div>` : ''}` : '';
+     ${conn.lastError ? `<div class="rd" style="margin-top:10px; color:${conn.status === 'rate_limited' || conn.status === 'needs_login' ? 'var(--text-2)' : 'var(--danger)'};">${esc(conn.lastError)}</div>` : ''}` : '';
 
    const can = b.broker === 'binance'
      ? ['Read your spot balances.', 'Trade, withdraw, transfer or place any order. The key is rejected at connect time if it can.']
@@ -678,10 +683,17 @@
      </div>`;
    }
 
+   // autocomplete="new-password" on BOTH fields, not just the secret. Chrome
+   // ignores autocomplete="off" on credential-shaped inputs and had been filling
+   // the user's own email and password into the broker key boxes — which is how
+   // a login for one service gets pasted into another. "new-password" is the one
+   // value browsers honour, and the data-*-ignore attributes tell the common
+   // password managers the same thing.
+   const noFill = 'autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other"';
    const form = b.broker === 'binance' ? `
      <div class="set-grid2" style="margin-top:14px;">
-       <input class="set-input" id="bnKey" placeholder="API key" autocomplete="off" spellcheck="false">
-       <input class="set-input" id="bnSecret" type="password" placeholder="API secret" autocomplete="off" spellcheck="false">
+       <input class="set-input" id="bnKey" placeholder="API key" ${noFill}>
+       <input class="set-input" id="bnSecret" type="password" placeholder="API secret" ${noFill}>
      </div>
      <div class="rd" style="margin-top:10px;">
        Create the key at <b>Binance → API Management</b> with <b>Enable Reading</b> only, and no IP restriction
@@ -689,8 +701,8 @@
      </div>
      <button class="sb sb-primary" data-broker-connect="binance" style="margin-top:14px;">Connect Binance</button>` : `
      <div class="set-grid2" style="margin-top:14px;">
-       <input class="set-input" id="kiteKey" placeholder="Kite API key" autocomplete="off" spellcheck="false">
-       <input class="set-input" id="kiteSecret" type="password" placeholder="Kite API secret" autocomplete="off" spellcheck="false">
+       <input class="set-input" id="kiteKey" placeholder="Kite API key" ${noFill}>
+       <input class="set-input" id="kiteSecret" type="password" placeholder="Kite API secret" ${noFill}>
      </div>
      <div class="rd" style="margin-top:10px;">
        Create a free <b>Personal</b> app at <b>developers.kite.trade</b> — it covers holdings at no cost — and set its redirect URL to

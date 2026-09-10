@@ -27,6 +27,45 @@ const DUST_THRESHOLD = 1e-8;
 let _clockSkewMs = 0;
 let _skewCheckedAt = 0;
 
+// ── IP bans ──────────────────────────────────────────────────────
+// Binance error -1003 rate-limits an IP ADDRESS, not an account or a key, and
+// the reply carries the epoch-ms the ban lifts at. This matters more here than
+// it would elsewhere: FinChat runs on shared hosting whose outbound IP is used
+// by other tenants, so a ban usually arrives having been earned by somebody
+// else's traffic — a sync is three requests of trivial weight.
+//
+// The cooldown is what stops it compounding. Atlas re-syncs Binance on EVERY
+// portfolio valuation, so without this a ban would be met with a fresh request
+// on every question the user asks, which is how a short ban becomes a long one.
+// While the cooldown holds we fail locally and make no network call at all.
+//
+// Process-local on purpose: it is a property of this container's IP, and after a
+// restart (which on Render's free tier may mean a different address anyway) the
+// worst case is one probe request.
+let _bannedUntilMs = 0;
+
+function banRemainingMs() { return Math.max(0, _bannedUntilMs - Date.now()); }
+
+function noteBan(untilMs) {
+  if (Number.isFinite(untilMs) && untilMs > _bannedUntilMs) _bannedUntilMs = untilMs;
+}
+
+/** For the UI and for Atlas: when does this lift, in words? */
+function banMessage() {
+  const until = new Date(_bannedUntilMs);
+  const mins = Math.max(1, Math.ceil(banRemainingMs() / 60000));
+  return `Binance has rate-limited this server's IP address until ${until.toISOString()} ` +
+    `(about ${mins} minute${mins === 1 ? '' : 's'} away). This is a limit on the shared hosting IP, ` +
+    'not on your API key — your key is fine and nothing needs changing. Positions will refresh once it lifts.';
+}
+
+function rateLimitError() {
+  const err = new Error(banMessage());
+  err.rateLimited = true;
+  err.retryAt = new Date(_bannedUntilMs).toISOString();
+  return err;
+}
+
 async function syncClock() {
   // Signed requests carry a timestamp Binance rejects if it drifts outside
   // recvWindow. Container clocks drift; this is cheaper than failing the call.
@@ -56,6 +95,10 @@ function sign(params, apiSecret) {
  * with status code 401".
  */
 async function signedGet(path, { apiKey, apiSecret }, extra = {}) {
+  // Refuse locally while the IP is banned. Sending the request anyway is what
+  // extends the ban.
+  if (banRemainingMs() > 0) throw rateLimitError();
+
   await syncClock();
   const qs = sign({
     ...extra,
@@ -78,6 +121,16 @@ async function signedGet(path, { apiKey, apiSecret }, extra = {}) {
         'the key has an IP whitelist that does not include this server, or it has been deleted. ' +
         'FinChat runs on shared hosting with no fixed outbound IP, so the key must be created without an IP restriction.'
       );
+    }
+    // -1003: too much request weight from this IP. The message carries the epoch
+    // milliseconds the ban lifts ("IP banned until 1789015432402"); record it so
+    // every later call fails locally instead of adding to the pile.
+    if (code === -1003) {
+      const m = /banned until (\d+)/i.exec(String((data && data.msg) || ''));
+      // No timestamp in the message means a soft weight warning rather than a
+      // ban; back off for a minute so a retry loop cannot turn it into one.
+      noteBan(m ? Number(m[1]) : Date.now() + 60_000);
+      throw rateLimitError();
     }
     if (code === -1022) throw new Error('Binance rejected the request signature — the API secret does not match the API key.');
     if (code === -1021) throw new Error('Binance rejected the request timestamp (server clock drift). Try again in a moment.');
@@ -182,4 +235,7 @@ async function fetchHoldings(creds) {
   };
 }
 
-module.exports = { verify, fetchHoldings, fetchRestrictions, assertReadOnly, BASE };
+module.exports = {
+  verify, fetchHoldings, fetchRestrictions, assertReadOnly, BASE,
+  banRemainingMs, noteBan, _resetBan: () => { _bannedUntilMs = 0; }
+};

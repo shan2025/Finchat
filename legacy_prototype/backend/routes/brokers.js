@@ -21,7 +21,7 @@ function settingsUrl(params) {
 // ── GET /api/brokers ───────────────────────────────────────────
 router.get('/', requireAuth, async (req, res) => {
   try {
-    res.json(await brokers.list(req.user.id));
+    res.json(await brokers.list(req.user.id, zerodha.originOf(req)));
   } catch (err) {
     console.error('Broker list error:', err);
     res.status(500).json({ error: 'Failed to read broker connections', details: err.message });
@@ -47,7 +47,8 @@ router.post('/binance', requireAuth, async (req, res) => {
 // Returns the Kite login URL to send the browser to.
 router.post('/zerodha/app', requireAuth, async (req, res) => {
   try {
-    res.json(await brokers.saveZerodhaApp(req.user.id, req.body.apiKey, req.body.apiSecret));
+    res.json(await brokers.saveZerodhaApp(
+      req.user.id, req.body.apiKey, req.body.apiSecret, zerodha.originOf(req)));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -58,7 +59,7 @@ router.post('/zerodha/app', requireAuth, async (req, res) => {
 // fetch() from Settings, and a 302 inside XHR is useless.
 router.get('/zerodha/login', requireAuth, async (req, res) => {
   try {
-    res.json(await brokers.zerodhaLoginUrl(req.user.id));
+    res.json(await brokers.zerodhaLoginUrl(req.user.id, zerodha.originOf(req)));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

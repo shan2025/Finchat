@@ -83,6 +83,84 @@ describe('a Binance key that can act on the account is refused', () => {
   });
 });
 
+describe('a Binance IP ban is absorbed, not compounded', () => {
+  // Binance -1003 rate-limits an IP ADDRESS. On shared hosting the ban is
+  // usually earned by another tenant's traffic, and it arrived in production
+  // within minutes of the first connection. Atlas re-syncs Binance on every
+  // portfolio valuation, so the danger is that a ban is met with a fresh
+  // request per question asked — turning a seven-minute ban into a long one.
+  test('while banned, no request is attempted at all', async () => {
+    binance.noteBan(Date.now() + 5 * 60_000);
+    try {
+      await binance.fetchHoldings({ apiKey: 'k', apiSecret: 's' });
+      assert.fail('should have refused locally');
+    } catch (err) {
+      assert.equal(err.rateLimited, true);
+      assert.match(err.message, /rate-limited this server's IP/);
+      assert.ok(err.retryAt, 'must say when it lifts, so the UI can stop guessing');
+    } finally {
+      binance._resetBan();
+    }
+  });
+
+  test('the message absolves the user\'s key by name', () => {
+    binance.noteBan(Date.now() + 60_000);
+    try {
+      binance.assertReadOnly(readOnlyKey); // unrelated call, just to keep shape
+    } catch (e) { /* not the point */ }
+    // The wording matters: the natural reading of "banned" is "I did something
+    // wrong", and the user's next move would be to delete a perfectly good key.
+    return binance.fetchHoldings({ apiKey: 'k', apiSecret: 's' }).then(
+      () => assert.fail('should have refused'),
+      (err) => {
+        assert.match(err.message, /not on your API key/);
+        assert.match(err.message, /nothing needs changing/);
+        binance._resetBan();
+      });
+  });
+
+  test('the ban clears once it expires', async () => {
+    binance.noteBan(Date.now() - 1000); // already past
+    assert.equal(binance.banRemainingMs(), 0, 'an expired ban must not block anything');
+    binance._resetBan();
+  });
+
+  test('a later ban extends, an earlier one does not shorten', () => {
+    const far = Date.now() + 10 * 60_000;
+    binance.noteBan(far);
+    binance.noteBan(Date.now() + 1000); // a shorter ban must not overwrite
+    assert.ok(binance.banRemainingMs() > 5 * 60_000);
+    binance._resetBan();
+  });
+});
+
+describe('the Kite redirect URL follows the request, not an env var', () => {
+  // On the deployed instance FRONTEND_URL was still a `localhost:5500` dev
+  // value, so Settings told the user to register a redirect URL pointing at
+  // their own laptop. This string is copied by hand into a form at Zerodha and
+  // the mismatch only surfaces later, as a rejected login.
+  const req = (host, proto) => ({ get: (h) => ({ host, 'x-forwarded-proto': proto }[h.toLowerCase()]), protocol: 'http' });
+
+  test('the request origin wins over the environment', () => {
+    const prev = process.env.FRONTEND_URL;
+    process.env.FRONTEND_URL = 'http://localhost:5500';
+    try {
+      const origin = zerodha.originOf(req('finchat-sg.onrender.com', 'https'));
+      assert.equal(origin, 'https://finchat-sg.onrender.com');
+      assert.equal(zerodha.redirectUri(origin),
+        'https://finchat-sg.onrender.com/api/brokers/zerodha/callback');
+    } finally {
+      if (prev === undefined) delete process.env.FRONTEND_URL; else process.env.FRONTEND_URL = prev;
+    }
+  });
+
+  test('a proxied protocol header is honoured', () => {
+    // Render terminates TLS, so req.protocol alone reads "http" and would hand
+    // Kite an http:// callback for an https:// site.
+    assert.match(zerodha.originOf(req('example.com', 'https')), /^https:/);
+  });
+});
+
 describe('saving a connection', () => {
   // The first Connect press in production failed with:
   //   null value in column "holdings_count" of relation "broker_connections"

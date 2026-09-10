@@ -108,7 +108,7 @@ function publicView(row) {
   };
 }
 
-async function list(userId) {
+async function list(userId, origin) {
   const res = await query(
     'SELECT * FROM broker_connections WHERE user_id = $1 ORDER BY created_at ASC', [userId]);
   return {
@@ -116,7 +116,9 @@ async function list(userId) {
       broker: id, label: m.label, kind: m.kind, autoSync: m.autoSync, docs: m.docs, note: m.note
     })),
     connections: res.rows.map(publicView),
-    zerodhaRedirectUri: zerodha.redirectUri()
+    // Passed through from the request: this string is copied by hand into the
+    // user's Kite app, so it has to be the host they are actually using.
+    zerodhaRedirectUri: zerodha.redirectUri(origin)
   };
 }
 
@@ -155,7 +157,7 @@ async function connectBinance(userId, apiKey, apiSecret) {
  * Zerodha is two steps, because the app credentials and the daily session are
  * different things. Step one stores the user's own Kite app key/secret.
  */
-async function saveZerodhaApp(userId, apiKey, apiSecret) {
+async function saveZerodhaApp(userId, apiKey, apiSecret, origin) {
   const creds = { apiKey: String(apiKey || '').trim(), apiSecret: String(apiSecret || '').trim() };
   if (!creds.apiKey || !creds.apiSecret) throw new Error('Both the Kite API key and API secret are required.');
   await saveRow(userId, 'zerodha', {
@@ -163,15 +165,15 @@ async function saveZerodhaApp(userId, apiKey, apiSecret) {
     status: 'needs_login',
     error: null
   });
-  return { loginUrl: zerodha.loginUrl(creds.apiKey, userId), redirectUri: zerodha.redirectUri() };
+  return { loginUrl: zerodha.loginUrl(creds.apiKey, userId), redirectUri: zerodha.redirectUri(origin) };
 }
 
-async function zerodhaLoginUrl(userId) {
+async function zerodhaLoginUrl(userId, origin) {
   const creds = credsOf(await getRow(userId, 'zerodha'));
   if (!creds || !creds.apiKey) {
     throw new Error('Add your Kite API key and secret first — they come from your own app at developers.kite.trade.');
   }
-  return { loginUrl: zerodha.loginUrl(creds.apiKey, userId), redirectUri: zerodha.redirectUri() };
+  return { loginUrl: zerodha.loginUrl(creds.apiKey, userId), redirectUri: zerodha.redirectUri(origin) };
 }
 
 /** Step two: the browser came back from Kite with a one-time request_token. */
@@ -283,15 +285,24 @@ async function sync(userId, broker) {
       note: fetched.note
     };
   } catch (err) {
-    // A flushed Kite token is expected daily; anything else is a real fault.
+    // Three different kinds of "didn't work", and conflating them would put the
+    // user through a pointless repair for a problem that fixes itself:
+    //   needs_login   — Kite's daily token is gone. Only the user can fix it.
+    //   rate_limited  — Binance banned the shared hosting IP. Nobody needs to do
+    //                   anything; it lifts on its own, and the stored positions
+    //                   from the last sync stay valid in the meantime.
+    //   error         — a real fault worth surfacing as one.
     const needsLogin = err.needsLogin === true;
+    const rateLimited = err.rateLimited === true;
+    const status = needsLogin ? 'needs_login' : rateLimited ? 'rate_limited' : 'error';
     await query(`
       UPDATE broker_connections SET status=$3, last_error=$4, updated_at=now()
        WHERE user_id=$1 AND broker=$2
-    `, [userId, broker, needsLogin ? 'needs_login' : 'error', err.message]);
+    `, [userId, broker, status, err.message]);
     return {
       broker, ok: false,
-      reason: needsLogin ? 'needs_login' : 'error',
+      reason: status,
+      retryAt: err.retryAt,
       message: err.message
     };
   }
@@ -342,6 +353,12 @@ async function freshness(userId) {
       lastError: r.last_error,
       needsUserAction: r.status === 'needs_login'
         ? "Zerodha's daily session has expired — the user must reconnect it in Settings before these numbers can be refreshed."
+        : undefined,
+      // Distinct from needsUserAction on purpose: there is nothing for the user
+      // to do here, and telling them to fix their key would send them to repair
+      // something that was never broken.
+      temporaryOutage: r.status === 'rate_limited'
+        ? `${BROKERS[r.broker]?.label || r.broker} has rate-limited the server's IP address, which is a shared-hosting limit rather than a problem with the user's key. It clears itself. Report the positions from the last sync and say when they were taken.`
         : undefined
     };
   });
