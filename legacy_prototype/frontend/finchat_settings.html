@@ -301,6 +301,7 @@
    gStatus: null,  // null until /integrations/google/status answers
    brokers: null, // { available, connections, zerodhaRedirectUri }
    chain: null, blocks: [],
+   pendingName: null, // an edited-but-unsaved display name; survives section switches
    providers: null, // { catalogue, keys, access, referral }
    addKeyRows: 1,   // how many blank "add a key" rows are showing
    appearance: {
@@ -976,8 +977,9 @@
      </div>
      <input type="file" id="avatarFile" accept="image/jpeg,image/png,image/webp" style="display:none;">
      <div class="set-grid2" style="margin-top:20px;">
-       <div><label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:5px;">Display name</label>
-         <input class="chan-input" style="max-width:none; margin-top:0;" id="acctName" value="${esc(u.name || '')}"></div>
+       <div><label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:5px;" for="acctName">Display name</label>
+         <input class="chan-input" style="max-width:none; margin-top:0;" id="acctName" maxlength="60"
+                value="${esc(state.pendingName != null ? state.pendingName : (u.name || ''))}"></div>
        <div><label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:5px;">Sign-in email</label>
          <input class="chan-input" style="max-width:none; margin-top:0; background:var(--surface-2); color:var(--text-3);" value="${esc(u.email || '')}" readonly></div>
      </div>
@@ -1024,7 +1026,7 @@
      });
      const d = await r.json();
      if (!r.ok) throw new Error(d.error || 'Could not save that photo');
-     applyNewAvatar(d.user);
+     applyProfile(d.user);
      showToast('Profile photo updated.');
    } catch (e) { showToast(e.message); }
  }
@@ -1034,22 +1036,42 @@
      const r = await fetch(API + '/api/auth/profile/avatar', { method: 'DELETE', headers: AUTH });
      const d = await r.json();
      if (!r.ok) throw new Error(d.error || 'Could not remove the photo');
-     applyNewAvatar(d.user);
+     applyProfile(d.user);
      showToast('Photo removed.');
    } catch (e) { showToast(e.message); }
  }
 
- // A new photo has to land in three places, or it looks like it half-saved: this
- // card, the rail avatar every other page shows, and the cached session both of
- // them read on the next page load.
- function applyNewAvatar(user) {
+ // A saved profile has to land in four places, or it looks like it half-saved:
+ // this card, the page header, the rail that every other page shows, and the
+ // cached session all of them read on the next page load.
+ function applyProfile(user) {
    Object.assign(SESSION_USER, user || {});
    try {
      sessionStorage.setItem('finchat_user', JSON.stringify(SESSION_USER));
      if (localStorage.getItem('finchat_session')) localStorage.setItem('finchat_session', JSON.stringify(SESSION_USER));
    } catch (e) { /* storage full or blocked — the in-memory copy still updates */ }
+   $('hdName').textContent = SESSION_USER.name || SESSION_USER.username || 'you';
+   if (window.fcSetRailName) window.fcSetRailName(SESSION_USER.name);
    if (window.fcSetRailAvatar) window.fcSetRailAvatar(SESSION_USER.avatar_url, SESSION_USER);
    if (state.section === 'account') renderSection();
+ }
+
+ // The display name rides the page's global Save along with everything else.
+ // The pending value lives in state rather than in the input, because moving to
+ // another section destroys the input — and an edit that disappears when you
+ // click away is worse than not being able to edit at all.
+ async function saveDisplayName() {
+   if (state.pendingName == null) return;
+   const name = state.pendingName.replace(/\s+/g, ' ').trim();
+   if (name === (SESSION_USER.name || '')) { state.pendingName = null; return; }
+   if (!name) throw new Error('Your display name cannot be empty');
+   const r = await fetch(API + '/api/auth/profile', {
+     method: 'PATCH', headers: AUTH, body: JSON.stringify({ name })
+   });
+   const d = await r.json().catch(() => ({}));
+   if (!r.ok) throw new Error(d.error || 'Could not save your name');
+   state.pendingName = null;
+   applyProfile(d.user);
  }
 
  // ─────────────────────────────────────────────────────────────────────────
@@ -1254,6 +1276,9 @@
    localStorage.setItem('finchat_theme_mode', (state.appearance.theme));
    localStorage.setItem('finchat_density', state.appearance.density);
    try {
+     // Before the prefs, so a rejected name (empty, too long) stops the save
+     // rather than being reported under a "Settings saved" toast.
+     await saveDisplayName();
      const r = await fetch(API + '/api/settings/notifications', { method: 'PUT', headers: AUTH, body: JSON.stringify(body) });
      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'save failed');
      const d = await r.json();
@@ -1263,7 +1288,13 @@
      if (state.section === 'notifications') renderSection();
    } catch (e) { showToast('Save failed: ' + e.message); }
  }
- async function discard() { setDirty(false); await loadPrefs(); showToast('Changes discarded'); }
+ async function discard() {
+   state.pendingName = null;
+   setDirty(false);
+   await loadPrefs();
+   if (state.section === 'account') renderSection();
+   showToast('Changes discarded');
+ }
 
  function toggleChannel(key) {
    state.prefs['channel_' + key] = !state.prefs['channel_' + key];
@@ -1482,6 +1513,7 @@
    // the global savebar.
    if (/^(aikey_|aiprov_|refCode)/.test(e.target.id)) return;
    if (e.target.hasAttribute && e.target.hasAttribute('data-ai-role')) return;
+   if (e.target.id === 'acctName') state.pendingName = e.target.value;
    if (e.target.classList.contains('chan-input')) setDirty(true);
  });
  bind('setPanel', 'change', e => {

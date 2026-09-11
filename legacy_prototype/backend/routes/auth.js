@@ -478,6 +478,37 @@ router.post('/logout', requireAuth, (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
+// ── PATCH /api/auth/profile ──────────────────────────────────
+// Display name only. The username is an identity other people resolve you by
+// and the email is what you sign in with, so neither changes here — the
+// Settings card shows them read-only for the same reason.
+const NAME_MAX = 60;
+
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    if (typeof req.body.name !== 'string') {
+      return fail(res, 400, 'name_required', 'A display name is required', 'name');
+    }
+    // Collapse whitespace: a name is one line, and " Bro   Test " and
+    // "Bro Test" should not be two different people in the sidebar.
+    const name = req.body.name.replace(/\s+/g, ' ').trim();
+    if (!name) {
+      return fail(res, 400, 'name_required', 'Your display name cannot be empty', 'name');
+    }
+    if (name.length > NAME_MAX) {
+      return fail(res, 400, 'name_too_long', `A display name can be at most ${NAME_MAX} characters`, 'name');
+    }
+
+    await query('UPDATE users SET name = $1 WHERE user_id = $2', [name, req.user.id]);
+    clearUserCache(req.user.id);
+    const resUser = await query('SELECT *, user_id as id FROM users WHERE user_id = $1', [req.user.id]);
+    res.json({ message: 'Profile updated', user: sanitizeUser(resUser.rows[0]) });
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ error: 'Could not save your profile' });
+  }
+});
+
 // ── Profile photo ────────────────────────────────────────────
 // The client sends an already-downscaled square image as a data: URL, so this
 // accepts one of two things: a data: URL (an upload — bytes go to user_avatars

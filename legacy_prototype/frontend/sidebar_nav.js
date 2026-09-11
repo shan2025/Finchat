@@ -357,9 +357,18 @@
         .then(function (b) { if (b) paintAvatar(URL.createObjectURL(b)); })
         .catch(function () {});
     }
-    // Settings calls this the moment a photo is saved, so the rail updates
-    // without a reload.
+    // Settings calls these the moment a photo or a name is saved, so the rail
+    // updates without a reload.
     window.fcSetRailAvatar = setAvatar;
+    window.fcSetRailName = function (newName) {
+      if (!newName) return;
+      initials = String(newName).split(' ').map(function (w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+      var el = nav.querySelector('#sbnProfile .sbn-uname');
+      if (el) el.textContent = newName;
+      // Only when initials are what is on screen — a photo must not be wiped
+      // by a rename.
+      if (!sess.avatar_url) paintAvatar('');
+    };
 
     if (sess.avatar_url) setAvatar(sess.avatar_url);
     if (tok) {
