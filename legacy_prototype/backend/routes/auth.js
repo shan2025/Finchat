@@ -478,20 +478,105 @@ router.post('/logout', requireAuth, (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-// ── POST /api/auth/profile/avatar ────────────────────────────
+// ── Profile photo ────────────────────────────────────────────
+// The client sends an already-downscaled square image as a data: URL, so this
+// accepts one of two things: a data: URL (an upload — bytes go to user_avatars
+// and avatar_url becomes a path to them) or an https: URL (what Google sign-in
+// has always written — stored as-is, nothing to keep).
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const AVATAR_MAX_BYTES = 512 * 1024;
+
+// A stamped path, not a bare one. The image is immutable for as long as it is
+// the current photo, so the browser may cache it hard; changing the photo
+// changes the stamp and therefore the URL, which is what makes the new one show
+// up immediately instead of after the cache expires.
+function avatarPath(userId, updatedAt) {
+  return `/api/auth/avatar/${userId}?v=${new Date(updatedAt).getTime()}`;
+}
+
 router.post('/profile/avatar', requireAuth, async (req, res) => {
   try {
     const { avatarUrl } = req.body;
-    if (!avatarUrl) {
+    if (!avatarUrl || typeof avatarUrl !== 'string') {
       return res.status(400).json({ error: 'avatarUrl data is required' });
     }
-    await query('UPDATE users SET avatar_url = $1 WHERE user_id = $2', [avatarUrl, req.user.id]);
+
+    let stored = avatarUrl;
+
+    const dataUrl = /^data:([a-z/+.-]+);base64,(.+)$/i.exec(avatarUrl);
+    if (dataUrl) {
+      const mime = dataUrl[1].toLowerCase();
+      if (!AVATAR_TYPES.includes(mime)) {
+        return res.status(400).json({ error: 'A profile photo must be a JPEG, PNG or WebP image' });
+      }
+      const bytes = Buffer.from(dataUrl[2], 'base64');
+      // The browser downscales to 256px before sending, so anything near this
+      // ceiling means that step did not run — refuse rather than bank a
+      // full-size camera photo that every page load then has to fetch.
+      if (!bytes.length || bytes.length > AVATAR_MAX_BYTES) {
+        return res.status(400).json({ error: 'That image is too large — please pick a smaller one' });
+      }
+      const saved = await query(`
+        INSERT INTO user_avatars (user_id, mime, size_bytes, data, updated_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (user_id) DO UPDATE
+          SET mime = EXCLUDED.mime, size_bytes = EXCLUDED.size_bytes,
+              data = EXCLUDED.data, updated_at = NOW()
+        RETURNING updated_at
+      `, [req.user.id, mime, bytes.length, bytes]);
+      stored = avatarPath(req.user.id, saved.rows[0].updated_at);
+    } else if (!/^https:\/\//i.test(avatarUrl) && !avatarUrl.startsWith('/api/auth/avatar/')) {
+      return res.status(400).json({ error: 'avatarUrl must be an uploaded image or an https URL' });
+    }
+
+    await query('UPDATE users SET avatar_url = $1 WHERE user_id = $2', [stored, req.user.id]);
     clearUserCache(req.user.id);
     const resUser = await query('SELECT *, user_id as id FROM users WHERE user_id = $1', [req.user.id]);
     res.json({ message: 'Avatar updated', user: sanitizeUser(resUser.rows[0]) });
   } catch (err) {
     console.error('Avatar update error:', err);
     res.status(500).json({ error: 'Could not update avatar' });
+  }
+});
+
+// ── DELETE /api/auth/profile/avatar ──────────────────────────
+// Back to initials. Drops the bytes too — a photo someone removed should not
+// stay readable in the table it was removed from.
+router.delete('/profile/avatar', requireAuth, async (req, res) => {
+  try {
+    await query('DELETE FROM user_avatars WHERE user_id = $1', [req.user.id]);
+    await query('UPDATE users SET avatar_url = NULL WHERE user_id = $1', [req.user.id]);
+    clearUserCache(req.user.id);
+    const resUser = await query('SELECT *, user_id as id FROM users WHERE user_id = $1', [req.user.id]);
+    res.json({ message: 'Avatar removed', user: sanitizeUser(resUser.rows[0]) });
+  } catch (err) {
+    console.error('Avatar delete error:', err);
+    res.status(500).json({ error: 'Could not remove the photo' });
+  }
+});
+
+// ── GET /api/auth/avatar/:userId ─────────────────────────────
+// Serves the stored photo. Behind requireAuth and matched to the session for
+// the same reason chat attachments are (see aiChat.js): the client fetches this
+// with its bearer token and renders the blob, so there is no URL that works
+// without a session and no token sitting in an <img src> to leak through logs
+// and referrers.
+router.get('/avatar/:userId', requireAuth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.id) return res.status(404).json({ error: 'No photo' });
+    const r = await query('SELECT mime, data FROM user_avatars WHERE user_id = $1', [req.user.id]);
+    const row = r.rows[0];
+    if (!row || !row.data) return res.status(404).json({ error: 'No photo' });
+
+    res.set('Content-Type', row.mime);
+    // The ?v= stamp changes whenever the photo does, so this URL's bytes never
+    // change — a year in the browser's cache costs one DB read per photo, not
+    // one per page view.
+    res.set('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(row.data);
+  } catch (err) {
+    console.error('Avatar fetch error:', err);
+    res.status(500).json({ error: 'Could not load the photo' });
   }
 });
 

@@ -20,6 +20,17 @@
     } catch (e) { return null; }
   }
 
+  // The token is stored beside the user, not always inside it: only the
+  // localStorage 'finchat_session' copy carries a `token` field, so a tab whose
+  // session came from sessionStorage has none — and everything here that was
+  // gated on `sess.token` silently did nothing in that tab.
+  function getToken(sess) {
+    try {
+      return localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
+        (sess && sess.token) || '';
+    } catch (e) { return (sess && sess.token) || ''; }
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -314,19 +325,48 @@
 
     // Avatar: render cached one, then refresh from the server (it's the source
     // of truth — cached sessions can predate an avatar upload).
-    function setAvatar(url) {
+    //
+    // An uploaded photo's avatar_url is an authenticated path, not a public
+    // one, so it cannot go straight into an <img src> — it is fetched with the
+    // session token and shown as a blob, the same way chat images are. A Google
+    // sign-in picture is an ordinary https URL and is used as-is.
+    //
+    // avatar_image.js holds the same rule for the pages that also UPLOAD a
+    // photo. It is repeated here rather than required, because this file is on
+    // all seventeen pages and has no dependencies by design.
+    function paintAvatar(src) {
       var el = document.getElementById('sbnAvatar');
-      if (el && url) {
+      if (!el) return;
+      if (src) {
         el.style.background = 'none';
-        el.innerHTML = '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+        el.innerHTML = '<img src="' + src + '" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+      } else {
+        // Back to initials — a removed photo has to actually disappear here,
+        // not linger until the cached session is replaced.
+        el.style.background = '';
+        el.textContent = initials;
       }
     }
+    var tok = getToken(sess);
+    function setAvatar(url) {
+      if (!url) return paintAvatar('');
+      if (url.indexOf('/api/auth/avatar/') !== 0) return paintAvatar(url);
+      if (!tok) return;
+      fetch(API + url, { headers: { 'Authorization': 'Bearer ' + tok } })
+        .then(function (r) { return r.ok ? r.blob() : null; })
+        .then(function (b) { if (b) paintAvatar(URL.createObjectURL(b)); })
+        .catch(function () {});
+    }
+    // Settings calls this the moment a photo is saved, so the rail updates
+    // without a reload.
+    window.fcSetRailAvatar = setAvatar;
+
     if (sess.avatar_url) setAvatar(sess.avatar_url);
-    if (sess.token) {
-      fetch(API + '/api/auth/me', { headers: { 'Authorization': 'Bearer ' + sess.token } })
+    if (tok) {
+      fetch(API + '/api/auth/me', { headers: { 'Authorization': 'Bearer ' + tok } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (d && d.user && d.user.avatar_url) {
+          if (d && d.user && d.user.avatar_url !== sess.avatar_url) {
             setAvatar(d.user.avatar_url);
             try {
               sess.avatar_url = d.user.avatar_url;
@@ -336,7 +376,7 @@
           }
         }).catch(function () {});
 
-      refreshRecents(sess.token);
+      refreshRecents(tok);
     }
 
     // Theme toggle — persists and rebuilds so every themed element updates.

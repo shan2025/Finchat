@@ -130,6 +130,23 @@
     yet, so we show the shape of the card instead of a default one — flashing
     "needs setup" or an empty broker list at someone whose accounts are in fact
     connected reads as the app losing them. */
+ /* profile photo — the picture is the control, with the plain-language buttons
+    beside it for anyone who does not think to click a picture */
+ .acct-photo-well { position: relative; width: 64px; height: 64px; flex: none; padding: 0; border: none;
+   background: none; border-radius: 50%; cursor: pointer; display: block; }
+ .acct-photo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; display: grid; place-items: center;
+   background: var(--accent-soft); transition: filter .15s; }
+ .acct-photo-initials { color: var(--accent-warm); font-family: var(--serif); font-size: 23px; }
+ .acct-photo-well:hover .acct-photo { filter: brightness(.82); }
+ .acct-photo-well:focus-visible { outline: 2px solid var(--accent-warm); outline-offset: 3px; }
+ .acct-photo-badge { position: absolute; right: -2px; bottom: -2px; width: 23px; height: 23px; border-radius: 50%;
+   background: var(--accent-warm); color: #fff; display: grid; place-items: center;
+   border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+ .acct-photo-link { background: none; border: none; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px;
+   font-weight: 600; color: var(--accent-warm); text-decoration: underline; text-underline-offset: 2px; }
+ .acct-photo-link:hover { opacity: .78; }
+ .acct-photo-link-danger { color: var(--danger); }
+
  .set-skel { border-radius: 6px; background: rgb(var(--text-rgb) / .11); animation: setSkelPulse 1.4s ease-in-out infinite; }
  @keyframes setSkelPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
  @media (prefers-reduced-motion: reduce) { .set-skel { animation: none; } }
@@ -190,6 +207,10 @@
  }
  @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>
+<!-- In the head, not with the bundle at the foot of the body: the page's own
+     inline script renders Account & profile at boot and needs fcAvatar by then.
+     spa_router.js adopts head script includes on a view swap. -->
+<script src="avatar_image.js"></script>
 </head>
 
 <body class="bg-cream-bg h-screen overflow-hidden">
@@ -922,26 +943,39 @@
  }
 
  // ── Account & profile ──
+ // Resizing before upload and fetching an authenticated photo as a blob both
+ // live in avatar_image.js, because the chat page and the nav rail need exactly
+ // the same two rules.
  function secAccount() {
    const u = SESSION_USER;
    const initials = (u.name || u.username || 'You').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase();
    // Cached sessions can predate an avatar upload (or a Google sign-in), so the
    // photo only appears once refreshUser() has been back to /api/auth/me.
    const avatar = u.avatar_url
-     ? `<img src="${esc(u.avatar_url)}" alt="" referrerpolicy="no-referrer"
-          style="width:54px; height:54px; flex:none; border-radius:50%; object-fit:cover; background:var(--accent-soft);">`
-     : `<span style="width:54px; height:54px; flex:none; border-radius:50%; background:var(--accent-soft); color:var(--accent-warm); display:grid; place-items:center; font-family:var(--serif); font-size:20px;">${esc(initials)}</span>`;
+     ? `<img id="acctPhoto" alt="" referrerpolicy="no-referrer" class="acct-photo">`
+     : `<span id="acctPhoto" class="acct-photo acct-photo-initials">${esc(initials)}</span>`;
    return `
    <div class="set-sec-head"><h2>Account &amp; profile</h2><p>Your identity across this workspace.</p></div>
    <div class="set-card" style="padding:24px;">
      <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid var(--border);">
-       ${avatar}
+       <button class="acct-photo-well" data-avatar="pick" title="Change your profile photo" aria-label="Change your profile photo">
+         ${avatar}
+         <span class="acct-photo-badge" aria-hidden="true">
+           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"></path><circle cx="12" cy="13" r="3.2"></circle></svg>
+         </span>
+       </button>
        <div style="flex:1; min-width:0;">
          <div style="font-size:17px; font-weight:700; color:var(--text);">${esc(u.name || u.username || 'You')}</div>
          <div style="font-size:12.5px; color:var(--text-3);">${esc(u.username ? '@' + u.username : (u.email || ''))}</div>
+         <div style="display:flex; align-items:center; gap:12px; margin-top:7px;">
+           <button class="acct-photo-link" data-avatar="pick">${u.avatar_url ? 'Change photo' : 'Add a photo'}</button>
+           ${u.avatar_url ? `<button class="acct-photo-link acct-photo-link-danger" data-avatar="remove">Remove</button>` : ''}
+           <span style="font-size:11.5px; color:var(--text-3);">JPEG, PNG or WebP — cropped square and resized to ${AVATAR_PX}px here in your browser.</span>
+         </div>
        </div>
        <span class="stag stag-on">role: ${esc(u.role || 'user')}</span>
      </div>
+     <input type="file" id="avatarFile" accept="image/jpeg,image/png,image/webp" style="display:none;">
      <div class="set-grid2" style="margin-top:20px;">
        <div><label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:5px;">Display name</label>
          <input class="chan-input" style="max-width:none; margin-top:0;" id="acctName" value="${esc(u.name || '')}"></div>
@@ -959,6 +993,64 @@
        Sign out
      </button>
    </div>`;
+ }
+
+ // renderSection() calls this once the markup is in the DOM: the <img> has no
+ // src until the fetch behind it comes back.
+ secAccount.after = () => {
+   bind('avatarFile', 'change', e => {
+     const f = e.target.files && e.target.files[0];
+     e.target.value = ''; // so picking the same file twice still fires
+     uploadAvatar(f);
+   });
+   const img = $('acctPhoto');
+   if (!img || img.tagName !== 'IMG') return;
+   fcAvatar.src(SESSION_USER.avatar_url, token).then(src => {
+     const el = $('acctPhoto');
+     // The section can re-render while the fetch is in flight.
+     if (el && el.tagName === 'IMG' && src) el.src = src;
+   });
+ };
+
+ // ── Profile photo ──
+ const AVATAR_PX = window.fcAvatar ? fcAvatar.SIZE : 256;
+
+ async function uploadAvatar(file) {
+   if (!file) return;
+   try {
+     showToast('Preparing your photo…');
+     const avatarUrl = await fcAvatar.prepare(file);
+     const r = await fetch(API + '/api/auth/profile/avatar', {
+       method: 'POST', headers: AUTH, body: JSON.stringify({ avatarUrl })
+     });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'Could not save that photo');
+     applyNewAvatar(d.user);
+     showToast('Profile photo updated.');
+   } catch (e) { showToast(e.message); }
+ }
+
+ async function removeAvatar() {
+   try {
+     const r = await fetch(API + '/api/auth/profile/avatar', { method: 'DELETE', headers: AUTH });
+     const d = await r.json();
+     if (!r.ok) throw new Error(d.error || 'Could not remove the photo');
+     applyNewAvatar(d.user);
+     showToast('Photo removed.');
+   } catch (e) { showToast(e.message); }
+ }
+
+ // A new photo has to land in three places, or it looks like it half-saved: this
+ // card, the rail avatar every other page shows, and the cached session both of
+ // them read on the next page load.
+ function applyNewAvatar(user) {
+   Object.assign(SESSION_USER, user || {});
+   try {
+     sessionStorage.setItem('finchat_user', JSON.stringify(SESSION_USER));
+     if (localStorage.getItem('finchat_session')) localStorage.setItem('finchat_session', JSON.stringify(SESSION_USER));
+   } catch (e) { /* storage full or blocked — the in-memory copy still updates */ }
+   if (window.fcSetRailAvatar) window.fcSetRailAvatar(SESSION_USER.avatar_url, SESSION_USER);
+   if (state.section === 'account') renderSection();
  }
 
  // ─────────────────────────────────────────────────────────────────────────
@@ -1362,6 +1454,9 @@
    if ((el = t.closest('[data-walink]'))) return linkWhatsApp();
    if (t.id === 'testBtn' || t.closest('#testBtn')) return sendTest();
    if (t.id === 'logoutBtn' || t.closest('#logoutBtn')) return logout();
+   if ((el = t.closest('[data-avatar]'))) {
+     return el.dataset.avatar === 'remove' ? removeAvatar() : $('avatarFile').click();
+   }
    if ((el = t.closest('[data-gmail]'))) return el.dataset.gmail === 'connect' ? connectGoogle() : askDisconnectGmail();
    if ((el = t.closest('[data-broker-connect]'))) return connectBroker(el.dataset.brokerConnect);
    if ((el = t.closest('[data-broker-login]'))) return zerodhaLogin();

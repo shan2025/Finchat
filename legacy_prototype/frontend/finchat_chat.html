@@ -701,6 +701,7 @@
          with a single re-added include). -->
     <script src="auth_session.js"></script>
     <script src="api_client.js"></script>
+    <script src="avatar_image.js"></script>
     <script src="system_panels.js"></script>
     <script src="knowledge_search.js"></script>
     <script src="notifications_widget.js"></script>
@@ -1549,11 +1550,24 @@
     // the user actually said. Both renderers now come through here, and the
     // `data-user-avatar` hook lets an upload restyle bubbles already on screen
     // without a reload.
+    // An uploaded photo is served from a route behind requireAuth, so
+    // avatar_url is not a thing an <img src> can load: avatar_image.js fetches
+    // it once with the session token and hands back a blob URL, and a Google
+    // picture passes straight through. Every avatar on this page draws from
+    // that resolved value, never from avatar_url directly.
+    function avatarSrc() { return SESSION_USER._avatarSrc || ''; }
+    async function resolveAvatarSrc() {
+      SESSION_USER._avatarSrc = SESSION_USER.avatar_url && window.fcAvatar
+        ? await fcAvatar.src(SESSION_USER.avatar_url)
+        : '';
+      return SESSION_USER._avatarSrc;
+    }
+
     function userAvatarMarkup() {
       const initials = (SESSION_USER.name || 'User')
         .split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-      const inner = SESSION_USER.avatar_url
-        ? `<img src="${SESSION_USER.avatar_url}" alt="${escHtml(SESSION_USER.name || 'You')}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      const inner = avatarSrc()
+        ? `<img src="${avatarSrc()}" alt="${escHtml(SESSION_USER.name || 'You')}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
         : initials;
       return `<div class="avatar user-avatar" data-user-avatar style="width:32px;height:32px;font-size:12px">${inner}</div>`;
     }
@@ -3014,6 +3028,17 @@
     // ── Init UI from session ─────────────────────────────
     (function initSessionUI() {
       if (!SESSION_USER) return;
+      // The cached avatar_url is a path, so the picture is one fetch away.
+      // Initials paint first and the photo replaces them when it lands.
+      resolveAvatarSrc().then(src => {
+        if (!src) return;
+        const img = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        const sb = document.getElementById('sidebarAvatar');
+        if (sb) sb.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        const tb = document.getElementById('topbarUserIcon');
+        if (tb) tb.innerHTML = img;
+        refreshUserAvatars();
+      });
       const name = SESSION_USER.name || 'User';
       const role = SESSION_USER.role || 'user';
 
@@ -3031,12 +3056,12 @@
 
       if (nameEl) nameEl.textContent = name;
       const topbarUserIcon = document.getElementById('topbarUserIcon');
-      if (topbarUserIcon && SESSION_USER.avatar_url) {
-        topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      if (topbarUserIcon && avatarSrc()) {
+        topbarUserIcon.innerHTML = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
       }
       if (avatarEl) {
-        if (SESSION_USER.avatar_url) {
-          avatarEl.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        if (avatarSrc()) {
+          avatarEl.innerHTML = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
         } else {
           const textSpan = document.getElementById('sidebarAvatarText');
           if (textSpan) textSpan.textContent = initials;
@@ -3061,7 +3086,8 @@
             _session.avatar_url = fresh.avatar_url;
             sessionStorage.setItem('finchat_user', JSON.stringify(_session));
             if (localStorage.getItem('finchat_session')) localStorage.setItem('finchat_session', JSON.stringify(_session));
-            const img = `<img src="${fresh.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            await resolveAvatarSrc();
+            const img = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
             const sb = document.getElementById('sidebarAvatar');
             if (sb) sb.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
             const tb = document.getElementById('topbarUserIcon');
@@ -3277,62 +3303,57 @@
     let phantomWallet = null;
     let selectedTier = null;
 
-    function uploadProfileAvatar(files) {
+    // This used to FileReader the picked file straight to base64 and post it
+    // whole, which is how an account ended up with 3.3MB of data: URL in its
+    // users row — re-read by every /api/auth/me call, on every page. It now
+    // goes through the same crop-and-resize as Settings, so what leaves the
+    // browser is about 20KB.
+    async function uploadProfileAvatar(files) {
       if (!files || files.length === 0) return;
-      const file = files[0];
-      if (!file.type.startsWith('image/')) {
-        showToast('Please select a valid image file.', 'warning');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64Url = e.target.result;
-        try {
-          showToast('Uploading profile photo...', 'info');
-          const token = _session?.token;
-          const r = await fetch(`${API_URL}/api/auth/profile/avatar`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ avatarUrl: base64Url })
-          });
-          if (!r.ok) {
-            const errData = await r.json().catch(() => ({}));
-            throw new Error(errData.error || 'Upload failed');
-          }
-          const data = await r.json();
-          SESSION_USER.avatar_url = data.user?.avatar_url || base64Url;
-          _session.avatar_url = SESSION_USER.avatar_url;
-          sessionStorage.setItem('finchat_user', JSON.stringify(_session));
-          if (localStorage.getItem('finchat_session')) {
-            localStorage.setItem('finchat_session', JSON.stringify(_session));
-          }
+      try {
+        showToast('Preparing your photo...', 'info');
+        const avatarUrl = await fcAvatar.prepare(files[0]);
+        const r = await fetch(`${API_URL}/api/auth/profile/avatar`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${_session?.token}`
+          },
+          body: JSON.stringify({ avatarUrl })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || 'Upload failed');
 
-          // Update settings & sidebar avatars
-          const settingsAvatar = document.getElementById('settingsAvatar');
-          if (settingsAvatar) settingsAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-          const sidebarAvatar = document.getElementById('sidebarAvatar');
-          if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
-          const topbarUserIcon = document.getElementById('topbarUserIcon');
-          if (topbarUserIcon) topbarUserIcon.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-          refreshUserAvatars();
-
-          showToast('Profile photo updated successfully!', 'success');
-        } catch (err) {
-          showToast(`Photo update error: ${err.message}`, 'danger');
+        SESSION_USER.avatar_url = data.user?.avatar_url || '';
+        _session.avatar_url = SESSION_USER.avatar_url;
+        sessionStorage.setItem('finchat_user', JSON.stringify(_session));
+        if (localStorage.getItem('finchat_session')) {
+          localStorage.setItem('finchat_session', JSON.stringify(_session));
         }
-      };
-      reader.readAsDataURL(file);
+        await resolveAvatarSrc();
+
+        // Update settings & sidebar avatars
+        const img = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        const settingsAvatar = document.getElementById('settingsAvatar');
+        if (settingsAvatar) settingsAvatar.innerHTML = img;
+        const sidebarAvatar = document.getElementById('sidebarAvatar');
+        if (sidebarAvatar) sidebarAvatar.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        const topbarUserIcon = document.getElementById('topbarUserIcon');
+        if (topbarUserIcon) topbarUserIcon.innerHTML = img;
+        refreshUserAvatars();
+
+        showToast('Profile photo updated successfully!', 'success');
+      } catch (err) {
+        showToast(`Photo update error: ${err.message}`, 'danger');
+      }
     }
 
     function openSettings() {
       const initials = SESSION_USER.name ? SESSION_USER.name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2) : 'U';
       const settingsAvatar = document.getElementById('settingsAvatar');
       if (settingsAvatar) {
-        if (SESSION_USER.avatar_url) {
-          settingsAvatar.innerHTML = `<img src="${SESSION_USER.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        if (avatarSrc()) {
+          settingsAvatar.innerHTML = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         } else {
           settingsAvatar.textContent = initials;
         }
