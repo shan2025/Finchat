@@ -42,9 +42,9 @@
  .set-nav-btn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font-family: var(--sans);
    font-size: 13.5px; font-weight: 500; color: var(--text-2); background: transparent; border: 1px solid transparent;
    border-radius: 999px; padding: 8px 14px; cursor: pointer; transition: background .12s, color .12s; }
- .set-nav-btn:hover { background: rgba(var(--text-rgb), .06); color: var(--text); }
+ .set-nav-btn:hover { background: rgb(var(--text-rgb) / .06); color: var(--text); }
  .set-nav-btn.active { font-weight: 600; color: var(--accent); background: var(--accent-soft);
-   border-color: rgba(var(--accent-warm-rgb), .3); }
+   border-color: rgb(var(--accent-warm-rgb) / .3); }
  .set-nav-btn .label { flex: 1; }
  .set-nav-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warm); }
  .set-nav-btn .badge { font-size: 9.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
@@ -74,7 +74,7 @@
  .sb-primary { background: var(--accent-warm); color: #fff; }
  .sb-primary:hover { background: var(--accent-warm-hover); }
  .sb-secondary { border-color: var(--border-2); color: var(--text); background: transparent; }
- .sb-secondary:hover { background: rgba(var(--text-rgb), .06); }
+ .sb-secondary:hover { background: rgb(var(--text-rgb) / .06); }
  .sb-ghost { color: var(--accent-warm); background: transparent; padding-inline: 6px; }
  .sb-ghost:hover { text-decoration: underline; }
  .sb-danger { color: var(--danger); border-color: rgba(176,71,46,.4); background: transparent; }
@@ -126,10 +126,18 @@
 
  .set-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
+ /* Loading placeholders. A status request that is still in flight has no answer
+    yet, so we show the shape of the card instead of a default one — flashing
+    "needs setup" or an empty broker list at someone whose accounts are in fact
+    connected reads as the app losing them. */
+ .set-skel { border-radius: 6px; background: rgb(var(--text-rgb) / .11); animation: setSkelPulse 1.4s ease-in-out infinite; }
+ @keyframes setSkelPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+ @media (prefers-reduced-motion: reduce) { .set-skel { animation: none; } }
+
  .set-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
  .set-table th { text-align: left; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3);
    padding: 10px 8px; border-bottom: 1px solid var(--border); font-weight: 600; }
- .set-table td { padding: 10px 8px; border-bottom: 1px solid rgba(var(--text-rgb), .07); vertical-align: top; }
+ .set-table td { padding: 10px 8px; border-bottom: 1px solid rgb(var(--text-rgb) / .07); vertical-align: top; }
  .set-table tbody tr:last-child td { border-bottom: none; }
 
  .set-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -269,7 +277,7 @@
    section: 'notifications',
    dirty: false,
    prefs: {}, serverChannels: {}, waStatus: {}, deliveries: [],
-   gStatus: {},
+   gStatus: null,  // null until /integrations/google/status answers
    brokers: null, // { available, connections, zerodhaRedirectUri }
    chain: null, blocks: [],
    providers: null, // { catalogue, keys, access, referral }
@@ -550,10 +558,20 @@
    </div>`;
  }
 
+ // Card-shaped placeholders, used while a status request is still in flight.
+ const skelLine = (w, h) => `<div class="set-skel" style="width:${w}; height:${h || '11px'};"></div>`;
+ const skelCard = (h) => `
+   <div class="set-card" style="padding:20px; display:flex; flex-direction:column; gap:11px; min-height:${h || 78}px;">
+     ${skelLine('180px', '15px')}
+     ${skelLine('68%')}
+   </div>`;
+
  function secConnections() {
    const g = state.gStatus;
    let gmailCard;
-   if (!g.configured) {
+   if (!g) {
+     gmailCard = skelCard();
+   } else if (!g.configured) {
      gmailCard = `
      <div class="set-card" style="padding:20px;">
        <div class="rt">Gmail — job alerts <span class="stag stag-warn">needs setup</span></div>
@@ -721,15 +739,19 @@
 
  function secBrokers() {
    const d = state.brokers;
-   if (!d) return '<div class="set-card" style="padding:20px;"><div class="rd">Loading brokerage accounts…</div></div>';
    const byId = {};
-   for (const c of (d.connections || [])) byId[c.broker] = c;
+   for (const c of ((d && d.connections) || [])) byId[c.broker] = c;
+   // The heading is true whether or not the list has arrived, so it renders
+   // straight away and only the cards below it are placeholders.
+   const cards = d
+     ? (d.available || []).map(b => brokerCard(b, byId[b.broker])).join('')
+     : skelCard(122) + skelCard(122);
    return `
    <div style="margin-top:26px;">
      <h3 style="font-family:var(--serif); font-size:17px; margin:0 0 6px; color:var(--text);">Brokerage accounts</h3>
      <div class="rd" style="margin-bottom:12px;">Read-only links to where your money actually sits. Atlas prices these every day; nothing here can place a trade.</div>
      <div style="display:flex; flex-direction:column; gap:12px;">
-       ${(d.available || []).map(b => brokerCard(b, byId[b.broker])).join('')}
+       ${cards}
      </div>
    </div>`;
  }
