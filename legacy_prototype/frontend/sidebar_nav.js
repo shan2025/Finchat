@@ -177,6 +177,25 @@
     // which matches their previous hidden-below-md behaviour).
     '@media (max-width:767px) { #sideNav.sbn { transform:translateX(-100%); transition:transform .25s; z-index:60; } #sideNav.sbn.open { transform:translateX(0); box-shadow:0 20px 60px rgba(0,0,0,.45); } }',
     '@media (min-width:768px) { #sideNav.sbn { transform:none !important; } }',
+    // Mobile app bar. The drawer rule above hides the rail below 768px on every
+    // page, but only pages that ship their own toggle can open it again — on
+    // Knowledge, Reports and Audit a phone had no way to navigate at all. The
+    // bar is the fallback: shown only when the page has no toggle of its own
+    // (html.sbn-mbar-on), and it reserves its height on body so it never sits
+    // on top of a page header.
+    '.sbn-mbar { --sbn-bg:#2a241d; --sbn-fg:#efe6d6; display:none; }',
+    '.sbn-mbar.sbn-cream { --sbn-bg:#f3eee3; --sbn-fg:#3a2e23; }',
+    '.sbn-mbackdrop { display:none; }',
+    '@media (max-width:767px) {',
+    '  html.sbn-mbar-on .sbn-mbar { display:flex; position:fixed; left:0; right:0; top:0; z-index:50; height:calc(52px + env(safe-area-inset-top, 0px)); padding:env(safe-area-inset-top, 0px) 12px 0 8px; align-items:center; gap:8px; background:var(--sbn-bg); color:var(--sbn-fg); box-shadow:0 1px 0 rgba(127,127,127,.22); }',
+    '  html.sbn-mbar-on body { padding-top:calc(52px + env(safe-area-inset-top, 0px)); }',
+    '  .sbn-mbackdrop.sbn-show { display:block; position:fixed; inset:0; z-index:55; background:rgba(0,0,0,.45); }',
+    '}',
+    '.sbn-mbar-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; padding:0; border:none; border-radius:12px; background:transparent; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }',
+    '.sbn-mbar-btn:active { background:rgba(127,127,127,.2); }',
+    '.sbn-mbar .sbn-logo { margin-top:0; text-decoration:none; }',
+    '.sbn-mbar .sbn-logo svg { width:28px; }',
+    '.sbn-mbar .sbn-brand { font-size:21px; }',
     // Short viewports (a 768px laptop is ~720px once browser chrome is taken
     // out) — the full rail needs ~970px, so tighten the chrome around the nav
     // list and cap Recent, which claws back ~190px before scrolling has to
@@ -405,8 +424,72 @@
         nav.classList.remove('open');
         var bd = document.getElementById('navBackdrop');
         if (bd) bd.classList.add('hidden');
+        setMobileDrawer(false);
       });
     });
+
+    syncMobileBar(navTheme === 'cream');
+  }
+
+  // ── Mobile app bar (fallback drawer toggle) ────────────────────────────
+  // Pages that open the drawer themselves. Their handlers own #navBackdrop;
+  // the bar owns #sbnMBackdrop, so the two never fight over one element.
+  var PAGE_TOGGLE = '#navToggle, #nsMenu, [data-nav-toggle]';
+
+  function setMobileDrawer(open) {
+    var bd = document.getElementById('sbnMBackdrop');
+    // Closing only concerns the bar's own drawer — a page-driven one is left
+    // to the page, or this would fight its toggle.
+    if (!open && !(bd && bd.classList.contains('sbn-show'))) return;
+    var nav = document.getElementById('sideNav');
+    if (nav) nav.classList.toggle('open', open);
+    if (bd) bd.classList.toggle('sbn-show', open);
+    var btn = document.getElementById('sbnMToggle');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  // Idempotent: build() calls it on every theme switch, and syncActive() after
+  // every SPA swap — the incoming <main> may or may not carry its own toggle
+  // (Settings does, Knowledge and Reports do not), so the bar is re-decided
+  // per view rather than once per document.
+  function syncMobileBar(cream) {
+    if (!document.getElementById('sideNav') || !document.body) return;
+    var bar = document.getElementById('sbnMBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'sbnMBar';
+      bar.className = 'sbn-mbar';
+      bar.innerHTML =
+        '<button type="button" class="sbn-mbar-btn" id="sbnMToggle" aria-label="Open navigation" aria-controls="sideNav" aria-expanded="false">' +
+          '<span class="material-symbols-outlined" style="font-size:24px;">menu</span>' +
+        '</button>' +
+        '<a class="sbn-logo" href="finchat_chat.html" title="Home — Chat">' + MASCOT_HEAD + '</a>' +
+        '<a class="sbn-serif sbn-brand" href="finchat_chat.html" style="color:inherit; text-decoration:none;">FinChat</a>';
+      document.body.insertBefore(bar, document.body.firstChild);
+
+      var bd = document.createElement('div');
+      bd.id = 'sbnMBackdrop';
+      bd.className = 'sbn-mbackdrop';
+      document.body.appendChild(bd);
+
+      bar.querySelector('#sbnMToggle').addEventListener('click', function () {
+        var nav = document.getElementById('sideNav');
+        setMobileDrawer(!(nav && nav.classList.contains('open')));
+      });
+      bd.addEventListener('click', function () { setMobileDrawer(false); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setMobileDrawer(false);
+      });
+      // Rotating a phone to landscape can cross 768px with the drawer open;
+      // the desktop rule then shows the rail but the backdrop would linger.
+      window.addEventListener('resize', function () {
+        if (window.innerWidth >= 768) setMobileDrawer(false);
+      });
+    }
+    if (typeof cream === 'boolean') bar.classList.toggle('sbn-cream', cream);
+    var pageOwnsToggle = !!document.querySelector(PAGE_TOGGLE);
+    if (pageOwnsToggle) setMobileDrawer(false);
+    document.documentElement.classList.toggle('sbn-mbar-on', !pageOwnsToggle);
   }
 
   // ── Short-viewport scroll cues ─────────────────────────────────────────
@@ -451,6 +534,7 @@
       if (icon) icon.style.fontVariationSettings = act ? "'FILL' 1" : '';
     });
     revealActive(nav);
+    syncMobileBar();
   }
 
   // At short heights the current page's own link can start out below the fold.

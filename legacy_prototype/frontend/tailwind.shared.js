@@ -101,8 +101,15 @@ const SPACING = {
   'margin-desktop': '64px',
 };
 
+// `h-screen` is 100vh, which mobile browsers size as if their URL bar were
+// collapsed and never shrink for the on-screen keyboard — so a pinned layout
+// pushes its bottom edge (the chat composer) out of reach. dvh tracks what is
+// actually visible; the 100vh entry is the fallback for browsers without it.
+const VIEWPORT_HEIGHT = { screen: ['100vh', '100dvh'] };
+
 module.exports = {
   here,
+  VIEWPORT_HEIGHT,
   CONTENT,
   PLUGINS,
   THEME_TOKENS,
