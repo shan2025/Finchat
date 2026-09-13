@@ -514,6 +514,34 @@
     #recentList { max-height:74px; }
     #sideNav .fc-nav { padding:6px 12px !important; font-size:13.5px !important; }
   }
+
+  /* ── Print / export ──────────────────────────────────────────────────
+     On screen the page is locked to the viewport (body h-screen + overflow
+     hidden) and only #messages scrolls, so printing used to capture exactly
+     one screenful: the rest of the conversation fell off the bottom of the
+     sheet. Printing also dropped every background, turning the cream page and
+     tinted cards white. Here the viewport locks are released so the thread
+     flows across pages, the app chrome is removed, and colours are kept. */
+  @media print {
+    @page { margin: 12mm; }
+    html, body.bg-cream-bg {
+      height: auto !important; overflow: visible !important; background: #f5ead8 !important;
+    }
+    body.bg-cream-bg, body.bg-cream-bg * {
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+    #sideNav, #chatHeader, #composerWrap, #fcNapMascot, #notifDropdown, #toast,
+    .msg-copy, .sb-actions { display: none !important; }
+    #chatShell, #chatShell > main, #chatShell > main > section, #messages {
+      display: block !important; height: auto !important; min-height: 0 !important;
+      overflow: visible !important; margin-left: 0 !important; padding-bottom: 0 !important;
+    }
+    #messages > * { break-inside: avoid-page; }
+    .markdown-body pre, .markdown-body .md-table-scroll { overflow: visible !important; white-space: pre-wrap; }
+
+    /* A study card's Export button prints that one answer, not the thread. */
+    body.fc-print-one #messages > *:not(.fc-print-target) { display: none !important; }
+  }
 </style>
 </head>
 
@@ -611,7 +639,7 @@
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
 <!-- ═══════════════════════════════════ -->
-<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div id="chatShell" class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top header (single, design: Chat.dc.html) -->
   <header id="chatHeader" class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
@@ -1431,7 +1459,22 @@
       const bubble = (saveBtn || exportBtn).closest('[data-study]');
       if (!bubble) return;
 
-      if (exportBtn) { window.print(); return; }
+      if (exportBtn) {
+        // Print only the row holding this answer; the print CSS hides its
+        // siblings while body.fc-print-one is set. Cleared on afterprint, which
+        // fires whether the dialog was printed or cancelled.
+        const row = [...document.getElementById('messages').children].find(c => c.contains(bubble));
+        if (row) {
+          row.classList.add('fc-print-target');
+          document.body.classList.add('fc-print-one');
+          window.addEventListener('afterprint', () => {
+            row.classList.remove('fc-print-target');
+            document.body.classList.remove('fc-print-one');
+          }, { once: true });
+        }
+        window.print();
+        return;
+      }
 
       const root = bubble.querySelector('.sb-root');
       const text = root ? root.innerText.trim() : '';
