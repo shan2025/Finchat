@@ -68,18 +68,16 @@
 
   var AGENT_AVATARS = {
     plato: 'plato_avatar.png', aurelius: 'aurelius_avatar.png',
-    atlas: 'atlas_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png'
+    atlas: 'atlas_avatar.png', rasha: 'rasha_avatar.png', nova: 'nova_avatar.png',
+    hopper: 'hopper_avatar.png', feynman: 'feynman_avatar.png'
   };
   // Agents with no PNG of their own. Without an entry here they fall through to
   // the generic 🤖 bubble, which reads as "unknown sender" rather than as a
   // named agent — so they get a coloured initial plate instead.
   // The server's personaAvatar for these is SVG markup, which the fallback below
   // escapes and prints as text — that is how "<rect rx=..." ended up spilling
-  // across the Recent list. Colours match the avatars in services/personas.js.
-  var AGENT_PLATES = {
-    hopper: { bg: '#232b34', fg: '#8fb8de', initial: 'H' },
-    feynman: { bg: '#2c3a33', fg: '#e8b86d', initial: 'F' }
-  };
+  // across the Recent list.
+  var AGENT_PLATES = {};
   function agentBubble(id) {
     var base = 'width:24px; height:24px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;';
     if (AGENT_AVATARS[id]) {
