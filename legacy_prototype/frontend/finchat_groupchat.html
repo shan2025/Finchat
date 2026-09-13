@@ -58,8 +58,8 @@
   <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
-  <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Group Chat</h1>
-  <span id="hdrSub" class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:240px;">agents + you, one room</span>
+  <h1 class="fc-h1 shrink-0">Group Chat</h1>
+  <span id="hdrSub" class="text-[10px] uppercase tracking-widest truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:240px;">agents + you, one room</span>
   <div class="flex-1"></div>
   <button onclick="openCreateModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white shrink-0" style="background:#3a2e23;">
    <span class="material-symbols-outlined text-[16px]">group_add</span> New group
@@ -83,7 +83,7 @@
 
   <!-- Group list -->
   <aside id="groupListCol" class="w-72 border-r flex flex-col shrink-0" style="background:var(--surface2); border-color:var(--border);">
-   <div class="px-4 py-3 text-[10px] uppercase tracking-widest font-mono font-bold" style="color:var(--text3);">Your groups</div>
+   <div class="px-4 py-3 text-[10px] uppercase tracking-widest font-bold" style="color:var(--text3);">Your groups</div>
    <div id="groupList" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
     <div class="px-3 py-2 text-xs" style="color:var(--text3);">Loading…</div>
    </div>
@@ -145,7 +145,7 @@
        <span class="material-symbols-outlined text-[18px]">send</span>
       </button>
      </div>
-     <div class="mt-1.5 px-2 text-[10px] font-mono" style="color:var(--text3);">
+     <div class="mt-1.5 px-2 text-[10px]" style="color:var(--text3);">
       Tip: "/task @aurelius check BTC price and news" gives Aurelius real background work — the result posts back here.
      </div>
     </div>
@@ -158,14 +158,14 @@
 <div id="createModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4" style="background:rgba(30,22,15,.55);">
  <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
   <div class="flex items-center justify-between mb-4">
-   <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">New group chat</h2>
+   <h2 class="fc-h2">New group chat</h2>
    <button onclick="closeCreateModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
   </div>
   <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Group name</label>
   <input id="newGrpName" placeholder="e.g. Morning market huddle" class="w-full mt-1 mb-4 px-4 py-2.5 rounded-2xl text-sm border-0 outline-none" style="background:var(--surface2); border:1px solid var(--border) !important;" />
   <div class="flex items-center justify-between">
    <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agents in this group</label>
-   <span id="agentCount" class="text-[11px] font-mono" style="color:var(--text3);">0 selected</span>
+   <span id="agentCount" class="text-[11px]" style="color:var(--text3);">0 selected</span>
   </div>
   <div id="agentPicker" class="mt-2 space-y-2 max-h-56 overflow-y-auto pr-1">
    <div class="text-xs" style="color:var(--text3);">Loading agents…</div>
@@ -178,7 +178,7 @@
 <div id="taskModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4" style="background:rgba(30,22,15,.55);">
  <div class="w-full max-w-md rounded-3xl p-6 shadow-2xl" style="background:#fffaf0; border:1px solid #e3d3ba;">
   <div class="flex items-center justify-between mb-4">
-   <h2 class="text-lg font-bold" style="font-family:Georgia, serif;">Assign a task</h2>
+   <h2 class="fc-h2">Assign a task</h2>
    <button onclick="closeTaskModal()" class="w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2);"><span class="material-symbols-outlined text-[18px]">close</span></button>
   </div>
   <label class="text-[11px] font-bold uppercase tracking-wider" style="color:var(--text3);">Agent</label>
@@ -277,7 +277,7 @@
      <div class="flex items-center gap-2">
       <span class="material-symbols-outlined text-[18px]">forum</span>
       <span class="font-bold text-[13px] truncate flex-1">${esc(g.name)}</span>
-      <span class="text-[10px] font-mono opacity-70">${g.agent_count}🤖</span>
+      <span class="text-[10px] opacity-70">${g.agent_count}🤖</span>
      </div>
      <div class="text-[11px] truncate mt-0.5 opacity-70">${g.last_message ? mdLine(g.last_message) : 'No messages yet'}</div>
     </div>`).join('');
@@ -358,7 +358,7 @@
    <div class="max-w-[75%] min-w-0">
     <div class="text-[11px] font-bold mb-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text2);">${esc(name)}${fallbackBadge}${taskBadge}</div>
     <div class="px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed markdown-body" style="${isUser ? 'background:#3a2e23; color:#efe8de;' : 'background:var(--surface); border:1px solid var(--border);'}">${body}</div>
-    <div class="text-[10px] font-mono mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
+    <div class="text-[10px] mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
      <button class="ml-1 opacity-60 hover:opacity-100" title="Copy message" onclick="navigator.clipboard.writeText(this.closest('div').parentNode.querySelector('.markdown-body').innerText).then(()=>showToast('Message copied'))"><span class="material-symbols-outlined text-[12px] align-middle">content_copy</span></button>
     </div>
    </div>`;

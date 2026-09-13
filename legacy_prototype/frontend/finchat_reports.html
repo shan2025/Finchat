@@ -34,7 +34,7 @@
  /* Report card visuals — lead with the numbers, keep prose optional. */
  .stat-row{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
  .stat{ flex:1 1 120px; min-width:108px; background:var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
- .stat-n{ font-size:26px; font-weight:800; letter-spacing:-.02em; color:var(--txt); line-height:1; font-variant-numeric:tabular-nums; }
+ .stat-n{ font-family:var(--serif); font-size:var(--fs-stat); font-weight:400; color:var(--txt); line-height:1; font-variant-numeric:tabular-nums; }
  .stat-l{ font-size:11.5px; font-weight:600; color:var(--sub); margin-top:5px; }
  .bars-wrap{ margin-top:4px; }
  .bars-title{ font-size:12px; font-weight:700; color:var(--sub); margin-bottom:8px; }
@@ -69,8 +69,8 @@
     <div class="flex items-center gap-2 text-[13px] font-semibold" style="color:var(--sub)">
      <span class="material-symbols-outlined" style="font-size:18px">assessment</span> Reports
     </div>
-    <h1 class="text-3xl font-extrabold mt-1" style="letter-spacing:-.02em">Memory reports</h1>
-    <p class="text-sm mt-1" style="color:var(--sub)">Periodic, shareable narratives generated over the live memory vitals.</p>
+    <h1 class="fc-h1 mt-1">Memory reports</h1>
+    <p class="fc-sub mt-1">Periodic, shareable narratives generated over the live memory vitals.</p>
    </div>
   </div>
 

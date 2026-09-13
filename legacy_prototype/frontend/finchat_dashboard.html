@@ -64,10 +64,10 @@
             <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
                 FinChat
             </h1>
-            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+            <p class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
         </div>
         <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
             <a class="flex items-center gap-3 px-3 py-2 text-primary-brown bg-cream-bg rounded-full font-bold cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
                 <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
                 <span class="font-body-sm font-medium">Operations</span>
@@ -105,7 +105,7 @@
                 <span class="font-body-sm font-medium">Audit Logs</span>
             </a>
             <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
                 <span class="material-symbols-outlined text-[20px]" >settings</span>
                 <span class="font-body-sm font-medium">Settings</span>
@@ -139,8 +139,8 @@
       <button id="navToggle" title="Menu" class="md:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
         <span class="material-symbols-outlined text-[20px]">menu</span>
       </button>
-      <h1 class="text-lg md:text-2xl truncate tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;"><span class="md:hidden">Operations</span><span class="hidden md:inline">Agent Operations Dashboard</span></h1>
-      <span class="hidden sm:flex shrink-0 px-3 py-1 rounded-full text-xs font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] items-center gap-1.5" id="liveStatusBadge">
+      <h1 class="fc-h1 truncate"><span class="md:hidden">Operations</span><span class="hidden md:inline">Agent Operations Dashboard</span></h1>
+      <span class="hidden sm:flex shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] items-center gap-1.5" id="liveStatusBadge">
         <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span> LIVE PULSE
       </span>
     </div>
@@ -175,21 +175,21 @@
       <!-- SYSTEM INTEGRITY STRIP -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
-          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Proof Chain</div>
-          <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="intBlocks">—</div>
-          <div class="text-[10px] text-[#8c7a6b] font-mono">messages hashed</div>
+          <div class="fc-kicker">Proof Chain</div>
+          <div class="fc-stat text-[#3a2e23] mt-1" id="intBlocks">—</div>
+          <div class="text-[10px] text-[#8c7a6b]">messages hashed</div>
         </div>
         <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
-          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Solana Anchors</div>
-          <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="intAnchors">—</div>
-          <div class="text-[10px] text-[#8c7a6b] font-mono">checkpoints on devnet</div>
+          <div class="fc-kicker">Solana Anchors</div>
+          <div class="fc-stat text-[#3a2e23] mt-1" id="intAnchors">—</div>
+          <div class="text-[10px] text-[#8c7a6b]">checkpoints on devnet</div>
         </div>
         <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
-          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Devnet Status</div>
+          <div class="fc-kicker">Devnet Status</div>
           <div class="text-sm font-bold mt-2 flex items-center gap-1.5 text-[#3a2e23]" id="intSolana"><span class="w-2 h-2 rounded-full bg-[#8c7a6b]"></span> checking…</div>
         </div>
         <div class="bg-cream-bg border border-border-color rounded-2xl p-4 min-w-0">
-          <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Last Anchor</div>
+          <div class="fc-kicker">Last Anchor</div>
           <div class="text-xs font-mono text-[#3a2e23] mt-2 truncate" id="intLastAnchor">—</div>
         </div>
       </div>
@@ -200,32 +200,32 @@
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">hub</span> Knowledge Memory
           </h3>
-          <span class="text-xs text-[#8c7a6b] font-mono">Graph-RAG · Procedural chaining</span>
+          <span class="text-xs text-[#8c7a6b]">Graph-RAG · Procedural chaining</span>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Entities</div>
-            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memEntities">—</div>
-            <div class="text-[10px] text-[#8c7a6b] font-mono">nodes in graph</div>
+            <div class="fc-kicker">Entities</div>
+            <div class="fc-stat text-[#3a2e23] mt-1" id="memEntities">—</div>
+            <div class="text-[10px] text-[#8c7a6b]">nodes in graph</div>
           </div>
           <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Edges</div>
-            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memEdges">—</div>
-            <div class="text-[10px] text-[#8c7a6b] font-mono">learned relationships</div>
+            <div class="fc-kicker">Edges</div>
+            <div class="fc-stat text-[#3a2e23] mt-1" id="memEdges">—</div>
+            <div class="text-[10px] text-[#8c7a6b]">learned relationships</div>
           </div>
           <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Skill Recipes</div>
-            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memRecipes">—</div>
-            <div class="text-[10px] text-[#8c7a6b] font-mono">reusable plans</div>
+            <div class="fc-kicker">Skill Recipes</div>
+            <div class="fc-stat text-[#3a2e23] mt-1" id="memRecipes">—</div>
+            <div class="text-[10px] text-[#8c7a6b]">reusable plans</div>
           </div>
           <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-            <div class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Recipe Reuses</div>
-            <div class="text-2xl font-bold text-[#3a2e23] mt-1 font-mono" id="memReuses">—</div>
-            <div class="text-[10px] text-[#8c7a6b] font-mono">times injected as context</div>
+            <div class="fc-kicker">Recipe Reuses</div>
+            <div class="fc-stat text-[#3a2e23] mt-1" id="memReuses">—</div>
+            <div class="text-[10px] text-[#8c7a6b]">times injected as context</div>
           </div>
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-2">
-          <span class="text-[10px] uppercase tracking-wider text-[#8c7a6b] font-mono">Top entities:</span>
+          <span class="fc-kicker">Top entities:</span>
           <span id="memTopEntities" class="text-xs text-[#5c4a38]">—</span>
         </div>
       </div>
@@ -236,7 +236,7 @@
           <h2 class="text-lg font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">groups</span> Specialist Executive Team Pulse
           </h2>
-          <span class="text-xs text-[#8c7a6b] font-mono">Status updated in real-time</span>
+          <span class="text-xs text-[#8c7a6b]">Status updated in real-time</span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="agentsGrid">
@@ -259,24 +259,24 @@
             </h3>
             <div class="grid grid-cols-2 gap-4">
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">RUNNING NOW</div>
-                <div class="text-2xl font-bold font-mono text-[#3b82f6] mt-1" id="qActive">0</div>
+                <div class="fc-kicker">RUNNING NOW</div>
+                <div class="fc-stat text-[#3b82f6] mt-1" id="qActive">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">MISSIONS DUE</div>
-                <div class="text-2xl font-bold font-mono text-[#d97706] mt-1" id="qWaiting">0</div>
+                <div class="fc-kicker">MISSIONS DUE</div>
+                <div class="fc-stat text-[#d97706] mt-1" id="qWaiting">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">COMPLETED TODAY</div>
-                <div class="text-2xl font-bold font-mono text-[#16a34a] mt-1" id="qCompleted">0</div>
+                <div class="fc-kicker">COMPLETED TODAY</div>
+                <div class="fc-stat text-[#16a34a] mt-1" id="qCompleted">0</div>
               </div>
               <div class="bg-[#f3eee3] border border-border-color rounded-2xl p-3.5">
-                <div class="text-xs text-[#8c7a6b] font-mono">FAILED TODAY</div>
-                <div class="text-2xl font-bold font-mono text-[#dc2626] mt-1" id="qFailed">0</div>
+                <div class="fc-kicker">FAILED TODAY</div>
+                <div class="fc-stat text-[#dc2626] mt-1" id="qFailed">0</div>
               </div>
             </div>
           </div>
-          <div class="text-[11px] text-[#8c7a6b] mt-4 font-mono">Missions fired by external cron · state in Postgres</div>
+          <div class="text-[11px] text-[#8c7a6b] mt-4">Missions fired by external cron · state in Postgres</div>
         </div>
 
         <!-- Morning Executive Briefing Trigger Card -->
@@ -285,8 +285,8 @@
           <div>
             <div class="flex justify-between items-start">
               <div>
-                <span class="text-xs font-bold uppercase tracking-wider text-[#d97706] font-mono bg-[#fef3c7] border border-[#fde68a] px-2.5 py-1 rounded-full">Automated Cron Routine</span>
-                <h3 class="text-xl font-bold text-[#3a2e23] font-serif mt-2" style="font-family: Georgia, serif;">Daily Morning Executive Briefing</h3>
+                <span class="text-xs font-bold uppercase tracking-wider text-[#d97706] bg-[#fef3c7] border border-[#fde68a] px-2.5 py-1 rounded-full">Automated Cron Routine</span>
+                <h3 class="fc-h3 mt-2">Daily Morning Executive Briefing</h3>
               </div>
               <span class="material-symbols-outlined text-[#8c7a6b] text-[36px]">wb_twilight</span>
             </div>
@@ -309,7 +309,7 @@
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">forum</span> Council Debate
           </h3>
-          <span class="text-xs text-[#8c7a6b] font-mono">Multi-agent deliberation → Plato consensus</span>
+          <span class="text-xs text-[#8c7a6b]">Multi-agent deliberation → Plato consensus</span>
         </div>
         <div class="flex flex-col gap-3">
           <div class="flex flex-col md:flex-row gap-3">
@@ -327,7 +327,7 @@
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="nova" checked> Nova <span class="text-[#8c7a6b]">(research)</span></label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="atlas"> Atlas <span class="text-[#8c7a6b]">(portfolio)</span></label>
             <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="rasha"> Rasha <span class="text-[#8c7a6b]">(career)</span></label>
-            <span class="ml-auto font-mono text-[10px] text-[#d97706]" id="debateProgress"></span>
+            <span class="ml-auto text-[10px] text-[#d97706]" id="debateProgress"></span>
           </div>
           <div id="debateResult" class="hidden mt-2"></div>
         </div>
@@ -339,13 +339,13 @@
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">stream</span> Live Cognitive Activity Feed
           </h3>
-          <span class="text-xs text-[#8c7a6b] font-mono">Last 15 executions</span>
+          <span class="text-xs text-[#8c7a6b]">Last 15 executions</span>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b border-border-color text-[11px] font-bold uppercase tracking-wider text-[#8c7a6b] font-mono">
+              <tr class="border-b border-border-color text-[11px] font-bold uppercase tracking-wider text-[#8c7a6b]">
                 <th class="py-3 px-4">Agent</th>
                 <th class="py-3 px-4">Goal / Task</th>
                 <th class="py-3 px-4">Status</th>
@@ -356,7 +356,7 @@
             </thead>
             <tbody id="activityTableBody" class="text-xs divide-y divide-[#d6ccbc]/60">
               <tr>
-                <td colspan="6" class="py-8 text-center text-[#8c7a6b] font-mono">Loading activity stream...</td>
+                <td colspan="6" class="py-8 text-center text-[#8c7a6b]">Loading activity stream...</td>
               </tr>
             </tbody>
           </table>
@@ -504,10 +504,10 @@
           : 'border border-border-color bg-cream-bg';
 
       const statusBadge = isWorking
-        ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#dbafe9] text-[#1e40af] border border-[#bfdbfe] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#3b82f6]"></span> WORKING / BUSY</span>`
+        ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#dbafe9] text-[#1e40af] border border-[#bfdbfe] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#3b82f6]"></span> WORKING / BUSY</span>`
         : isWaiting
-          ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#fef3c7] text-[#92400e] border border-[#fde68a] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#d97706]"></span> WAITING (HITL)</span>`
-          : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span> AT REST / IDLE</span>`;
+          ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#fef3c7] text-[#92400e] border border-[#fde68a] flex items-center gap-1.5 pulse-working"><span class="w-1.5 h-1.5 rounded-full bg-[#d97706]"></span> WAITING (HITL)</span>`
+          : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span> AT REST / IDLE</span>`;
 
       let taskContent = `<div class="text-xs text-[#8c7a6b] italic py-4">Currently at rest. Standing by for incoming cognitive tasks.</div>`;
       if (agent.activeTask) {
@@ -521,12 +521,12 @@
         taskContent = `
           <div class="mt-3 pt-3 border-t border-border-color/80 flex flex-col gap-2">
             <div class="text-[11px] font-bold text-[#3a2e23] line-clamp-2">"${t.goal}"</div>
-            <div class="flex justify-between items-center text-[10px] font-mono text-[#8c7a6b]">
+            <div class="flex justify-between items-center text-[10px] text-[#8c7a6b]">
               <span>Steps: ${t.iterations}</span>
               <span>Tools: ${t.toolCalls}</span>
               <span>Time: ${elapsed}s</span>
             </div>
-            <div class="flex justify-between items-center text-[10px] font-mono">
+            <div class="flex justify-between items-center text-[10px]">
               <span class="text-[#b45309] font-bold" title="LLM tokens burned on this task so far">🔥 ${(t.tokensUsed || 0).toLocaleString()} tok</span>
               <span class="${isWaiting ? 'text-[#d97706]' : 'text-[#16a34a]'} font-bold" title="Estimated time remaining, based on this agent's average task duration">⏳ ${etaLabel}</span>
             </div>
@@ -545,7 +545,7 @@
                 </span>
                 <div>
                   <h3 class="font-bold text-base text-[#3a2e23]">${agent.name}</h3>
-                  <p class="text-[11px] text-[#8c7a6b] font-mono">${agent.role}</p>
+                  <p class="text-[11px] text-[#8c7a6b]">${agent.role}</p>
                 </div>
               </div>
             </div>
@@ -554,7 +554,7 @@
             </div>
             ${taskContent}
           </div>
-          <div class="mt-4 pt-3 border-t border-border-color/60 flex justify-between items-center text-[11px] font-mono text-[#8c7a6b]">
+          <div class="mt-4 pt-3 border-t border-border-color/60 flex justify-between items-center text-[11px] text-[#8c7a6b]">
             <span title="Total tasks handled by this agent">${(agent.burn?.tasks || 0)} tasks · ${(agent.burn?.toolCalls || 0)} tool calls</span>
             <span class="text-[#b45309] font-bold" title="Lifetime LLM tokens burned by this agent">🔥 ${(agent.burn?.tokens || 0).toLocaleString()} tok</span>
           </div>
@@ -574,7 +574,7 @@
     // 3. Render Activity Table
     const tbody = document.getElementById('activityTableBody');
     if (!data.recentActivity || data.recentActivity.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-[#8c7a6b] font-mono">No recent tasks recorded yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-[#8c7a6b]">No recent tasks recorded yet.</td></tr>`;
       return;
     }
 
@@ -592,11 +592,11 @@
     const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     data.recentActivity.forEach(act => {
       const goalText = stripMd(act.goal);
-      let stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#f3eee3] text-[#5c4a38]">${act.state.toUpperCase()}</span>`;
-      if (act.state === 'completed') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#dcfce7] text-[#166534]">COMPLETED</span>`;
-      if (act.state === 'running' || act.state === 'ready') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#bfdbfe] text-[#1e40af] animate-pulse">RUNNING</span>`;
-      if (act.state === 'waiting') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#fef3c7] text-[#92400e]">WAITING</span>`;
-      if (act.state === 'failed') stateBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#fee2e2] text-[#991b1b]">FAILED</span>`;
+      let stateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#f3eee3] text-[#5c4a38]">${act.state.toUpperCase()}</span>`;
+      if (act.state === 'completed') stateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#dcfce7] text-[#166534]">COMPLETED</span>`;
+      if (act.state === 'running' || act.state === 'ready') stateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#bfdbfe] text-[#1e40af] animate-pulse">RUNNING</span>`;
+      if (act.state === 'waiting') stateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fef3c7] text-[#92400e]">WAITING</span>`;
+      if (act.state === 'failed') stateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#fee2e2] text-[#991b1b]">FAILED</span>`;
 
       const toolsList = act.toolsInvoked && act.toolsInvoked.length > 0
         ? act.toolsInvoked.map(t => `<span class="bg-[#f3eee3] border border-border-color px-1.5 py-0.5 rounded text-[10px] font-mono">${t.tool}</span>`).join(' ')
@@ -608,8 +608,8 @@
           <td class="py-3.5 px-4 max-w-md truncate text-[#3a2e23]" title="${esc(goalText)}">${esc(goalText)}</td>
           <td class="py-3.5 px-4">${stateBadge}</td>
           <td class="py-3.5 px-4 flex flex-wrap gap-1">${toolsList}</td>
-          <td class="py-3.5 px-4 font-mono text-[#5c4a38]">${act.iterationsUsed} step(s)</td>
-          <td class="py-3.5 px-4 font-mono text-[#8c7a6b] text-[11px]">${new Date(act.updatedAt).toLocaleTimeString()} (${act.durationSeconds}s)</td>
+          <td class="py-3.5 px-4 text-[#5c4a38]">${act.iterationsUsed} step(s)</td>
+          <td class="py-3.5 px-4 text-[#8c7a6b] text-[11px]">${new Date(act.updatedAt).toLocaleTimeString()} (${act.durationSeconds}s)</td>
         </tr>
       `;
     });
@@ -728,7 +728,7 @@
 
     let html = '<div class="flex flex-col gap-4">';
     html += `<div class="flex items-center gap-2 flex-wrap">
-      <span class="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${d.conflictDetected ? 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]' : 'bg-[#dcfce7] text-[#166534] border border-[#bbf7d0]'}">${d.conflictDetected ? '⚔ CONFLICT — ' + d.roundsRun + ' round(s)' : '✓ CONSENSUS'}</span>
+      <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${d.conflictDetected ? 'bg-[#fef3c7] text-[#92400e] border border-[#fde68a]' : 'bg-[#dcfce7] text-[#166534] border border-[#bbf7d0]'}">${d.conflictDetected ? '⚔ CONFLICT — ' + d.roundsRun + ' round(s)' : '✓ CONSENSUS'}</span>
       <span class="text-[11px] text-[#8c7a6b]">${(d.participants || []).map(p => p.name).join(' · ')}</span>
     </div>`;
     if (d.conflictSummary) html += `<div class="text-xs text-[#5c4a38] italic">"${formatMd(d.conflictSummary, false)}"</div>`;

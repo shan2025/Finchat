@@ -109,10 +109,10 @@
     <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
       FinChat
     </h1>
-    <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+    <p class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
   </div>
   <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+    <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
     <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
       <span class="material-symbols-outlined text-[20px]">dashboard</span>
       <span class="font-body-sm font-medium">Operations</span>
@@ -150,7 +150,7 @@
       <span class="font-body-sm font-medium">Audit Logs</span>
     </a>
     <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+    <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
     <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
       <span class="material-symbols-outlined text-[20px]">settings</span>
       <span class="font-body-sm font-medium">Settings</span>
@@ -184,7 +184,7 @@
   <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
-  <h1 class="text-2xl tracking-normal font-bold shrink-0" style="font-family: Georgia, 'Times New Roman', Times, serif; color: var(--nm-accent-hi);">Neural Map</h1>
+  <h1 class="fc-h1 shrink-0" style="color: var(--txt);">Neural Map</h1>
   <span class="text-[10px] uppercase tracking-widest font-mono hidden xl:inline-block nm-sub truncate min-w-0" style="max-width:220px" id="mapStats">loading…</span>
 
   <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
@@ -298,7 +298,7 @@
   <div id="emptyVeil" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6 z-40"
        style="background: var(--bg); color: var(--sub);">
    <span class="material-symbols-outlined" style="font-size:52px; opacity:.4;">hub</span>
-   <div style="font-family: Georgia, serif; font-size:22px; color: var(--txt);">No map open</div>
+   <div class="fc-h2" style="color: var(--txt);">No map open</div>
    <div class="text-[13.5px] leading-relaxed" style="max-width:380px;">
     Open the System Map to see the live wiring of your agents, tools and learned
     concepts — or start a map of your own and build it node by node.
@@ -325,7 +325,7 @@
  <div class="nm-panel nm-surface w-full max-w-[560px] rounded-2xl shadow-2xl overflow-hidden">
   <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
    <div>
-    <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">New map</div>
+    <div class="fc-h2" style="color: var(--txt)">New map</div>
     <div class="text-[12px] nm-sub mt-0.5">What do you want to build?</div>
    </div>
    <button id="newMapClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
@@ -362,7 +362,7 @@
  <div class="nm-panel nm-surface w-full max-w-[520px] rounded-2xl shadow-2xl overflow-hidden flex flex-col" style="max-height:80vh;">
   <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border)">
    <div>
-    <div class="text-[19px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">Add a document</div>
+    <div class="fc-h2" style="color: var(--txt)">Add a document</div>
     <div class="text-[12px] nm-sub mt-0.5">Pick one of your uploaded files — it joins the map as a Document node you can connect.</div>
    </div>
    <button id="docModalClose" class="nm-sub"><span class="material-symbols-outlined text-[20px]">close</span></button>
@@ -1377,7 +1377,7 @@ function openNode(n) {
     <div class="flex items-center gap-2.5 min-w-0">
      <span class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-[15px]" style="background:${col}; color: var(--bg)">${esc(n.label.charAt(0).toUpperCase())}</span>
      <div class="min-w-0">
-      <input id="npLabel" value="${esc(n.label)}" class="w-full border-0 bg-transparent text-[19px] font-bold outline-none p-0" style="font-family: Georgia, serif; color: var(--txt)" />
+      <input id="npLabel" value="${esc(n.label)}" class="fc-h3 w-full border-0 bg-transparent outline-none p-0" style="font-size:19px; color: var(--txt)" />
       <div class="text-[10px] uppercase tracking-widest mt-0.5" style="color:${col}">${esc(TYPE_LABEL[n.type] || n.type)}${n.derived ? '' : ' · yours'}</div>
      </div>
     </div>
@@ -1607,7 +1607,7 @@ function openEdge(e) {
   <div class="p-4 border-b flex items-start justify-between gap-2" style="border-color: var(--border)">
    <div>
     <div class="text-[10px] uppercase tracking-widest nm-sub">Connection${e.derived ? '' : ' · yours'}</div>
-    <div class="flex items-center gap-2 mt-1 text-[16px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">
+    <div class="fc-h3 flex items-center gap-2 mt-1" style="color: var(--txt)">
      <span>${esc(a ? a.label : '?')}</span>
      <span class="material-symbols-outlined text-[18px]" style="color: var(--nm-accent-hi)">arrow_forward</span>
      <span>${esc(b ? b.label : '?')}</span>
@@ -1963,7 +1963,7 @@ async function openInsights() {
  panel.innerHTML = `
   <div class="p-4 border-b flex items-center justify-between" style="border-color: var(--border)">
    <div>
-    <div class="text-[17px] font-bold" style="font-family: Georgia, serif; color: var(--txt)">What your AI noticed</div>
+    <div class="fc-h3" style="color: var(--txt)">What your AI noticed</div>
     <div class="text-[11px] nm-sub">Gaps, contradictions and dream reports from the memory engine</div>
    </div>
    <button id="insClose" class="nm-sub"><span class="material-symbols-outlined text-[18px]">close</span></button>

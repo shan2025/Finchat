@@ -64,8 +64,8 @@
   <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
-  <h1 class="text-2xl font-bold shrink-0" style="font-family: Georgia, serif; color:#8c491a;">Blockchain</h1>
-  <span id="hdrChain" class="text-[10px] uppercase tracking-widest font-mono truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:280px;">connecting…</span>
+  <h1 class="fc-h1 shrink-0">Blockchain</h1>
+  <span id="hdrChain" class="text-[10px] uppercase tracking-widest truncate min-w-0 hidden sm:inline-block" style="color:var(--text3); max-width:280px;">connecting…</span>
   <div class="flex-1"></div>
   <button onclick="refreshAll(true)" title="Refresh" class="w-9 h-9 flex items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
    <span class="material-symbols-outlined text-[16px]" id="refreshIcon">sync</span>
@@ -91,7 +91,7 @@
    <!-- Status cards -->
    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
-     <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Active chain</div>
+     <div class="text-[10px] uppercase tracking-widest" style="color:var(--text3);">Active chain</div>
      <div class="mt-1.5 flex items-center gap-2">
       <span class="live-dot bad" id="rpcDot"></span>
       <span class="text-lg font-bold" id="chainName">—</span>
@@ -99,18 +99,18 @@
      <div class="text-[11px] font-mono mt-1 truncate" id="chainCluster" style="color:var(--text3);">—</div>
     </div>
     <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
-     <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Proof-chain height</div>
-     <div class="mt-1.5 text-2xl font-black font-mono" id="statHeight">—</div>
+     <div class="text-[10px] uppercase tracking-widest" style="color:var(--text3);">Proof-chain height</div>
+     <div class="mt-1.5 fc-stat" id="statHeight">—</div>
      <div class="text-[11px] mt-1" style="color:var(--text3);"><span id="statTotal">—</span> blocks total</div>
     </div>
     <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
-     <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Anchored on Solana</div>
-     <div class="mt-1.5 text-2xl font-black font-mono" id="statAnchored">—</div>
+     <div class="text-[10px] uppercase tracking-widest" style="color:var(--text3);">Anchored on Solana</div>
+     <div class="mt-1.5 fc-stat" id="statAnchored">—</div>
      <div class="text-[11px] mt-1" style="color:var(--text3);">every 10th block is a ⚓ checkpoint</div>
     </div>
     <div class="rounded-3xl p-5" style="background:var(--surface); border:1px solid var(--border);">
-     <div class="text-[10px] uppercase tracking-widest font-mono" style="color:var(--text3);">Live network slot</div>
-     <div class="mt-1.5 text-2xl font-black font-mono" id="statSlot">—</div>
+     <div class="text-[10px] uppercase tracking-widest" style="color:var(--text3);">Live network slot</div>
+     <div class="mt-1.5 fc-stat" id="statSlot">—</div>
      <div class="text-[11px] mt-1 truncate" style="color:var(--text3);">wallet <span id="statBalance">—</span> SOL</div>
     </div>
    </div>
@@ -121,11 +121,11 @@
      <h2 class="text-lg font-bold flex items-center gap-2">
       <span class="material-symbols-outlined">account_tree</span> Proof-of-conversation chain
      </h2>
-     <span class="text-[11px] font-mono" style="color:var(--text3);">newest on the right · hover to pause · click a block for details</span>
+     <span class="text-[11px]" style="color:var(--text3);">newest on the right · hover to pause · click a block for details</span>
     </div>
     <div id="chainViewport" class="mt-4 py-4">
      <div id="chainTrack">
-      <div class="text-xs font-mono px-4" style="color:var(--text3);">Loading blocks…</div>
+      <div class="text-xs px-4" style="color:var(--text3);">Loading blocks…</div>
      </div>
     </div>
     <div id="blockDetail" class="hidden mt-2 rounded-2xl p-4 text-[12px] font-mono break-all" style="background:var(--surface); border:1px solid var(--border);"></div>
@@ -194,7 +194,7 @@
   blocks = (await r.json()).blocks || [];
   const track = document.getElementById('chainTrack');
   if (!blocks.length) {
-   track.innerHTML = '<div class="text-xs font-mono px-4" style="color:var(--text3);">No blocks yet — send a chat message to mint block #1.</div>';
+   track.innerHTML = '<div class="text-xs px-4" style="color:var(--text3);">No blocks yet — send a chat message to mint block #1.</div>';
    return;
   }
   track.innerHTML = blocks.map((b, i) => {
@@ -209,7 +209,7 @@
      </div>
      <div class="text-[10px] font-mono mt-1.5 truncate" style="color:var(--text2);">${esc(String(b.hash).slice(0, 14))}…</div>
      <div class="text-[9px] font-mono mt-0.5 truncate" style="color:var(--text3);">prev ${esc(String(b.prev_hash || '').slice(0, 10))}…</div>
-     <div class="text-[9px] font-mono mt-1" style="color:var(--text3);">${new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${esc(b.sender_id || '')}</div>
+     <div class="text-[9px] mt-1" style="color:var(--text3);">${new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${esc(b.sender_id || '')}</div>
     </div>`;
   }).join('');
  }

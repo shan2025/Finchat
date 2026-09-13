@@ -53,23 +53,30 @@ const THEME_TOKENS = {
   'text-secondary': 'rgb(var(--text-2-rgb) / <alpha-value>)',
 };
 
+// Resolve through the finchat_theme.css stacks, so a Tailwind `font-serif` is
+// the same face as `var(--serif)`. These used to name Inter and Playfair
+// Display — Playfair is never loaded, so `font-serif` rendered Times New Roman.
+const SANS = ['var(--sans)'];
+const SERIF = ['var(--serif)'];
+const MONO = ['var(--mono)'];
+
 const FONT_FAMILY = {
-  'headline-lg': ['Inter'],
-  'headline-md': ['Inter'],
-  'headline-xl': ['Inter'],
-  'body-lg': ['Inter'],
-  'body-md': ['Inter'],
-  'body-sm': ['Inter'],
-  'code-md': ['JetBrains Mono'],
-  'code-sm': ['JetBrains Mono'],
-  'label-caps': ['JetBrains Mono'],
-  serif: ['Playfair Display', 'serif'],
-  sans: ['Inter', 'sans-serif'],
-  headline: ['Inter'],
-  display: ['Inter'],
-  body: ['Inter'],
-  label: ['Inter'],
-  mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+  'headline-lg': SANS,
+  'headline-md': SANS,
+  'headline-xl': SANS,
+  'body-lg': SANS,
+  'body-md': SANS,
+  'body-sm': SANS,
+  'code-md': MONO,
+  'code-sm': MONO,
+  'label-caps': SANS,
+  serif: SERIF,
+  sans: SANS,
+  headline: SANS,
+  display: SANS,
+  body: SANS,
+  label: SANS,
+  mono: MONO,
 };
 
 const FONT_SIZE = {

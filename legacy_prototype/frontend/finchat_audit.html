@@ -30,10 +30,10 @@
             <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
                 FinChat
             </h1>
-            <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+            <p class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
         </div>
         <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+            <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
                 <span class="material-symbols-outlined text-[20px]">dashboard</span>
                 <span class="font-body-sm font-medium">Operations</span>
@@ -71,7 +71,7 @@
                 <span class="font-body-sm font-medium">Audit Logs</span>
             </a>
             <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-            <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+            <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
             <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
                 <span class="material-symbols-outlined text-[20px]">settings</span>
                 <span class="font-body-sm font-medium">Settings</span>
@@ -138,8 +138,8 @@
             <section class="flex-1 flex flex-col overflow-hidden">
                 <div class="px-6 py-4 border-b border-border-color flex justify-between items-center bg-cream-bg shrink-0">
                     <div>
-                        <h2 class="font-serif text-2xl font-bold text-primary-brown">Proof-of-Conversation</h2>
-                        <p class="font-body-sm text-text-secondary mt-1">Verified Chain Blocks</p>
+                        <h2 class="fc-h2">Proof-of-Conversation</h2>
+                        <p class="fc-sub mt-1">Verified Chain Blocks</p>
                     </div>
                     <div class="flex gap-2">
                         <button onclick="toggleFilter()" class="px-3 py-1.5 rounded-full border border-border-color font-body-sm text-sm text-text-secondary hover:text-primary-brown hover:border-primary-brown transition-colors flex items-center gap-1 bg-cream-card">
@@ -178,7 +178,7 @@
             <!-- Details Panel (Right/Sidebar - System Monitor) -->
             <aside id="systemMonitorAside" class="w-[400px] xl:w-[450px] flex flex-col border-l border-border-color bg-cream-bg/80 backdrop-blur-md hidden lg:flex shrink-0">
                 <div class="p-4 border-b border-border-color shrink-0 flex items-center justify-between bg-cream-bg">
-                    <h3 class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-widest flex items-center gap-2">
+                    <h3 class="text-xs font-bold text-primary-brown uppercase tracking-widest flex items-center gap-2">
                         SYSTEM MONITOR
                     </h3>
                     <div id="monitorBlockBadge" class="font-code-sm text-[10px] text-text-secondary uppercase tracking-widest bg-cream-card px-2 py-1 rounded border border-border-color">
@@ -193,8 +193,8 @@
                             <span class="material-symbols-outlined text-[120px]">verified</span>
                         </div>
                         <div class="flex justify-between items-center mb-6 shrink-0">
-                            <span class="font-code-sm text-[10px] tracking-widest text-cream-bg/70 uppercase">INTEGRITY STATUS</span>
-                            <div class="flex items-center gap-1.5 bg-cream-bg/20 text-cream-bg px-2 py-1 rounded-md font-code-sm text-[10px]">
+                            <span class="text-[10px] tracking-widest text-cream-bg/70 uppercase">INTEGRITY STATUS</span>
+                            <div class="flex items-center gap-1.5 bg-cream-bg/20 text-cream-bg px-2 py-1 rounded-md text-[10px]">
                                 <div class="w-1.5 h-1.5 rounded-full bg-accent-gold animate-pulse"></div>
                                 <span id="networkBadge">Solana Devnet</span>
                             </div>
@@ -206,12 +206,12 @@
                         </div>
                         <div class="grid grid-cols-2 gap-3 mt-6 relative z-10 shrink-0">
                             <div class="bg-cream-bg/10 p-3 rounded-xl border border-cream-bg/20 flex flex-col items-center">
-                                <span id="monitorMsgCount" class="font-code-sm text-xl text-cream-bg font-bold">12</span>
-                                <span class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">MESSAGES</span>
+                                <span id="monitorMsgCount" class="text-xl text-cream-bg font-bold">12</span>
+                                <span class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">MESSAGES</span>
                             </div>
                             <div class="bg-cream-bg/10 p-3 rounded-xl border border-cream-bg/20 flex flex-col items-center">
-                                <span id="monitorFlagCount" class="font-code-sm text-xl text-cream-bg font-bold">0</span>
-                                <span class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">FLAGS</span>
+                                <span id="monitorFlagCount" class="text-xl text-cream-bg font-bold">0</span>
+                                <span class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">FLAGS</span>
                             </div>
                         </div>
                     </div>
@@ -220,10 +220,10 @@
                     <div class="flex-1 flex flex-col mt-2">
                         <!-- Tabs -->
                         <div class="flex border-b border-border-color mb-4">
-                            <button id="tabBtnProof" onclick="switchMonitorTab('proof')" class="px-4 py-2 text-primary-brown border-b-2 border-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest">Proof</button>
-                            <button id="tabBtnTokens" onclick="switchMonitorTab('tokens')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">Tokens</button>
-                            <button id="tabBtnRules" onclick="switchMonitorTab('rules')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">Rules</button>
-                            <button id="tabBtnScans" onclick="switchMonitorTab('scans')" class="px-4 py-2 text-text-secondary hover:text-primary-brown font-code-sm text-xs font-bold uppercase tracking-widest transition-colors">AI Scans</button>
+                            <button id="tabBtnProof" onclick="switchMonitorTab('proof')" class="px-4 py-2 text-primary-brown border-b-2 border-primary-brown text-xs font-bold uppercase tracking-widest">Proof</button>
+                            <button id="tabBtnTokens" onclick="switchMonitorTab('tokens')" class="px-4 py-2 text-text-secondary hover:text-primary-brown text-xs font-bold uppercase tracking-widest transition-colors">Tokens</button>
+                            <button id="tabBtnRules" onclick="switchMonitorTab('rules')" class="px-4 py-2 text-text-secondary hover:text-primary-brown text-xs font-bold uppercase tracking-widest transition-colors">Rules</button>
+                            <button id="tabBtnScans" onclick="switchMonitorTab('scans')" class="px-4 py-2 text-text-secondary hover:text-primary-brown text-xs font-bold uppercase tracking-widest transition-colors">AI Scans</button>
                         </div>
 
                         <!-- Tab Content: Proof -->
@@ -231,7 +231,7 @@
                             <!-- Hash Item -->
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color">
                                 <div class="flex justify-between items-end mb-2">
-                                    <span class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-wider">Conversation Hash (SHA-256)</span>
+                                    <span class="text-xs font-bold text-primary-brown uppercase tracking-wider">Conversation Hash (SHA-256)</span>
                                     <span onclick="copyToClipboard(currentSelectedBlock ? currentSelectedBlock.hash : '')" class="material-symbols-outlined text-[16px] text-text-secondary cursor-pointer hover:text-primary-brown" title="Copy Hash">content_copy</span>
                                 </div>
                                 <div id="panelHashDisplay" class="bg-cream-bg p-3 rounded-lg border border-border-color/50 font-code-sm text-xs text-text-secondary break-all">
@@ -241,7 +241,7 @@
                             <!-- On-Chain Anchor -->
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color">
                                 <div class="flex justify-between items-end mb-2">
-                                    <span class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-wider">Solana Anchor</span>
+                                    <span class="text-xs font-bold text-primary-brown uppercase tracking-wider">Solana Anchor</span>
                                     <span onclick="openExternal(currentSelectedBlock ? `https://explorer.solana.com/tx/${currentSelectedBlock.solana_tx}?cluster=devnet` : '#')" class="material-symbols-outlined text-[16px] text-text-secondary cursor-pointer hover:text-primary-brown" title="Open on Explorer">open_in_new</span>
                                 </div>
                                 <div onclick="openExternal(currentSelectedBlock && currentSelectedBlock.solana_tx ? `https://explorer.solana.com/tx/${currentSelectedBlock.solana_tx}?cluster=devnet` : '#')" class="bg-cream-bg p-3 rounded-lg border border-border-color/50 font-code-sm text-xs break-all hover:border-primary-brown/30 transition-colors cursor-pointer group">
@@ -251,7 +251,7 @@
                             <!-- IPFS Record -->
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color">
                                 <div class="flex justify-between items-end mb-2">
-                                    <span class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-wider">IPFS CID Payload</span>
+                                    <span class="text-xs font-bold text-primary-brown uppercase tracking-wider">IPFS CID Payload</span>
                                     <span onclick="openExternal(currentSelectedBlock && currentSelectedBlock.ipfs_url ? currentSelectedBlock.ipfs_url : '#')" class="material-symbols-outlined text-[16px] text-text-secondary cursor-pointer hover:text-primary-brown" title="Open IPFS Record">open_in_new</span>
                                 </div>
                                 <div onclick="openExternal(currentSelectedBlock && currentSelectedBlock.ipfs_url ? currentSelectedBlock.ipfs_url : '#')" class="bg-cream-bg p-3 rounded-lg border border-border-color/50 font-code-sm text-xs break-all hover:border-primary-brown/30 transition-colors cursor-pointer group">
@@ -272,7 +272,7 @@
                         <div id="tabContentTokens" class="space-y-4 hidden">
                             <div id="spEconomy"></div>
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color">
-                                <div class="font-code-sm text-xs font-bold text-primary-brown uppercase tracking-wider mb-2">Gas & Storage Ledger</div>
+                                <div class="text-xs font-bold text-primary-brown uppercase tracking-wider mb-2">Gas & Storage Ledger</div>
                                 <div class="space-y-2 text-sm text-text-secondary">
                                     <div class="flex justify-between"><span>Solana Anchor Fee:</span><span class="font-bold text-text-primary">0.000005 SOL</span></div>
                                     <div class="flex justify-between"><span>IPFS Pinning Cost:</span><span class="font-bold text-text-primary">0.00 CHAT</span></div>
@@ -292,7 +292,7 @@
                         <div id="tabContentScans" class="space-y-4 hidden">
                             <div id="spScans"></div>
                             <div class="bg-cream-card rounded-xl p-4 border border-border-color flex flex-col items-center">
-                                <div class="w-full flex justify-between font-code-sm text-[10px] text-text-secondary uppercase tracking-widest mb-4">
+                                <div class="w-full flex justify-between text-[10px] text-text-secondary uppercase tracking-widest mb-4">
                                     <span>INPUT</span>
                                     <span>HIDDEN</span>
                                     <span>OUTPUT</span>
@@ -501,14 +501,14 @@
                         <div class="flex justify-between items-start mb-3">
                             <div class="flex items-center gap-3">
                                 <span class="font-code-sm text-xs ${isActive ? 'text-cream-bg bg-primary-brown' : 'text-text-secondary bg-cream-card border border-border-color group-hover:text-primary-brown group-hover:border-primary-brown/30'} px-2 py-1 rounded-md font-bold tracking-wider">Block #${b.chain_height}</span>
-                                <span class="font-code-sm text-xs text-text-secondary">${timeStr}</span>
+                                <span class="text-xs text-text-secondary">${timeStr}</span>
                             </div>
                             <div class="flex items-center gap-1 ${isActive ? 'text-primary-brown bg-primary-brown/10' : 'text-text-secondary/70 group-hover:text-primary-brown/70 transition-colors'} px-2 py-0.5 rounded-full text-xs font-bold">
                                 <span class="material-symbols-outlined text-[14px]">verified</span>
                                 Secured
                             </div>
                         </div>
-                        <div class="font-serif text-lg font-bold ${isActive ? 'text-primary-brown' : 'text-text-primary'} mb-3">${title}</div>
+                        <div class="text-[15px] font-semibold ${isActive ? 'text-primary-brown' : 'text-text-primary'} mb-3">${title}</div>
                         <div class="flex flex-wrap gap-3 mt-2">
                             <div class="flex items-center gap-1.5 ${isActive ? 'bg-cream-bg shadow-sm' : 'bg-cream-card'} px-3 py-1.5 rounded-full border border-border-color/50">
                                 <span class="material-symbols-outlined text-[16px] text-text-secondary">group</span>

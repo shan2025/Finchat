@@ -84,10 +84,10 @@
     <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
       FinChat
     </h1>
-    <p class="font-code-sm text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
+    <p class="text-[10px] text-cream-bg/70 mt-1 uppercase tracking-widest">AI Operating System</p>
   </div>
   <div class="flex-1 overflow-y-auto space-y-1 pr-2">
-    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
+    <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">Navigation</div>
     <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_dashboard.html">
       <span class="material-symbols-outlined text-[20px]">dashboard</span>
       <span class="font-body-sm font-medium">Operations</span>
@@ -125,7 +125,7 @@
       <span class="font-body-sm font-medium">Audit Logs</span>
     </a>
     <div class="mt-8 mb-4 border-t border-cream-bg/20 w-full pt-4"></div>
-    <div class="font-code-sm text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
+    <div class="text-[10px] text-cream-bg/50 px-2 py-1 mb-2 tracking-wider uppercase font-bold">System</div>
     <a class="flex items-center gap-3 px-3 py-2 rounded-full text-cream-bg/80 hover:text-primary-brown hover:bg-cream-bg transition-colors duration-150 cursor-pointer active:scale-95 group" href="finchat_chat.html">
       <span class="material-symbols-outlined text-[20px]">settings</span>
       <span class="font-body-sm font-medium">Settings</span>
@@ -160,7 +160,7 @@
    <span class="material-symbols-outlined text-[15px]">arrow_back</span> Neural Map
   </a>
   <div class="w-px h-6 shrink-0 hidden md:block" style="background: var(--border);"></div>
-  <input id="mapNameInput" class="text-xl font-bold bg-transparent border-0 outline-none min-w-0" style="font-family: Georgia, serif; color: var(--nm-accent-hi); max-width: 260px;" />
+  <input id="mapNameInput" class="fc-h2 bg-transparent border-0 outline-none min-w-0" style="color: var(--txt); max-width: 260px;" />
   <span id="archLabel" class="text-[11px] uppercase tracking-widest nm-sub font-mono hidden sm:inline-block truncate min-w-0" style="max-width:200px">—</span>
   <div class="flex-1"></div>
   <button id="themeBtn" title="Toggle theme" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
@@ -221,7 +221,7 @@
 
    <!-- Architecture -->
    <div class="nm-field rounded-2xl p-3.5">
-    <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Architecture</div>
+    <div class="fc-h3 mb-3" style="color: var(--txt)">Architecture</div>
     <div class="flex gap-1.5 mb-3">
      <button class="seg-btn flex-1" data-preset="0,1">Perceptron</button>
      <button class="seg-btn flex-1" data-preset="1,6">MLP</button>
@@ -246,7 +246,7 @@
 
    <!-- Training -->
    <div class="nm-field rounded-2xl p-3.5">
-    <div class="text-[15px] font-bold mb-3" style="font-family: Georgia, serif;">Training</div>
+    <div class="fc-h3 mb-3" style="color: var(--txt)">Training</div>
     <div class="flex justify-between text-[12px] nm-sub mb-1.5"><span>What it learns</span></div>
     <div class="flex gap-1.5 mb-3.5 flex-wrap">
      <button class="seg-btn flex-1" data-target="sine">sine</button>
@@ -270,7 +270,7 @@
    <!-- Fit & generalization -->
    <div class="nm-field rounded-2xl p-3.5">
     <div class="flex items-baseline justify-between mb-2.5">
-     <div class="text-[15px] font-bold" style="font-family: Georgia, serif;">Fit &amp; generalization</div>
+     <div class="fc-h3" style="color: var(--txt)">Fit &amp; generalization</div>
      <div class="text-[12px] nm-sub">epoch <b id="epochVal" style="color:var(--txt)">0</b></div>
     </div>
     <canvas id="regCanvas" class="nn-canvas w-full rounded-xl" style="height:170px; background: var(--graphbg);"></canvas>

@@ -83,6 +83,19 @@
   --serif: 'Caprasimo', 'Playfair Display', Georgia, serif;
   --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
+  /* Type scale — taken from the Settings page, which is the app standard.
+     Display face (--serif) for page titles, section titles and headline
+     numbers; --sans for everything a person reads; --mono only for hashes,
+     IDs and code. */
+  --fs-h1:     28px;
+  --fs-h2:     22px;
+  --fs-h3:     17px;
+  --fs-stat:   26px;
+  --fs-title:  14px;    /* card / row title, sans 600 */
+  --fs-body:   13.5px;
+  --fs-small:  12.5px;
+  --fs-kicker: 10px;
+
   /* --- elevation & shape ------------------------------------------------- */
   --shadow:    0 1px 2px rgba(46, 43, 37, .06);
   --shadow-md: 0 8px 28px rgba(46, 43, 37, .12);
@@ -142,6 +155,9 @@ body {
   color: var(--text);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
+  /* Caprasimo ships one weight. Without this, every `font-bold` title set in
+     it gets a browser-smeared fake bold instead of the real face. */
+  font-synthesis-weight: none;
 }
 
 h1, h2, h3, h4 { color: var(--text); font-weight: 700; }
@@ -149,6 +165,29 @@ h1, h2, h3, h4 { color: var(--text); font-weight: 700; }
 /* The display face is opt-in per element, not global — Caprasimo is a poster
    face and sets badly at paragraph sizes. */
 .fc-display, .mm-serif { font-family: var(--serif); font-weight: 400; }
+
+/* Headings. Use these instead of per-page font stacks (Georgia, Playfair,
+   extrabold sans…) so every module's titles are the same object. */
+.fc-h1, .fc-h2, .fc-h3, .fc-stat { font-family: var(--serif); font-weight: 400; }
+/* Stat numbers inherit colour: dashboards tint them by status (running blue,
+   failed red), and this file loads after Tailwind so a colour here would win. */
+.fc-h1, .fc-h2, .fc-h3 { color: var(--text); }
+/* No margin here: this file loads after finchat_tw.css, so a margin would
+   silently beat Tailwind spacing (`mt-1`) on the same element. */
+.fc-h1 { font-size: var(--fs-h1); line-height: 1.15; letter-spacing: -.01em; }
+.fc-h2 { font-size: var(--fs-h2); line-height: 1.2; }
+.fc-h3 { font-size: var(--fs-h3); line-height: 1.25; }
+.fc-stat { font-size: var(--fs-stat); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.fc-sub { font-size: var(--fs-body); color: var(--text-2); }
+.fc-title { font-family: var(--sans); font-size: var(--fs-title); font-weight: 600; color: var(--text); }
+.fc-kicker {
+  font-family: var(--sans); font-size: var(--fs-kicker); font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
+}
+@media (max-width: 767px) {
+  .fc-h1 { font-size: 22px; }
+  .fc-h2 { font-size: 19px; }
+}
 
 a { color: var(--accent-warm); text-decoration: none; }
 a:hover { color: var(--accent-warm-hover); text-decoration: underline; }
