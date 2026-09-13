@@ -17,6 +17,7 @@ const { dream, detectGaps, ingestDocument } = require('../services/cognitive/Mem
 // Read-through cache in front of the polled aggregate endpoints. See
 // services/QueryCache.js for why this is a query cache and not an HTTP one.
 const cache = require('../services/QueryCache');
+const { listPersonas } = require('../services/personas');
 
 // ── GET /api/knowledge/nodes/:entityId ─────────────────────
 // Everything known about one node: identity, vitals, connections (with the
@@ -742,9 +743,19 @@ router.get('/patterns', requireAuth, async (req, res) => {
       `, [req.user.id])
     ]);
 
+      // Every agent on the roster gets a chip, not only the ones that have
+      // learned something. Built from counts alone, a newly added agent (Atlas,
+      // Hopper, Feynman) was simply absent from the picker, which read as the
+      // agent not existing rather than as "hasn't learned about you yet".
+      // Learned agents keep their count order; the rest follow at zero.
+      const seen = new Set(roster.rows.map(r => r.agent_id));
+      const agents = roster.rows.concat(listPersonas()
+        .filter(p => !seen.has(p.id))
+        .map(p => ({ agent_id: p.id, agent_name: p.name, count: 0, last_learned_at: null, avg_strength: null })));
+
       return {
         patterns: q.rows,
-        agents: roster.rows,
+        agents,
         total: roster.rows.reduce((s, a) => s + a.count, 0),
         agent: agent || null
       };

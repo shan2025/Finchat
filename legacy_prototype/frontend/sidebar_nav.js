@@ -73,7 +73,13 @@
   // Agents with no PNG of their own. Without an entry here they fall through to
   // the generic 🤖 bubble, which reads as "unknown sender" rather than as a
   // named agent — so they get a coloured initial plate instead.
-  var AGENT_PLATES = {};
+  // The server's personaAvatar for these is SVG markup, which the fallback below
+  // escapes and prints as text — that is how "<rect rx=..." ended up spilling
+  // across the Recent list. Colours match the avatars in services/personas.js.
+  var AGENT_PLATES = {
+    hopper: { bg: '#232b34', fg: '#8fb8de', initial: 'H' },
+    feynman: { bg: '#2c3a33', fg: '#e8b86d', initial: 'F' }
+  };
   function agentBubble(id) {
     var base = 'width:24px; height:24px; border-radius:999px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;';
     if (AGENT_AVATARS[id]) {
@@ -626,7 +632,7 @@
     {
       list.innerHTML = sessions.map(function (s) {
           var av = agentBubble(s.persona)
-            || '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(s.personaAvatar || '🤖') + '</span>';
+            || '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(/^\s*</.test(s.personaAvatar || '') ? '🤖' : (s.personaAvatar || '🤖')) + '</span>';
           return '<a class="sbn-recent" data-sid="' + esc(s.session_id) + '" data-title="' + esc(s.title) + '" href="finchat_chat.html?session=' + encodeURIComponent(s.session_id) + '" title="' + esc(s.title) + ' — ' + esc(s.personaName || s.persona) + '">' +
             av + '<span class="sbn-truncate" style="flex:1; min-width:0;">' + esc(s.title) + '</span>' +
             '<span class="sbn-ract">' +

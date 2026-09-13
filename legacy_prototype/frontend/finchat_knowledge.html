@@ -24,6 +24,8 @@
  .fchip:hover { border-color:var(--accent); color:var(--txt); }
  .fchip[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
  .fchip .n { opacity:.7; font-weight:600; }
+ /* An agent that has learned nothing about you yet: present, but quieter. */
+ .fchip.is-empty:not([aria-pressed="true"]) { opacity:.55; }
  .agent-row { cursor:pointer; border-radius:10px; padding:6px 8px; margin:0 -8px; transition:background .12s; }
  .agent-row:hover { background:var(--accent-soft); }
  .abadge { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); white-space:nowrap; }
@@ -358,7 +360,7 @@ function renderPatternFilter(agents,total){
  // One agent means the filter can only ever say "all" — nothing to choose.
  if(agents.length<2){ el.innerHTML=''; return; }
  el.innerHTML=[{agent_id:'',agent_name:'All agents',count:total}].concat(agents).map(a=>
-  `<button type="button" class="fchip" data-agent="${esc(a.agent_id)}" aria-pressed="${a.agent_id===patternAgent}">${esc(a.agent_name)} <span class="n">${a.count}</span></button>`
+  `<button type="button" class="fchip${a.agent_id&&!a.count?' is-empty':''}" data-agent="${esc(a.agent_id)}" aria-pressed="${a.agent_id===patternAgent}">${esc(a.agent_name)} <span class="n">${a.count}</span></button>`
  ).join('');
 }
 
