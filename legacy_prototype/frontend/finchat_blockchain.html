@@ -22,6 +22,13 @@
  #chainViewport { overflow: hidden; position: relative; }
  #chainTrack { display: flex; align-items: center; gap: 0; width: max-content; animation: chainDrift 40s linear infinite; }
  #chainTrack:hover { animation-play-state: paused; }
+ /* Touch screens can't hover to pause the drift, so there the chain holds
+    still and the reader swipes along it instead. */
+ @media (hover: none) {
+  #chainViewport { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #chainViewport::-webkit-scrollbar { display: none; }
+  #chainTrack { animation: none; padding-right: 16px; }
+ }
  @keyframes chainDrift { 0% { transform: translateX(0); } 50% { transform: translateX(calc(-100% + min(100%, 900px))); } 100% { transform: translateX(0); } }
  .blk { position: relative; min-width: 168px; max-width: 168px; border-radius: 18px; padding: 12px 14px; background: var(--surface); border: 1.5px solid var(--border); transition: transform .15s, box-shadow .15s; cursor: pointer; }
  .blk:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(58,46,35,.18); z-index: 2; }

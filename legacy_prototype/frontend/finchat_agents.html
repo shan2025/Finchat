@@ -160,14 +160,14 @@
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top App Bar -->
-  <header class="flex justify-between items-center w-full px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
-    <div class="flex items-center gap-md">
-      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-outline-variant bg-cream-bg text-[#3a2e23]">
+  <header class="flex justify-between items-center gap-2 w-full px-3 md:px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
+    <div class="flex items-center gap-2 md:gap-md min-w-0">
+      <button id="navToggle" title="Menu" class="md:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-outline-variant bg-cream-bg text-[#3a2e23]">
         <span class="material-symbols-outlined text-[20px]">menu</span>
       </button>
-      <h1 class="text-3xl tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;">FinChat | Agent Configuration</h1>
+      <h1 class="text-lg md:text-3xl truncate tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;"><span class="md:hidden">Agents</span><span class="hidden md:inline">FinChat | Agent Configuration</span></h1>
     </div>
-    <div class="flex items-center gap-lg">
+    <div class="flex items-center gap-2 md:gap-lg shrink-0">
       <!-- Legacy "CHAT token" balance pill. Hidden like finchat_chat.html does —
            the stub stays in the DOM so the balance wiring below keeps working. -->
       <span id="topbarTokenDisplay" style="display:none;">1000</span>
@@ -191,8 +191,8 @@
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-8">
-    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
       
       <!-- LEFT COLUMN: AI AGENTS LIST -->
       <div class="lg:col-span-1 flex flex-col">

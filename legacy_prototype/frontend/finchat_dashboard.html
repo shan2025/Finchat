@@ -134,19 +134,19 @@
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top App Bar -->
-  <header class="flex justify-between items-center w-full px-8 py-4 h-16 z-50 bg-cream-bg border-b border-border-color shrink-0">
-    <div class="flex items-center gap-4">
-      <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
+  <header class="flex justify-between items-center gap-2 w-full px-3 md:px-8 py-4 h-16 z-50 bg-cream-bg border-b border-border-color shrink-0">
+    <div class="flex items-center gap-2 md:gap-4 min-w-0">
+      <button id="navToggle" title="Menu" class="md:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
         <span class="material-symbols-outlined text-[20px]">menu</span>
       </button>
-      <h1 class="text-2xl tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;">Agent Operations Dashboard</h1>
-      <span class="px-3 py-1 rounded-full text-xs font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] flex items-center gap-1.5" id="liveStatusBadge">
+      <h1 class="text-lg md:text-2xl truncate tracking-normal text-[#3a2e23] font-serif font-bold" style="font-family: Georgia, 'Times New Roman', Times, serif;"><span class="md:hidden">Operations</span><span class="hidden md:inline">Agent Operations Dashboard</span></h1>
+      <span class="hidden sm:flex shrink-0 px-3 py-1 rounded-full text-xs font-bold font-mono bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] items-center gap-1.5" id="liveStatusBadge">
         <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span> LIVE PULSE
       </span>
     </div>
-    <div class="flex items-center gap-4">
-      <button onclick="triggerManualRefresh(this)" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#f3eee3] hover:bg-[#e8dfd1] border border-border-color rounded-xl text-xs font-bold transition-all text-[#3a2e23]">
-        <span id="refreshIcon" class="material-symbols-outlined text-[16px]">refresh</span> Refresh Pulse
+    <div class="flex items-center gap-1 md:gap-4 shrink-0">
+      <button onclick="triggerManualRefresh(this)" title="Refresh Pulse" class="flex items-center justify-center gap-1.5 min-w-[40px] h-10 md:h-auto px-2 md:px-3 py-1.5 bg-[#f3eee3] hover:bg-[#e8dfd1] border border-border-color rounded-xl text-xs font-bold transition-all text-[#3a2e23]">
+        <span id="refreshIcon" class="material-symbols-outlined text-[16px]">refresh</span><span class="hidden md:inline"> Refresh Pulse</span>
       </button>
       <!-- Notification bell -->
       <div class="relative">
@@ -169,8 +169,8 @@
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-8">
-    <div class="max-w-7xl mx-auto flex flex-col gap-8">
+  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
+    <div class="max-w-7xl mx-auto flex flex-col gap-6 md:gap-8">
 
       <!-- SYSTEM INTEGRITY STRIP -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -196,7 +196,7 @@
 
       <!-- KNOWLEDGE MEMORY (Graph-RAG + Skill Recipes) -->
       <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">hub</span> Knowledge Memory
           </h3>
@@ -232,7 +232,7 @@
 
       <!-- SECTION 1: LIVE AGENT STATUS GRID -->
       <div>
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h2 class="text-lg font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">groups</span> Specialist Executive Team Pulse
           </h2>
@@ -305,7 +305,7 @@
 
       <!-- SECTION 2.5: COUNCIL DEBATE -->
       <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">forum</span> Council Debate
           </h3>

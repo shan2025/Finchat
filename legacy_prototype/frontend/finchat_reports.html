@@ -25,6 +25,7 @@
  .kbtn:hover { filter:brightness(1.07); } .kbtn:disabled{opacity:.55;cursor:default;}
  .kbtn.ghost { background:var(--card); color:var(--txt); border:1px solid var(--border); }
  .kind-tab { border:1px solid var(--border); background:var(--card); color:var(--sub); border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+ @media (pointer: coarse) { .kind-tab, #daysSel { min-height:40px; } }
  .kind-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
  .skel { background:linear-gradient(90deg,var(--accent-soft) 25%,#f3ead8 50%,var(--accent-soft) 75%); background-size:200% 100%; animation:sh 1.3s infinite; border-radius:8px; }
  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }

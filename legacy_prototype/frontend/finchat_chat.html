@@ -45,6 +45,12 @@
   .markdown-body table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0.6em 0; font-size: 13.5px; }
   .markdown-body th, .markdown-body td { padding: 7px 12px; border: 1px solid var(--border); text-align: left; vertical-align: top; word-break: normal; overflow-wrap: break-word; hyphens: none; }
   .markdown-body th { font-weight: 600; background: rgba(0,0,0,0.045); white-space: nowrap; }
+  /* renderMessageBody wraps each table in .md-table-scroll. With the table as
+     its own scroll box, its column layout is still capped at the box width, so
+     a narrow bubble crushed every column; the wrapper scrolls and the table
+     inside is free to size. Desktop keeps the same 100% cap as above. */
+  .markdown-body .md-table-scroll { max-width: 100%; overflow-x: auto; margin: 0.6em 0; }
+  .markdown-body .md-table-scroll > table { display: table; margin: 0; overflow: visible; }
   .markdown-body tbody tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
 
   .bot .bubble.markdown-body a { color: #4a3828; text-decoration-color: rgba(74, 56, 40, 0.4); }
@@ -382,6 +388,45 @@
   #webToggle.on { border-color:var(--accent) !important; background:#fff3e6 !important; color:var(--accent) !important; }
   .fc-icon:hover { background:#f0e4cd !important; }
 
+  /* ── Phone composer ────────────────────────────────────────────────────
+     At 375px the toolbar row (picker, three tools, Web, Study, token hint,
+     Send) needed ~712px and cannot wrap, so Send sat off-screen and the whole
+     chat column was stretched to match it. Below 768px the toggles go
+     icon-only with the chip colour carrying on/off (the track is what showed
+     it on desktop), the picker shows just the avatar, and the token hint, the
+     second image button (same file picker as attach) and the mic button (no
+     handler yet) are dropped. */
+  @media (max-width: 767px) {
+    #composerWrap { padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
+    #composerBox { border-radius:22px !important; }
+    /* Under 16px, iOS Safari zooms the whole page when the field takes focus. */
+    #msgInput { font-size:16px !important; padding:13px 16px 2px !important; }
+    #composerTools { gap:4px !important; padding:6px 8px 8px !important; }
+    #agentPickerName, #govHint, .fc-tlabel, #webTrack, #studyTrack, .fc-tool-wide { display:none !important; }
+    #agentPickerBtn { padding:4px 4px 4px 4px !important; gap:0 !important; }
+    #webToggle, #studyToggle { width:38px; height:38px; padding:0 !important; gap:0 !important; justify-content:center; }
+    #studyToggle.on { border-color:var(--accent) !important; background:#fff3e6 !important; color:var(--accent) !important; }
+    #composerDisclaimer { margin-top:5px !important; font-size:10.5px !important; }
+    #messages { padding:14px 12px !important; }
+    /* Desktop caps a row at 78% beside a 38px avatar gutter — on a phone that
+       left agent replies ~220px wide, too narrow for tables and code. */
+    .msg-row { max-width:100%; gap:8px; }
+    .msg-group.user .msg-row { max-width:88%; }
+    .msg-avatar-space { width:30px; }
+    .bubble { padding:11px 13px; }
+    /* Let a table outgrow the ~290px bubble and scroll, up to a width where
+       long cells start wrapping again rather than running on forever. */
+    .markdown-body .md-table-scroll > table { max-width:36em; }
+    /* Header: desktop's 24px padding and 16px gaps left the agent's name ~20px
+       ("P…") beside four round buttons. */
+    #chatHeader { height:60px !important; padding:0 10px !important; gap:6px !important; }
+    #chatHeader #navToggle { width:40px; height:40px; }
+    #chatHeader #topbarAvatar { width:36px !important; height:36px !important; }
+    #chatHeader #topbarName { font-size:17px !important; }
+    #chatHeader #topbarDesc { font-size:11.5px !important; }
+    #chatHeader .fc-icon { width:40px !important; height:40px !important; }
+  }
+
   /* Welcome / suggestion cards */
   .fc-card { transition:transform .14s ease, box-shadow .16s ease, border-color .14s ease; }
   .fc-card:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(46,43,37,.14); border-color:var(--accent) !important; }
@@ -569,7 +614,7 @@
 <div class="flex-1 flex flex-col md:ml-64 relative h-full">
 
   <!-- Top header (single, design: Chat.dc.html) -->
-  <header class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
+  <header id="chatHeader" class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
     <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full shrink-0" style="border:1px solid #e3d3ba; background:#f5ead8; color:#5b4a3a;">
       <span class="material-symbols-outlined text-[20px]">menu</span>
     </button>
@@ -632,7 +677,7 @@
     <!-- ═══════════════════════════════ -->
     <!-- CENTRAL CHAT AREA               -->
     <!-- ═══════════════════════════════ -->
-    <section class="flex-1 flex flex-col relative" style="background:#f5ead8;">
+    <section class="flex-1 min-w-0 flex flex-col relative" style="background:#f5ead8;">
       <!-- Messages Container. When the conversation is empty this holds the
            welcome hero (renderHeroHTML): big agent avatar, "How can I help
            today?" and the suggestion cards, matching Chat.dc.html. -->
@@ -641,14 +686,14 @@
       </div>
 
       <!-- Input Area (rounded pill composer, design: Chat.dc.html) -->
-      <div class="shrink-0" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
+      <div id="composerWrap" class="shrink-0" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
         <!-- The napping mascot perches on the composer's top edge; it sleeps
              until sendMessage() calls fcNap.bonk(). See mascot_nap.js. -->
         <div id="fcNapMascot" aria-hidden="true"></div>
         <div id="composerBox" style="max-width:860px; margin:0 auto; background:#fffaf0; border:1px solid #e3d3ba; border-radius:26px; box-shadow:0 8px 28px rgba(46,43,37,.10); transition:border-color .15s;">
           <div class="attach-preview" id="attachPreview" style="border-top:none; border-radius:26px 26px 0 0;"></div>
           <textarea id="msgInput" rows="1" placeholder="Message Plato..." style="width:100%; border:none; background:transparent; resize:none; outline:none; font-family:inherit; font-size:15.5px; line-height:1.55; color:#201e1d; padding:17px 20px 4px; min-height:40px; max-height:180px;"></textarea>
-          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px 11px;">
+          <div id="composerTools" style="display:flex; align-items:center; gap:8px; padding:8px 12px 11px;">
             <!-- Agent picker (replaces the old persona bar) -->
             <div class="fc-agentwrap" style="position:relative;">
               <button id="agentPickerBtn" onclick="toggleAgentMenu(event)" title="Choose agent" style="display:inline-flex; align-items:center; gap:8px; padding:5px 11px 5px 5px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">
@@ -662,10 +707,10 @@
               <span class="material-symbols-outlined text-[20px]">attach_file</span>
             </button>
             <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
-            <button class="fc-tool" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+            <button class="fc-tool fc-tool-wide" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
               <span class="material-symbols-outlined text-[20px]">mic</span>
             </button>
-            <button class="fc-tool" title="Upload image" onclick="document.getElementById('fileInput').click()" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+            <button class="fc-tool fc-tool-wide" title="Upload image" onclick="document.getElementById('fileInput').click()" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
               <span class="material-symbols-outlined text-[20px]">image</span>
             </button>
 
@@ -673,13 +718,13 @@
 
             <button id="webToggle" onclick="toggleWebAccess()" title="Web access" style="display:inline-flex; align-items:center; gap:9px; padding:7px 10px 7px 13px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#8a7d6a; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; letter-spacing:.03em; transition:all .15s;">
               <span class="material-symbols-outlined text-[16px]">language</span>
-              WEB
+              <span class="fc-tlabel">WEB</span>
               <span id="webTrack" style="width:34px; height:20px; border-radius:999px; background:#e0d4bd; position:relative; transition:background .16s;"><span id="webKnob" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transform:translateX(0); transition:transform .16s; box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span>
             </button>
 
             <button id="studyToggle" onclick="toggleStudyMode()" title="Study Mode — answers come back as study cards" style="display:inline-flex; align-items:center; gap:9px; padding:7px 10px 7px 13px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#8a7d6a; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; letter-spacing:.03em; transition:all .15s;">
               <span class="material-symbols-outlined text-[16px]">school</span>
-              STUDY
+              <span class="fc-tlabel">STUDY</span>
               <span id="studyTrack" style="width:34px; height:20px; border-radius:999px; background:#e0d4bd; position:relative; transition:background .16s;"><span id="studyKnob" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transform:translateX(0); transition:transform .16s; box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span>
             </button>
 
@@ -690,7 +735,7 @@
             </button>
           </div>
         </div>
-        <div style="max-width:860px; margin:9px auto 0; text-align:center; font-size:11.5px; color:#a1937f;">FinChat agents can make mistakes. Verify important results.</div>
+        <div id="composerDisclaimer" style="max-width:860px; margin:9px auto 0; text-align:center; font-size:11.5px; color:#a1937f;">FinChat agents can make mistakes. Verify important results.</div>
       </div>
     </section>
 
@@ -1352,6 +1397,12 @@
       } else {
         el.removeAttribute('data-study');
         el.innerHTML = DOMPurify.sanitize(marked.parse(text || ''), { ADD_ATTR: ['target'] });
+        el.querySelectorAll('table').forEach(t => {
+          const scroller = document.createElement('div');
+          scroller.className = 'md-table-scroll';
+          t.replaceWith(scroller);
+          scroller.appendChild(t);
+        });
       }
     }
 

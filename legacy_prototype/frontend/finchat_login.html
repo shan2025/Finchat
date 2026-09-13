@@ -205,6 +205,12 @@
     transition: color .2s;
   }
   .link-btn:hover { color: #3a2b1c; text-decoration: underline; }
+  /* Touch: "Forgot Password?" was a 20px-tall target. The padding widens the
+     tap area and the matching negative margin keeps the layout where it was. */
+  @media (pointer: coarse) {
+    .link-btn { padding: 12px 6px; margin: -12px -6px; }
+    .pw-toggle { padding: 12px 12px; }
+  }
 
   .primary-btn {
     width: 100%;

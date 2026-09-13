@@ -96,6 +96,13 @@
    background: #fff; transition: left .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
  .tgl.on { background: var(--ok); } .tgl.on::after { left: 22px; }
  .tgl.locked { opacity: .5; cursor: default; }
+ /* Touch: switches are drawn 24px tall and buttons 34px. Grow what a finger
+    can hit without growing what is drawn — ::after is the switch knob, so the
+    invisible hit area goes on ::before. */
+ @media (pointer: coarse) {
+   .sb { min-height: 40px; }
+   .tgl::before { content: ''; position: absolute; inset: -10px -4px; }
+ }
 
  .chan-input { width: 100%; max-width: 340px; margin-top: 10px; padding: 8px 14px; border-radius: 999px;
    font-size: 13px; background: var(--bg); border: 1px solid var(--border); outline: none; color: var(--text); }
@@ -156,6 +163,18 @@
    padding: 10px 8px; border-bottom: 1px solid var(--border); font-weight: 600; }
  .set-table td { padding: 10px 8px; border-bottom: 1px solid rgb(var(--text-rgb) / .07); vertical-align: top; }
  .set-table tbody tr:last-child td { border-bottom: none; }
+ /* Phones: the delivery and proof tables fix ~350px of column widths inside an
+    overflow:hidden card narrower than that, so Target was crushed to nothing.
+    Each row becomes a wrapping line of cells; the header row is dropped
+    because the cells (status tag, channel, time) read on their own. */
+ @media (max-width: 640px) {
+   .set-table thead { display: none; }
+   .set-table, .set-table tbody { display: block; }
+   .set-table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 10px 0;
+     border-bottom: 1px solid rgb(var(--text-rgb) / .07); }
+   .set-table tbody tr:last-child { border-bottom: none; }
+   .set-table td { display: block; padding: 0; border-bottom: none; min-width: 0; overflow-wrap: anywhere; }
+ }
 
  .set-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
    background: var(--chrome); color: var(--chrome-fg); font-size: 13px; font-weight: 600; padding: 11px 22px;
@@ -204,6 +223,19 @@
   .set-nav > div { flex-direction: row !important; }
   .set-content { padding: 20px 16px 60px; }
   .set-stats, .set-grid2 { grid-template-columns: 1fr; }
+  /* The tab strip scrolls sideways, but each tab still had width:100% and
+     wrapping text, so "Bring Your Own AI" stood four lines tall. */
+  .set-nav-btn { width: auto; flex: none; white-space: nowrap; }
+  /* Header: desktop bottom-aligns a wide row, which on a phone left the menu
+     button stranded under a title squeezed to ~70px. One centred row of
+     menu · title · bell; the "All changes saved" line (a resting state) is
+     dropped, and unsaved-changes buttons wrap to their own row when present. */
+  .set-head { align-items: center; gap: 10px; padding: 12px 16px 14px; }
+  .set-head h1 { font-size: 22px; }
+  .set-head .sub { font-size: 12px; }
+  .set-head #navToggle { width: 40px; height: 40px; }
+  .set-head #notifBell { width: 40px; height: 40px; }
+  #cleanState, #dirtyState > span:first-child { display: none !important; }
  }
  @media (min-width: 768px) { #sideNav { transform: none !important; } }
 </style>

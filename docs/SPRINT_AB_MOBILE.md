@@ -1,6 +1,6 @@
 # Sprint AB — FinChat on Mobile Phones
 
-**Status:** Phase 1 shipped locally 2026-09-13 (verified at 375×812, not yet deployed) · Phases 2–4 open · Phase 5 optional
+**Status:** Phases 1–2 committed locally 2026-09-13 (verified at 375×812, not yet deployed) · Phases 3–4 open · Phase 5 optional
 **Written:** 2026-09-13
 
 ---
@@ -127,5 +127,63 @@ Local dev server, viewport 375×812, a dummy session object so pages render
 **Not yet verified:** a real phone (iOS Safari keyboard behaviour in
 particular), and a signed-in session.
 
-**Seen during verification, left for Phase 2:** Audit overflows by 1px at 375px
-(`scrollWidth` 376) — its header search is a fixed `w-64`.
+~~Audit overflows by 1px at 375px~~ — not real: the emulated viewport is
+375.2px wide, so the "overflow" is sub-pixel rounding (confirmed in Phase 2).
+
+---
+
+## 4. Phase 2 — shipped 2026-09-13
+
+### 4.1 Measured, not eyeballed
+
+Every non-spatial page was loaded at 375×812 and scanned by script for
+elements past the viewport edge, content clipped by an `overflow:hidden`
+ancestor, and tap targets under 36px. Then each page was screenshotted,
+because the scan cannot see a layout that fits but reads badly (Settings).
+
+| Page | Found | Severity |
+|---|---|---|
+| **Chat** | Composer toolbar needed 712px and can't wrap → **Send button off-screen**; the `flex-1` section had `min-width:auto`, so the whole conversation column stretched to 793px and was clipped | **Critical — could not send a message** |
+| Chat | Header squeezed the agent name to "P…"; replies capped at ~220px wide; markdown tables crushed to one word per line | High |
+| Dashboard | Header controls didn't shrink → page 521px wide (sideways scroll); menu button squashed to 26px | High |
+| Agents | Same header pattern → 397px | Medium |
+| Settings | Header bottom-aligned with the menu button stranded mid-row; each tab `width:100%` so "Bring Your Own AI" wrapped to 4 lines; two tables with ~354px of fixed columns inside a ~330px `overflow:hidden` card | High (layout fit, so only a screenshot caught it) |
+| Blockchain | 4,814px drifting chain strip that pauses on *hover* — unreachable by touch | Medium |
+| Login / Signup / Reports / Settings | "Forgot Password?" 20px tall; buttons/tabs 34px; switches 24px | Low |
+| Group Chat, Knowledge, Reports, Audit, Login, Signup | Clean | — |
+
+### 4.2 Fixes
+
+| Fix | Where | Desktop impact |
+|---|---|---|
+| `min-w-0` on the chat section (the actual root cause of the stretch) | `finchat_chat.html` | none |
+| Phone composer: Web/Study go icon-only with the chip colour carrying on/off; avatar-only agent picker; token hint, duplicate image button and handler-less mic dropped; input 16px so iOS doesn't zoom on focus; safe-area bottom padding | `finchat_chat.html` (`@media max-width:767px`) | none |
+| Phone chat header (60px, tighter gaps, 40px buttons) and message rows (100% bot / 88% user, 30px avatar gutter) | `finchat_chat.html` | none |
+| Markdown tables wrapped in `.md-table-scroll` by `renderMessageBody` — the table was its own scroll box, which capped its column layout at bubble width; now the wrapper scrolls and the table sizes naturally (up to 36em on phones, then long cells wrap) | `finchat_chat.html` | none — same 100% cap |
+| Dashboard/Agents headers: short titles on phones ("Operations", "Agents"), `min-w-0` + `truncate`, icon-only Refresh, LIVE badge hidden below `sm`, `shrink-0` 40px menu button, `p-4 md:p-8` | `finchat_dashboard.html`, `finchat_agents.html` | none |
+| Dashboard section title rows `flex-wrap` | `finchat_dashboard.html` | none (only wraps when it doesn't fit) |
+| Settings phone header (one centred row), nowrap tabs, tables become wrapping rows below 640px | `finchat_settings.html` | none |
+| Blockchain chain: on `(hover: none)` the drift stops and the strip swipes | `finchat_blockchain.html` | none |
+| Touch-only hit areas via `(pointer: coarse)`: invisible padding/`::before` so what's drawn doesn't change | login, signup, settings, reports | none |
+
+### 4.3 Verified
+
+At 375×812 after the fixes: document width exactly 375 on Chat, Dashboard,
+Agents, Blockchain, Settings. Chat Send at x 312–356, both toggles on-screen,
+input 16px. A real `renderMessageBody` call with a 5-column table: rows 36px
+(were ~100px), table 486px scrolling inside a 286px bubble; a sentence-length
+table wraps at readable widths. Settings delivery table with sample rows: no
+cell clipped, Target 318px wide. Blockchain strip `overflow-x:auto`, animation
+none. At 1280×800 every changed page reads back its original desktop values
+(labels, tracks, titles, paddings, 236px settings nav, bottom-aligned header,
+coarse-pointer rules inactive). No JS exceptions.
+
+**Not verified:** real devices (iOS keyboard + safe areas especially), and
+pages populated with real data beyond the injected samples.
+
+**Seen, not fixed:**
+- Agents on a phone lists all six agents first; the configuration card for
+  the one you tap is far below and nothing scrolls to it.
+- Group Chat's header wraps its buttons onto a second, left-aligned row —
+  usable, not tidy.
+- Neural Map's toolbar wraps to three rows — held for the Phase 4 decision.
