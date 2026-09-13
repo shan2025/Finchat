@@ -193,21 +193,56 @@ function splitForTelegram(text, max = 4000) {
   return out;
 }
 
-// Sent WITHOUT parse_mode on purpose. Telegram's Markdown/MarkdownV2 modes
-// reject the whole message with a 400 if a single character is unescaped, and
-// agent output is full of unescaped _ * [ ] ( ) — the user would get nothing
-// instead of a slightly plainer report. Callers pass text already flattened by
-// services/markdown.js, so the "#" and "**" are gone before we get here.
-async function sendTelegram(chatId, text) {
+// Plain text by default. Telegram's Markdown/MarkdownV2 modes reject the whole
+// message with a 400 if a single character is unescaped, and agent output is
+// full of unescaped _ * [ ] ( ). `html: true` is only for text built by
+// services/telegramEditor.js, which escapes every piece of agent text itself —
+// HTML mode needs just & < > escaped, so it cannot be tripped the same way.
+// `silent` delivers without a sound or vibration.
+async function sendTelegram(chatId, text, { html = false, silent = false } = {}) {
   if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
-  for (const chunk of splitForTelegram(text)) {
+  // An HTML card is short by construction; splitting it could cut a tag in half.
+  const chunks = html ? [text] : splitForTelegram(text);
+  for (const chunk of chunks) {
     await axios.post(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      { chat_id: chatId, text: chunk },
+      {
+        chat_id: chatId,
+        text: chunk,
+        ...(html ? { parse_mode: 'HTML' } : {}),
+        disable_notification: silent,
+        // A link preview card would be larger than the message it belongs to.
+        link_preview_options: { is_disabled: true }
+      },
       { timeout: 15000 }
     );
   }
   return { status: 'sent' };
+}
+
+// What Telegram gets for a notification: a short reviewed card, sent loudly,
+// quietly, or held in the app. See services/telegramEditor.js for why.
+async function deliverTelegram(chatId, n) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
+  const { reviewForTelegram } = require('./telegramEditor');
+  const card = await reviewForTelegram(n);
+  const logged = { payload: card.text, importance: card.importance };
+  if (!card.send) {
+    return { status: 'held', detail: `Held in app (importance ${card.importance}/5): ${card.reason}`, ...logged };
+  }
+  try {
+    await sendTelegram(chatId, card.html, { html: true, silent: card.silent });
+  } catch (err) {
+    // A 400 means Telegram rejected the markup. The same words as plain text
+    // are better than a report that silently never arrives.
+    if (!(err.response && err.response.status === 400)) throw err;
+    await sendTelegram(chatId, card.text, { silent: card.silent });
+  }
+  // The "Alert"/"Silent" prefix is load-bearing: telegramEditor counts today's
+  // alerts by it to cap how often the phone rings.
+  const how = card.importance == null ? card.reason
+    : `${card.silent ? 'Silent' : 'Alert'} (importance ${card.importance}/5): ${card.reason}`;
+  return { status: 'sent', detail: how, ...logged };
 }
 
 // ── Telegram auto-link helpers (getUpdates polling — no public webhook) ──
@@ -248,13 +283,14 @@ async function sendPush(subscription, payload) {
 }
 
 // ── Delivery log ─────────────────────────────────────────────
-async function logDelivery({ notificationId, userId, channel, destination, status, detail }) {
+async function logDelivery({ notificationId, userId, channel, destination, status, detail, payload, importance }) {
   try {
     await query(`
-      INSERT INTO notification_deliveries (delivery_id, notification_id, user_id, channel, destination, status, detail)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO notification_deliveries (delivery_id, notification_id, user_id, channel, destination, status, detail, payload, importance)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [`dlv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        notificationId, userId, channel, destination || null, status, detail || null]);
+        notificationId, userId, channel, destination || null, status, detail || null,
+        payload || null, importance == null ? null : importance]);
   } catch (e) { /* never let logging break dispatch */ }
 }
 
@@ -295,7 +331,7 @@ async function dispatchToChannels(n) {
     attempts.push(['sms', prefs.sms_to, () => sendSMS(prefs.sms_to, `${n.title}\n${toSnippet(n.content, 260)}`)]);
   }
   if (prefs.channel_telegram && prefs.telegram_chat_id) {
-    attempts.push(['telegram', prefs.telegram_chat_id, () => sendTelegram(prefs.telegram_chat_id, text)]);
+    attempts.push(['telegram', prefs.telegram_chat_id, () => deliverTelegram(prefs.telegram_chat_id, n)]);
   }
   if (prefs.channel_push) {
     attempts.push(['push', 'browser', () => sendPush(prefs.push_subscription, {
@@ -306,8 +342,12 @@ async function dispatchToChannels(n) {
   for (const [channel, destination, fn] of attempts) {
     try {
       const r = await fn();
-      await logDelivery({ notificationId: n.notification_id, userId: n.user_id, channel, destination, status: r.status, detail: r.detail });
+      await logDelivery({
+        notificationId: n.notification_id, userId: n.user_id, channel, destination,
+        status: r.status, detail: r.detail, payload: r.payload, importance: r.importance
+      });
       if (r.status === 'sent') console.log(`📨 Notification ${n.notification_id} → ${channel} (${destination})`);
+      if (r.status === 'held') console.log(`📨 Notification ${n.notification_id} held from ${channel}: ${r.detail}`);
     } catch (err) {
       await logDelivery({ notificationId: n.notification_id, userId: n.user_id, channel, destination, status: 'failed', detail: err.message });
       console.warn(`⚠️ ${channel} delivery failed: ${err.message}`);

@@ -315,6 +315,25 @@
       const s = window.socket || (typeof socket !== 'undefined' ? socket : null);
       if (s && !window.__notifSockBound) { s.on('notification:new', () => { refreshBadge(); if (open) loadList(); }); window.__notifSockBound = true; }
     }
+    // ?report=<notification_id> — the "Read full report" link on a Telegram
+    // card. Telegram only gets a summary, so this is where the whole report
+    // lives. Opened once, then the param is dropped so a reload doesn't reopen it.
+    const reportId = new URLSearchParams(location.search).get('report');
+    if (reportId && window.__notifReportOpened !== reportId) {
+      window.__notifReportOpened = reportId;
+      fetch('/api/notifications/' + encodeURIComponent(reportId), { headers: { Authorization: 'Bearer ' + tok() } })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!d || !d.notification) return;
+          showReport(d.notification);
+          fetch('/api/notifications/' + encodeURIComponent(reportId) + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } })
+            .then(refreshBadge).catch(() => { });
+          const u = new URL(location.href); u.searchParams.delete('report');
+          history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+        })
+        .catch(() => { });
+    }
+
     refreshBadge();
     // Egress guard: skip the network poll while the tab is hidden; socket push
     // still delivers new notifications instantly when the tab is open.

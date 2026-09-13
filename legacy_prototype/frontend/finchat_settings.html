@@ -814,10 +814,11 @@
  function secLog() {
    const rows = state.deliveries || [];
    const fails = failCount();
-   const COLOR = { sent: 'stag-on', failed: 'stag-danger', unconfigured: 'stag-warn', skipped: 'stag-neutral' };
+   const COLOR = { sent: 'stag-on', failed: 'stag-danger', unconfigured: 'stag-warn', skipped: 'stag-neutral', held: 'stag-neutral' };
+   const held = rows.filter(d => d.status === 'held').length;
    return `
    <div class="set-title-row">
-     <div class="grow set-sec-head"><h2>Delivery log</h2><p>The last ${rows.length} notification attempts across every channel.</p></div>
+     <div class="grow set-sec-head"><h2>Delivery log</h2><p>The last ${rows.length} notification attempts across every channel. Reports are reviewed before Telegram: importance 5 alerts you (at most 3 a day), 4 arrives silently, 1–3 stays in the app${held ? ` (${held} held here)` : ''}.</p></div>
      ${fails ? `<span class="stag stag-danger" style="align-self:center;">${fails} failed</span>` : ''}
    </div>
    <div class="set-card" style="padding:6px 16px 8px;">
@@ -829,8 +830,10 @@
              <td><span class="stag ${COLOR[d.status] || 'stag-neutral'}">${esc(d.status)}</span></td>
              <td style="font-weight:600; color:var(--text);">${esc(d.channel)}</td>
              <td style="font-family:var(--mono); font-size:12px; color:var(--text-2);">
+               ${d.notification_title ? `<div style="font-family:inherit; font-weight:600; color:var(--text);">${esc(d.notification_title)}</div>` : ''}
                ${esc(d.destination || '')}
-               ${d.detail ? `<div style="color:var(--danger); margin-top:2px;">↳ ${esc(d.detail)}</div>` : ''}
+               ${d.detail ? `<div style="color:${['failed', 'unconfigured'].includes(d.status) ? 'var(--danger)' : 'var(--text-3)'}; margin-top:2px;">↳ ${esc(d.detail)}</div>` : ''}
+               ${d.payload ? `<details style="margin-top:4px;"><summary style="cursor:pointer; color:var(--text-3);">${d.status === 'held' ? 'Message that was held' : 'Message sent'}</summary><div style="white-space:pre-wrap; font-family:var(--sans, inherit); font-size:12.5px; color:var(--text); background:var(--surface-2, transparent); border-radius:8px; padding:8px 10px; margin-top:4px;">${esc(d.payload)}</div></details>` : ''}
              </td>
              <td style="font-size:12px; color:var(--text-2);">${fmtTime(d.created_at)}</td>
            </tr>`).join('') : `<tr><td colspan="4" style="color:var(--text-3); padding:16px 8px;">No external deliveries yet — enable a channel and hit “Send test”.</td></tr>`}

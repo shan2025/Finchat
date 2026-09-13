@@ -42,10 +42,15 @@ function whatsappStatus(prefs) {
 router.get('/notifications', requireAuth, async (req, res) => {
   try {
     const prefs = await getPrefs(req.user.id);
+    // payload/importance/title let the Delivery log show what Telegram was
+    // actually sent (or why a report was held back), not just that it went.
     const deliveries = await query(`
-      SELECT channel, destination, status, detail, created_at
-      FROM notification_deliveries WHERE user_id = $1
-      ORDER BY created_at DESC LIMIT 15
+      SELECT d.channel, d.destination, d.status, d.detail, d.payload, d.importance, d.created_at,
+             n.title AS notification_title
+      FROM notification_deliveries d
+      LEFT JOIN notifications n ON n.notification_id = d.notification_id
+      WHERE d.user_id = $1
+      ORDER BY d.created_at DESC LIMIT 25
     `, [req.user.id]);
     res.json({
       prefs: prefs || {

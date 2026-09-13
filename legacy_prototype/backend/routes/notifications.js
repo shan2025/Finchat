@@ -37,6 +37,26 @@ router.get('/unread-count', requireAuth, async (req, res) => {
   }
 });
 
+// ── GET /api/notifications/:id ── one notification, for the Telegram card's
+// "Read full report" link. The card is deliberately short, so the full body
+// has to be reachable from the phone even when it is older than the bell's
+// last 20 items.
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT notification_id, type, title, content, is_read, link, created_at
+       FROM notifications
+       WHERE notification_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Notification not found' });
+    res.json({ notification: result.rows[0] });
+  } catch (err) {
+    console.error('Fetch notification error:', err);
+    res.status(500).json({ error: 'Failed to fetch notification' });
+  }
+});
+
 // ── POST /api/notifications/:id/read ── mark one as read ──
 router.post('/:id/read', requireAuth, async (req, res) => {
   try {
