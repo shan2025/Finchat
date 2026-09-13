@@ -84,6 +84,16 @@ const GREETING_REPLIES = {
     "New field, old question, or something you read and didn't believe?",
     "The bench is clear and the coffee's fresh. What are we investigating?"
   ],
+  feynman: [
+    "Bring me a claim that sounds too clever and we'll see what's underneath it.",
+    "What never quite clicked? A paper, a ratio, a framework — pick one.",
+    "Most hyped ideas turn out to be one simple mechanism with a new name. Want to test one?",
+    "I teach AI architecture, finance concepts and product frameworks. Where do we start?",
+    "Give me a headline and I'll give you the mechanism, the trade-off and where it came from.",
+    "If I can't explain it simply, I don't understand it yet. Try me.",
+    "Whiteboard's clean. What are we unpacking today?",
+    "Read something this week you only half believed? That's a good place to start."
+  ],
   _default: [
     "I'm here and ready. What are we working on?",
     "Good to see you. Give me something to chew on.",
@@ -137,7 +147,7 @@ const GREETING_RE = new RegExp(
   '^(?:h+i+|h+e+y+|h+e+l+o+|h+e+l+l+o+|hiya|yo|howdy|greetings|sup|namaste|hola|' +
   'good\\s+(?:morning|afternoon|evening|day))' +
   '(?:\\s+(?:there|again|all|team|everyone|folks|guys|bot|ai|agent|' +
-  'plato|aurelius|atlas|rasha|nova))*' +
+  'plato|aurelius|atlas|rasha|nova|hopper|feynman))*' +
   '[\\s!.,?~\\-]*$',
   'i'
 );

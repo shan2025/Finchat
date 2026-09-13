@@ -255,6 +255,15 @@
             </div>
           </div>
 
+          <!-- Feynman -->
+          <div class="agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4" id="card-feynman" onclick="selectAgent('feynman')">
+            <span class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-cream-bg shrink-0 border border-outline-variant"><svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#2c3a33"/><rect x="24" y="28" width="22" height="18" rx="3" fill="none" stroke="#efe8de" stroke-width="3"/><rect x="54" y="54" width="22" height="18" rx="3" fill="none" stroke="#efe8de" stroke-width="3"/><path d="M46 37 C62 37 65 43 65 54" fill="none" stroke="#e8b86d" stroke-width="3" stroke-linecap="round"/><path d="M54 63 C38 63 35 57 35 46" fill="none" stroke="#e8b86d" stroke-width="3" stroke-linecap="round"/></svg></span>
+            <div>
+              <div class="font-bold text-base">Feynman</div>
+              <div class="text-xs text-[#8c7a6b] font-mono flex items-center gap-1 mt-0.5"><span class="w-2 h-2 rounded-full bg-[#16a34a]"></span> Explainer &amp; Tutor</div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -420,7 +429,7 @@
   // map from before that agent existed is re-seeded rather than left with an
   // undefined entry the sliders then read as NaN.
   if (!agentConfigs || !agentConfigs.aurelius || !agentConfigs.plato || !agentConfigs.atlas
-      || !agentConfigs.hopper) {
+      || !agentConfigs.hopper || !agentConfigs.feynman) {
     agentConfigs = {
       plato: { risk: 'High', formal: 85, brief: 20, serious: 90 },
       aurelius: { risk: 'Low', formal: 70, brief: 40, serious: 80 },
@@ -433,6 +442,10 @@
       // so: lowest risk, terse, and entirely serious. Mirrors runtime_settings
       // in migration 047.
       hopper: { risk: 'Low', formal: 60, brief: 55, serious: 95 },
+      // A teacher at a whiteboard: conversational rather than formal, but low
+      // risk because a lesson with a wrong number teaches the wrong thing.
+      // Mirrors runtime_settings in migration 054.
+      feynman: { risk: 'Low', formal: 35, brief: 45, serious: 70 },
       // Spread LAST so re-seeding for a new agent adds the missing key without
       // discarding sliders the user has already tuned for the existing ones.
       ...(agentConfigs || {})

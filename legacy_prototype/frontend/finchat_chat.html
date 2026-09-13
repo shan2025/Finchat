@@ -997,7 +997,7 @@
     // before that agent existed — without it a returning user keeps the old
     // five-key object and the new agent shows an undefined balance forever.
     if (!personaBalances || !personaBalances.plato || !personaBalances.atlas
-        || !personaBalances.hopper) {
+        || !personaBalances.hopper || !personaBalances.feynman) {
       personaBalances = {
         plato: 1000,
         aurelius: 1000,
@@ -1005,6 +1005,7 @@
         rasha: 1000,
         nova: 1000,
         hopper: 1000,
+        feynman: 1000,
         // Preserve whatever the browser already had, so re-seeding for a new
         // agent does not reset the balances of the existing ones.
         ...(personaBalances || {})
@@ -1083,7 +1084,9 @@
       // Inline SVG rather than a PNG like the others: there is no hopper_avatar.png,
       // and a missing <img> renders as a broken-image icon in the rail instead of
       // an avatar. Matches the SVG in backend/services/personas.js.
-      hopper: { name: 'Hopper', avatar: '<svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#232b34"/><path d="M32 34 L20 50 L32 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 34 L80 50 L68 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="58" y1="28" x2="42" y2="72" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/></svg>', desc: 'Systems Diagnostician', color: '#8fb8de' }
+      hopper: { name: 'Hopper', avatar: '<svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#232b34"/><path d="M32 34 L20 50 L32 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 34 L80 50 L68 66" fill="none" stroke="#8fb8de" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><line x1="58" y1="28" x2="42" y2="72" stroke="#efe8de" stroke-width="4" stroke-linecap="round"/></svg>', desc: 'Systems Diagnostician', color: '#8fb8de' },
+      // Inline SVG for the same reason as Hopper. Matches backend/services/personas.js.
+      feynman: { name: 'Feynman', avatar: '<svg viewBox="0 0 100 100" style="width:100%;height:100%;border-radius:50%;"><circle cx="50" cy="50" r="50" fill="#2c3a33"/><rect x="24" y="28" width="22" height="18" rx="3" fill="none" stroke="#efe8de" stroke-width="3"/><rect x="54" y="54" width="22" height="18" rx="3" fill="none" stroke="#efe8de" stroke-width="3"/><path d="M46 37 C62 37 65 43 65 54" fill="none" stroke="#e8b86d" stroke-width="3" stroke-linecap="round"/><path d="M54 63 C38 63 35 57 35 46" fill="none" stroke="#e8b86d" stroke-width="3" stroke-linecap="round"/></svg>', desc: 'Explainer & Tutor', color: '#b8863b' }
     };
     // The "[Agent] " prefix the backend puts in front of a stored reply.
     //
@@ -1266,6 +1269,18 @@
             { icon: 'monitor_heart', title: 'Is everything working?', desc: 'Check every agent for real: configured, able to deliver, and completing runs.', prompt: 'Is everything working? Check the system status of every agent and report honestly — do not describe an agent by what it is designed to do.' },
             { icon: 'troubleshoot', title: 'Diagnose one failure', desc: 'Take the biggest cluster, read the run in full, and trace it into the code.', prompt: 'Take the largest failure cluster from the last 14 days, read one of its executions in full, then read the code it points at and tell me the root cause with the file and line.' },
             { icon: 'speed', title: 'Why is it slow?', desc: 'Check provider latency and which models are carrying the load.', prompt: 'Why is the system slow? Check inference provider latency and volume for the last 14 days and tell me where the time is actually going.' }
+          ]
+        },
+        feynman: {
+          title: 'What should we unpack?',
+          subtitle: 'Bring a hyped claim, a paper, or a concept that never quite clicked. Plain mechanism, real numbers, and where the idea came from.',
+          badgeBg: '#f6ead3',
+          badgeText: '#7a5418',
+          cards: [
+            { icon: 'fact_check', title: 'Debunk an AI claim', desc: 'Is a "looped transformer" really new? Strip it to the mechanism and the trade-off.', prompt: 'Debunk this for me: people say new models use "recurrent depth" or looped transformers. Explain in simple terms what that actually is, draw the architecture, give the memory vs compute trade-off in numbers, and trace which papers the idea came from.' },
+            { icon: 'menu_book', title: 'Explain a paper simply', desc: 'Find the paper, read it, and teach the one idea that matters.', prompt: 'Teach me the Mixture-of-Recursions paper. Find it on arXiv, read it, and explain the core idea simply with a diagram, the trade-off in numbers, and what came before it.' },
+            { icon: 'show_chart', title: 'Teach a finance concept', desc: 'Sharpe, drawdown, yield — with a worked example you can follow.', prompt: 'Teach me the Sharpe ratio in simple terms: the intuition, a worked example with small round numbers, what it gets wrong, and where the idea came from.' },
+            { icon: 'view_kanban', title: 'Break down a PM framework', desc: 'RICE, JTBD, north star metrics — when to use it and when not to.', prompt: 'Break down the RICE prioritisation framework for me: what it is in plain terms, a worked scoring example, the trade-offs versus other methods, and when a product manager should not use it.' }
           ]
         }
       };

@@ -110,6 +110,23 @@ function determineDelegationTarget(message) {
   ) {
     return 'hopper';
   }
+  // Feynman comes next, ahead of the domain specialists, for the same reason:
+  // "explain drawdown in simple terms" contains an Atlas trigger and "teach me
+  // how AI transformers work" a Nova one, but a request to be TAUGHT wants the
+  // tutor's lesson, not a portfolio read or a research brief. Only explicit
+  // teaching phrases qualify — a bare "what is" stays with whoever owns the domain.
+  if (
+    lower.includes('feynman') ||
+    lower.includes('teach me') ||
+    lower.includes('explain like') ||
+    lower.includes('eli5') ||
+    lower.includes('in simple terms') ||
+    lower.includes('help me understand') ||
+    lower.includes('break it down') ||
+    lower.includes('debunk')
+  ) {
+    return 'feynman';
+  }
   // Atlas is checked before Aurelius on purpose: "review my investments" and
   // "how are my holdings doing" both contain Aurelius triggers ("invest"), but
   // a question about the user's OWN positions belongs to the steward who has
