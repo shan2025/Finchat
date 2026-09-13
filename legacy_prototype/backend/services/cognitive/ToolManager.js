@@ -28,6 +28,8 @@ const TOOL_IMPLEMENTATIONS = {
   youtube: require('../../tools/YouTubeTool'),
   watchlist: require('../../tools/WatchlistTool'),
   portfolio: require('../../tools/PortfolioTool'),
+  analytics: require('../../tools/AnalyticsTool'),
+  alerts: require('../../tools/AlertsTool'),
   mission: require('../../tools/MissionTool'),
   applications: require('../../tools/ApplicationsTool'),
   gmail: require('../../tools/GmailTool'),

@@ -222,6 +222,66 @@ const TOOLS = {
     rateLimitPerMinute: 10
   },
 
+  analytics: {
+    name: 'analytics',
+    description: 'Professional risk and performance analytics from historical daily prices. {"action":"portfolio"} — the user\'s whole book: per-asset volatility/Sharpe/drawdown, covariance-based portfolio volatility, correlations, concentration (HHI, effective number of positions), and RISK CONTRIBUTION — how much of total risk each holding supplies, which often differs sharply from its share of value. {"action":"asset","symbol":"ETH"} — one asset: return, annualised volatility, Sharpe, Sortino, Calmar, max and current drawdown, 1-day VaR/expected shortfall, SMA 20/50/200, RSI(14), MACD, Bollinger %B, plus plain readings of each. {"action":"compare","symbols":["BTC","ETH","SOL"],"rankBy":"sortino"} — ranks assets by risk-adjusted return over a PAST window. {"action":"horizon","symbol":"ETH"} — what holding for 7/30/90/180/365 days has historically returned (share profitable, median, worst). Optional "days", "kind" ("crypto"|"stock"), "riskFreeRate" (annual, default 0). EVERYTHING HERE DESCRIBES THE PAST: a high Sharpe or a strong horizon history is not a forecast, a ranking can reverse in a different window, and none of it tells the user what to buy or how long to hold. Report it as evidence and say so.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'portfolio | asset | compare | horizon' },
+        symbol: { type: 'string', description: 'For asset/horizon: e.g. BTC, ETH, RELIANCE' },
+        symbols: { type: 'array', description: 'For compare: 2-10 symbols' },
+        kind: { type: 'string', description: 'crypto | stock (default crypto)' },
+        days: { type: 'number', description: 'History window (portfolio default 90, asset/compare 365, horizon 1095)' },
+        rankBy: { type: 'string', description: 'For compare: sortino | sharpe | calmar | totalReturn | maxDrawdown | volatility' },
+        horizons: { type: 'array', description: 'For horizon: holding periods in days, default [7,30,90,180,365]' },
+        riskFreeRate: { type: 'number', description: 'Annual risk-free rate as a decimal, e.g. 0.065. Default 0 — always state what was used' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        risk: { type: 'object', description: 'Volatility, Sharpe, Sortino, drawdowns, VaR' },
+        trend: { type: 'object', description: 'Moving averages, RSI, MACD, Bollinger' },
+        riskContribution: { type: 'array', description: 'For portfolio: each holding\'s share of total risk vs its share of value' },
+        readings: { type: 'array', description: 'Plain-language descriptions of the numbers — definitions, never instructions' }
+      }
+    },
+    cacheTTLSeconds: 0, // the history is cached underneath; the result depends on the live portfolio
+    rateLimitPerMinute: 10
+  },
+
+  alerts: {
+    name: 'alerts',
+    description: 'Risk alerts on the user\'s holdings, checked every 15 minutes and delivered to every channel they enabled (Telegram included). Material holdings (≥5% of the portfolio) get default protection automatically: 15% drawdown from the 30-day high, 10% fall in 24h, a 1% stablecoin depeg, and a 15% portfolio drawdown. {"action":"list"} shows what is watched and recent alerts. {"action":"create","type":"price_below","symbol":"ETH","threshold":2000} adds one — types: drawdown_from_peak (%, windowDays), sharp_drop (% in 24h), price_below / price_above (price in the asset\'s OWN quote currency: USD for crypto, INR for NSE/BSE), trend_break (below the windowDays average, default 200), volatility_spike (multiple of normal, default 2), depeg (%, stablecoins), portfolio_drawdown (%). {"action":"update","ruleId":"…","threshold":20} or "enabled":false; {"action":"remove","ruleId":"…"} (a default is switched off, not deleted); {"action":"check"} evaluates everything now without notifying — use it for "is anything wrong right now?"; {"action":"history"} lists past alerts. Alerts catch a move within minutes of crossing a line — they cannot see one coming, and they never tell the user to sell. Say both when setting one up.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | create | update | remove | check | history' },
+        type: { type: 'string', description: 'For create: drawdown_from_peak | sharp_drop | price_below | price_above | trend_break | volatility_spike | depeg | portfolio_drawdown' },
+        symbol: { type: 'string', description: 'For create: the asset (omit for portfolio_drawdown)' },
+        threshold: { type: 'number', description: '% for relative rules, a price for price_*, a multiple for volatility_spike' },
+        windowDays: { type: 'number', description: 'Lookback for drawdown/trend/volatility rules' },
+        ruleId: { type: 'string', description: 'For update/remove: from list' },
+        enabled: { type: 'boolean', description: 'For update: pause or resume a rule' },
+        note: { type: 'string', description: 'For create: why the user wanted it, in their words' },
+        days: { type: 'number', description: 'For history: look-back window' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        rules: { type: 'array', description: 'For list: each watched condition with its state' },
+        wouldFireNow: { type: 'array', description: 'For check: lines crossed right now' },
+        alerts: { type: 'array', description: 'For history: past alerts sent' }
+      }
+    },
+    cacheTTLSeconds: 0, // stateful — never cache
+    rateLimitPerMinute: 20
+  },
+
   jobs: {
     name: 'jobs',
     description: 'Search REAL job listings for a role (analyst, data science, ML, AI, product manager, business analyst, etc.), optionally filtered by company and region — always pass the region, it selects the right boards. Every result carries "kind": "posting" is ONE opening (cite it, shortlist it, draft for it); "listing_page" is a board\'s search page such as "Business Analyst Jobs in Hyderabad — 2227 Vacancies" — offer those as "browse here", never as a specific job. Cite each result\'s URL and board label, and report the "sources" field honestly if a source was skipped or unconfigured.',

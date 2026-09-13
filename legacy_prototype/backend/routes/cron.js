@@ -76,6 +76,21 @@ router.use((req, res, next) => {
 router.all('/tick', async (req, res) => {
   const wait = req.query.wait === '1' || req.query.wait === 'true';
 
+  // Portfolio risk alerts ride the same 15-minute heartbeat. Started FIRST and
+  // independently of missions, because the mission path below returns early
+  // when nothing is due — which, on most ticks, is always — and an alert check
+  // placed after that return would simply never run. Its own failures are
+  // caught here so a price-feed outage can never stop missions from being
+  // claimed, and vice versa.
+  const alertsRun = (async () => {
+    try {
+      return await require('../services/alerts/monitor').runMonitor();
+    } catch (err) {
+      console.error('❌ [Cron] Alert monitor failed:', err.message);
+      return { error: err.message };
+    }
+  })();
+
   let claimed;
   try {
     const result = await query(`
@@ -97,7 +112,10 @@ router.all('/tick', async (req, res) => {
   }
 
   if (claimed.length === 0) {
-    return res.json({ ok: true, claimed: 0, missions: [], note: 'Nothing due.' });
+    if (wait) {
+      return res.json({ ok: true, claimed: 0, missions: [], alerts: await alertsRun, note: 'No missions due.' });
+    }
+    return res.json({ ok: true, claimed: 0, missions: [], note: 'No missions due; alert check running in the background.' });
   }
 
   console.log(`⏰ [Cron] Claimed ${claimed.length} due mission(s): ${claimed.map(m => m.title).join(', ')}`);
@@ -120,8 +138,8 @@ router.all('/tick', async (req, res) => {
   };
 
   if (wait) {
-    const results = await runAll();
-    return res.json({ ok: true, claimed: claimed.length, waited: true, results });
+    const [results, alerts] = await Promise.all([runAll(), alertsRun]);
+    return res.json({ ok: true, claimed: claimed.length, waited: true, results, alerts });
   }
 
   // Fire and forget — the response goes out now, the runs continue behind it.
