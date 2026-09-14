@@ -292,7 +292,6 @@
         '<div class="sbn-logo" title="Home — Chat" onclick="location.href=\'finchat_chat.html\'">' + MASCOT_HEAD + '</div>' +
         '<div style="flex:1; min-width:0;">' +
           '<div class="sbn-serif sbn-brand" style="cursor:pointer;" title="Home — Chat" onclick="location.href=\'finchat_chat.html\'">FinChat</div>' +
-          '<div class="sbn-brandsub">AI Operating System</div>' +
         '</div>' +
         '<button class="sbn-themebtn" id="sbnThemeBtn" title="Switch nav theme (espresso / cream)">' +
           '<span class="material-symbols-outlined" style="font-size:16px;">' + (navTheme === 'cream' ? 'dark_mode' : 'light_mode') + '</span>' +
