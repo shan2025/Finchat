@@ -1909,7 +1909,9 @@
   // Roster from GET /api/agents/locations — every agent's home district and
   // whether it is currently out on a task. Empty when logged out (demo only).
   var ROSTER = [];
-  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', atlas: '#2f6f5e', rasha: '#c76b6b' };
+  // Mirror of AGENT_SKIN in backend/services/cognitive/ExecutionTrace.js — keep
+  // the two in step, or an agent plates in the wrong colour on the map.
+  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', atlas: '#2f6f5e', rasha: '#c76b6b', feynman: '#c9a24a', hopper: '#6f7fa8' };
   function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
 
   function applyScenario(s) {

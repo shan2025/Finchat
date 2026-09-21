@@ -7,10 +7,13 @@
 const db = require('../database');
 const microCache = require('./microCache');
 const { agentMeta } = require('./cognitive/ExecutionTrace');
+const { personas } = require('./personas');
 
-// The competitive roster. Other assigned_agents (system MemoryAgent, Sentinel)
-// do real work but are not racers, so they stay off the leaderboard.
-const ROSTER = new Set(['plato', 'nova', 'aurelius', 'rasha', 'atlas']);
+// Derived from the persona roster, NOT a hand-written list — the literal list
+// was frozen at five and silently hid Feynman and Hopper from Ranks and
+// Profiles for as long as they have existed. Other assigned_agents (system
+// MemoryAgent, Sentinel) are not personas, so they stay off by construction.
+const ROSTER = new Set(Object.keys(personas));
 // Wall-clock (updated_at - created_at) includes time a run sat parked on a human
 // approval or was swept stale — not working time. Cap each run's counted
 // duration so one parked execution can't blow an agent's average latency.

@@ -17,10 +17,11 @@ const { query } = require('../../database');
 // so replay, live stream, and route-yield all resolve legs the same way.
 const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
 
-// Identity + colour for the four specialists + Plato, matching the Agent Map
-// demo palette and the avatar files in the frontend.
-// The real FinChat roster: Plato supervises; Nova / Aurelius / Rasha are the
-// specialists. (There is no "Cato" — that was a design-mock placeholder.)
+// Identity + colour for every persona, matching the Agent Map demo palette and
+// the avatar files in the frontend.
+// The real FinChat roster: Plato supervises; Nova / Aurelius / Rasha / Atlas /
+// Feynman / Hopper are the specialists. (There is no "Cato" — that was a
+// design-mock placeholder.)
 // Identity comes from personas.js — the same definitions that build the live
 // system prompts — so an agent's name and role can never drift from what it is
 // actually told to be. (They had: Nova was labelled "Finance" and Aurelius
@@ -34,11 +35,18 @@ const AGENT_SKIN = {
   nova: { color: '#e08a44', avatar: 'nova_avatar.png' },
   aurelius: { color: '#93a56e', avatar: 'aurelius_avatar.png' },
   rasha: { color: '#c76b6b', avatar: 'rasha_avatar.png' },
-  // No PNG for Atlas yet. The map consumers all guard on a falsy avatar and
-  // fall back to the colour plate, so an empty string is the honest value —
-  // better than pointing at a file that would 404 on every frame.
-  atlas: { color: '#2f6f5e', avatar: '' }
+  atlas: { color: '#2f6f5e', avatar: 'atlas_avatar.png' },
+  feynman: { color: '#c9a24a', avatar: 'feynman_avatar.png' },
+  hopper: { color: '#6f7fa8', avatar: 'hopper_avatar.png' }
 };
+// Every persona needs a skin, or the agent shows up on the map as an anonymous
+// plate — which is how Atlas stayed avatar-less long after atlas_avatar.png
+// landed in the frontend, and how Feynman and Hopper never appeared at all.
+// A missing skin is a bug, but not one worth refusing to boot over: warn here,
+// and let execution-trace-skins.test.js fail the build.
+for (const id of Object.keys(personas)) {
+  if (!AGENT_SKIN[id]) console.warn(`ExecutionTrace: persona "${id}" has no AGENT_SKIN entry — it will render without an avatar`);
+}
 const AGENT_META = Object.keys(AGENT_SKIN).reduce((acc, id) => {
   const p = personas[id] || {};
   acc[id] = {
