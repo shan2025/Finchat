@@ -98,7 +98,6 @@
       <input id="bmSearch" placeholder="Find a place…" style="width:100%; padding:8px 12px 8px 34px; border-radius:999px; border:1px solid var(--line); background:var(--ink3); color:var(--parch); font-family:inherit; font-size:12px; outline:none;">
     </div>
 
-    <div id="bmSpeeds" style="display:flex; align-items:center; gap:3px; padding:3px; border-radius:999px; background:var(--ink3);"></div>
     <button id="bmAskBtn" class="bm-btn" title="Ask a question and watch the agent route live" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; background:var(--ink3); color:var(--parch); font-family:inherit; font-weight:700; font-size:12px; border:1px solid var(--line);">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Ask
     </button>
@@ -396,9 +395,9 @@
       wp: [['hub', 'Dispatched', 0], ['news-0', 'Read the earnings call in full before touching numbers', 1.5], ['filings-0', 'The 10-K Vault — this is the evidence that lifted the fog', 3.6], ['filings-2', 'Auditor Notes, an unusual but decisive stop', 4.8], ['compliance-0', 'Took Plato’s verification route to Suitability Rules', 6.4], ['models-0', 'Arrived with every claim sourced', 8]]
     },
     {
-      id: 'cato', name: 'Cato', role: 'Risk', avatar: '', c: '#5b8fa6', fuel: 11.8, conf: 88, risk: 6, rate: 66, finish: 9.5 / DUR,
+      id: 'atlas', name: 'Atlas', role: 'Portfolio', avatar: 'atlas_avatar.png', c: '#2f6f5e', fuel: 11.8, conf: 88, risk: 6, rate: 66, finish: 9.5 / DUR,
       bio: 'Looks for the reason not to act. Found the contradiction this race — the mandate and the concentration limit disagreed.',
-      chain: 'Cato drove Risk → Portfolio → Client History → Valuation, doubling back after finding a contradiction.',
+      chain: 'Atlas drove Risk → Portfolio → Client History → Valuation, doubling back after finding a contradiction.',
       wp: [['hub', 'Dispatched', 0], ['risk-0', 'Drawdown Ridge — modelled the downside before the upside', 1.6], ['risk-1', 'Concentration: a figure that contradicts the mandate', 3], ['portfolio-1', 'Cost Basis confirmed exposure was understated', 5.2], ['clients-0', 'Mandate & Limits settled which figure governs', 7.4], ['models-1', 'Delivered a hard ceiling to Comps Table', 9.5]]
     },
     {
@@ -413,15 +412,15 @@
     [0, 'Task issued', 'Four agents dispatched from the Question Hub. Fuel cap 14k each, verification required before any recommendation.', 'plato'],
     [1.2, 'Aurelius opens Ledger Avenue', 'First road of the race lights up: Hub → Portfolio.', 'aurelius'],
     [1.5, 'Nova heads for News', 'A second route lights up across the north of the map.', 'nova'],
-    [3.0, 'Contradiction found', 'Cato reports Concentration disagreeing with Mandate & Limits. The building is flagged on the map.', 'contradiction'],
+    [3.0, 'Contradiction found', 'Atlas reports Concentration disagreeing with Mandate & Limits. The building is flagged on the map.', 'contradiction'],
     [3.6, 'Rasha left the network', 'Route entered the unknown block north of Portfolio. No road, no source, no support.', 'fog'],
     [4.0, 'Verification route opened', 'Plato paves a new road: Auditor Notes → Suitability Rules. Nova is reassigned to drive it.', 'plato'],
     [6.0, 'Aurelius reaches Valuation', 'First arrival. 9.2k fuel, every claim sourced.', 'aurelius'],
     [7.0, 'Fog lifted', 'Nova produced the 10-K figure Rasha had guessed. The unknown block is paved and Q3 Guidance is built.', 'clear'],
     [8.0, 'Nova reaches Valuation', 'Second arrival, highest confidence on the board, 46% more fuel than Aurelius.', 'nova'],
-    [9.5, 'Cato delivers the ceiling', 'Contradiction resolved in favour of the mandate. Position size capped.', 'cato'],
+    [9.5, 'Atlas delivers the ceiling', 'Contradiction resolved in favour of the mandate. Position size capped.', 'atlas'],
     [10.5, 'Rasha arrives', 'Fastest route, weakest support. Flagged for review, excluded from the answer.', 'fog'],
-    [11, 'Answer verified', 'Plato validates: Aurelius’ answer, Nova’s citations, Cato’s ceiling. Rasha’s claim discarded.', 'done']
+    [11, 'Answer verified', 'Plato validates: Aurelius’ answer, Nova’s citations, Atlas’ ceiling. Rasha’s claim discarded.', 'done']
   ];
   // Fog sits on open grid cells rather than on a district. `grown` names the
   // building that goes up once the block is paved; `noBlob` lists a gap that is
@@ -927,8 +926,7 @@
     document.getElementById('bmApp').addEventListener('click', function (e) {
       var el = e.target.closest('[data-act]'); if (!el) return;
       var act = el.getAttribute('data-act');
-      if (act === 'speed') self.setState({ speed: +el.getAttribute('data-v') });
-      else if (act === 'sel') self.setState({ sel: el.getAttribute('data-id'), tab: 'route', road: null });
+      if (act === 'sel') self.setState({ sel: el.getAttribute('data-id'), tab: 'route', road: null });
       else if (act === 'tab') self.setState({ tab: el.getAttribute('data-k') });
       else if (act === 'leg') self.onLeg(+el.getAttribute('data-i'));
       else if (act === 'log') { var at = +el.getAttribute('data-at'); self.t = at / DUR; self.setState({ playing: false }); }
@@ -1531,10 +1529,6 @@
 
     // top bar
     document.getElementById('bmPlay').textContent = S.playing ? 'Pause' : this.t >= 1 ? 'Replay' : 'Play';
-    document.getElementById('bmSpeeds').innerHTML = [['0.5×', .5], ['1×', 1], ['2×', 2]].map(function (row) {
-      var on = S.speed === row[1];
-      return '<span class="bm-tab" data-act="speed" data-v="' + row[1] + '" style="padding:5px 10px; border-radius:999px; font-size:11px; font-weight:600; background:' + (on ? 'rgba(245,234,216,.14)' : 'transparent') + '; color:' + (on ? 'var(--parch)' : 'var(--parch-dim)') + ';">' + row[0] + '</span>';
-    }).join('');
 
     // directive bar
     var past = EVENTS.filter(function (e) { return secs >= e[0]; });
@@ -1551,12 +1545,11 @@
     var lod = this.z < 0.55 ? 'Districts' : this.z < 0.95 ? 'Streets' : 'Buildings';
     document.getElementById('bmLod').textContent = lod;
     var anyFog = AG.some(function (a) { var c = self.paths ? self.posAt(a, secs) : null; return c && c.pt.off; });
-    var nextTier = TIERS.filter(function (t) { return S.queries < t.at; })[0];
-    var visible = this.order.filter(function (k) { return self.unlocked(self.B[k].locked); }).length;
+    // One status badge only. The "queries learned / buildings" counter and the
+    // "NEXT: UNLOCK …" tier badge were gamification chrome that crowded the map —
+    // that state still lives in the Growth panel on the right, not over the map.
     var tags = [
-      { label: (anyFog ? 'AGENT IN FOG · UNSOURCED' : secs >= DUR ? 'ANSWER VERIFIED' : 'RACE LIVE · ' + AG.length + (AG.length === 1 ? ' AGENT' : ' AGENTS')), bg: anyFog ? 'rgba(199,107,107,.85)' : 'rgba(28,24,21,.82)', border: anyFog ? 'rgba(199,107,107,.6)' : 'var(--line)', fg: anyFog ? '#fff' : 'var(--parch)', dot: anyFog ? '#fff' : secs >= 11 ? '#93a56e' : 'var(--accent)' },
-      { label: S.queries + ' queries learned · ' + visible + ' buildings', bg: 'rgba(28,24,21,.82)', border: 'var(--line)', fg: 'var(--parch-dim)', dot: 'rgba(245,234,216,.35)' },
-      { label: nextTier ? 'NEXT: ' + nextTier.name.toUpperCase() + ' · ' + (nextTier.at - S.queries) + ' TO GO' : 'ATLAS FULLY UNLOCKED', bg: 'rgba(28,24,21,.82)', border: 'var(--line)', fg: 'var(--accent-300)', dot: 'var(--accent)' }
+      { label: (anyFog ? 'AGENT IN FOG · UNSOURCED' : secs >= DUR ? 'ANSWER VERIFIED' : 'RACE LIVE · ' + AG.length + (AG.length === 1 ? ' AGENT' : ' AGENTS')), bg: anyFog ? 'rgba(199,107,107,.85)' : 'rgba(28,24,21,.82)', border: anyFog ? 'rgba(199,107,107,.6)' : 'var(--line)', fg: anyFog ? '#fff' : 'var(--parch)', dot: anyFog ? '#fff' : secs >= 11 ? '#93a56e' : 'var(--accent)' }
     ];
     document.getElementById('bmLiveTags').innerHTML = tags.map(function (gt) {
       return '<span style="display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; background:' + gt.bg + '; border:1px solid ' + gt.border + '; font-size:11px; font-weight:700; color:' + gt.fg + '; backdrop-filter:blur(3px); white-space:nowrap; flex-shrink:0;">' +
@@ -1578,6 +1571,7 @@
       if (S.qDist && sel2.value !== S.qDist) sel2.value = S.qDist;
       var txt = document.getElementById('bmComposeText');
       if (txt.value !== S.qText) txt.value = S.qText;
+      var nextTier = TIERS.filter(function (t) { return S.queries < t.at; })[0];
       document.getElementById('bmComposeNote').textContent = nextTier ? nextTier.name + ' in ' + (nextTier.at - S.queries) + ' more' : 'Everything unlocked';
     }
 
