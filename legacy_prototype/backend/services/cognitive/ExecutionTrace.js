@@ -11,11 +11,12 @@
 // The Agent Map UI does the geometry (isometric layout); this only supplies
 // the ordered route, the fuel/verification/fog facts, and the controller log.
 const { query } = require('../../database');
+const microCache = require('../microCache');
 
 // Which knowledge "district" each tool belongs to, and its tone
 // ('a' = analytical/orange, 's' = source/green, 'n' = neutral). Shared taxonomy
 // so replay, live stream, and route-yield all resolve legs the same way.
-const { TOOL_DISTRICT, DEFAULT_DISTRICT } = require('./toolDistricts');
+const { TOOL_DISTRICT, DEFAULT_DISTRICT, homeDistrict } = require('./toolDistricts');
 
 // Identity + colour for every persona, matching the Agent Map demo palette and
 // the avatar files in the frontend.
@@ -239,7 +240,15 @@ async function buildExecutionTrace({ executionId, userId = null }) {
     } else if (lg.phase === 'thinking') {
       const last = waypoints.length ? waypoints[waypoints.length - 1].buildingId : null;
       lastThought = asText(c.thought) || lastThought;
-      waypoints.push({ buildingId: last, reason: asText(c.thought) || 'Reasoning', atMs: at, offRoad: false, phase: 'think' });
+      // Every token a run spends is spent on a reasoning turn, so the turn's
+      // cost is charged to where the agent was standing when it thought: the
+      // hub before its first tool, the last stop after one. A 'respond' turn is
+      // the answer being written. Runs logged before per-turn costs existed
+      // carry tokens: null, and the map falls back to the total.
+      waypoints.push({
+        buildingId: last, reason: asText(c.thought) || 'Reasoning', atMs: at, offRoad: false, phase: 'think',
+        action: c.action || null, tokens: c.tokens == null ? null : Number(c.tokens) || 0
+      });
     } else if (lg.phase === 'waiting') {
       events.push({ atMs: at, title: 'Waiting for approval', body: asText(c.message || c.reason), kind: 'plato' });
     }
@@ -306,12 +315,80 @@ async function buildExecutionTrace({ executionId, userId = null }) {
   if (typeof metrics === 'string') { try { metrics = JSON.parse(metrics); } catch (_) { metrics = null; } }
   const routing = (metrics && metrics.routing) || null;
 
+  const [before, comparison] = await Promise.all([
+    agentBefore(e).catch(() => null),
+    tokenComparison(e, routing && routing.taskType).catch(() => null)
+  ]);
+
   return {
     executionId, question: e.goal, createdAt: e.created_at, updatedAt: e.updated_at,
     durationMs: endMs, live: !isDone,
     agent, districts: [...districts.values()], buildings, waypoints, events, fog, sources, routing,
-    verification: { verified, summary: reflection?.summary || null, reason: okReason }
+    verification: { verified, summary: reflection?.summary || null, reason: okReason },
+    before, comparison
   };
+}
+
+// Where the agent was, and what it was doing, when this task reached it: its
+// home district (from its own tool grant — the block it circles while idle) and
+// its previous run for the same user. If that run was still going when this one
+// started, the agent was busy, not idle.
+async function agentBefore(e) {
+  const agentId = e.assigned_agent;
+  if (!agentId) return null;
+  const cfg = await query('SELECT tools FROM agent_configs WHERE agent_id = $1', [agentId]);
+  const { home } = homeDistrict(cfg.rows[0] && cfg.rows[0].tools);
+  const prevRes = await query(`
+    SELECT execution_id, goal, current_state, completion_reason, created_at, updated_at
+    FROM executions
+    WHERE assigned_agent = $1 AND user_id IS NOT DISTINCT FROM $2
+      AND created_at < $3 AND execution_id <> $4
+    ORDER BY created_at DESC LIMIT 1
+  `, [agentId, e.user_id || null, e.created_at, e.execution_id]);
+  const p = prevRes.rows[0] || null;
+  const startedAt = new Date(e.created_at).getTime();
+  const prevEnd = p ? new Date(p.updated_at).getTime() : null;
+  const busy = !!p && prevEnd > startedAt;
+  return {
+    home: home ? { id: home[0], name: home[1] } : null,
+    status: busy ? 'busy' : 'idle',
+    idleMs: p && !busy ? startedAt - prevEnd : null,
+    previous: p ? {
+      executionId: p.execution_id, goal: asText(p.goal, 140), state: p.current_state,
+      reason: p.completion_reason || null, endedAt: p.updated_at
+    } : null
+  };
+}
+
+// How this run's spend compares: every agent's average tokens on the same kind
+// of question (Plato's taskType), falling back to all questions when too few
+// runs share the type. Aggregates only — no other run's content leaves here.
+// Cached briefly: every replay asks, and the averages barely move per minute.
+function tokenComparison(e, taskType) {
+  return microCache.cached('token_cmp:' + (taskType || '*'), 60000, () => loadTokenComparison(taskType));
+}
+async function loadTokenComparison(taskType) {
+  const run = async (typed) => {
+    const r = await query(`
+      SELECT assigned_agent AS agent, COUNT(*)::int AS runs,
+             AVG(tokens_used) AS avg_tokens, AVG(tool_calls_used) AS avg_tools,
+             AVG(iterations_used) AS avg_turns
+      FROM executions
+      WHERE assigned_agent IS NOT NULL AND current_state IN ('completed', 'failed')
+        ${typed ? "AND metrics->'routing'->>'taskType' = $1" : ''}
+      GROUP BY assigned_agent
+    `, typed ? [taskType] : []);
+    return r.rows.filter((x) => personas[x.agent]).map((x) => ({
+      id: x.agent, name: agentMeta(x.agent).name, runs: x.runs,
+      avgTokens: Math.round(Number(x.avg_tokens) || 0),
+      avgTools: round1(x.avg_tools), avgTurns: round1(x.avg_turns)
+    }));
+  };
+  let rows = taskType ? await run(true) : [];
+  let scope = taskType || null;
+  if (rows.reduce((n, x) => n + x.runs, 0) < 3) { rows = await run(false); scope = null; }
+  rows.sort((a, b) => a.avgTokens - b.avgTokens);
+  return { taskType: scope, agents: rows };
 }
 
 // Shared map-location helpers — reused by the live stream (BrainStream.js) so a

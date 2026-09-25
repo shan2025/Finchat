@@ -205,6 +205,7 @@
         </div>
       </div>
     </div>
+    <div id="amFuelWhy" style="margin:0 20px 12px; font-size:13px; line-height:1.55; color:#4a4238;"></div>
 
     <div id="amVerify" style="margin:4px 16px 18px; padding:18px; border-radius:14px; display:flex; align-items:center; gap:16px;"></div>
   </div>
@@ -299,6 +300,11 @@
     return (sp > 120 ? cut.slice(0, sp) : cut) + '…';
   }
   function fmtN(n) { return Math.round(n).toLocaleString('en-US'); }
+  function fmtTok(n) { n = Math.round(n || 0); return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n); }
+  function fmtAgo(ms) {
+    var m = Math.round((ms || 0) / 60000);
+    return m < 1 ? 'under a minute' : m < 60 ? m + ' min' : m < 2880 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + ' days';
+  }
   function fmtSecs(ms) { var s = (ms || 0) / 1000; return s < 10 ? s.toFixed(1).replace(/\.0$/, '') + 's' : Math.round(s) + 's'; }
   function shade(hex, f) {
     var n = parseInt(String(hex).slice(1), 16);
@@ -330,11 +336,18 @@
     var lane = {
       agent: { id: 'nova', name: 'Nova', role: 'Research' },
       legs: [
-        { lm: 'web', name: 'Web & Search', reason: 'Searching latest FinTech news…', real: '' },
-        { lm: 'news', name: 'News & Sentiment', reason: 'Fetching articles and trends…', real: '' }
+        { lm: 'web', name: 'Web & Search', reasons: ['Searching latest FinTech news…'], real: '', tokens: 3100, calls: 2 },
+        { lm: 'news', name: 'News & Sentiment', reasons: ['Fetching articles and trends…'], real: '', tokens: 2300, calls: 1 }
       ],
       fuel: 8420, fuelCap: 14000, verified: true, reason: 'natural', confidence: 87, sources: 6,
-      fog: [{ name: 'we don’t know enough here' }], validate: true, durationMs: null, live: false, execId: null
+      fog: [{ name: 'we don’t know enough here' }], validate: true, durationMs: null, live: false, execId: null,
+      hubTokens: 900, answerTokens: 2120, stepTokens: true, promptTokens: 6900, completionTokens: 1520, turns: 4, toolCalls: 3,
+      before: { home: { id: 'research', name: 'Research' }, status: 'idle', idleMs: 7200000, previous: { goal: 'Summarise the new RBI digital lending rules' } },
+      comparison: { taskType: 'news', agents: [
+        { id: 'aurelius', name: 'Aurelius', runs: 12, avgTokens: 4200, avgTurns: 2.5, avgTools: 1.8 },
+        { id: 'nova', name: 'Nova', runs: 31, avgTokens: 6100, avgTurns: 2.8, avgTools: 2.2 },
+        { id: 'atlas', name: 'Atlas', runs: 7, avgTokens: 7300, avgTurns: 3.1, avgTools: 2.6 }
+      ] }
     };
     return {
       demo: true, race: false, question: 'What are the latest trends in FinTech in India?', lanes: [lane],
@@ -348,23 +361,42 @@
     var bmap = {}, dname = {};
     (tr.buildings || []).forEach(function (b) { bmap[b.id] = b; });
     (tr.districts || []).forEach(function (d) { dname[d.id] = d.name; });
-    var legs = [];
+    var legs = [], hubTokens = 0, answerTokens = 0, stepTokens = false;
     (tr.waypoints || []).forEach(function (w) {
+      // Reasoning turns carry what they cost. Charge each to where the agent
+      // stood while thinking: the hub before its first stop, the stop it had
+      // just reached after one, or the answer for the turn that wrote it.
+      if (w.phase === 'think' && w.tokens != null) {
+        stepTokens = true;
+        if (w.action === 'respond') answerTokens += w.tokens;
+        else if (legs.length) legs[legs.length - 1].tokens += w.tokens;
+        else hubTokens += w.tokens;
+      }
+      // Only tool calls are stops. Thoughts and the answer stand where the car
+      // already is — letting them into the merge below overwrote a failed
+      // stop's error with whatever the agent thought next.
+      if (w.phase && w.phase !== 'tool') return;
       var b = w.buildingId && bmap[w.buildingId]; if (!b) return;
       var lm = lmFor(b.district), reason = w.reason || ('Used ' + b.label);
       var last = legs[legs.length - 1];
-      // Consecutive stops in the same district are one visit to its landmark.
+      // Consecutive stops in the same district are one visit to its landmark,
+      // but every call there keeps its own reason.
       if (last && last.lm === lm) {
-        last.n++;
-        if (last.err && !w.offRoad) { last.err = false; last.reason = reason; }
+        last.calls++;
+        if (last.reasons.indexOf(reason) < 0) last.reasons.push(reason);
+        if (last.err && !w.offRoad) last.err = false;
         return;
       }
-      legs.push({ lm: lm, name: dname[b.district] || b.districtName || cap2(b.district), reason: reason, err: !!w.offRoad, n: 1, atMs: w.atMs || 0, real: w.atMs != null ? fmtSecs(w.atMs) : '' });
+      legs.push({ lm: lm, name: dname[b.district] || b.districtName || cap2(b.district), reasons: [reason], err: !!w.offRoad, calls: 1, tokens: 0, atMs: w.atMs || 0, real: w.atMs != null ? fmtSecs(w.atMs) : '' });
     });
     var a = tr.agent || {};
     var id = a.id || 'plato';
     var ver = tr.verification || {};
     return {
+      hubTokens: hubTokens, answerTokens: answerTokens, stepTokens: stepTokens,
+      promptTokens: a.promptTokens || 0, completionTokens: a.completionTokens || 0,
+      turns: a.iterations || 0, toolCalls: a.toolCalls || 0,
+      before: tr.before || null, comparison: tr.comparison || null,
       agent: { id: id, name: a.name || cap2(id), role: a.role || AGENT_ROLES[id] || '' },
       legs: legs,
       fuel: Math.round((a.fuel || 0) * 1000), fuelCap: Math.round((a.fuelCap || 15) * 1000),
@@ -467,15 +499,28 @@
       L.backAt = L.legs.length ? L.legs[L.legs.length - 1].at + 5 : 3;
     }
     var real = function (t) { return S.demo ? t + 's' : ''; };
-    var steps = [{ at: 0, a: (S.race ? 'Plato sent ' : 'Plato selected ') + name, kind: 'start', real: real(0) }];
-    L.legs.forEach(function (l) { steps.push({ at: l.at, a: name, b: l.name, sub: (l.err ? 'Failed: ' : '') + l.reason.replace(/^Failed: /, ''), kind: l.err ? 'err' : 'leg', real: S.demo ? l.at + 's' : l.real }); });
+    var tok = function (n) { return L.stepTokens ? n : null; };
+    var steps = [];
+    var home = L.before && L.before.home ? lmById(lmFor(L.before.home.id)) : null;
+    if (L.before) {
+      var bf = L.before;
+      steps.push({
+        at: 0, kind: 'before',
+        a: name + ' was ' + (bf.status === 'busy' ? 'busy' : 'idle') + ' at ' + (home ? cap2(home.label.toLowerCase()) : 'the hub'),
+        sub: bf.previous
+          ? (bf.status === 'busy' ? 'Still on: “' : 'Last job: “') + bf.previous.goal + '”' + (bf.idleMs != null ? ' · idle for ' + fmtAgo(bf.idleMs) : '')
+          : 'No earlier runs for you, so this was its first job.'
+      });
+    }
+    steps.push({ at: 0, a: (S.race ? 'Plato sent ' : 'Plato selected ') + name, kind: 'start', real: real(0), sub: L.stepTokens && L.hubTokens ? 'Planned the route at the hub' : '', tok: tok(L.hubTokens) });
+    L.legs.forEach(function (l) { steps.push({ at: l.at, a: name, b: l.name, subs: l.reasons, calls: l.calls, kind: l.err ? 'err' : 'leg', real: S.demo ? l.at + 's' : l.real, tok: tok(l.tokens) }); });
     var t = L.backAt;
     if (S.race) {
-      steps.push({ at: t, a: 'Writing the answer', kind: 'mid', real: '' });
+      steps.push({ at: t, a: 'Writing the answer', kind: 'mid', real: '', tok: tok(L.answerTokens) });
       t += 2;
     } else {
       steps.push({ at: t, a: 'Analyzing findings', kind: 'mid', real: real(t) });
-      t += 5; steps.push({ at: t, a: 'Generating answer', kind: 'mid', real: real(t) });
+      t += 5; steps.push({ at: t, a: 'Generating answer', kind: 'mid', real: real(t), tok: tok(L.answerTokens) });
       if (L.validate) { t += 3; steps.push({ at: t, a: 'Plato validating', kind: 'mid', real: real(t) }); }
       t += 4;
     }
@@ -483,8 +528,11 @@
     steps.push({ at: t, a: ok ? (S.race ? 'Finished' : 'Complete') : 'Stopped: ' + cap2(L.reason), kind: ok ? 'end' : 'err', real: S.demo ? t + 's' : (L.durationMs ? fmtSecs(L.durationMs) : '') });
     L.steps = steps; L.end = t;
     // Road path keyframes.
-    var keys = [{ x: HUB_DOOR[0], y: HUB_DOOR[1], t: 0 }];
-    var cur = HUB_DOOR, tPrev = 0;
+    // The agent sets off from where it was when the task came in — its home
+    // block — and drives to the hub to pick the task up before its first stop.
+    var start = home ? doorOf(home.id) : HUB_DOOR;
+    var keys = [{ x: start[0], y: start[1], t: 0 }];
+    var cur = start, tPrev = 0;
     function drive(a, b, t0, t1) {
       if (t0 > keys[keys.length - 1].t) keys.push({ x: a[0], y: a[1], t: t0 });
       var pts = [a];
@@ -495,6 +543,7 @@
       var acc = 0;
       for (var j = 1; j < pts.length; j++) { acc += lens[j - 1]; keys.push({ x: pts[j][0], y: pts[j][1], t: t0 + (t1 - t0) * (tot ? acc / tot : 1) }); }
     }
+    if (start !== HUB_DOOR) { drive(start, HUB_DOOR, 0, 2.5); cur = HUB_DOOR; tPrev = 2.5; }
     L.legs.forEach(function (l) {
       var d = doorOf(l.lm);
       var dep = tPrev + (tPrev ? Math.min(1, (l.at - tPrev) * 0.2) : 0);
@@ -927,7 +976,9 @@
       var cx = lm ? lm.x : 0, cy = lm ? lm.y : 0, key = lm ? lm.id : 'hub';
       var n = perHome[key] = (perHome[key] || 0) + 1;
       var pts = [[cx - 4, cy - 4], [cx + 4, cy - 4], [cx + 4, cy + 4], [cx - 4, cy + 4]];
-      return { id: a.id, name: a.name || cap2(a.id), pts: pts, period: 13 + (n - 1) * 2, off: (n - 1) * 6.5 };
+      // An agent still on another of your runs says so on its tag.
+      var nm = (a.name || cap2(a.id)) + (a.status === 'running' ? ' · busy' : '');
+      return { id: a.id, name: nm, pts: pts, period: 13 + (n - 1) * 2, off: (n - 1) * 6.5 };
     });
   };
 
@@ -999,7 +1050,7 @@
       runPct = L.live ? Math.min(92, (L.legs.length / (L.legs.length + 2)) * 100) : Math.min(1, t / S.RUN) * 100;
     }
     $('amRunBar').style.width = runPct.toFixed(1) + '%';
-    var main = L.steps.slice(1, L.steps.length - 1);
+    var main = L.steps.slice(L.steps[0].kind === 'before' ? 2 : 1, L.steps.length - 1);
     var stepN = Math.max(1, Math.min(main.length, main.filter(function (s) { return t >= s.at; }).length));
     $('amStepLabel').textContent = S.race ? (S.lanes.filter(function (x) { return !x.live && t >= x.end; }).length + ' of ' + S.lanes.length + ' finished') : 'Step ' + stepN + ' of ' + main.length;
     var slowest = Math.max.apply(null, S.lanes.map(function (x) { return x.durationMs || 0; }));
@@ -1065,9 +1116,12 @@
     $('amRouteTitle').textContent = S.race ? 'Live Route · ' + L.agent.name : 'Live Route';
     var acol = colorOf(L.agent.id);
     setHtml('amSteps', L.steps.map(function (s) {
-      var reached = L.live ? (s.kind === 'start' || s.kind === 'leg' || s.kind === 'err') && t >= s.at - 0.01 : t >= s.at;
+      var reached = L.live ? (s.kind === 'before' || s.kind === 'start' || s.kind === 'leg' || s.kind === 'err') && t >= s.at - 0.01 : t >= s.at;
       var green = s.kind === 'start' || s.kind === 'end';
-      var dc = s.kind === 'err' ? '#d0833a' : green ? '#3aa865' : acol;
+      var dc = s.kind === 'err' ? '#d0833a' : s.kind === 'before' ? '#a39a8c' : green ? '#3aa865' : acol;
+      var subs = s.subs || (s.sub ? [s.sub] : []);
+      if (s.calls > 1) subs = subs.concat(s.calls + ' calls here');
+      var right = [s.tok != null && s.tok > 0 ? fmtTok(s.tok) + ' tok' : '', s.real || ''].filter(Boolean).join(' · ');
       var dot = reached ? dc : '#cfc8bc', ring = reached ? alpha(dc, 0.2) : 'transparent';
       var bold = s.b && reached;
       return '<div style="position:relative; display:flex; gap:22px; padding:4px 0;">' +
@@ -1076,9 +1130,9 @@
           '<div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:' + (bold ? 600 : 400) + '; color:' + (reached ? '#1f1b16' : '#4a4238') + ';">' +
             '<span style="white-space:nowrap;">' + esc(s.a) + '</span>' +
             (s.b ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M5 12h14M12 5l7 7-7 7"></path></svg><span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(s.b) + '</span>' : '') +
-            '<span style="margin-left:auto; font-size:14px; font-weight:400; color:#6f665a; font-variant-numeric:tabular-nums;">' + esc(s.real || '') + '</span>' +
+            '<span style="margin-left:auto; font-size:14px; font-weight:400; color:#6f665a; font-variant-numeric:tabular-nums; white-space:nowrap;">' + esc(right) + '</span>' +
           '</div>' +
-          (s.sub ? '<div title="' + esc(s.sub) + '" style="font-size:13px; color:' + (s.kind === 'err' ? '#a8642a' : '#6f665a') + '; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(s.sub) + '</div>' : '') +
+          subs.map(function (x) { return '<div title="' + esc(x) + '" style="font-size:13px; color:' + (s.kind === 'err' && /fail/i.test(x) ? '#a8642a' : '#6f665a') + '; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(x) + '</div>'; }).join('') +
         '</div></div>';
     }).join('') + (L.live ? '<div style="font-size:13px; color:#8a8174; padding:4px 0 0 40px;" class="am-pulse">' + esc(L.agent.name) + ' is working…</div>' : ''));
 
@@ -1089,6 +1143,7 @@
     $('amFuelBar').style.width = Math.min(100, fpct) + '%';
     $('amFuelBar').style.background = fpct > 100 ? '#d0833a' : '#4dbf74';
     $('amFuelPct').textContent = fpct + '%';
+    setHtml('amFuelWhy', fuelWhyHtml(L, S));
 
     // Verification
     var v;
@@ -1103,6 +1158,77 @@
       '<div style="flex:1; min-width:0;"><div style="font-size:17px; font-weight:600; color:' + v.fg + ';">' + esc(v.title) + '</div>' +
       '<div style="font-size:13px; color:' + v.fg + '; margin-top:4px; white-space:pre;">' + esc(v.sub) + '</div></div>');
     renderModes();
+  }
+
+  // Why the run cost what it did: where the tokens went (per stop), what kind
+  // of tokens they were, and how that compares with this agent's usual spend
+  // and with the other agents on the same kind of question.
+  function fuelWhyHtml(L, S) {
+    var out = [], muted = 'color:#7a7064;';
+    var bar = function (label, n, max, hot, c) {
+      return '<div style="display:flex; align-items:center; gap:10px; margin-top:5px;">' +
+        '<span style="width:128px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' + (hot ? ' font-weight:600;' : '') + '" title="' + esc(label) + '">' + esc(label) + '</span>' +
+        '<div style="flex:1; height:6px; border-radius:999px; background:#ece5da; overflow:hidden;"><div style="height:100%; width:' + Math.max(2, Math.round(n / max * 100)) + '%; background:' + c + '; border-radius:999px;"></div></div>' +
+        '<span style="width:44px; text-align:right; font-variant-numeric:tabular-nums;">' + fmtTok(n) + '</span></div>';
+    };
+    var acol = colorOf(L.agent.id);
+
+    // 1. Where it went.
+    if (L.stepTokens) {
+      var parts = [{ label: 'Planning at the hub', n: L.hubTokens }]
+        .concat(L.legs.map(function (l) { return { label: l.name + (l.calls > 1 ? ' ×' + l.calls : ''), n: l.tokens }; }))
+        .concat([{ label: 'Writing the answer', n: L.answerTokens }])
+        .filter(function (p) { return p.n > 0; });
+      if (parts.length) {
+        var max = Math.max.apply(null, parts.map(function (p) { return p.n; }));
+        var top = parts.filter(function (p) { return p.n === max; })[0];
+        out.push('<div style="font-weight:600; margin-top:2px;">Where the tokens went' + (L.live ? ' so far' : '') + '</div>' +
+          parts.map(function (p) { return bar(p.label, p.n, max, p === top, p === top ? acol : alpha(acol, 0.45)); }).join(''));
+      }
+    } else if (!L.live && L.fuel) {
+      out.push('<div style="' + muted + '">This run was recorded before per-stop costs were saved, so only its total is known.</div>');
+    }
+
+    // 2. What kind of tokens, and why that adds up.
+    if (L.promptTokens || L.completionTokens) {
+      var tot = L.promptTokens + L.completionTokens, share = tot ? L.promptTokens / tot : 0;
+      var line = 'Reading ' + fmtTok(L.promptTokens) + ' · writing ' + fmtTok(L.completionTokens) +
+        (L.turns ? ' · ' + L.turns + ' turn' + (L.turns === 1 ? '' : 's') : '') +
+        (L.toolCalls ? ' · ' + L.toolCalls + ' tool call' + (L.toolCalls === 1 ? '' : 's') : '');
+      var why = share >= 0.7 && L.turns > 1
+        ? ' Most of it was reading: every turn re-reads the question plus everything gathered so far, so each extra turn costs more than the one before.'
+        : '';
+      out.push('<div style="margin-top:10px;">' + esc(line) + '<span style="' + muted + '">' + esc(why) + '</span></div>');
+    }
+
+    // 3. Against its own habit and against the others.
+    var cmp = L.comparison;
+    if (!L.live && cmp && cmp.agents && cmp.agents.length && L.fuel) {
+      var mine = cmp.agents.filter(function (a) { return a.id === L.agent.id; })[0];
+      var others = cmp.agents.filter(function (a) { return a.id !== L.agent.id; });
+      var scope = cmp.taskType ? cap2(cmp.taskType) + ' questions' : 'all questions';
+      var said = [];
+      if (mine && mine.avgTokens) {
+        var d = Math.round((L.fuel - mine.avgTokens) / mine.avgTokens * 100);
+        var s = Math.abs(d) < 10 ? 'About ' + L.agent.name + '’s usual ' + fmtTok(mine.avgTokens) + ' on ' + scope + '.'
+          : (Math.abs(d) + '% ' + (d > 0 ? 'more' : 'less') + ' than ' + L.agent.name + '’s usual ' + fmtTok(mine.avgTokens) + ' on ' + scope + '.');
+        var drivers = [];
+        if (L.turns && mine.avgTurns && Math.abs(L.turns - mine.avgTurns) >= 1) drivers.push(L.turns + ' turns vs ' + mine.avgTurns + ' usually');
+        if (L.toolCalls && mine.avgTools && Math.abs(L.toolCalls - mine.avgTools) >= 1) drivers.push(L.toolCalls + ' tool calls vs ' + mine.avgTools);
+        if (drivers.length && Math.abs(d) >= 10) s += ' It took ' + drivers.join(' and ') + '.';
+        said.push(s);
+      }
+      var cheaper = others.filter(function (a) { return a.avgTokens && a.avgTokens < L.fuel; });
+      if (cheaper.length) said.push(cheaper.map(function (a) { return a.name; }).join(', ') + ' usually spend' + (cheaper.length === 1 ? 's' : '') + ' less here. Tokens aren’t the whole story, so check accuracy on Ranks too.');
+      var rows = cmp.agents.map(function (a) { return { label: a.name + ' avg (' + a.runs + ')', n: a.avgTokens, id: a.id }; })
+        .concat([{ label: 'This run', n: L.fuel, id: L.agent.id, me: true }])
+        .sort(function (a, b) { return a.n - b.n; });
+      var cmax = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
+      out.push('<div style="font-weight:600; margin-top:12px;">Compared on ' + esc(scope) + '</div>' +
+        rows.map(function (r) { return bar(r.label, r.n, cmax, r.me, r.me ? acol : alpha(colorOf(r.id), 0.5)); }).join('') +
+        (said.length ? '<div style="margin-top:8px; ' + muted + '">' + esc(said.join(' ')) + '</div>' : ''));
+    }
+    return out.join('');
   }
 
   // ── API plumbing ────────────────────────────────────────────────────────
@@ -1232,7 +1358,17 @@
       return true;
     }
     if (p.type === 'tool_start') { ensureBuilding(tr, p.building); return false; }
-    if (p.type === 'step') { if (p.fuel != null) { tr.agent.fuel = p.fuel; return true; } return false; }
+    if (p.type === 'step') {
+      // Each step pulse follows one reasoning turn and carries the running
+      // total; the difference is that turn's cost, charged where the car stands.
+      if (p.tokensUsed != null) {
+        var spent = p.tokensUsed - (tr.tokSeen || 0); tr.tokSeen = p.tokensUsed;
+        var wps = tr.waypoints, here = wps.length ? wps[wps.length - 1].buildingId : null;
+        if (spent > 0) wps.push({ buildingId: here, phase: 'think', tokens: spent, atMs: p.atMs });
+      }
+      if (p.fuel != null) { tr.agent.fuel = p.fuel; return true; }
+      return false;
+    }
     if (p.type === 'error') { tr.fog.push({ name: 'Run error', state: 'unknown' }); return true; }
     if (p.type === 'done') {
       if (p.fuel != null) tr.agent.fuel = p.fuel;
@@ -1246,6 +1382,15 @@
     }
     return false;
   }
+  // The stream says what the agent does from here on; where it was and what it
+  // was doing before this task (and how its spend compares) come from the
+  // server's trace, fetched once as the run starts.
+  function fillContext(tr, redraw) {
+    loadTrace(tr.executionId).then(function (full) {
+      tr.before = full.before || null; tr.comparison = full.comparison || null;
+      redraw();
+    }).catch(function () { /* the run still maps without it */ });
+  }
   function pushLive() { setScenario(scenarioFromTrace(live), { keepT: true, keepSel: true }); }
   function pushRace(fresh) { setScenario(scenarioFromRace(race), fresh ? {} : { keepT: true, keepSel: true }); }
 
@@ -1257,8 +1402,10 @@
         setUrl(null, p.raceId);
       }
       if (!race.traces[p.executionId]) race.order.push(p.executionId);
-      race.traces[p.executionId] = newLiveTrace(p);
+      var lane = race.traces[p.executionId] = newLiveTrace(p);
       pushRace(race.order.length === 1);
+      var rr = race;
+      fillContext(lane, function () { if (race === rr && rr.traces[lane.executionId] === lane) pushRace(); });
       return;
     }
     var tr = race.traces[p.executionId];
@@ -1301,9 +1448,10 @@
     if (p.type === 'start') {
       race = null;
       watchingId = p.executionId; RUN_ACTIVE = true; pendingAsk = false; mode = 'live';
-      live = newLiveTrace(p);
+      var tr = live = newLiveTrace(p);
       setScenario(scenarioFromTrace(live));
       setUrl(p.executionId);
+      fillContext(tr, function () { if (live === tr) pushLive(); });
       return;
     }
     if (!live || p.executionId !== watchingId) return;

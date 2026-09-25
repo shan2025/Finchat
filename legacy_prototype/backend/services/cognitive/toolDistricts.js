@@ -24,5 +24,22 @@ const TOOL_DISTRICT = {
   glob: ['system', 'System', 'n']
 };
 const DEFAULT_DISTRICT = ['tools', 'Tools', 'n'];
+// Generic tools every agent carries — they say nothing about where it lives.
+const GENERIC_TOOLS = new Set(['search', 'fetch', 'crawl', 'mission']);
 
-module.exports = { TOOL_DISTRICT, DEFAULT_DISTRICT };
+// An agent's home district: where its own non-generic tools mostly land.
+// Returns { home: [id, name, tone] | null, districts: [{ d, n }] by count desc };
+// home is null for an agent with only generic tools (Plato — it lives at the hub).
+function homeDistrict(tools) {
+  const tally = new Map();
+  for (const t of Array.isArray(tools) ? tools : []) {
+    if (GENERIC_TOOLS.has(t)) continue;
+    const d = TOOL_DISTRICT[t] || DEFAULT_DISTRICT;
+    const cur = tally.get(d[0]) || { d, n: 0 };
+    cur.n++; tally.set(d[0], cur);
+  }
+  const districts = [...tally.values()].sort((a, b) => b.n - a.n);
+  return { home: districts.length ? districts[0].d : null, districts };
+}
+
+module.exports = { TOOL_DISTRICT, DEFAULT_DISTRICT, GENERIC_TOOLS, homeDistrict };

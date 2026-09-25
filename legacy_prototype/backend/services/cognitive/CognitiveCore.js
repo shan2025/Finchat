@@ -529,7 +529,12 @@ async function _runWithinStallClock({
         retried: result.retried,
         fallback: result.fallback,
         budgetBreached: verdict.breached,
-        lastTurn
+        lastTurn,
+        // What this one turn cost, so the Agent Map can say where a run's
+        // tokens went instead of only the total.
+        tokens: result.tokens || 0,
+        promptTokens: result.promptTokens || 0,
+        completionTokens: result.completionTokens || 0
       }, thinkStart);
       logs.push(logEntry);
 
