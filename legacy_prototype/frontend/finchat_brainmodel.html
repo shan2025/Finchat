@@ -125,6 +125,7 @@
   </div>
 
   <div id="amToast" class="am-pop"></div>
+  <div id="amTip" role="tooltip" style="display:none; position:absolute; z-index:6; width:300px; max-width:calc(100% - 32px); padding:14px 16px; border-radius:14px; background:#fffaf2; box-shadow:0 10px 30px rgba(40,30,15,.22); font-size:13px; line-height:1.5; color:#3a3024; pointer-events:none;"></div>
 
   <!-- Past runs picker -->
   <div id="amPast" class="am-pop">
@@ -280,6 +281,18 @@
   // The road corner of a landmark's lot that faces the hub — where a car parks.
   function doorOf(id) { var l = lmById(id); return [l.x - 4 * sgn(l.x), l.y - 4 * sgn(l.y)]; }
   var HUB_DOOR = [-4, -4];
+  // What each building holds, for the hover card. Tools mirror
+  // services/cognitive/toolDistricts.js; keep them in step when a tool moves.
+  var LM_INFO = {
+    hub: { title: 'Question Hub', what: 'Plato’s tower. Every question arrives here, Plato picks the agent (or the field, in a race), and each answer comes back here to be checked before you see it.', tools: [] },
+    web: { title: 'Web & Search', what: 'The open web: search results, reading a single page, crawling a site. Every agent carries these tools, so this is where a question with no specialist data usually goes first.', tools: ['search', 'fetch', 'crawl'] },
+    news: { title: 'News & Sentiment', what: 'Headlines and what people are saying about them. News articles are sources; Reddit and Quora threads are treated as opinion until something else backs them up.', tools: ['news', 'reddit', 'quora'] },
+    markets: { title: 'Markets', what: 'Prices and market data: stocks, crypto, forex and commodities, plus trading signals and which market sessions are open.', tools: ['stocks', 'crypto', 'forex', 'commodities', 'signal', 'session'] },
+    research: { title: 'Research', what: 'Deeper reading: academic papers, Wikipedia, and the knowledge graph of companies, people and ideas that earlier runs have linked together.', tools: ['paper', 'wikipedia', 'neural_map'] },
+    ops: { title: 'Operations', what: 'Doing things for you rather than looking things up: notifications, Gmail, drafting job applications and scheduled missions. Some of these ask for your approval first.', tools: ['notifications', 'gmail', 'apply_draft', 'mission'] },
+    portfolio: { title: 'Portfolio', what: 'Your own data: holdings from connected brokers, your watchlist, your résumé, job search and applications.', tools: ['portfolio', 'watchlist', 'resume', 'jobs', 'applications'] },
+    system: { title: 'System', what: 'FinChat’s own machinery: reading and editing its files and running diagnostics. Any tool without a district of its own also parks here.', tools: ['file_read', 'file_edit', 'file_write', 'glob', 'bash'] }
+  };
   var FOG = { x0: -14, x1: 6, y0: 29.5, y1: 41 };
 
   // Mirror of AGENT_SKIN in backend/services/cognitive/ExecutionTrace.js — keep
@@ -568,10 +581,25 @@
     canvas.addEventListener('wheel', function (e) { self.onWheel(e); }, { passive: false });
     canvas.addEventListener('pointerdown', function (e) { self.drag = { x: e.clientX, y: e.clientY, px: self.px, py: self.py }; });
     window.addEventListener('pointermove', function (e) {
-      if (!self.drag) return; self.userView = true;
+      if (!self.drag) return;
+      if (Math.abs(e.clientX - self.drag.x) + Math.abs(e.clientY - self.drag.y) > 4) self.drag.moved = true;
+      self.userView = true;
       self.px = self.drag.px + e.clientX - self.drag.x; self.py = self.drag.py + e.clientY - self.drag.y;
     });
-    window.addEventListener('pointerup', function () { self.drag = null; });
+    // Hovering a building (or tapping one, on touch) asks the app to explain it.
+    canvas.addEventListener('pointermove', function (e) {
+      if (self.drag || e.pointerType === 'touch') return;
+      var r = canvas.getBoundingClientRect(), id = self.hitLandmark(e.clientX - r.left, e.clientY - r.top);
+      canvas.style.cursor = id ? 'pointer' : '';
+      if (self.onHover) self.onHover(id, e.clientX - r.left, e.clientY - r.top, false);
+    });
+    canvas.addEventListener('pointerleave', function () { if (self.onHover) self.onHover(null, 0, 0, false); });
+    window.addEventListener('pointerup', function (e) {
+      var d = self.drag; self.drag = null;
+      if (!d || d.moved || e.target !== canvas || !self.onHover) return;
+      var r = canvas.getBoundingClientRect(), id = self.hitLandmark(e.clientX - r.left, e.clientY - r.top);
+      self.onHover(id, e.clientX - r.left, e.clientY - r.top, true);
+    });
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -818,6 +846,26 @@
     if (bg === '#f7eedc') { g.strokeStyle = '#e1d0af'; g.lineWidth = 1; g.stroke(); }
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(text, x, y + 0.5); g.textBaseline = 'alphabetic';
+  };
+
+  // Which landmark (or 'hub') is under a canvas-space point: the screen box of
+  // its walls, roof and name tag, front-most first since nearer lots overlap.
+  P.hitLandmark = function (sx, sy) {
+    var self = this, z = this.z, hit = null, best = -Infinity;
+    LM.forEach(function (l) {
+      var e = 2.55 * 1.16, pts = [
+        self.proj(l.x - e, l.y + e), self.proj(l.x + e, l.y + e), self.proj(l.x + e, l.y - e),
+        self.proj(l.x - e, l.y + e, 24), self.proj(l.x + e, l.y - e, 24), self.proj(l.x, l.y, 40)
+      ];
+      var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+      var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys) + 26 * Math.max(0.6, z);
+      if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && l.x + l.y > best) { best = l.x + l.y; hit = l.id; }
+    });
+    if (hit) return hit;
+    var c = this.proj(0, 0), top = this.proj(0, 0, 36), rx = 3.2 * TW * z * 1.4;
+    if (Math.abs(sx - c[0]) <= rx && sy >= top[1] - 20 * z && sy <= c[1] + 50 * z) return 'hub';
+    return null;
   };
 
   P.showFog = function () { return !!(this.S && this.S.fog && this.S.fog.length); };
@@ -1229,6 +1277,64 @@
         (said.length ? '<div style="margin-top:8px; ' + muted + '">' + esc(said.join(' ')) + '</div>' : ''));
     }
     return out.join('');
+  }
+
+  // ── Building hover card ─────────────────────────────────────────────────
+  // What a building holds, which tools answer there, which agents are based
+  // there, and what the run on screen did there.
+  function landmarkTipHtml(id) {
+    var info = LM_INFO[id]; if (!info) return '';
+    var lm = id === 'hub' ? null : lmById(id);
+    var dot = lm ? lm.roof : '#9a5c8a';
+    var h = '<div style="display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700;"><span style="width:10px; height:10px; border-radius:3px; background:' + dot + ';"></span>' + esc(info.title) + '</div>' +
+      '<div style="margin-top:6px; color:#4a4238;">' + esc(info.what) + '</div>';
+    if (info.tools.length) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">TOOLS HERE</div><div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">' +
+        info.tools.map(function (t) { return '<span style="padding:2px 8px; border-radius:999px; background:#f1e8d9; font-size:12px;">' + esc(cap2(t)) + '</span>'; }).join('') + '</div>';
+    }
+    var based = id === 'hub' ? [{ id: 'plato', name: 'Plato' }]
+      : ROSTER.filter(function (a) { return a.id !== 'plato' && a.home && lmFor(a.home.id) === id; });
+    if (based.length) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">BASED HERE</div><div style="margin-top:4px;">' +
+        based.map(function (a) { return '<span style="font-weight:600; color:' + shade(colorOf(a.id), 0.8) + ';">' + esc(a.name || cap2(a.id)) + '</span>' + (a.status === 'running' ? ' (busy)' : ''); }).join(', ') + '</div>';
+    }
+    // This run, per agent on it.
+    var S = SCN, lines = [];
+    if (S) S.lanes.forEach(function (L) {
+      var nm = '<b>' + esc(L.agent.name) + '</b>';
+      if (id === 'hub') {
+        lines.push(nm + ' picked up the task here' + (L.stepTokens && L.hubTokens ? ' and spent ' + fmtTok(L.hubTokens) + ' tokens planning' : '') + '.');
+        return;
+      }
+      var legs = L.legs.filter(function (l) { return l.lm === id; });
+      if (!legs.length) return;
+      var calls = legs.reduce(function (n, l) { return n + l.calls; }, 0);
+      var tok = legs.reduce(function (n, l) { return n + (l.tokens || 0); }, 0);
+      var reasons = [].concat.apply([], legs.map(function (l) { return l.reasons; })).slice(0, 3);
+      lines.push(nm + ': ' + calls + ' call' + (calls === 1 ? '' : 's') + (legs.length > 1 ? ' over ' + legs.length + ' visits' : '') +
+        (L.stepTokens ? ' · ' + fmtTok(tok) + ' tokens' : '') + (legs.some(function (l) { return l.err; }) ? ' · <span style="color:#a8642a;">a call failed</span>' : '') +
+        reasons.map(function (r) { return '<div style="color:#6f665a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">· ' + esc(r) + '</div>'; }).join(''));
+    });
+    if (S) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">' + (S.live ? 'THIS RUN SO FAR' : 'IN THIS RUN') + '</div>' +
+        '<div style="margin-top:4px;">' + (lines.length ? lines.join('<div style="height:6px;"></div>') : '<span style="color:#8a8174;">Not visited.</span>') + '</div>';
+    }
+    return h;
+  }
+  var tipPinned = null;
+  function onMapHover(id, x, y, tap) {
+    var tip = $('amTip');
+    if (tap) tipPinned = id && id !== tipPinned ? id : null;
+    else if (tipPinned) return; // a tapped card stays until the next tap
+    var show = tap ? tipPinned : id;
+    if (!show) { tip.style.display = 'none'; return; }
+    tip.innerHTML = landmarkTipHtml(show);
+    tip.style.display = 'block';
+    var app = $('amApp'), W = app.clientWidth - map.panelW(), Hh = app.clientHeight;
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = x + 18 + tw > W - 8 ? x - tw - 18 : x + 18;
+    tip.style.left = Math.max(8, Math.min(left, W - tw - 8)) + 'px';
+    tip.style.top = Math.max(8, Math.min(y - 20, Hh - th - 8)) + 'px';
   }
 
   // ── API plumbing ────────────────────────────────────────────────────────
@@ -1683,6 +1789,7 @@
   function init() {
     map = new AgentMap($('amCanvas'));
     map.onTick = renderPanel;
+    map.onHover = onMapHover;
     wire();
     loadRoster();
     wireLiveStream();
