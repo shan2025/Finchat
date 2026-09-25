@@ -447,8 +447,10 @@
   body.nav-cream #sideNav [style*="#cfc3ad"] { color:#5c4a38 !important; }
   body.nav-cream #sideNav [style*="#867a63"] { color:#b3a693 !important; }
   body.nav-cream #sideNav [style*="#f3ead9"] { color:#3a2e23 !important; }
-  /* Active recent chat is rendered with white text on a white tint — invisible on cream. */
-  body.nav-cream #sideNav .fc-recent[style*="color:#fff"] { color:#3a2e23 !important; background:rgba(58,46,35,.09) !important; font-weight:600 !important; }
+  #sideNav .fc-recent { color:#cfc3ad; }
+  #sideNav .fc-recent.rc-active { color:#fff; background:rgba(255,255,255,.09); }
+  body.nav-cream #sideNav .fc-recent { color:#5c4a38; }
+  body.nav-cream #sideNav .fc-recent.rc-active { color:#3a2e23; background:rgba(58,46,35,.1); font-weight:600; }
   body.nav-cream #sideNav .side-soon { background:rgba(58,46,35,.08); }
   body.nav-cream #sideNav [style*="border-top"] { border-top-color:rgba(58,46,35,.12) !important; }
   body.nav-cream #sideNav .fc-nav:not([style*="background:var(--accent)"]):hover { background:rgba(58,46,35,.07); }
@@ -1772,7 +1774,7 @@
           ? `<span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0" style="background:#efe8de;">${p.avatar}</span>`
           : `<span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style="background:#efe8de; font-size:13px;">${s.personaAvatar || '🤖'}</span>`;
         const active = s.session_id === personaSessions[activePersona];
-        return `<a class="fc-nav fc-recent" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:${active ? '#fff' : '#cfc3ad'}; background:${active ? 'rgba(255,255,255,.09)' : 'transparent'}; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
+        return `<a class="fc-nav fc-recent${active ? ' rc-active' : ''}" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
             ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
             <span class="rc-actions">
               <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
@@ -2042,9 +2044,7 @@
         renderHistoryMessages(data.messages, pid);
         // Update active highlight in-DOM instead of re-fetching all sessions
         document.querySelectorAll('#recentList [data-session]').forEach(a => {
-          const isActive = a.dataset.session === sessionId;
-          a.style.color = isActive ? '#fff' : '#cfc3ad';
-          a.style.background = isActive ? 'rgba(255,255,255,.09)' : 'transparent';
+          a.classList.toggle('rc-active', a.dataset.session === sessionId);
         });
       } catch (e) { console.log('Could not open session:', e); }
     }
