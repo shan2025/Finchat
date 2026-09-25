@@ -68,7 +68,8 @@ router.get('/list/recent', requireAuth, async (req, res) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const rows = await query(`
       SELECT execution_id, assigned_agent, current_state, completion_reason, goal,
-             tokens_used, tool_calls_used, created_at, updated_at
+             tokens_used, tool_calls_used, created_at, updated_at,
+             metrics->>'raceId' AS race_id
       FROM executions
       WHERE user_id = $1
       ORDER BY created_at DESC
