@@ -219,6 +219,41 @@ router.all('/route-learning', async (req, res) => {
 });
 
 /**
+ * Memory consolidation ("dream") and the nightly "While you were away" digest.
+ *
+ * Both used to run on in-process timers (6h and 24h) started at boot. Every
+ * deploy or restart reset those clocks, so the 6h pass fired only when the
+ * process happened to live that long and the 24h digest stopped entirely — the
+ * last one was written on 2026-08-17. Point pg_cron here instead: the dream
+ * pass at 06/12/18 UTC and the digest at 00 UTC (it runs a dream pass of its
+ * own first, which is why the dream job skips that slot).
+ *
+ * Like /tick these answer once started; pass ?wait=1 to await the result.
+ */
+function backgroundJob(label, run) {
+  return async (req, res) => {
+    const wait = req.query.wait === '1' || req.query.wait === 'true';
+    if (wait) {
+      try {
+        return res.json({ ok: true, waited: true, result: await run() });
+      } catch (err) {
+        console.error(`❌ [Cron] ${label} failed:`, err.message);
+        return res.status(503).json({ ok: false, error: err.message });
+      }
+    }
+    run().catch(err => console.error(`❌ [Cron] ${label} failed: ${err.message}`));
+    console.log(`⏰ [Cron] Started ${label}`);
+    res.status(202).json({ ok: true, note: `${label} started in the background.` });
+  };
+}
+
+router.all('/dream', backgroundJob('dream cycle',
+  () => require('../services/cognitive/MemoryEngine').dreamAllUsers()));
+
+router.all('/digest', backgroundJob('dream digest',
+  () => require('../services/cognitive/DreamDigest').runNightlyDigest({})));
+
+/**
  * Which AI providers this deployment can actually use.
  *
  * Answers "is the Gemini key set on Render?" without the dashboard. Default is a

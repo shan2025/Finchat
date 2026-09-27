@@ -521,23 +521,12 @@ server.listen(PORT, async () => {
     console.error('⚠️ Could not read mission state:', e.message);
   }
 
-  // Sprint X: dream cycle — consolidate the knowledge graph every 6 hours
-  // (merge duplicates, decay stale edges, surface knowledge gaps).
-  // Per-user: the graph-wide consolidation runs once, then each user's graph
-  // gets its own gap/community pass and its own live neural-map pulse. A single
-  // ownerless dream() cannot be delivered to anyone without broadcasting one
-  // user's entity names to every browser.
-  const { dreamAllUsers } = require('./services/cognitive/MemoryEngine');
-  setInterval(() => dreamAllUsers().catch(e => console.error('Dream cycle failed:', e.message)), 6 * 60 * 60 * 1000);
-
-  // Sprint X · Stage 4: nightly dream digest — consolidate, then tell each
-  // active user what changed ("While you were away: merged 3, learned 12…")
-  // via their configured notification channels + a Reports snapshot.
-  const { runNightlyDigest } = require('./services/cognitive/DreamDigest');
-  setInterval(
-    () => runNightlyDigest({}).catch(e => console.error('Dream digest failed:', e.message)),
-    24 * 60 * 60 * 1000
-  );
+  // The dream cycle (knowledge-graph consolidation) and the nightly digest are
+  // fired by pg_cron via /api/cron/dream and /api/cron/digest, for the same
+  // reason as missions: in-process timers reset on every deploy, so the 24h
+  // digest never fired once the app was deployed more than daily. They also
+  // ran from every local dev server against the shared database, decaying the
+  // same edges twice. See routes/cron.js and scripts/pg_cron/.
 
   // Last, so the list of what is unconfigured sits directly above the banner
   // instead of scrolling away under the migration output.
