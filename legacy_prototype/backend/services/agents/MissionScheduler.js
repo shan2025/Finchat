@@ -54,12 +54,66 @@ const FAILED_REASONS = new Set(['error', 'budget_exceeded', 'failed', 'timeout']
 
 // Thrown when a run completes technically but has nothing worth sending, so the
 // existing failure bookkeeping (backoff, auto-disable) handles it unchanged.
+// `output` keeps the text the run produced, so the failure path can tell a
+// provider outage from a mission that is genuinely broken.
 class DegradedRunError extends Error {
-  constructor(message, reason) {
+  constructor(message, reason, output = '') {
     super(message);
     this.name = 'DegradedRunError';
     this.completionReason = reason;
+    this.output = output;
   }
+}
+
+// How long to wait before retrying a run that failed because every provider
+// was down. The claim lease alone retried after 15 minutes, so a 45-minute
+// outage on 2026-09-14 spent all three strikes on one evening and switched
+// Rasha's daily job hunt off for two weeks.
+const OUTAGE_RETRY_MINUTES = 60;
+
+// Marks a mission whose last run was lost to an outage. A second outage in a
+// row goes back to the regular schedule instead of retrying hourly, so a long
+// outage costs one extra run per slot rather than one every hour.
+const OUTAGE_PREFIX = 'SKIPPED (provider outage)';
+
+// Every provider failing at once says nothing about the mission itself —
+// inference.js throws this when the whole fallback chain is exhausted, and
+// ReasoningEngine wraps the same failure in its "temporary high traffic"
+// apology. Those must not count toward auto-disable.
+function isProviderOutage(...texts) {
+  return texts.some(t => /unavailable across providers|temporary high traffic or network delays/i.test(String(t || '')));
+}
+
+// What to do with the row after a failed run. Pure so it can be tested
+// without a database.
+function planFailure(mission, { outage, now = Date.now() } = {}) {
+  if (outage) {
+    const alreadyRetried = String(mission.last_result_preview || '').startsWith(OUTAGE_PREFIX);
+    return {
+      failures: mission.consecutive_failures || 0, // an outage is not the mission's fault
+      autoDisable: false,
+      nextRunAt: alreadyRetried
+        ? estimateNextRun(mission.cadence, mission.mission_id)
+        : new Date(now + OUTAGE_RETRY_MINUTES * 60e3).toISOString()
+    };
+  }
+  const failures = (mission.consecutive_failures || 0) + 1;
+  return {
+    failures,
+    autoDisable: failures >= MAX_CONSECUTIVE_FAILURES,
+    nextRunAt: null // null = keep the claim lease as the retry time
+  };
+}
+
+// The run's own date, in the user's timezone. Without it the model titled
+// reports with whatever date the first source carried — "09 February 2026",
+// "27 August 2026" — on runs made in September.
+function missionDateLine(now = new Date()) {
+  const date = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric'
+  }).format(now);
+  return `[TODAY IS ${date} (IST). Use exactly this date in the report title. ` +
+    `Dates inside tool results belong to those sources, not to this run.]`;
 }
 
 // Deterministic 0–50 minute offset per mission. Every 'daily' mission used to
@@ -294,7 +348,7 @@ async function runMission(missionId, { manual = false } = {}) {
     // they would do ("I will fetch...") instead of doing it — there is no user
     // in the loop to say "go ahead" on a scheduled run.
     const missionGoal =
-      `${mission.goal}\n\n[AUTONOMOUS SCHEDULED RUN — nobody will reply to you. ` +
+      `${mission.goal}\n\n${missionDateLine()}\n\n[AUTONOMOUS SCHEDULED RUN — nobody will reply to you. ` +
       `This is a multi-step goal: use action "plan" on your FIRST turn so every ` +
       `tool step runs in one pass. Do NOT describe what you are about to do or ask ` +
       `for confirmation, and never invent numbers or URLs — only report what tools returned. ` +
@@ -335,7 +389,7 @@ async function runMission(missionId, { manual = false } = {}) {
         completionReason === 'budget_exceeded'
           ? 'ran out of tool-call/token budget before writing the report'
           : 'the agent could not complete the run (model or tool failure)',
-        completionReason);
+        completionReason, fullReport);
     }
     if (!fullReport) {
       throw new DegradedRunError('the run finished but produced no report text', 'empty');
@@ -364,39 +418,60 @@ async function runMission(missionId, { manual = false } = {}) {
     return { success: true, executionId: result.executionId, durationMs, preview };
 
   } catch (err) {
-    const failures = (mission.consecutive_failures || 0) + 1;
-    const autoDisable = failures >= MAX_CONSECUTIVE_FAILURES;
-    console.error(`❌ [Missions] "${mission.title}" failed (${failures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`);
+    const outage = isProviderOutage(err.message, err.output);
+    const { failures, autoDisable, nextRunAt } = planFailure(mission, { outage });
+    console.error(outage
+      ? `⏸️ [Missions] "${mission.title}" hit a provider outage — not counted, retrying at ${nextRunAt}: ${err.message}`
+      : `❌ [Missions] "${mission.title}" failed (${failures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`);
 
     await query(`
       UPDATE agent_missions
       SET consecutive_failures = $1, enabled = CASE WHEN $2 THEN false ELSE enabled END,
           last_run_at = now(), last_result_preview = $3, updated_at = now(),
-          next_run_at = CASE WHEN $2 THEN NULL ELSE next_run_at END
+          next_run_at = CASE WHEN $2 THEN NULL ELSE COALESCE($5::timestamptz, next_run_at) END
       WHERE mission_id = $4
-    `, [failures, autoDisable, `FAILED: ${err.message}`.slice(0, 500), missionId]);
+    `, [failures, autoDisable,
+        `${outage ? OUTAGE_PREFIX : 'FAILED'}: ${err.message}`.slice(0, 500), missionId, nextRunAt]);
 
     // Tell the user the run failed. Previously nothing was sent until the third
     // consecutive failure, so a mission that silently degraded just stopped
     // producing news with no explanation — or worse, delivered its own error
     // text as though it were the report.
+    //
+    // The switch-off notice goes out as 'system', not 'mission'. telegramEditor
+    // reviews every 'mission' notification with a model and holds anything it
+    // scores 1–3, so whether "your mission has stopped" reached the phone was
+    // the reviewer's call (on 2026-09-14 it scored the notice 5 and sent it, and
+    // held the two failure notices before it). The review also needs inference,
+    // which is exactly what an outage takes away. A switch-off must always land.
     try {
       const { createNotification } = require('../notifications');
-      await createNotification({
-        userId: mission.user_id,
-        type: 'mission',
-        title: `⚠️ Mission didn't complete: ${mission.title}`,
-        content: `This run failed, so there's no report for it — ${err.message}.\n\n` +
-          `Attempt ${failures} of ${MAX_CONSECUTIVE_FAILURES} before it is auto-disabled.` +
-          (autoDisable ? '\n\nIt has now been disabled. Re-enable it from the Agents page once the cause is fixed.' : '')
-      });
+      await createNotification(autoDisable
+        ? {
+          userId: mission.user_id,
+          type: 'system',
+          title: `⛔ Mission switched off: ${mission.title}`,
+          content: `"${mission.title}" failed ${failures} runs in a row and has been switched off, ` +
+            `so it will not run again until you turn it back on from the Agents page.\n\n` +
+            `Last error: ${err.message}.`
+        }
+        : {
+          userId: mission.user_id,
+          type: 'mission',
+          title: `⚠️ Mission didn't complete: ${mission.title}`,
+          content: outage
+            ? `Every AI provider was unavailable for this run, so there's no report for it — ${err.message}.\n\n` +
+              `This doesn't count against the mission. Next attempt: ${new Date(nextRunAt).toUTCString()}.`
+            : `This run failed, so there's no report for it — ${err.message}.\n\n` +
+              `Attempt ${failures} of ${MAX_CONSECUTIVE_FAILURES} before it is auto-disabled.`
+        });
     } catch (e) { /* notification is best-effort; the row already records it */ }
 
     // Auto-disable needs no extra bookkeeping: the UPDATE above already cleared
     // next_run_at, and the cron tick only claims rows that are enabled and due.
 
-    eventBus.emit('mission:failed', { missionId, failures, autoDisabled: autoDisable });
-    return { success: false, error: err.message, failures, autoDisabled: autoDisable };
+    eventBus.emit('mission:failed', { missionId, failures, autoDisabled: autoDisable, outage });
+    return { success: false, error: err.message, failures, autoDisabled: autoDisable, outage };
   }
 }
 
@@ -418,5 +493,6 @@ async function missionHistory(missionId, userId, limit = 10) {
 module.exports = {
   listMissions, getMission, createMission, updateMission, deleteMission,
   runMission, missionHistory,
-  cadenceToCron, isValidCadence, estimateNextRun, nextCronRun, MAX_CONSECUTIVE_FAILURES
+  cadenceToCron, isValidCadence, estimateNextRun, nextCronRun, MAX_CONSECUTIVE_FAILURES,
+  isProviderOutage, planFailure, missionDateLine, OUTAGE_PREFIX, OUTAGE_RETRY_MINUTES
 };
