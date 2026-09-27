@@ -56,7 +56,7 @@ test('drafts from the run are appended verbatim, strongest first as given, with 
     { role: 'Business Analyst', company: null, url: null, match_score: null, draft: 'Letter two' }
   ]);
   assert.match(out, /## ✉️ Application drafts/);
-  assert.match(out, /### Software Product Manager — Eli Lilly \(fit 80\/100\)\n\n\*\*Apply:\*\* https:\/\/www\.linkedin\.com\/jobs\/view\/1\/\n\n## Cover Letter\nDear team,/);
+  assert.match(out, /### Software Product Manager — Eli Lilly \(fit 80\/100\)\n\n\*\*Apply:\*\* https:\/\/www\.linkedin\.com\/jobs\/view\/1\/\n\n#### Cover Letter\nDear team,/);
   assert.match(out, /### Business Analyst\n\nLetter two/);
   assert.match(out, /nothing has been submitted/);
 });

@@ -114,7 +114,9 @@ function formatDraftAppendix(rows) {
   const parts = rows.map(r => {
     const head = `### ${r.role}${r.company ? ` — ${r.company}` : ''}` +
       (r.match_score != null ? ` (fit ${r.match_score}/100)` : '');
-    return [head, r.url ? `**Apply:** ${r.url}` : null, String(r.draft).trim()].filter(Boolean).join('\n\n');
+    // Drafts carry their own "## Cover Letter" headings; push them under the ###.
+    const body = String(r.draft).trim().replace(/^(#{1,4}) /gm, '$1## ');
+    return [head, r.url ? `**Apply:** ${r.url}` : null, body].filter(Boolean).join('\n\n');
   });
   return `\n\n---\n\n## ✉️ Application drafts\n` +
     `Review and edit before sending — nothing has been submitted.\n\n${parts.join('\n\n---\n\n')}`;
