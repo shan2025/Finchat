@@ -54,14 +54,18 @@
  .rep-details>summary::-webkit-details-marker{ display:none; }
  .rep-details>summary::before{ content:'chevron_right'; font-family:'Material Symbols Outlined'; font-size:18px; transition:transform .15s ease; }
  .rep-details[open]>summary::before{ transform:rotate(90deg); }
- @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} .bar-label{width:88px;} }
+ /* Rail: drawer below 1024px (phones and portrait tablets); the shared app
+    bar in sidebar_nav.js opens it, since this page has no toggle of its own. */
+ @media (max-width:1023px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+ @media (max-width:767px){ .bar-label{width:88px;} }
+ @media (pointer:coarse){ .rep-details>summary{ min-height:40px; } }
 </style>
 </head>
 <body class="min-h-screen ">
 
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
 
-<main class="flex-1 md:ml-64 min-h-screen">
+<main class="flex-1 lg:ml-64 min-h-screen">
  <div class="max-w-[1000px] mx-auto px-5 md:px-8 py-8">
 
   <div class="flex items-start justify-between flex-wrap gap-4 mb-6">

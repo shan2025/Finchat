@@ -203,6 +203,15 @@ hr { border: 0; border-top: 1px solid var(--border); }
   outline-offset: 2px;
 }
 
+/* Touch screens. Safari on iPhone zooms the whole page whenever a field under
+   16px takes focus, and leaves it zoomed after — every 13-14px search box,
+   login field and settings input did it. !important because pages size these
+   with Tailwind classes and inline styles, which a plain rule here loses to. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="button"]):not([type="submit"]),
+  select, textarea { font-size: 16px !important; }
+}
+
 /* Scrollbars, so panels don't show OS chrome that fights the palette. */
 * { scrollbar-color: var(--border-2) transparent; scrollbar-width: thin; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }

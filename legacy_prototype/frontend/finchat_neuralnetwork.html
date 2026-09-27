@@ -36,15 +36,14 @@
  ::-webkit-scrollbar { width: 6px; height: 6px; }
  ::-webkit-scrollbar-track { background: transparent; }
  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
- /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
-   navigation is reachable on narrow screens (the old `hidden md:flex` left no
-   nav at all under 768px). */
+ /* Sidebar behaves as a static rail at lg+, and a slide-in drawer below it
+   (phones and portrait tablets) so the network keeps the full width. */
  #sideNav { transition: transform .25s ease; }
- @media (max-width: 767px) {
-  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-  #sideNav.open { transform: translateX(0); }
+ @media (max-width: 1023px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; }
+  #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
  }
- @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ @media (min-width: 1024px) { #sideNav { transform: none !important; } }
  .nn-canvas { display: block; }
  .nm-rail  { background: var(--rail); color: var(--rail-txt); border-color: var(--border); }
  .nm-chrome { background: var(--nm-panel); border-color: var(--border); }
@@ -76,9 +75,9 @@
 <body class="h-screen overflow-hidden ">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
-<!-- LEFT SIDEBAR NAV (static rail at md+, slide-in drawer below) -->
+<!-- LEFT SIDEBAR NAV (static rail at lg+, slide-in drawer below) -->
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
   <div class="mb-10 px-2">
     <h1 class="font-serif text-3xl font-bold flex items-center gap-2 text-cream-bg">
@@ -147,11 +146,11 @@
   </div>
 </nav>
 
-<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div class="flex-1 flex flex-col lg:ml-64 relative h-full">
 
  <!-- Top App Bar -->
  <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
-  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
+  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex lg:hidden items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
   <a href="finchat_neuralmap.html" class="nm-btn flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shrink-0">

@@ -51,14 +51,40 @@
  ::-webkit-scrollbar-track { background: transparent; }
  ::-webkit-scrollbar-thumb { background: var(--sub); border-radius: 4px; }
 
- /* Sidebar behaves as a static rail at md+, and a slide-in drawer below it so
-   navigation is reachable on narrow screens. */
+ /* Sidebar behaves as a static rail at lg+, and a slide-in drawer below it
+   (phones and portrait tablets) so the map keeps the full width. */
  #sideNav { transition: transform .25s ease; }
- @media (max-width: 767px) {
-  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-  #sideNav.open { transform: translateX(0); }
+ @media (max-width: 1023px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; }
+  #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
  }
- @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ @media (min-width: 1024px) { #sideNav { transform: none !important; } }
+
+ /* Toolbar: below lg the two labelled buttons go icon-only, and on a phone
+    the tools become one sideways-scrolling row under the title + search
+    instead of wrapping the header into three rows over the map. */
+ @media (max-width: 1023px) {
+  .nm-tlabel { display: none; }
+  #addNodeBtn, #addDocBtn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+ }
+ @media (max-width: 767px) {
+  #nmHeader { padding: 10px 12px; gap: 8px; }
+  #nmHeader h1 { font-size: 22px; }
+  #nmTools { display: flex; align-items: center; gap: 8px; order: 5; flex: 1 0 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; padding-bottom: 2px; }
+  #nmTools::-webkit-scrollbar { display: none; }
+  #nmHeader .nm-grow { display: none; }
+  /* Settings is one tap away in the drawer; the row needs the room. */
+  #nmHeader #topbarUserIcon { display: none; }
+  #nmHint { display: none; }
+  #legend { left: 12px; right: 12px; bottom: 10px; overflow-x: auto; justify-content: flex-start; }
+ }
+ @media (pointer: coarse) {
+  #nmHeader .nm-btn.w-9 { width: 40px; height: 40px; }
+  #searchInput { font-size: 16px; }
+ }
+ /* Touch has no hover and no shift key, so it gets its own one-line hint. */
+ .nm-hint-touch { display: none; }
+ @media (hover: none) { .nm-hint-mouse { display: none; } .nm-hint-touch { display: block; } }
 
  #graphCanvas { display: block; touch-action: none; }
  @keyframes nmpop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -99,10 +125,10 @@
 <body class="h-screen overflow-hidden ">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- LEFT SIDEBAR NAV (rail at lg+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
   <div class="mb-10 px-2">
@@ -175,11 +201,11 @@
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN                -->
 <!-- ═══════════════════════════════════ -->
-<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div class="flex-1 flex flex-col lg:ml-64 relative h-full">
 
  <!-- Top App Bar -->
- <header class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
-  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0">
+ <header id="nmHeader" class="nm-chrome flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-50 border-b shrink-0">
+  <button id="navToggle" title="Menu" class="nm-btn w-9 h-9 flex lg:hidden items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
   <h1 class="fc-h1 shrink-0" style="color: var(--txt);">Neural Map</h1>
@@ -200,13 +226,14 @@
    <datalist id="nm-known"></datalist>
   </div>
 
-  <div class="flex-1"></div>
+  <div class="flex-1 nm-grow"></div>
 
-  <button id="addNodeBtn" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
-   <span class="material-symbols-outlined text-[16px]">add</span> New node
+  <div id="nmTools" class="contents">
+  <button id="addNodeBtn" title="New node" aria-label="New node" class="nm-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+   <span class="material-symbols-outlined text-[16px]">add</span><span class="nm-tlabel">New node</span>
   </button>
-  <button id="addDocBtn" title="Add one of your uploaded documents to the map" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
-   <span class="material-symbols-outlined text-[16px]">description</span> Add document
+  <button id="addDocBtn" title="Add one of your uploaded documents to the map" aria-label="Add document" class="nm-btn flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0">
+   <span class="material-symbols-outlined text-[16px]">description</span><span class="nm-tlabel">Add document</span>
   </button>
   <button id="selectAllBtn" title="Select all nodes (Ctrl+A) — then drag any of them to move the whole set" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[16px]">select_all</span>
@@ -233,6 +260,7 @@
   <button id="reloadBtn" title="Rebuild from live system state" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full shrink-0">
    <span class="material-symbols-outlined text-[16px]">sync</span>
   </button>
+  </div>
   <!-- Notification bell -->
   <div class="relative shrink-0">
    <button id="notifBell" onclick="toggleNotifications(event)" title="Notifications" class="nm-btn w-9 h-9 flex items-center justify-center rounded-full relative">
@@ -260,9 +288,10 @@
   <canvas id="graphCanvas" class="w-full h-full"></canvas>
 
   <!-- Hints -->
-  <div class="absolute left-4 bottom-3 flex flex-col gap-1 text-[11px] nm-sub pointer-events-none leading-relaxed">
-   <div>drag a node to move it · let go and it settles back · hover to trace its chain</div>
-   <div>scroll to zoom · drag background to pan · shift-drag to box-select · double-click to reshuffle</div>
+  <div id="nmHint" class="absolute left-4 bottom-3 flex flex-col gap-1 text-[11px] nm-sub pointer-events-none leading-relaxed">
+   <div class="nm-hint-mouse">drag a node to move it · let go and it settles back · hover to trace its chain</div>
+   <div class="nm-hint-mouse">scroll to zoom · drag background to pan · shift-drag to box-select · double-click to reshuffle</div>
+   <div class="nm-hint-touch">tap a node to open it · drag to move it or pan · pinch to zoom</div>
   </div>
 
   <!-- Legend -->
@@ -1156,9 +1185,34 @@ function hitEdge(wx, wy) {
  return best;
 }
 
-canvas.addEventListener('mousedown', ev => {
+// Pointer events rather than mouse events: a finger never produces a
+// mousemove, so on a phone or tablet the map could be neither panned, dragged
+// nor zoomed. One finger (or the mouse) drags and pans as before; two fingers
+// pinch-zoom about their midpoint and pan as they travel.
+const pointers = new Map();  // pointerId -> latest client position
+let pinch = null;            // { d0, s0, wx, wy } while two fingers are down
+let pinchLock = false;       // after a pinch, the finger left behind must lift before it pans
+const DRAG_SLOP = 6;         // px a press travels before it is a drag — a shaky tap stays a tap
+
+function beginPinch() {
+ const [a, b] = [...pointers.values()];
+ const r = canvas.getBoundingClientRect();
+ const w = toWorld((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+ pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: view.scale, wx: w.x, wy: w.y };
+ // The pinch supersedes whatever the first finger had started.
+ dragging = null; panning = null; marquee = null; hoverId = null;
+}
+
+canvas.addEventListener('pointerdown', ev => {
+ if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+ pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+ if (pointers.size === 2) { beginPinch(); return; }
+ if (pointers.size > 2 || pinchLock) return;
+
  const { x, y } = localXY(ev), w = toWorld(x, y);
  const n = hitNode(w.x, w.y);
+ // No hover on touch — light the pressed node's chain while the finger is down.
+ if (ev.pointerType !== 'mouse') hoverId = n ? n.key : null;
 
  if (n) {
   if (linkMode) { finishLink(n); return; }
@@ -1166,11 +1220,12 @@ canvas.addEventListener('mousedown', ev => {
   if (selection.has(n.key) && selection.size > 1) {
    dragging = {
     keys: [...selection], moved: false, group: true, anchor: n.key,
+    sx: ev.clientX, sy: ev.clientY,
     start: { x: w.x, y: w.y },
     orig: [...selection].map(k => { const m = byKey(k); return { key: k, x: m.x, y: m.y }; })
    };
   } else {
-   dragging = { key: n.key, moved: false };
+   dragging = { key: n.key, moved: false, sx: ev.clientX, sy: ev.clientY };
   }
   return;
  }
@@ -1183,13 +1238,26 @@ canvas.addEventListener('mousedown', ev => {
  panning = { x: ev.clientX, y: ev.clientY, px: view.panX, py: view.panY };
 });
 
-window.addEventListener('mousemove', ev => {
+window.addEventListener('pointermove', ev => {
+ if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+ if (pinch) {
+  if (pointers.size < 2) return;
+  const [a, b] = [...pointers.values()];
+  const r = canvas.getBoundingClientRect();
+  view.scale = Math.max(0.25, Math.min(3, pinch.s0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0));
+  // Keep the world point that started under the fingers under their midpoint.
+  view.panX = (a.x + b.x) / 2 - r.left - pinch.wx * view.scale;
+  view.panY = (a.y + b.y) / 2 - r.top - pinch.wy * view.scale;
+  return;
+ }
+ if (pinchLock) return;
  if (marquee) {
   const { x, y } = localXY(ev);
   marquee.x1 = x; marquee.y1 = y;
   return;
  }
  if (dragging) {
+  if (!dragging.moved && Math.hypot(ev.clientX - dragging.sx, ev.clientY - dragging.sy) < DRAG_SLOP) return;
   const { x, y } = localXY(ev), w = toWorld(x, y);
   if (dragging.group) {
    const dx = w.x - dragging.start.x, dy = w.y - dragging.start.y;
@@ -1209,6 +1277,7 @@ window.addEventListener('mousemove', ev => {
   view.panY = panning.py + (ev.clientY - panning.y);
   return;
  }
+ if (ev.pointerType !== 'mouse') return; // hover tracking is for a mouse only
  const r = canvas.getBoundingClientRect();
  if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) {
   hoverId = null; return;
@@ -1219,7 +1288,17 @@ window.addEventListener('mousemove', ev => {
  canvas.style.cursor = hn ? 'pointer' : (hitEdge(w.x, w.y) ? 'pointer' : 'grab');
 });
 
-window.addEventListener('mouseup', () => {
+function endPointer(ev) {
+ const wasDown = pointers.delete(ev.pointerId);
+ if (pinch) {
+  if (pointers.size < 2) { pinch = null; pinchLock = pointers.size > 0; }
+  return;
+ }
+ if (pinchLock) { if (!pointers.size) pinchLock = false; return; }
+ if (!wasDown) return; // a mouse released after pressing outside the map
+ if (ev.pointerType !== 'mouse') hoverId = null;
+ // The system took the touch (a scroll, a gesture) — never treat it as a tap.
+ if (ev.type === 'pointercancel') { dragging = null; panning = null; marquee = null; return; }
  if (marquee) {
   const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
   const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
@@ -1255,7 +1334,9 @@ window.addEventListener('mouseup', () => {
   return;
  }
  panning = null;
-});
+}
+window.addEventListener('pointerup', endPointer);
+window.addEventListener('pointercancel', endPointer);
 
 canvas.addEventListener('wheel', ev => {
  ev.preventDefault();

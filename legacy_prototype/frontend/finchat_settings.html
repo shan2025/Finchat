@@ -211,11 +211,18 @@
  .set-root .chain-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
  @media (max-width: 720px) { .set-root .chain-stats { grid-template-columns: repeat(2, 1fr); } }
 
+ /* Rail: drawer below 1024px (phones and portrait tablets), pinned above. */
  #sideNav { transition: transform .25s ease; }
+ @media (max-width: 1023px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; }
+  #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  /* With the menu button in the row, centre it on the title rather than
+     bottom-aligning the row the way the rail-less desktop header does. */
+  .set-head { align-items: center; }
+  .set-head #navToggle { width: 40px; height: 40px; }
+ }
  @media (max-width: 991px) { .set-nav { width: 190px; } }
  @media (max-width: 767px) {
-  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-  #sideNav.open { transform: translateX(0); }
   .set-body { flex-direction: column; }
   .set-nav { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border);
     gap: 10px; padding: 12px 16px; }
@@ -237,7 +244,7 @@
   .set-head #notifBell { width: 40px; height: 40px; }
   #cleanState, #dirtyState > span:first-child { display: none !important; }
  }
- @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ @media (min-width: 1024px) { #sideNav { transform: none !important; } }
 </style>
 <!-- In the head, not with the bundle at the foot of the body: the page's own
      inline script renders Account & profile at boot and needs fcAvatar by then.
@@ -252,15 +259,15 @@
 <!-- Everything the view owns lives inside this one <main>: spa_router.js swaps
      only <main>, so a header/backdrop/toast left outside it would belong to
      whichever page loaded first and never be replaced. -->
-<main class="flex flex-col md:ml-64 h-full min-w-0">
+<main class="flex flex-col lg:ml-64 h-full min-w-0">
 
- <div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+ <div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
  <div class="set-root">
 
   <!-- ── header + save bar ── -->
   <div class="set-head">
-   <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface-2); border:1px solid var(--border);">
+   <button id="navToggle" title="Menu" class="w-9 h-9 flex lg:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface-2); border:1px solid var(--border);">
     <span class="material-symbols-outlined text-[18px]">menu</span>
    </button>
    <div style="flex:1; min-width:0;">

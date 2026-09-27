@@ -35,6 +35,9 @@
     '#' + MOUNT_ID + ' svg{width:112px;height:82px;display:block;overflow:visible;}',
     /* the composer pill has to sit in front of the robot's waist */
     '#composerBox{position:relative;z-index:2;}',
+    /* A phone on its side is ~390px tall; the perch's 82px was more than the
+       conversation itself got. The robot stays home on short screens. */
+    '@media (max-height:500px){#' + MOUNT_ID + '{display:none;}}',
 
     '.fcnap-ink{fill:#3a2b1c;}',
     '.fcnap-cream{fill:#f6f3eb;}',

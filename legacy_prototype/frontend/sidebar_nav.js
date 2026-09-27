@@ -155,13 +155,25 @@
     '.sbn-recent { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:var(--sbn-item); font-size:13px; font-weight:500; text-decoration:none; cursor:pointer; transition:background .14s ease; }',
     '.sbn-recent:hover { background:var(--sbn-hover); }',
     '.sbn-ract { display:none; align-items:center; gap:2px; flex-shrink:0; margin-left:auto; }',
-    '.sbn-recent:hover .sbn-ract { display:inline-flex; }',
-    '.sbn-ract button { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:var(--sbn-muted); cursor:pointer; padding:0; }',
+    '.sbn-ract button, .sbn-rmore { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:var(--sbn-muted); cursor:pointer; padding:0; }',
     '.sbn-ract button:hover { background:var(--sbn-hover); color:var(--sbn-fg); }',
+    // Copy / rename / delete appear on hover, which a touch screen never has —
+    // and tapping the row itself opens the chat. So a touch device gets a "⋯"
+    // button that swaps in the actions for that one row instead. Scoped to
+    // (hover:hover) so a tap's sticky :hover cannot open them as well.
+    '.sbn-rmore { display:none; flex-shrink:0; margin-left:auto; }',
+    '@media (hover:hover) { .sbn-recent:hover .sbn-ract { display:inline-flex; } }',
+    '@media (hover:none) {',
+    '  .sbn-rmore { display:inline-flex; width:34px; height:34px; margin-right:-6px; }',
+    '  .sbn-recent.sbn-ract-open .sbn-rmore { display:none; }',
+    '  .sbn-recent.sbn-ract-open .sbn-ract { display:inline-flex; }',
+    '  .sbn-ract button { width:34px; height:34px; }',
+    '}',
     '.sbn-newchat { width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--sbn-accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer; }',
     '.sbn-newchat:hover { background:var(--sbn-accent-hover); }',
     '.sbn-themebtn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:999px; background:var(--sbn-badge); color:var(--sbn-muted); cursor:pointer; padding:0; }',
     '.sbn-themebtn:hover { color:var(--sbn-fg); }',
+    '@media (pointer:coarse) { .sbn-themebtn { width:40px; height:40px; } }',
     '.sbn-truncate { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }',
     // Scrollbars in the rail: the gutter is always reserved (so nothing shifts)
     // but the thumb only paints while the pointer/focus is in the rail, keeping
@@ -176,21 +188,29 @@
     // properties are driven from JS (0px = no fade on that edge).
     '.sbn-faded { -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 var(--sbn-ft,0px), #000 calc(100% - var(--sbn-fb,0px)), transparent 100%); mask-image:linear-gradient(to bottom, transparent 0, #000 var(--sbn-ft,0px), #000 calc(100% - var(--sbn-fb,0px)), transparent 100%); }',
     '.sbn-serif { font-family:"Caprasimo", serif; }',
-    // Drawer behaviour on narrow screens (idempotent with pages that already
-    // ship the same rules; pages without a #navToggle simply keep it closed,
-    // which matches their previous hidden-below-md behaviour).
-    '@media (max-width:767px) { #sideNav.sbn { transform:translateX(-100%); transition:transform .25s; z-index:60; } #sideNav.sbn.open { transform:translateX(0); box-shadow:0 20px 60px rgba(0,0,0,.45); } }',
-    '@media (min-width:768px) { #sideNav.sbn { transform:none !important; } }',
-    // Mobile app bar. The drawer rule above hides the rail below 768px on every
-    // page, but only pages that ship their own toggle can open it again — on
-    // Knowledge, Reports and Audit a phone had no way to navigate at all. The
-    // bar is the fallback: shown only when the page has no toggle of its own
-    // (html.sbn-mbar-on), and it reserves its height on body so it never sits
-    // on top of a page header.
+    // Drawer below 1024px, persistent rail from 1024px. The rail is 256px, so
+    // pinning it on a portrait tablet (768-1023) left the page 512-767px:
+    // that is where the chat composer pushed Send off-screen, Group Chat's
+    // thread shrank to 224px and Audit scrolled sideways. Phones and portrait
+    // tablets therefore both get the off-canvas drawer, and pages clear the
+    // rail with lg:ml-64 (not md:ml-64) to match.
+    // !important because most pages still ship their own copy of these rules;
+    // a stale `min-width:768px { transform:none !important }` in one of them
+    // must not pin the rail over a tablet page again. The shadow belongs to
+    // the open drawer only - on the closed one it bled a dark strip down the
+    // left edge of every phone screen.
+    '@media (max-width:1023px) { #sideNav.sbn { transform:translateX(-100%) !important; transition:transform .25s; z-index:60; box-shadow:none !important; } #sideNav.sbn.open { transform:translateX(0) !important; box-shadow:0 20px 60px rgba(0,0,0,.45) !important; } }',
+    '@media (min-width:1024px) { #sideNav.sbn { transform:none !important; } }',
+    // Mobile app bar. The drawer rule above hides the rail below 1024px on
+    // every page, but only pages that ship their own toggle can open it again
+    // — on Knowledge, Reports and Audit a phone had no way to navigate at all.
+    // The bar is the fallback: shown only when the page has no VISIBLE toggle
+    // of its own (html.sbn-mbar-on), and it reserves its height on body so it
+    // never sits on top of a page header.
     '.sbn-mbar { --sbn-bg:#2a241d; --sbn-fg:#efe6d6; display:none; }',
     '.sbn-mbar.sbn-cream { --sbn-bg:#f3eee3; --sbn-fg:#3a2e23; }',
     '.sbn-mbackdrop { display:none; }',
-    '@media (max-width:767px) {',
+    '@media (max-width:1023px) {',
     '  html.sbn-mbar-on .sbn-mbar { display:flex; position:fixed; left:0; right:0; top:0; z-index:50; height:calc(52px + env(safe-area-inset-top, 0px)); padding:env(safe-area-inset-top, 0px) 12px 0 8px; align-items:center; gap:8px; background:var(--sbn-bg); color:var(--sbn-fg); box-shadow:0 1px 0 rgba(127,127,127,.22); }',
     '  html.sbn-mbar-on body { padding-top:calc(52px + env(safe-area-inset-top, 0px)); }',
     '  .sbn-mbackdrop.sbn-show { display:block; position:fixed; inset:0; z-index:55; background:rgba(0,0,0,.45); }',
@@ -438,6 +458,20 @@
   // Pages that open the drawer themselves. Their handlers own #navBackdrop;
   // the bar owns #sbnMBackdrop, so the two never fight over one element.
   var PAGE_TOGGLE = '#navToggle, #nsMenu, [data-nav-toggle]';
+  // Below this width the rail is a drawer (see the CSS above).
+  var RAIL_MIN = 1024;
+
+  // A page toggle only counts if it is actually drawn. Presence is not
+  // enough: a toggle styled `md:hidden` exists at every width but vanishes at
+  // 768px, and on a portrait tablet that left the drawer with no way to open.
+  function pageToggleVisible() {
+    var els = document.querySelectorAll(PAGE_TOGGLE);
+    for (var i = 0; i < els.length; i++) {
+      var r = els[i].getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return true;
+    }
+    return false;
+  }
 
   function setMobileDrawer(open) {
     var bd = document.getElementById('sbnMBackdrop');
@@ -483,14 +517,18 @@
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') setMobileDrawer(false);
       });
-      // Rotating a phone to landscape can cross 768px with the drawer open;
+      // Rotating a tablet to landscape can cross 1024px with the drawer open;
       // the desktop rule then shows the rail but the backdrop would linger.
+      // Rotation can also show or hide a page's own toggle, so the bar is
+      // re-decided on every resize — synchronously: it is one small query,
+      // and a debounce timer is exactly what a backgrounded tab defers.
       window.addEventListener('resize', function () {
-        if (window.innerWidth >= 768) setMobileDrawer(false);
+        if (window.innerWidth >= RAIL_MIN) setMobileDrawer(false);
+        syncMobileBar();
       });
     }
     if (typeof cream === 'boolean') bar.classList.toggle('sbn-cream', cream);
-    var pageOwnsToggle = !!document.querySelector(PAGE_TOGGLE);
+    var pageOwnsToggle = pageToggleVisible();
     if (pageOwnsToggle) setMobileDrawer(false);
     document.documentElement.classList.toggle('sbn-mbar-on', !pageOwnsToggle);
   }
@@ -574,6 +612,7 @@
   // and never leaks a previous user's conversations into a fresh sign-in — and
   // paint it instantly on the next page, then revalidate in the background.
   var RECENTS_CACHE_KEY = 'finchat_recents_cache';
+  var ractCloseBound = false;
   function readRecentsCache(token) {
     try {
       var c = JSON.parse(sessionStorage.getItem(RECENTS_CACHE_KEY) || 'null');
@@ -632,6 +671,7 @@
             || '<span style="width:24px; height:24px; border-radius:999px; flex-shrink:0; background:#efe8de; display:inline-flex; align-items:center; justify-content:center; font-size:12px;">' + esc(/^\s*</.test(s.personaAvatar || '') ? '🤖' : (s.personaAvatar || '🤖')) + '</span>';
           return '<a class="sbn-recent" data-sid="' + esc(s.session_id) + '" data-title="' + esc(s.title) + '" href="finchat_chat.html?session=' + encodeURIComponent(s.session_id) + '" title="' + esc(s.title) + ' — ' + esc(s.personaName || s.persona) + '">' +
             av + '<span class="sbn-truncate" style="flex:1; min-width:0;">' + esc(s.title) + '</span>' +
+            '<button type="button" class="sbn-rmore" title="Conversation actions" aria-label="Conversation actions"><span class="material-symbols-outlined" style="font-size:18px;">more_horiz</span></button>' +
             '<span class="sbn-ract">' +
               '<button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px;">content_copy</span></button>' +
               '<button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px;">edit</span></button>' +
@@ -639,6 +679,22 @@
             '</span></a>';
         }).join('');
         settled();
+        // Touch: "⋯" swaps that row's title for its actions; one row at a time.
+        list.querySelectorAll('.sbn-rmore').forEach(function (m) {
+          m.addEventListener('click', function (ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            var row = m.closest('.sbn-recent');
+            list.querySelectorAll('.sbn-ract-open').forEach(function (r) { if (r !== row) r.classList.remove('sbn-ract-open'); });
+            row.classList.toggle('sbn-ract-open');
+          });
+        });
+        if (!ractCloseBound) {
+          ractCloseBound = true; // once per document; the list is rebuilt on theme switch
+          document.addEventListener('click', function (ev) {
+            if (ev.target.closest && ev.target.closest('.sbn-ract, .sbn-rmore')) return;
+            document.querySelectorAll('#sbnRecent .sbn-ract-open').forEach(function (r) { r.classList.remove('sbn-ract-open'); });
+          });
+        }
         list.querySelectorAll('.sbn-ract button').forEach(function (b) {
           b.addEventListener('click', function (ev) {
             ev.preventDefault(); ev.stopPropagation();

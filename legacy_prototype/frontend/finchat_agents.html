@@ -45,15 +45,28 @@
   .agent-card { transition:all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
   .agent-card:hover { transform:translateY(-2px); }
 
-  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
-     narrow screens. */
+  /* Sidebar: static rail at lg+, slide-in drawer below — phones AND portrait
+     tablets, where a pinned 256px rail left the page only 512px. */
   #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
+  @media (max-width: 1023px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; }
+    #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
-  
+  @media (min-width: 1024px) { #sideNav { transform: none !important; } }
+
+  /* Phone: agents become a swipeable strip above the config card, so tapping
+     one changes what is on screen instead of something far below it. */
+  @media (max-width: 767px) {
+    #agentList { flex-direction: row; overflow-x: auto; gap: 10px; margin: 0 -16px; padding: 2px 16px 8px; scroll-snap-type: x proximity; scroll-padding: 0 16px; scrollbar-width: none; }
+    #agentList::-webkit-scrollbar { display: none; }
+    #agentList .agent-card { flex: 0 0 auto; padding: 10px 14px 10px 10px; gap: 10px; scroll-snap-align: start; }
+    #agentList .agent-card:hover { transform: none; }
+    /* The robot that peeks over the card is hidden below sm, so its 60px
+       headroom was just a gap. */
+    #configCard { margin-top: 0 !important; padding: 20px !important; gap: 24px !important; }
+    #modelPicker { min-width: 0 !important; width: 100% !important; }
+  }
+
   /* Markdown styling for mission results */
   .markdown-body { font-family:var(--sans); font-size: 13px; line-height: 1.5; word-wrap: break-word; }
   .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #3a2e23; }
@@ -80,10 +93,10 @@
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- LEFT SIDEBAR NAV (rail at lg+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
     <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
@@ -155,12 +168,12 @@
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
 <!-- ═══════════════════════════════════ -->
-<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div class="flex-1 flex flex-col lg:ml-64 relative h-full">
 
   <!-- Top App Bar -->
   <header class="flex justify-between items-center gap-2 w-full px-3 md:px-lg py-md h-16 z-50 bg-surface-container-low border-b border-outline-variant shrink-0">
     <div class="flex items-center gap-2 md:gap-md min-w-0">
-      <button id="navToggle" title="Menu" class="md:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-outline-variant bg-cream-bg text-[#3a2e23]">
+      <button id="navToggle" title="Menu" class="lg:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-outline-variant bg-cream-bg text-[#3a2e23]">
         <span class="material-symbols-outlined text-[20px]">menu</span>
       </button>
       <h1 class="fc-h1 truncate"><span class="md:hidden">Agents</span><span class="hidden md:inline">FinChat | Agent Configuration</span></h1>
@@ -190,12 +203,16 @@
 
   <!-- Main Dashboard Canvas -->
   <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
-    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
-      
+    <!-- Master/detail from md: the list keeps a column beside the config card
+         (a portrait tablet has the full width now the rail is a drawer). On a
+         phone the list is a swipeable strip — stacked, it pushed the card for
+         the agent you just tapped a screen and a half below the fold. -->
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+
       <!-- LEFT COLUMN: AI AGENTS LIST -->
-      <div class="lg:col-span-1 flex flex-col">
+      <div class="md:col-span-1 flex flex-col min-w-0">
         <h2 class="text-lg font-bold text-[#3a2e23] mb-4">AI Agents</h2>
-        <div class="flex flex-col gap-3">
+        <div id="agentList" class="flex flex-col gap-3">
           
           <!-- Plato -->
           <div class="agent-card bg-[#3a2e23] text-[#efe8de] border border-[#4a3828] rounded-2xl p-4 shadow-lg cursor-pointer flex items-center gap-4" id="card-plato" onclick="selectAgent('plato')">
@@ -264,12 +281,12 @@
       </div>
 
       <!-- RIGHT COLUMN: CONFIGURATION PANEL -->
-      <div class="lg:col-span-3 flex flex-col relative">
-        
+      <div class="md:col-span-2 lg:col-span-3 flex flex-col relative min-w-0">
+
         <!-- Main Card -->
         <!-- margin-top leaves room for the robot to peek above the card without the
              scrolling <main> clipping it. -->
-        <div class="bg-cream-bg border border-border-color rounded-3xl p-8 shadow-sm flex flex-col gap-8 relative" style="animation:fadeUp 0.3s ease;margin-top:60px;">
+        <div id="configCard" class="bg-cream-bg border border-border-color rounded-3xl p-8 shadow-sm flex flex-col gap-8 relative" style="animation:fadeUp 0.3s ease;margin-top:60px;">
           
           <!-- Same robot mark as the login screen (finchat_login.html), peeking over
                the card edge instead of standing in front of the title. -->
@@ -337,8 +354,9 @@
             <p class="text-xs text-[#5c4a38] mt-2 max-w-2xl">Pick a per-agent Groq model. 120B reasons harder but bills its reasoning tokens — roughly twice the budget per turn — so 20B suits chattier agents. Leaving this on Default also lets a spent daily quota fall through to Gemini or DeepSeek; a pinned model does not.</p>
           </div>
 
-          <!-- Bottom 2-Column Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Bottom 2-Column Grid — side by side only once the card itself is
+               wide (xl); beside the agent list on a tablet each half was ~200px. -->
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
             <!-- Left Box: Audit Logs -->
             <div class="flex flex-col">
@@ -501,6 +519,11 @@
         }
       }
     });
+    // On a phone the list is a sideways strip; bring a half-hidden pick fully in.
+    const picked = document.getElementById('card-' + agent);
+    if (picked && !isInit && window.matchMedia('(max-width: 767px)').matches) {
+      picked.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    }
 
     // Load config from the backend (fall back to local cache if offline)
     let cfg = agentConfigs[agent] || { risk: 'Low', formal: 50, brief: 50, serious: 50 };

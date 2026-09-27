@@ -562,34 +562,60 @@
   }
 
   // ── pointer ───────────────────────────────────────────────────────────────
+  // Pointer events cover mouse, pen and touch in one path. The touch path used
+  // to be separate touch* listeners — one finger only, no zoom, and a tap ran
+  // onClick twice (touchend, then the mouseup the browser synthesizes after
+  // it). One finger orbits, two fingers pinch the camera in and out, and a
+  // pinch ends only when every finger has lifted, so it never lands as a tap.
   var drag = null, hover = null;
-  canvas.addEventListener('mousedown', function (e) { drag = { x:e.clientX, y:e.clientY, moved:0 }; canvas.classList.add('ns-drag'); });
-  window.addEventListener('mouseup', function (e) {
-    if (drag && drag.moved < 5) onClick(e.clientX, e.clientY);
-    drag = null; canvas.classList.remove('ns-drag');
+  var pts = {}, pinch = null;
+  function pair() { var k = Object.keys(pts); return k.length === 2 ? [pts[k[0]], pts[k[1]]] : null; }
+  function gap(p) { return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1; }
+  canvas.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pts[e.pointerId] = { x:e.clientX, y:e.clientY };
+    var p = pair();
+    if (p) {
+      pinch = { d:gap(p), L:len(sub(cam.dEye, cam.dTarget)) };
+      drag = null; canvas.classList.remove('ns-drag'); hideTip();
+      return;
+    }
+    if (pinch) return;
+    drag = { x:e.clientX, y:e.clientY, moved:0, touch:e.pointerType !== 'mouse' };
+    canvas.classList.add('ns-drag');
   });
-  window.addEventListener('mousemove', function (e) {
+  window.addEventListener('pointermove', function (e) {
+    if (pts[e.pointerId]) pts[e.pointerId] = { x:e.clientX, y:e.clientY };
+    if (pinch) {
+      var p = pair(); if (!p) return;
+      lastInteract = performance.now();
+      var L = Math.max(150, Math.min(2900, pinch.L * pinch.d / gap(p)));
+      var no = scl(norm(sub(cam.dEye, cam.dTarget)), L);
+      cam.dEye = add(cam.dTarget, no);
+      if (focusMember) camOff = no;
+      return;
+    }
     if (drag) {
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
       orbit(dx, dy); hideTip(); return;
     }
+    if (e.pointerType !== 'mouse') return; // tooltips follow a hovering mouse only
     var rect = canvas.getBoundingClientRect();
     var h = pick(e.clientX - rect.left, e.clientY - rect.top);
     hover = h;
     canvas.classList.toggle('ns-point', !!h);
     if (h) showTip(h, e.clientX, e.clientY); else hideTip();
   });
-  canvas.addEventListener('touchstart', function (e) { var t = e.touches[0]; drag = { x:t.clientX, y:t.clientY, moved:0 }; }, { passive:true });
-  canvas.addEventListener('touchmove', function (e) {
-    if (!drag) return; var t = e.touches[0];
-    var dx = t.clientX-drag.x, dy = t.clientY-drag.y;
-    drag.moved += Math.abs(dx)+Math.abs(dy); drag.x = t.clientX; drag.y = t.clientY; orbit(dx, dy);
-  }, { passive:true });
-  canvas.addEventListener('touchend', function (e) {
-    if (drag && drag.moved < 8) { var t = e.changedTouches[0]; onClick(t.clientX, t.clientY); }
-    drag = null;
-  });
+  function endPointer(e) {
+    delete pts[e.pointerId];
+    if (pinch) { if (!Object.keys(pts).length) pinch = null; drag = null; canvas.classList.remove('ns-drag'); return; }
+    var d = drag; drag = null; canvas.classList.remove('ns-drag');
+    // A finger wobbles more than a mouse, so a touch tap tolerates more travel.
+    if (e.type === 'pointerup' && d && d.moved < (d.touch ? 8 : 5)) onClick(e.clientX, e.clientY);
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
 
   function orbit(dx, dy) {
     lastInteract = performance.now();

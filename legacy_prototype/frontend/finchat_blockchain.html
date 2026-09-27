@@ -44,24 +44,27 @@
  @keyframes livePulse { 0%,100% { box-shadow:0 0 0 0 rgba(22,163,74,.5);} 60% { box-shadow:0 0 0 7px rgba(22,163,74,0);} }
  .live-dot.ok { background:#16a34a; animation: livePulse 1.8s infinite; }
  .live-dot.bad { background:#dc2626; }
+ /* Rail: drawer below 1024px (phones and portrait tablets), pinned above. */
  #sideNav { transition: transform .25s ease; }
- @media (max-width: 767px) {
-  #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-  #sideNav.open { transform: translateX(0); }
+ @media (max-width: 1023px) {
+  #sideNav { transform: translateX(-100%); z-index: 60; }
+  #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
  }
- @media (min-width: 768px) { #sideNav { transform: none !important; } }
+ @media (min-width: 1024px) { #sideNav { transform: none !important; } }
+ @media (max-width: 767px) { #bcHeader { padding-left: 12px; padding-right: 12px; } }
+ @media (pointer: coarse) { #bcHeader button { width: 40px; height: 40px; } }
 </style>
 </head>
 
 <body class="bg-cream-bg h-screen overflow-hidden ">
 
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
 
-<div class="flex-1 flex flex-col md:ml-64 h-full min-w-0">
+<div class="flex-1 flex flex-col lg:ml-64 h-full min-w-0">
 
- <header class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
-  <button id="navToggle" title="Menu" class="w-9 h-9 flex md:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
+ <header id="bcHeader" class="flex items-center flex-wrap gap-3 w-full px-6 py-3 min-h-[4rem] z-30 border-b shrink-0" style="background:var(--surface); border-color:var(--border);">
+  <button id="navToggle" title="Menu" class="w-9 h-9 flex lg:hidden items-center justify-center rounded-full shrink-0" style="background:var(--surface2); border:1px solid var(--border);">
    <span class="material-symbols-outlined text-[18px]">menu</span>
   </button>
   <h1 class="fc-h1 shrink-0">Blockchain</h1>

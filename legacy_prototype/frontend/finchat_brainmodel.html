@@ -22,8 +22,10 @@
   body { font-family: 'Figtree', system-ui, sans-serif; background: #fbf4ea; color: #1f1b16; overflow: hidden; }
 
   .am-app { position: fixed; inset: 0; background: #9fbd72; overflow: hidden; }
-  @media (min-width: 768px) { .am-app { left: 256px; } }
-  @media (max-width: 767px) { html.sbn-mbar-on .am-app { top: calc(52px + env(safe-area-inset-top, 0px)); } }
+  /* The rail is pinned only from 1024px (sidebar_nav.js); below that it is a
+     drawer and the shared app bar takes the top 52px instead. */
+  @media (min-width: 1024px) { .am-app { left: 256px; } }
+  @media (max-width: 1023px) { html.sbn-mbar-on .am-app { top: calc(52px + env(safe-area-inset-top, 0px)); } }
 
   .am-app a { color: #2f6fd6; text-decoration: none; }
   .am-app a:hover { color: #2259b3; text-decoration: underline; }
@@ -81,6 +83,10 @@
   .am-tog { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: #f1e9dc; margin-left: auto; }
   .am-tog span { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .am-x { width: 30px; height: 30px; border-radius: 999px; background: #f1e9dc; color: #3a332b; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+  @media (pointer: coarse) {
+    .am-x { width: 40px; height: 40px; }
+    .am-tog span { padding: 9px 14px; }
+  }
 </style>
 <script>
 /* file:// fallback — route root-relative "/api/…" fetches to the local backend
@@ -579,8 +585,38 @@
     this.ro.observe(canvas.parentElement);
     this.resize(); this.fit();
     canvas.addEventListener('wheel', function (e) { self.onWheel(e); }, { passive: false });
-    canvas.addEventListener('pointerdown', function (e) { self.drag = { x: e.clientX, y: e.clientY, px: self.px, py: self.py }; });
+    // One finger (or the mouse) pans; two fingers pinch-zoom about their
+    // midpoint and pan as they travel — a tablet has no wheel. Once a pinch
+    // starts, nothing else happens until every finger has lifted, so the one
+    // left behind neither jumps the map nor lands as a tap.
+    var pts = {}, pinch = null;
+    var pair = function () { var k = Object.keys(pts); return k.length === 2 ? [pts[k[0]], pts[k[1]]] : null; };
+    canvas.addEventListener('pointerdown', function (e) {
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var p = pair();
+      if (p) {
+        var r = canvas.getBoundingClientRect();
+        pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: self.z, px: self.px, py: self.py,
+                  mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top };
+        self.drag = null;
+        if (self.onHover) self.onHover(null, 0, 0, false);
+        return;
+      }
+      if (pinch) return;
+      self.drag = { x: e.clientX, y: e.clientY, px: self.px, py: self.py };
+    });
     window.addEventListener('pointermove', function (e) {
+      if (pts[e.pointerId]) pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (pinch) {
+        var p = pair(); if (!p) return;
+        var r = canvas.getBoundingClientRect();
+        var mx = (p[0].x + p[1].x) / 2 - r.left, my = (p[0].y + p[1].y) / 2 - r.top;
+        var nz = Math.min(3, Math.max(0.3, pinch.z * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / pinch.d)), k = nz / pinch.z;
+        // The ground point that started under the fingers stays under them.
+        self.px = mx - (pinch.mx - pinch.px) * k; self.py = my - (pinch.my - pinch.py) * k; self.z = nz;
+        self.userView = true;
+        return;
+      }
       if (!self.drag) return;
       if (Math.abs(e.clientX - self.drag.x) + Math.abs(e.clientY - self.drag.y) > 4) self.drag.moved = true;
       self.userView = true;
@@ -594,7 +630,14 @@
       if (self.onHover) self.onHover(id, e.clientX - r.left, e.clientY - r.top, false);
     });
     canvas.addEventListener('pointerleave', function () { if (self.onHover) self.onHover(null, 0, 0, false); });
+    window.addEventListener('pointercancel', function (e) {
+      delete pts[e.pointerId];
+      if (!Object.keys(pts).length) pinch = null;
+      self.drag = null; // the system took the touch: no pan, no tap
+    });
     window.addEventListener('pointerup', function (e) {
+      delete pts[e.pointerId];
+      if (pinch) { if (!Object.keys(pts).length) pinch = null; self.drag = null; return; }
       var d = self.drag; self.drag = null;
       if (!d || d.moved || e.target !== canvas || !self.onHover) return;
       var r = canvas.getBoundingClientRect(), id = self.hitLandmark(e.clientX - r.left, e.clientY - r.top);

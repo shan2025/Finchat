@@ -107,9 +107,23 @@
   .msg-group:hover .msg-copy { opacity:1; }
   .msg-copy:hover { background:var(--surface2); color:var(--text2); }
   .rc-actions { display:none; align-items:center; gap:2px; flex-shrink:0; }
-  .fc-recent:hover .rc-actions { display:inline-flex; }
-  .rc-actions button { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:#a99e88; cursor:pointer; padding:0; }
+  .rc-actions button, .rc-more { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:#a99e88; cursor:pointer; padding:0; }
   .rc-actions button:hover { background:rgba(255,255,255,.12); color:#fff; }
+  /* Touch screens have no hover, so neither the per-message copy/edit buttons
+     (opacity 0 until hovered) nor a recent chat's actions could be found —
+     and tapping the recent row opens the chat. Messages keep their buttons
+     visible, dimmed; each recent row gets a "⋯" that swaps in its actions.
+     The hover rule is scoped to (hover:hover) so a tap's sticky :hover cannot
+     open the actions as well. */
+  .rc-more { display:none; flex-shrink:0; }
+  @media (hover: hover) { .fc-recent:hover .rc-actions { display:inline-flex; } }
+  @media (hover: none) {
+    .msg-copy { opacity:.6; width:32px; height:32px; }
+    .rc-more { display:inline-flex; width:34px; height:34px; margin-right:-6px; }
+    .fc-recent.rc-open .rc-more { display:none; }
+    .fc-recent.rc-open .rc-actions { display:inline-flex; }
+    .rc-actions button { width:34px; height:34px; }
+  }
   .msg-time { font-size:10px; color:var(--text3); font-family:var(--mono); }
   .read-receipt { font-size:11px; color:var(--text3); }
   .read-receipt.read { color:var(--accent-blue); }
@@ -427,6 +441,17 @@
     #chatHeader .fc-icon { width:40px !important; height:40px !important; }
   }
 
+  /* Short screens — a phone on its side is ~390px tall and wider than 768px,
+     so it got the desktop header and composer and the thread was left 68px.
+     Trim the chrome; the napping mascot hides itself here (mascot_nap.js). */
+  @media (max-height: 500px) {
+    #chatHeader { height:56px !important; }
+    #composerWrap { padding:6px 16px calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
+    #msgInput { padding-top:10px !important; }
+    #composerTools { padding-top:4px !important; padding-bottom:6px !important; }
+    #composerDisclaimer { display:none !important; }
+  }
+
   /* Welcome / suggestion cards */
   .fc-card { transition:transform .14s ease, box-shadow .16s ease, border-color .14s ease; }
   .fc-card:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(46,43,37,.14); border-color:var(--accent) !important; }
@@ -438,8 +463,9 @@
   @keyframes fcPop { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
   .fc-pop { animation:fcPop .2s cubic-bezier(.2,.8,.2,1); }
 
-  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
-     narrow screens (was `hidden md:flex` — no nav at all under 768px). */
+  /* Sidebar: static rail at lg+, slide-in drawer below so nav is reachable on
+     phones and portrait tablets (was `hidden md:flex` — no nav at all under
+     768px). */
   /* ── Cream nav theme (toggle in the sidebar header; shared key
         localStorage['finchat_nav_theme'] with every other page) ── */
   body.nav-cream { --side-bg:#f3eee3; --side-fg:#3a2e23; --side-muted:#8c7a6b; }
@@ -458,13 +484,18 @@
   body.nav-cream #sideNav .rc-actions button:hover { background:rgba(58,46,35,.1); color:#3a2e23; }
   .nav-theme-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:999px; background:rgba(239,230,214,.1); color:var(--side-muted); cursor:pointer; padding:0; }
   .nav-theme-btn:hover { color:var(--side-fg); }
+  @media (pointer: coarse) { .nav-theme-btn { width:40px; height:40px; } }
   body.nav-cream .nav-theme-btn { background:rgba(58,46,35,.08); }
+  /* Rail from 1024px, drawer below — phones AND portrait tablets. Pinned at
+     768px the rail left the conversation 512px, and the composer's toolbar
+     pushed Send past the right edge of an iPad. The shadow belongs to the
+     open drawer only; on the closed one it bled down the left edge. */
   #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
+  @media (max-width: 1023px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; }
+    #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+  @media (min-width: 1024px) { #sideNav { transform: none !important; } }
 
   /* ── Short-viewport rail ──────────────────────────────────────────────
      This page builds its own sidebar rather than loading sidebar_nav.js, so
@@ -479,7 +510,7 @@
      1-2px hairline from fractional child heights. The drawer keeps its own
      scrolling as a fallback for very short screens. */
   #sideNav { overflow-y:auto; }
-  @media (min-width: 768px) { #sideNav { overflow-y:hidden; } }
+  @media (min-width: 1024px) { #sideNav { overflow-y:hidden; } }
   .fcs-head { padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px; }
   .fcs-brand { font-family:var(--serif); font-size:27px; line-height:1; letter-spacing:-.01em; color:#f3ead9; }
   .fcs-brandsub { font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--side-muted); margin-top:7px; }
@@ -552,10 +583,10 @@
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- LEFT SIDEBAR NAV (rail at lg+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
     <!-- overflow-y is set in CSS, not inline: the rail must not scroll (the nav
          list inside it does), and an inline value would outrank the rule. -->
@@ -641,11 +672,11 @@
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
 <!-- ═══════════════════════════════════ -->
-<div id="chatShell" class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div id="chatShell" class="flex-1 flex flex-col lg:ml-64 relative h-full">
 
   <!-- Top header (single, design: Chat.dc.html) -->
   <header id="chatHeader" class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
-    <button id="navToggle" title="Menu" class="md:hidden flex items-center justify-center w-9 h-9 rounded-full shrink-0" style="border:1px solid #e3d3ba; background:#f5ead8; color:#5b4a3a;">
+    <button id="navToggle" title="Menu" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-full shrink-0" style="border:1px solid #e3d3ba; background:#f5ead8; color:#5b4a3a;">
       <span class="material-symbols-outlined text-[20px]">menu</span>
     </button>
     <!-- Active agent identity -->
@@ -1794,6 +1825,7 @@
         const active = s.session_id === personaSessions[activePersona];
         return `<a class="fc-nav fc-recent${active ? ' rc-active' : ''}" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
             ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
+            <button type="button" class="rc-more" data-act="more" title="Conversation actions" aria-label="Conversation actions"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>
             <span class="rc-actions">
               <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
               <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
@@ -1812,12 +1844,27 @@
         b.onclick = (ev) => {
           ev.preventDefault(); ev.stopPropagation();
           const a = b.closest('[data-session]');
+          if (b.dataset.act === 'more') {
+            // Touch: one row's actions at a time; any other tap closes them.
+            list.querySelectorAll('.rc-open').forEach(r => { if (r !== a) r.classList.remove('rc-open'); });
+            a.classList.toggle('rc-open');
+            return;
+          }
           if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
           else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
           else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
           else if (b.dataset.act === 'mindmap') mindMapFromChat(a.dataset.session);
         };
       });
+      // Once per page — the list itself is repainted often. Kept on the
+      // (hoisted) function rather than a `let`, which this can run before.
+      if (!renderRecentList.closeBound) {
+        renderRecentList.closeBound = true;
+        document.addEventListener('click', (ev) => {
+          if (ev.target.closest('.rc-actions, .rc-more')) return;
+          document.querySelectorAll('#recentList .rc-open').forEach(r => r.classList.remove('rc-open'));
+        });
+      }
     }
 
     async function loadRecentSessions() {
@@ -3982,7 +4029,7 @@
     })();
   </script>
   <script>
-    // Drawer nav on narrow screens (below the md breakpoint the sidebar is
+    // Drawer nav on narrow screens (below the lg breakpoint the sidebar is
     // otherwise hidden with no way to navigate).
     (function () {
       const nav = document.getElementById('sideNav'), bd = document.getElementById('navBackdrop'), btn = document.getElementById('navToggle');

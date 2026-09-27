@@ -44,14 +44,17 @@
  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
  .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:.3s; transform:translateY(20px); z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,.2); }
  .toast.show { opacity:1; transform:translateY(0); }
- @media (max-width:767px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+ /* Rail: drawer below 1024px (phones and portrait tablets); the shared app
+    bar in sidebar_nav.js opens it, since this page has no toggle of its own. */
+ @media (max-width:1023px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+ @media (pointer:coarse){ .fchip{ min-height:36px; padding:7px 13px; } }
 </style>
 </head>
 <body class="min-h-screen ">
 
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
 
-<main class="flex-1 md:ml-64 min-h-screen">
+<main class="flex-1 lg:ml-64 min-h-screen">
  <div class="max-w-[1200px] mx-auto px-5 md:px-8 py-8">
 
   <!-- Header -->
@@ -90,7 +93,9 @@
   <div class="mb-2 font-bold text-sm flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">psychology</span> Memory stores</div>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" id="stores"></div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- Two-up only from xl: beside the rail, lg leaves each card ~370px and the
+       three stat columns inside Inference crushed to ~90px. -->
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
    <!-- Inference -->
    <div class="card p-5">
     <div class="font-bold text-sm flex items-center gap-2 mb-1"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">bolt</span> Inference &amp; context reuse</div>
@@ -105,7 +110,7 @@
    </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
    <!-- Insights -->
    <div class="card p-5">
     <div class="font-bold text-sm flex items-center gap-2 mb-4"><span class="material-symbols-outlined" style="font-size:18px;color:var(--accent)">emergency_home</span> Health &amp; insights</div>

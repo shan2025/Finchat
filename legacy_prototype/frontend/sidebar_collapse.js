@@ -7,8 +7,9 @@
 // Shared-JS pattern (same as sidebar_nav.js): if a design-tool regen wipes the
 // include, re-add <script src="sidebar_collapse.js"></script> at the end of body.
 //
-// Desktop only (>=768px). Below that the sidebar is already a drawer driven by
-// #navToggle, so this script keeps its hands off.
+// Desktop only (>=1024px — see sidebar_nav.js RAIL_MIN). Below that the
+// sidebar is already a drawer driven by #navToggle or the app bar, so this
+// script keeps its hands off.
 (function () {
   var KEY = 'finchat_nav_collapsed';
   var CLS = 'nav-collapsed';
@@ -25,7 +26,7 @@
   root.classList.toggle(CLS, isCollapsed());
 
   var CSS = [
-    '@media (min-width:768px) {',
+    '@media (min-width:1024px) {',
     '  #sideNav { transition:transform .22s ease; }',
     // Higher specificity than the pages\' own `#sideNav { transform:none !important }`
     // desktop rule, so the retract wins.
@@ -40,9 +41,12 @@
     '}',
     '#navCollapseFab { position:fixed; left:14px; top:14px; z-index:70; display:none; width:34px; height:34px; align-items:center; justify-content:center; padding:0; border:none; border-radius:10px; background:#2a241d; color:#efe6d6; box-shadow:0 8px 22px rgba(0,0,0,.28); cursor:pointer; }',
     '#navCollapseFab:hover { background:#3a322a; }',
-    '@media (max-width:767px) { #navCollapseFab { display:none !important; } }',
+    // In drawer mode the button would slide away a rail that is already off
+    // the page, and the rail's own close is the backdrop.
+    '@media (max-width:1023px) { #navCollapseFab, #navCollapseBtn { display:none !important; } }',
     '.nav-collapse-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:none; border-radius:999px; background:rgba(127,127,127,.16); color:inherit; opacity:.72; cursor:pointer; }',
-    '.nav-collapse-btn:hover { opacity:1; }'
+    '.nav-collapse-btn:hover { opacity:1; }',
+    '@media (pointer:coarse) { .nav-collapse-btn { width:40px; height:40px; } #navCollapseFab { width:44px; height:44px; } }'
   ].join('\n');
 
   function ensureStyle() {
@@ -121,7 +125,7 @@
     if ((e.key || '').toLowerCase() !== 'b') return;
     var t = e.target;
     if (t && t.isContentEditable) return;
-    if (window.innerWidth < 768) return;
+    if (window.innerWidth < 1024) return;
     e.preventDefault();
     toggle();
   });

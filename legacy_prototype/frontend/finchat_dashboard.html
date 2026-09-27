@@ -40,24 +40,24 @@
   .toast { position:fixed; bottom:24px; right:24px; background:#3a2e23; color:#efe8de; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; box-shadow:0 10px 25px rgba(58,46,35,0.25); border:1px solid #4a3828; transform:translateY(20px); }
   .toast.show { opacity:1; transform:translateY(0); }
 
-  /* Sidebar: static rail at md+, slide-in drawer below so nav is reachable on
-     narrow screens. */
+  /* Sidebar: static rail at lg+, slide-in drawer below — phones AND portrait
+     tablets, where a pinned 256px rail left the page only 512px. */
   #sideNav { transition: transform .25s ease; }
-  @media (max-width: 767px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-    #sideNav.open { transform: translateX(0); }
+  @media (max-width: 1023px) {
+    #sideNav { transform: translateX(-100%); z-index: 60; }
+    #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   }
-  @media (min-width: 768px) { #sideNav { transform: none !important; } }
+  @media (min-width: 1024px) { #sideNav { transform: none !important; } }
 </style>
 </head>
 
 <body class="bg-cream-bg text-text-primary h-screen overflow-hidden">
 
 <!-- Backdrop behind the drawer nav on narrow screens -->
-<div id="navBackdrop" class="hidden md:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
+<div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV (rail at md+, drawer below) -->
+<!-- LEFT SIDEBAR NAV (rail at lg+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
     <nav id="sideNav" class="flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg">
         <div class="mb-10 px-2">
@@ -129,15 +129,17 @@
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
 <!-- ═══════════════════════════════════ -->
-<div class="flex-1 flex flex-col md:ml-64 relative h-full">
+<div class="flex-1 flex flex-col lg:ml-64 relative h-full">
 
   <!-- Top App Bar -->
   <header class="flex justify-between items-center gap-2 w-full px-3 md:px-8 py-4 h-16 z-50 bg-cream-bg border-b border-border-color shrink-0">
     <div class="flex items-center gap-2 md:gap-4 min-w-0">
-      <button id="navToggle" title="Menu" class="md:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
+      <button id="navToggle" title="Menu" class="lg:hidden flex shrink-0 items-center justify-center w-10 h-10 rounded-full border border-border-color bg-[#f3eee3] text-[#3a2e23]">
         <span class="material-symbols-outlined text-[20px]">menu</span>
       </button>
-      <h1 class="fc-h1 truncate"><span class="md:hidden">Operations</span><span class="hidden md:inline">Agent Operations Dashboard</span></h1>
+      <!-- Short title until xl: beside the badge and buttons, the long one
+           truncated to "Agent Operations Das…" on every tablet width. -->
+      <h1 class="fc-h1 truncate"><span class="xl:hidden">Operations</span><span class="hidden xl:inline">Agent Operations Dashboard</span></h1>
       <span class="hidden sm:flex shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] items-center gap-1.5" id="liveStatusBadge">
         <span class="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse"></span> LIVE PULSE
       </span>
@@ -237,7 +239,10 @@
           <span class="text-xs text-[#8c7a6b]">Status updated in real-time</span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="agentsGrid">
+        <!-- Column counts track the space beside the rail, not the viewport:
+             from 1024px the rail takes 256px, so lg gets ~768px — four cards
+             there crushed each agent's role to one word per line. -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="agentsGrid">
           <!-- Loading placeholders -->
           <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
           <div class="bg-cream-bg border border-border-color rounded-3xl p-6 h-52 animate-pulse"></div>
@@ -247,8 +252,8 @@
       </div>
 
       <!-- SECTION 2: QUEUE & BACKGROUND METRICS AND SCHEDULES -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
         <!-- Queue Stats Card -->
         <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between">
           <div>
@@ -278,7 +283,7 @@
         </div>
 
         <!-- Morning Executive Briefing Trigger Card -->
-        <div class="lg:col-span-2 bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div class="xl:col-span-2 bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div class="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-[#e8dfd1] to-transparent pointer-events-none opacity-50"></div>
           <div>
             <div class="flex justify-between items-start">

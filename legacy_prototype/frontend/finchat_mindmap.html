@@ -241,6 +241,8 @@ html.nav-collapsed #mmShell { margin-left:0; }
   line-height:1; opacity:0; transition:opacity .12s, background .12s, color .12s; }
 .mm-card:hover .mm-card-del { opacity:1; }
 .mm-card-del:hover { background:rgba(220,60,60,.15); color:#e05252; }
+/* No hover on a touch screen: keep delete findable (dimmed) and fingertip-sized. */
+@media (hover:none) { .mm-card-del { opacity:.6; width:32px; height:32px; top:4px; right:4px; } }
 .mm-card-meta { font-size:11px; color:var(--mm-muted); margin-top:2px; }
 
 /* modal ----------------------------------------------------------- */
@@ -328,17 +330,26 @@ html.nav-collapsed #mmShell { margin-left:0; }
 
 @media (max-width:860px) {
   #mmList { display:none; }
-  #mmList.mobile-open { display:flex; position:absolute; z-index:30; height:100%; }
+  #mmList.mobile-open { display:flex; position:absolute; z-index:30; height:100%; box-shadow:0 18px 50px rgba(0,0,0,.28); }
 }
+/* The list collapses below 860px (phones, portrait tablets); this button is
+   the only way back to it there — without it an existing map could not be
+   reopened on a phone at all. */
+#mmListToggle { display:none; }
+@media (max-width:860px) { body.mm-body #mmListToggle { display:inline-flex; } }
 /* The rail is fixed at every width now that it sits outside <main>; #mmShell
    holds the 250px back with a margin. On a phone sidebar_nav.js slides it away
    (#sideNav.sbn / .sbn.open), so the margin has to go or the canvas is starved
    — measured at 125px of usable width when the rail stayed in flow. */
 /* #navToggle exists on other pages too, so it is scoped to this page's body
-   class — these rules are adopted into the shared head and never removed. */
-@media (max-width:767px) {
+   class — these rules are adopted into the shared head and never removed.
+   The rail is a drawer below 1024px (portrait tablets too), so the margin and
+   the menu button follow that breakpoint, not the phone one. */
+@media (max-width:1023px) {
   body.mm-body #mmShell { margin-left:0; }
   body.mm-body #navToggle { display:inline-flex !important; }
+}
+@media (max-width:767px) {
   .mm-topbar { padding:10px 12px; gap:7px; }
   .mm-title { font-size:16px; }
   .mm-btn { padding:7px 10px; }
@@ -384,6 +395,8 @@ body.mm-body #navToggle { display:none; }
     <div class="mm-topbar">
       <button class="mm-btn" id="navToggle" data-act="toggleNav" title="Menu" style="padding:7px 9px;">
         <span class="material-symbols-outlined">menu</span></button>
+      <button class="mm-btn" id="mmListToggle" title="My mind maps" aria-controls="mmList" style="padding:7px 10px;">
+        <span class="material-symbols-outlined">folder_open</span> Maps</button>
       <h1 class="mm-title mm-serif" id="mmTitle">Mind Map Studio</h1>
       <span class="mm-sub" id="mmMeta"></span>
       <button class="mm-btn" data-act="fitToScreen" title="Fit to screen (F)">
@@ -779,6 +792,24 @@ function toggleNav() {
   // closes the other rather than stacking two panels over the canvas.
   document.getElementById('mmList').classList.remove('mobile-open');
 }
+// Narrow screens: the Maps button slides the list over the canvas, and
+// picking a map (not its delete button) puts it away again.
+document.getElementById('mmListToggle').addEventListener('click', () => {
+  document.getElementById('mmList').classList.toggle('mobile-open');
+  document.getElementById('sideNav').classList.remove('open');
+});
+document.getElementById('mmListBody').addEventListener('click', (e) => {
+  if (e.target.closest('.mm-card') && !e.target.closest('.mm-card-del')) {
+    document.getElementById('mmList').classList.remove('mobile-open');
+  }
+});
+// The open list covers its own button, so a tap anywhere outside it closes it.
+document.getElementById('mmShell').addEventListener('pointerdown', (e) => {
+  const list = document.getElementById('mmList');
+  if (list.classList.contains('mobile-open') && !list.contains(e.target) && !e.target.closest('#mmListToggle')) {
+    list.classList.remove('mobile-open');
+  }
+});
 
 function toggleTheme() {
   const next = document.documentElement.getAttribute('data-nm-theme') === 'dark' ? 'warm' : 'dark';
@@ -1511,21 +1542,49 @@ function fitToScreen(animate = true) {
 (function () {
   const svg = document.getElementById('mmSvg');
   let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
+  // Two fingers pinch-zoom about their midpoint (a tablet has no wheel). The
+  // pinch holds until every finger lifts, so the one left behind neither
+  // pans with a jump nor lands as a tap that closes the panel.
+  const pts = new Map();
+  let pinch = null;
 
   svg.addEventListener('pointerdown', e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()], r = svg.getBoundingClientRect();
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, k: view.k, x: view.x, y: view.y,
+        mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top };
+      dragging = false; svg.classList.remove('panning');
+      return;
+    }
+    if (pinch) return;
     if (e.target.closest('.mm-node')) return;
     dragging = true; moved = false; sx = e.clientX; sy = e.clientY; ox = view.x; oy = view.y;
     svg.classList.add('panning'); svg.setPointerCapture(e.pointerId);
   });
   svg.addEventListener('pointermove', e => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch) {
+      if (pts.size < 2) return;
+      const [a, b] = [...pts.values()], r = svg.getBoundingClientRect();
+      const k2 = Math.max(0.15, Math.min(3, pinch.k * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+      const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+      // The map point that started under the fingers stays under them.
+      view.x = mx - (pinch.mx - pinch.x) * (k2 / pinch.k);
+      view.y = my - (pinch.my - pinch.y) * (k2 / pinch.k);
+      view.k = k2; applyView();
+      return;
+    }
     if (!dragging) return;
     if (Math.abs(e.clientX - sx) > 4 || Math.abs(e.clientY - sy) > 4) moved = true;
     view.x = ox + (e.clientX - sx); view.y = oy + (e.clientY - sy); applyView();
   });
   const stop = e => {
+    pts.delete(e.pointerId);
+    if (pinch) { if (!pts.size) pinch = null; return; }
     // A click on empty canvas (as opposed to the end of a pan) deselects and
     // closes the detail panel.
-    if (dragging && !moved && !e.target.closest('.mm-node') && SELECTED) closePanel();
+    if (e.type === 'pointerup' && dragging && !moved && !e.target.closest('.mm-node') && SELECTED) closePanel();
     dragging = false; svg.classList.remove('panning');
   };
   svg.addEventListener('pointerup', stop);
