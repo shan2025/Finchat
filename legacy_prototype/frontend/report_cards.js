@@ -67,6 +67,9 @@
   var CLOSING_RE = /^(key takeaways?|the takeaway|bottom line|conclusion|final word|what to watch)\b/i;
   var SOURCES_RE = /^(sources|references|citations|further reading)\b/i;
   var REF_DEF_RE = /^\s{0,3}\[([^\]]+)\]:\s+(\S+)(?:\s+["'(](.*?)["')])?\s*$/;
+  var TEXT_REF_RE = /^\s{0,3}\[(\d+)\]:\s+(.+?)\s*$/;
+  // "**References**" written as a bold line instead of a heading.
+  var BOLD_SOURCES_RE = /^\s*\*\*\s*(sources|references|citations|further reading)\s*:?\s*\*\*\s*:?\s*$/i;
   var WHY_RE = /^\s*(?:[-*]\s*)?\*\*\s*why it matters\s*[:—–-]?\s*\*\*\s*[:—–-]?\s*/i;
   var TAG_RE = /^\s*[*_]*\s*(?:in short|tagline|in a line|one line)\s*[:—–-]\s*(.+?)\s*[*_]*\s*$/i;
 
@@ -87,8 +90,17 @@
     var body = [];
     lines.forEach(function (ln) {
       var m = ln.match(REF_DEF_RE);
-      if (m) refs.push({ id: m[1], url: m[2], title: m[3] || '' , raw: ln.trim() });
-      else body.push(ln);
+      // A proper link definition, `[1]: https://… "Title"`.
+      if (m && /^(https?:|mailto:|\/)/i.test(m[2])) {
+        refs.push({ id: m[1], url: m[2], title: m[3] || '', raw: ln.trim() });
+        return;
+      }
+      // Numbered but not a link — `[3]: Internal stocks API – AAPL $341`. Left
+      // in the prose it printed as a stray paragraph in whichever card came
+      // last, so list it as a source without a link instead.
+      var t = ln.match(TEXT_REF_RE);
+      if (t) { refs.push({ id: t[1], url: '', title: t[2], raw: '' }); return; }
+      body.push(ln);
     });
 
     var title = '', date = '', intro = [];
@@ -106,7 +118,8 @@
       var hasText = cur.lines.join('').trim().length > 0;
       // An H2 used only as a group label for the H3s under it has no text of
       // its own — its name lives on as their kicker instead of an empty card.
-      if (hasText || cur.sub) slides.push(cur);
+      // A Sources heading is kept even when empty: its list comes from refs.
+      if (hasText || cur.sub || cur.kind === 'sources') slides.push(cur);
       cur = null;
     }
 
@@ -135,6 +148,7 @@
         ln = '**' + cleanHeading(txt) + '**';
       }
       if (!inFence && /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(ln)) return;
+      if (!inFence && BOLD_SOURCES_RE.test(ln)) { open('sources', 'Sources', 'Sources'); return; }
       if (cur) cur.lines.push(ln); else intro.push(ln);
     });
     close();
@@ -171,10 +185,12 @@
     if (!src) return '';
     // A citation to a reference the model never defined stays as literal
     // "([3])"; show it as a plain "(3)" instead of stray brackets.
+    // Only real link definitions are appended; unlinked sources cite as "(3)".
+    var links = refs.filter(function (r) { return r.url; });
     var ids = {};
-    refs.forEach(function (r) { ids[r.id] = 1; });
+    links.forEach(function (r) { ids[r.id] = 1; });
     src = src.replace(/(?<!\])\[(\d+)\](?![\[(:])/g, function (m, n) { return ids[n] ? m : n; });
-    var full = src + (refs.length ? '\n\n' + refs.map(function (r) { return r.raw; }).join('\n') : '');
+    var full = src + (links.length ? '\n\n' + links.map(function (r) { return r.raw; }).join('\n') : '');
     if (global.marked && global.DOMPurify) {
       var html = global.DOMPurify.sanitize(global.marked.parse(full), { ADD_ATTR: ['target'] });
       return html.replace(/<a /g, '<a target="_blank" rel="noopener" ');
@@ -234,20 +250,22 @@
         out.push(card(html, i, n, 'rc-closing'));
       } else if (s.kind === 'sources') {
         var list = refs.map(function (r) {
+          if (!r.url) return '<li><span>' + esc(r.id) + '</span><p>' + esc(r.title) + '</p></li>';
           return '<li><span>' + esc(r.id) + '</span><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' +
             esc(r.title || hostOf(r.url)) + '<small>' + esc(hostOf(r.url)) + '</small></a></li>';
         }).join('');
-        html = kicker('Sources') + '<h3 class="rc-title">' + esc(s.headline) + '</h3>' +
+        html = kicker('Sources') + '<h3 class="rc-title">' + esc(s.headline === 'Sources' ? 'Where this comes from' : s.headline) + '</h3>' +
           (list ? '<ol class="rc-refs">' + list + '</ol>' : '<div class="rc-body">' + md(s.body, refs) + '</div>') +
           '<div class="rc-tag">Check the claim, not the tone</div>';
         out.push(card(html, i, n, 'rc-sources'));
       } else {
-        var long = plainLen(s.body) > 480;
+        // The whole story is always shown — a clamped card hid the end of the
+        // text. Long ones set a little tighter so they stay card-sized.
+        var dense = plainLen(s.body) + plainLen(s.why) > 700;
         html = kicker(s.kicker && s.kicker !== s.headline ? s.kicker : 'Story ' + String(stories.indexOf(s) + 1).padStart(2, '0')) +
           '<h3 class="rc-title">' + esc(s.headline) + '</h3>' +
           (s.sub ? '<p class="rc-sub">' + esc(s.sub) + '</p>' : '') +
-          '<div class="rc-body' + (long ? ' rc-clamp' : '') + '">' + md(s.body, refs) + '</div>' +
-          (long ? '<button type="button" class="rc-more" data-rc-more>Continue reading</button>' : '') +
+          '<div class="rc-body' + (dense ? ' rc-dense' : '') + '">' + md(s.body, refs) + '</div>' +
           (s.why ? '<div class="rc-why"><div class="rc-why-label">Why it matters</div>' + md(s.why, refs) + '</div>' : '') +
           (s.tag ? '<div class="rc-tag">' + esc(s.tag) + '</div>' : '');
         out.push(card(html, i, n, 'rc-story'));
@@ -267,6 +285,8 @@
           '<button type="button" class="rc-view" data-rc-view="2" title="Two cards at a time">2</button>' +
         '</span>' +
         '<span class="rc-spacer"></span>' +
+        '<button type="button" class="rc-toggle" data-rc-show title="Full-screen slideshow (F). Esc to exit">' +
+          'Slideshow <kbd>F</kbd></button>' +
         '<button type="button" class="rc-toggle rc-read-btn" data-rc-reading title="Hide the message box (H), bring it back with C">' +
           '<span class="rc-read-hide">Hide chat <kbd>H</kbd></span><span class="rc-read-show">Show chat <kbd>C</kbd></span></button>' +
         '<button type="button" class="rc-toggle" data-rc-pdf title="Save the deck as a PDF, one card per page">Save as PDF</button>' +
@@ -297,6 +317,7 @@
   }
 
   function cardsPerView(track) {
+    if (track.__rcPer) return track.__rcPer;
     var c = track.querySelector('[data-rc-card]');
     if (!c) return 1;
     return Math.max(1, Math.round((track.clientWidth + 14) / (c.getBoundingClientRect().width + 14)));
@@ -382,7 +403,6 @@
     host.id = 'rcPrintHost';
     var copy = root.cloneNode(true);
     copy.classList.remove('rc-textmode');
-    copy.querySelectorAll('.rc-open').forEach(function (c) { c.classList.remove('rc-open'); });
     host.appendChild(copy);
     document.body.appendChild(host);
     var title = document.title;
@@ -398,9 +418,82 @@
     ready.then(function () { window.print(); });
   }
 
-  // The deck the arrow keys drive: the one being interacted with, else the
-  // one taking up most of the viewport (a chat can hold several briefs).
+  // ── slideshow ────────────────────────────────────────────────────
+  // A copy of the deck in a full-screen layer, one large card at a time.
+  // A copy rather than the deck itself because chat's scrolling column (and
+  // its entrance animation) would trap a position:fixed child. Esc, the ×,
+  // or leaving browser full screen all close it, and the deck underneath is
+  // left on the card the slideshow ended on.
+  function showCounter(host) {
+    var track = host.querySelector('.rc-track');
+    var cards = track.querySelectorAll('[data-rc-card]');
+    var el = host.querySelector('[data-rc-show-count]');
+    if (el && cards.length) el.textContent = (nearestCard(track, cards) + 1) + ' / ' + cards.length;
+  }
+
+  function openShow(root) {
+    if (!root || document.getElementById('rcShowHost')) return;
+    var src = root.querySelector('.rc-track');
+    var srcCards = src.querySelectorAll('[data-rc-card]');
+    var start = srcCards.length ? nearestCard(src, srcCards) : 0;
+
+    var host = document.createElement('div');
+    host.id = 'rcShowHost';
+    host.setAttribute('role', 'dialog');
+    host.setAttribute('aria-label', (root.getAttribute('data-rc-name') || 'Report') + ' slideshow');
+    var copy = root.cloneNode(true);
+    copy.classList.remove('rc-textmode');
+    copy.querySelector('.rc-bar').remove();
+    copy.querySelector('.rc-text').remove();
+    copy.insertAdjacentHTML('beforeend',
+      '<button type="button" class="rc-show-close" data-rc-show-close aria-label="Close slideshow" title="Close (Esc)">&times;</button>' +
+      '<div class="rc-show-bar">' +
+        '<button type="button" class="rc-show-nav" data-rc-step="-1" aria-label="Previous card">&#8592;</button>' +
+        '<span class="rc-show-count" data-rc-show-count></span>' +
+        '<button type="button" class="rc-show-nav" data-rc-step="1" aria-label="Next card">&#8594;</button>' +
+        '<span class="rc-show-hint"><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> to move &middot; <kbd>Esc</kbd> to exit</span>' +
+      '</div>');
+    host.appendChild(copy);
+    document.body.appendChild(host);
+    html.classList.add('rc-showing');
+    host.__rcSrc = src;
+
+    var track = copy.querySelector('.rc-track');
+    track.__rcPer = 1;
+    var cards = track.querySelectorAll('[data-rc-card]');
+    if (cards[start]) track.scrollLeft = cards[start].offsetLeft - cards[0].offsetLeft;
+    track.__rcIdx = start;
+    track.addEventListener('scroll', function () { showCounter(host); }, { passive: true });
+    showCounter(host);
+    track.focus({ preventScroll: true });
+
+    if (host.requestFullscreen) host.requestFullscreen().catch(function () { /* layer still covers the window */ });
+  }
+
+  function closeShow() {
+    var host = document.getElementById('rcShowHost');
+    if (!host) return;
+    var track = host.querySelector('.rc-track');
+    var cards = track.querySelectorAll('[data-rc-card]');
+    var idx = cards.length ? nearestCard(track, cards) : 0;
+    var src = host.__rcSrc;
+    host.remove();
+    html.classList.remove('rc-showing');
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+    if (src && src.isConnected) {
+      var srcCards = src.querySelectorAll('[data-rc-card]');
+      var i = Math.min(idx, Math.max(0, srcCards.length - cardsPerView(src)));
+      if (srcCards[i]) src.scrollLeft = srcCards[i].offsetLeft - srcCards[0].offsetLeft;
+      src.__rcIdx = i;
+    }
+  }
+
+  // The deck the arrow keys drive: the slideshow when it is open, then the
+  // one being interacted with, else the one taking up most of the viewport
+  // (a chat can hold several briefs).
   function activeTrack() {
+    var show = document.getElementById('rcShowHost');
+    if (show) return show.querySelector('.rc-track');
     var focused = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-rc-root]');
     if (focused) return focused.querySelector('.rc-track');
     var best = null, bestArea = 0;
@@ -433,9 +526,20 @@
         return;
       }
 
-      // H / C are letters, so they only count when nothing is being typed.
+      if (document.getElementById('rcShowHost')) {
+        // Browsers keep Esc for leaving full screen and never deliver it
+        // here; fullscreenchange closes the slideshow then. This catches Esc
+        // when full screen was refused and the layer is only window-sized.
+        if (key === 'Escape' || key === 'f' || key === 'F') { ev.preventDefault(); closeShow(); }
+        return;
+      }
+
+      // H / C / F are letters, so they only count when nothing is being typed.
       if (inField) return;
-      if ((key === 'h' || key === 'H') && !html.classList.contains('rc-reading') && activeTrack()) {
+      if ((key === 'f' || key === 'F') && activeTrack()) {
+        ev.preventDefault();
+        openShow(activeTrack().closest('[data-rc-root]'));
+      } else if ((key === 'h' || key === 'H') && !html.classList.contains('rc-reading') && activeTrack()) {
         ev.preventDefault();
         setReading(true);
       } else if ((key === 'c' || key === 'C') && html.classList.contains('rc-reading')) {
@@ -452,25 +556,25 @@
         stepDeck(step.closest('[data-rc-root]').querySelector('.rc-track'), Number(step.getAttribute('data-rc-step')));
         return;
       }
+      if (t.closest('[data-rc-show]')) { openShow(t.closest('[data-rc-root]')); return; }
+      if (t.closest('[data-rc-show-close]')) { closeShow(); return; }
       var view = t.closest('[data-rc-view]');
       if (view) { setView(Number(view.getAttribute('data-rc-view'))); return; }
       if (t.closest('[data-rc-reading]')) { setReading(!html.classList.contains('rc-reading')); return; }
       if (t.closest('[data-rc-show-chat]')) { setReading(false); return; }
       var pdf = t.closest('[data-rc-pdf]');
       if (pdf) { printDeck(pdf.closest('[data-rc-root]')); return; }
-      var more = t.closest('[data-rc-more]');
-      if (more) {
-        var cardEl = more.closest('[data-rc-card]');
-        var open = cardEl.classList.toggle('rc-open');
-        more.textContent = open ? 'Show less' : 'Continue reading';
-        return;
-      }
       var tog = t.closest('[data-rc-toggle]');
       if (tog) {
         var root = tog.closest('[data-rc-root]');
         var textMode = root.classList.toggle('rc-textmode');
         tog.textContent = textMode ? 'View as cards' : 'Read as text';
       }
+    });
+
+    // Esc in full screen is handled by the browser, which only tells us here.
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement) closeShow();
     });
   }
 
