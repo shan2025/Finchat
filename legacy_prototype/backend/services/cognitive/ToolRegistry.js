@@ -829,6 +829,22 @@ const HOST_ACCESS_TOOLS = new Set(['bash', 'file_write', 'file_edit']);
 /** The one agent permitted to hold host-access tools. Must match migration 026. */
 const ADMIN_AGENT_ID = 'plato';
 
+// ── Host access is OFF unless an operator turns it on, and never in production ──
+//
+// The approval gate was the only thing between a chat message and a shell on
+// the host, and it was not enough: approval only checks that the approver OWNS
+// the run, signup is open, and plato's tool_permissions row grants bash. So any
+// account could ask for a command, approve its own run, and execute it on the
+// Render container with every production secret in its environment.
+//
+// The shell and file-writing tools now exist only where someone deliberately
+// asked for them: HOST_TOOLS_ENABLED=true, on a machine that is not production.
+// NODE_ENV=production refuses them even with the flag set, because a flag
+// copied into the Render dashboard by mistake must not reopen the hole.
+const HOST_TOOLS_ENABLED =
+  String(process.env.HOST_TOOLS_ENABLED || '').toLowerCase() === 'true' &&
+  process.env.NODE_ENV !== 'production';
+
 // ── The diagnostician's narrower grant ───────────────────────────
 //
 // Hopper's job is to explain a failure and propose the patch, which needs to
@@ -844,8 +860,12 @@ const ADMIN_AGENT_ID = 'plato';
 // workflow, so HOPPER_HOST_TOOLS=true opts in, and only there.
 const DIAGNOSTIC_AGENT_ID = 'hopper';
 const DIAGNOSTIC_READ_TOOLS = new Set(['file_read', 'glob']);
-const HOPPER_HOST_TOOLS =
+const HOPPER_HOST_TOOLS = HOST_TOOLS_ENABLED &&
   String(process.env.HOPPER_HOST_TOOLS || '').toLowerCase() === 'true';
+
+// What the admin holds when host access is off: the reading pair, same as the
+// diagnostician. Reading is confined to the repository by tools/fsSandbox.js.
+const ADMIN_READ_TOOLS = new Set(['file_read', 'glob']);
 
 /**
  * Which ADVANCED_SYSTEM_TOOLS this agent may hold.
@@ -859,7 +879,7 @@ const HOPPER_HOST_TOOLS =
  * it mid-plan.
  */
 function systemToolsFor(agentId) {
-  if (agentId === ADMIN_AGENT_ID) return ADVANCED_SYSTEM_TOOLS;
+  if (agentId === ADMIN_AGENT_ID) return HOST_TOOLS_ENABLED ? ADVANCED_SYSTEM_TOOLS : ADMIN_READ_TOOLS;
   if (agentId === DIAGNOSTIC_AGENT_ID) {
     return HOPPER_HOST_TOOLS
       ? new Set([...DIAGNOSTIC_READ_TOOLS, ...HOST_ACCESS_TOOLS])
@@ -955,5 +975,6 @@ function getToolNames() {
 module.exports = {
   TOOLS, getToolMeta, listTools, getToolNames,
   ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID, ALWAYS_AVAILABLE_TOOLS,
-  systemToolsFor, DIAGNOSTIC_AGENT_ID, DIAGNOSTIC_READ_TOOLS, HOPPER_HOST_TOOLS
+  systemToolsFor, DIAGNOSTIC_AGENT_ID, DIAGNOSTIC_READ_TOOLS, HOPPER_HOST_TOOLS,
+  HOST_TOOLS_ENABLED
 };

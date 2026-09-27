@@ -20,8 +20,10 @@ const path = require('path');
 
 const {
   listTools, getToolNames, ADVANCED_SYSTEM_TOOLS, ADMIN_AGENT_ID,
-  HOST_ACCESS_TOOLS, systemToolsFor, DIAGNOSTIC_AGENT_ID, HOPPER_HOST_TOOLS
+  HOST_ACCESS_TOOLS, systemToolsFor, DIAGNOSTIC_AGENT_ID, HOPPER_HOST_TOOLS,
+  HOST_TOOLS_ENABLED
 } = require('../services/cognitive/ToolRegistry');
+const { execFileSync } = require('child_process');
 
 const RESTRICTED = [...ADVANCED_SYSTEM_TOOLS];
 const namesFor = (opts) => listTools(opts).map(t => t.name);
@@ -37,11 +39,15 @@ describe('tool visibility is scoped to the agent', () => {
     }
   });
 
-  test('the admin agent still sees them', () => {
+  test('the admin agent sees the reading pair, and host access only when switched on', () => {
     const names = namesFor({ agentId: ADMIN_AGENT_ID });
-    for (const tool of RESTRICTED) {
+    for (const tool of ['file_read', 'glob']) {
       assert.ok(names.includes(tool),
         `"${tool}" must stay available to the admin agent "${ADMIN_AGENT_ID}"`);
+    }
+    for (const tool of HOST_ACCESS_TOOLS) {
+      assert.strictEqual(names.includes(tool), HOST_TOOLS_ENABLED,
+        `"${tool}" must follow HOST_TOOLS_ENABLED exactly — it is a shell on the host`);
     }
   });
 
@@ -106,6 +112,52 @@ describe('permission is checked before approval is requested', () => {
       'bash must remain an advanced system tool');
     assert.strictEqual(ADMIN_AGENT_ID, 'plato',
       'the admin agent id must match migration 026');
+  });
+});
+
+// Any registered account could ask plato for a command and approve its own run,
+// because approval only checked ownership and signup is open. Host access is
+// now off by default, refused outright in production, and approvable only by
+// an admin.
+describe('host access cannot be reached from an ordinary account', () => {
+  // The switch is read once at module load, so each case needs a fresh process
+  // with its own environment.
+  const grantUnder = (env) => JSON.parse(execFileSync(process.execPath, ['-e', `
+    const r = require('./services/cognitive/ToolRegistry');
+    console.log(JSON.stringify([...r.systemToolsFor('plato')].concat([...r.systemToolsFor('hopper')])));
+  `], {
+    cwd: path.join(__dirname, '..'),
+    env: { PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, ...env },
+    encoding: 'utf8'
+  }).trim().split('\n').pop());
+
+  test('off by default', () => {
+    const granted = grantUnder({});
+    for (const tool of HOST_ACCESS_TOOLS) {
+      assert.ok(!granted.includes(tool), `"${tool}" must not be granted without HOST_TOOLS_ENABLED`);
+    }
+  });
+
+  test('production refuses it even with the flag set', () => {
+    const granted = grantUnder({ HOST_TOOLS_ENABLED: 'true', HOPPER_HOST_TOOLS: 'true', NODE_ENV: 'production' });
+    for (const tool of HOST_ACCESS_TOOLS) {
+      assert.ok(!granted.includes(tool),
+        `"${tool}" must stay off in production — a flag copied to Render by mistake must not reopen a host shell`);
+    }
+  });
+
+  test('an operator can still opt in on a development machine', () => {
+    const granted = grantUnder({ HOST_TOOLS_ENABLED: 'true', NODE_ENV: 'development' });
+    assert.ok(granted.includes('bash'), 'plato should hold bash when an operator explicitly enabled it locally');
+  });
+
+  test('approving a host-access tool requires an admin account, not just ownership', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'executions.js'), 'utf8');
+    const approve = src.slice(src.indexOf("router.post('/:id/approve'"));
+    const guardAt = approve.indexOf("HOST_ACCESS_TOOLS.has(pendingTool) && req.user.role !== 'admin'");
+    const resumeAt = approve.indexOf('await resumeExecution(');
+    assert.ok(guardAt !== -1, 'the approve route must check the approver role for host-access tools');
+    assert.ok(guardAt < resumeAt, 'the role check must run before the execution resumes');
   });
 });
 

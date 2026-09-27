@@ -8,6 +8,7 @@ const { buildExecutionTrace } = require('../services/cognitive/ExecutionTrace');
 const { getRouteStatsCached } = require('../services/cognitive/RouteStats');
 const { getLearnedEdges } = require('../services/cognitive/RouteOptimizer');
 const { classifyTask } = require('../services/AgentLeaderboard');
+const { HOST_ACCESS_TOOLS } = require('../services/cognitive/ToolRegistry');
 
 // ── GET /api/executions?state=waiting ────────────────────────
 // List the user's executions, defaulting to those awaiting human approval
@@ -221,6 +222,16 @@ router.post('/:id/approve', requireAuth, async (req, res) => {
       ORDER BY step_number DESC LIMIT 1
     `, [executionId]);
     const pendingTool = logRes.rows[0]?.content?.pendingTool || null;
+
+    // Owning the run is not enough to authorise a shell on the host. Signup is
+    // open, so "the owner approved it" meant "anyone who registered approved
+    // it". Host-access tools need an admin account to approve, on top of being
+    // switched off entirely unless HOST_TOOLS_ENABLED (see ToolRegistry).
+    if (pendingTool && HOST_ACCESS_TOOLS.has(pendingTool) && req.user.role !== 'admin') {
+      return res.status(403).json({
+        error: `Approving "${pendingTool}" runs a command on the server host and needs an admin account.`
+      });
+    }
 
     const result = await resumeExecution(executionId, {
       userId: req.user.id,
