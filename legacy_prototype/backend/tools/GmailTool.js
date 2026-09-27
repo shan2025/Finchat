@@ -77,7 +77,7 @@ function parseInput(input) {
   if (s.startsWith('{')) {
     try { return JSON.parse(s); } catch (e) { /* fall through */ }
   }
-  const m = s.match(/^(list|read|status)\b\s*(.*)$/i);
+  const m = s.match(/^(match|list|read|status)\b\s*(.*)$/i);
   if (m) return { action: m[1].toLowerCase(), messageId: m[2].trim() || undefined };
   return { action: 'list' };
 }
@@ -147,6 +147,23 @@ async function execute(input, context = {}) {
 
   if (action === 'status') {
     return { action, ...(await status(userId)) };
+  }
+
+  // List → read → score against the stored resume → draft the strong ones, in
+  // one call. It goes back through this tool's own list/read, so the sender
+  // filter applies unchanged. See services/inboxJobMatcher.js for why a plan
+  // cannot chain these steps itself.
+  if (action === 'match') {
+    const { matchInbox } = require('../services/inboxJobMatcher');
+    return matchInbox({
+      userId,
+      missionId: context.missionId,
+      days: opts.days,
+      maxRead: opts.maxRead || opts.limit,
+      interests: opts.interests || opts.keywords,
+      minScore: opts.minScore,
+      maxDrafts: opts.maxDrafts
+    });
   }
 
   const accessToken = await getAccessToken(userId);
@@ -238,7 +255,7 @@ async function execute(input, context = {}) {
     };
   }
 
-  throw new Error(`Unknown gmail action "${action}". Use list, read or status.`);
+  throw new Error(`Unknown gmail action "${action}". Use match, list, read or status.`);
 }
 
 module.exports = { execute, buildQuery, sanitizeKeywords, senderAllowed, SENDER_TERMS };

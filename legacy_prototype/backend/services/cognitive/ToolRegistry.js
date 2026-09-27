@@ -162,12 +162,14 @@ const TOOLS = {
 
   gmail: {
     name: 'gmail',
-    description: 'Read the user\'s JOB mail — the alerts and recruiter messages already sitting in their inbox from LinkedIn, Naukri, Indeed, Internshala and company careers/ATS addresses. {"action":"list","days":14,"keywords":"product manager"} returns matching messages (sender, subject, snippet); {"action":"read","messageId":"…"} opens ONE of them and returns its text plus the application links inside it; {"action":"status"} reports whether the user has connected their account. This searches ONLY job senders — it is not a search of their mailbox, the filter is fixed in code and you cannot widen it, so never tell the user you looked through their email. Read-only: you cannot reply, send, label or delete anything. If it reports connected:false, ask the user to connect Gmail on the Settings page; you cannot do that for them.',
+    description: 'Read the user\'s JOB mail — the alerts and recruiter messages already sitting in their inbox from LinkedIn, Naukri, Indeed, Internshala and company careers/ATS addresses. {"action":"match","days":2,"interests":"early-career PM / business analyst, India"} is the one-step way to act on them: it opens the recent alerts, scores every posting against the stored resume, drafts cover letters for the strong matches with real links, logs them in the applications ledger, and returns them ranked — use it instead of chaining list/read/apply_draft. {"action":"list","days":14,"keywords":"product manager"} returns matching messages (sender, subject, snippet); {"action":"read","messageId":"…"} opens ONE of them and returns its text plus the application links inside it; {"action":"status"} reports whether the user has connected their account. This searches ONLY job senders — it is not a search of their mailbox, the filter is fixed in code and you cannot widen it, so never tell the user you looked through their email. Read-only: you cannot reply, send, label or delete anything. If it reports connected:false, ask the user to connect Gmail on the Settings page; you cannot do that for them.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', description: 'list | read | status' },
-        days: { type: 'number', description: 'For list: look-back window in days (default 14, max 90)' },
+        action: { type: 'string', description: 'match | list | read | status' },
+        days: { type: 'number', description: 'For list: look-back window in days (default 14, max 90); for match default 2' },
+        interests: { type: 'string', description: 'For match: the roles, seniority and locations the user wants' },
+        minScore: { type: 'number', description: 'For match: fit score (0-100) needed to draft (default 70)' },
         keywords: { type: 'string', description: 'For list: optional role words to narrow to, e.g. "product manager analyst"' },
         limit: { type: 'number', description: 'For list: max messages (default 10, max 25)' },
         messageId: { type: 'string', description: 'For read: an id from a previous list' }
