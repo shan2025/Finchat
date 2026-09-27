@@ -244,14 +244,19 @@ async function matchInbox(opts = {}, deps = {}) {
     read: emails.length,
     postingsFound: postings.length,
     minScore,
+    // Letters stay OUT of this result. Every tool result in a run shares one
+    // 12k-char budget (ContextBuilder), and three letters are ~10k on their own:
+    // on 2026-09-27 the pack cut this result after the first match and the
+    // report listed one match of three. The letters are in the ledger, and a
+    // mission appends the ones its run drafted to the report itself.
     matches: strong.map(p => ({
       title: p.title, company: p.company, location: p.location, url: p.url, source: p.source,
       score: p.score, why: p.why, gaps: p.gaps, status: p.status,
-      ...(p.draft ? { draft: p.draft } : {}), ...(p.draftError ? { draftError: p.draftError } : {})
+      ...(p.draft ? { coverLetter: 'drafted and saved' } : {}), ...(p.draftError ? { draftError: p.draftError } : {})
     })),
     belowThreshold: postings.filter(p => p.score < minScore)
       .slice(0, 8).map(p => ({ title: p.title, company: p.company, score: p.score, gaps: p.gaps })),
-    note: 'Drafted and shortlisted postings are logged in the applications ledger. Nothing was submitted — the user applies from each url.'
+    note: 'Drafted and shortlisted postings are logged in the applications ledger. Cover letters are saved there and attached to a scheduled report automatically — do not rewrite them. Nothing was submitted — the user applies from each url.'
   };
 }
 

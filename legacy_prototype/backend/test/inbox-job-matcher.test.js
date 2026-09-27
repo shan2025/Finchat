@@ -83,7 +83,9 @@ test('strong linked matches are drafted and logged; weak ones are only reported'
   assert.deepStrictEqual(drafted.map(j => j.company), ['Kyndryl', 'Razorpay']);
   assert.strictEqual(drafted[0].url, 'https://www.linkedin.com/jobs/view/4011111111/');
   assert.deepStrictEqual(out.matches.map(m => [m.company, m.status]), [['Kyndryl', 'drafted'], ['Razorpay', 'drafted']]);
-  assert.strictEqual(out.matches[0].draft, 'Letter for Kyndryl');
+  // The letter itself stays in the ledger; the result only says it exists.
+  assert.strictEqual(out.matches[0].coverLetter, 'drafted and saved');
+  assert.ok(!JSON.stringify(out).includes('Letter for Kyndryl'));
   assert.deepStrictEqual(out.belowThreshold.map(p => p.company), ['HCL']);
   // The ledger never hears "applied" from the matcher.
   assert.ok(logged.every(j => j.status === 'shortlisted'));

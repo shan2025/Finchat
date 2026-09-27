@@ -105,6 +105,35 @@ function planFailure(mission, { outage, now = Date.now() } = {}) {
   };
 }
 
+// Application drafts this run wrote, rendered as a report appendix. The letters
+// cannot ride inside the tool result — every result in a run shares a 12k-char
+// budget and three letters alone are ~10k — so the job ledger holds them and
+// the report picks them up here, verbatim, without the model re-typing them.
+function formatDraftAppendix(rows) {
+  if (!rows || !rows.length) return '';
+  const parts = rows.map(r => {
+    const head = `### ${r.role}${r.company ? ` — ${r.company}` : ''}` +
+      (r.match_score != null ? ` (fit ${r.match_score}/100)` : '');
+    return [head, r.url ? `**Apply:** ${r.url}` : null, String(r.draft).trim()].filter(Boolean).join('\n\n');
+  });
+  return `\n\n---\n\n## ✉️ Application drafts\n` +
+    `Review and edit before sending — nothing has been submitted.\n\n${parts.join('\n\n---\n\n')}`;
+}
+
+async function draftsFromRun(mission, since) {
+  try {
+    const res = await query(`
+      SELECT role, company, url, match_score, draft FROM job_applications
+       WHERE mission_id = $1 AND user_id = $2 AND draft IS NOT NULL AND updated_at >= $3
+       ORDER BY match_score DESC NULLS LAST, updated_at ASC LIMIT 5`,
+    // A few seconds of slack: `since` is this server's clock, updated_at the DB's.
+    [mission.mission_id, mission.user_id, new Date(since - 5000)]);
+    return res.rows;
+  } catch (e) {
+    return []; // the report still goes out without its appendix
+  }
+}
+
 // The run's own date, in the user's timezone. Without it the model titled
 // reports with whatever date the first source carried — "09 February 2026",
 // "27 August 2026" — on runs made in September.
@@ -370,7 +399,7 @@ async function runMission(missionId, { manual = false } = {}) {
     });
 
     const durationMs = Date.now() - start;
-    const fullReport = String(result.cleanResponse || result.response || '').trim();
+    let fullReport = String(result.cleanResponse || result.response || '').trim();
     const preview = fullReport.slice(0, 500); // short teaser stored on the mission row / in-app bell
 
     // Did this run actually produce a report? Ask the execution row rather than
@@ -394,6 +423,7 @@ async function runMission(missionId, { manual = false } = {}) {
     if (!fullReport) {
       throw new DegradedRunError('the run finished but produced no report text', 'empty');
     }
+    fullReport += formatDraftAppendix(await draftsFromRun(mission, start));
 
     await query(`
       UPDATE agent_missions
@@ -494,5 +524,5 @@ module.exports = {
   listMissions, getMission, createMission, updateMission, deleteMission,
   runMission, missionHistory,
   cadenceToCron, isValidCadence, estimateNextRun, nextCronRun, MAX_CONSECUTIVE_FAILURES,
-  isProviderOutage, planFailure, missionDateLine, OUTAGE_PREFIX, OUTAGE_RETRY_MINUTES
+  isProviderOutage, planFailure, missionDateLine, formatDraftAppendix, OUTAGE_PREFIX, OUTAGE_RETRY_MINUTES
 };

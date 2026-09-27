@@ -9,7 +9,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 
 const {
-  isProviderOutage, planFailure, missionDateLine,
+  isProviderOutage, planFailure, missionDateLine, formatDraftAppendix,
   OUTAGE_PREFIX, OUTAGE_RETRY_MINUTES, MAX_CONSECUTIVE_FAILURES
 } = require('../services/agents/MissionScheduler');
 
@@ -47,6 +47,18 @@ test('an ordinary failure still counts and still switches the mission off at the
 
   const last = planFailure(mission({ consecutive_failures: MAX_CONSECUTIVE_FAILURES - 1 }), { outage: false });
   assert.strictEqual(last.autoDisable, true);
+});
+
+test('drafts from the run are appended verbatim, strongest first as given, with their apply links', () => {
+  assert.strictEqual(formatDraftAppendix([]), '');
+  const out = formatDraftAppendix([
+    { role: 'Software Product Manager', company: 'Eli Lilly', url: 'https://www.linkedin.com/jobs/view/1/', match_score: 80, draft: '## Cover Letter\nDear team,' },
+    { role: 'Business Analyst', company: null, url: null, match_score: null, draft: 'Letter two' }
+  ]);
+  assert.match(out, /## ✉️ Application drafts/);
+  assert.match(out, /### Software Product Manager — Eli Lilly \(fit 80\/100\)\n\n\*\*Apply:\*\* https:\/\/www\.linkedin\.com\/jobs\/view\/1\/\n\n## Cover Letter\nDear team,/);
+  assert.match(out, /### Business Analyst\n\nLetter two/);
+  assert.match(out, /nothing has been submitted/);
 });
 
 test('the run date is stated in IST, so an evening UTC run carries the next day', () => {
