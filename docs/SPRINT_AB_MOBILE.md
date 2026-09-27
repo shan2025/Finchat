@@ -187,3 +187,39 @@ pages populated with real data beyond the injected samples.
 - Group Chat's header wraps its buttons onto a second, left-aligned row —
   usable, not tidy.
 - Neural Map's toolbar wraps to three rows — held for the Phase 4 decision.
+
+---
+
+## 5. Tablets + touch — committed db3aae7 on 2026-09-27 (not pushed)
+
+### 5.1 Found
+
+| Where | Problem |
+|---|---|
+| Every page, 768–1023px (portrait iPad) | The 256px rail stayed pinned, leaving 512–767px: chat Send off-screen again, Group Chat thread 224px, Audit scrolled sideways, Agent Map's question box 4px |
+| Shared app bar | Hid whenever a page *had* a toggle, even a `md:hidden` one that vanished at 768px — portrait tablets had no way to open the drawer |
+| Group Chat, Mind Maps (phones) | The group / map list was hidden and nothing showed it — an existing group or map could not be reopened |
+| Neural Map | Mouse events only: no pan, drag or zoom by finger |
+| Agent Map, Neural Space, Mind Maps | No pinch-zoom; Neural Space fired a tap twice |
+| Recent chats, message copy, map-card delete | Hover-only actions, unreachable on touch |
+| Closed drawer | Its shadow bled a dark strip down the left edge of every phone |
+| Landscape phones | Chat left 68px of conversation |
+
+### 5.2 Fixes
+
+- **Rail breakpoint is 1024px** (`sidebar_nav.js`, `!important` so stale page copies can't re-pin it). Pages use `lg:ml-64`, toggles `lg:hidden`. Shadow only on `.open`.
+- **App bar yields only to a visible toggle** (`pageToggleVisible()`, bounding rect) and is re-decided synchronously on resize.
+- **Group Chat phone master/detail**: list first, back arrow + `history.pushState` so the phone back gesture returns to the list. **Mind Maps**: "Maps" button below 860px, closes on pick or outside tap.
+- **Pointer events** with a 6px drag slop and a pinch that holds until every finger lifts (Neural Map rewritten; pinch added to Agent Map, Neural Space, Mind Maps).
+- **Touch equivalents** under `(hover:none)`: a "⋯" per recent chat swaps in its actions; copy and map delete shown dimmed at 32px.
+- `finchat_theme.css`: inputs 16px on `(pointer:coarse)` everywhere (no iOS focus zoom).
+- `(max-height:500px)`: chat header/composer trimmed (68 → 218px of conversation), mascot hidden.
+- Tablet landscape: Operations agent grid 3 columns at `lg`, 4 at `xl`; Knowledge/Operations pairs stack below `xl`. Agents on phones: horizontal snap strip, config card directly below.
+
+### 5.3 Verified
+
+Layout sweeps at 375, 768, 820, 1024, 1180, 1280 and 844×390: zero document overflow on every page. Synthetic pointer sequences on the canvas pages: pinch keeps the world point under the fingers' midpoint, a tap still selects. Desktop 1280 unchanged, Ctrl+B collapse intact. Every edited inline script parses.
+
+**Not verified:** real devices — the iOS keyboard, and rotation (the hidden Browser pane never delivers `resize`; the handler was proven by dispatching one).
+
+**Seen, not fixed:** Mind Maps' `toggleNav` has no backdrop; chat's inline sidebar lacks Neural Space and Agent Map; Neural Map's header needs ~1500px for one row (pre-existing). Phase 3 (PWA) not started.
