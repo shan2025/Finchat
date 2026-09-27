@@ -12,7 +12,42 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { classifyUrl, adzunaCountry, adzunaConfigured } = require('../tools/JobsTool');
+const { classifyUrl, adzunaCountry, adzunaConfigured, parseQuery } = require('../tools/JobsTool');
+
+// The model sends one sentence as often as it sends {role, region}. Read
+// literally, the sentence has no region: Adzuna (which needs one to pick a
+// country) was skipped and Remotive was searched for the whole string. These
+// are the exact inputs from the 2026-09-27 09:00 job hunt, which got the same
+// US remote listings for all three tracks.
+describe('parseQuery', () => {
+  test('a one-sentence query yields a clean role and an India region', () => {
+    const cases = [
+      ['Business Analyst early career 0-3 years India Bangalore MNC', 'Business Analyst'],
+      ['Project Manager early career 0-3 years India Bangalore', 'Project Manager'],
+      ['Associate Product Manager OR Product Manager early career 0-3 years India Bangalore', 'Product Manager']
+    ];
+    for (const [query, role] of cases) {
+      const out = parseQuery(query);
+      assert.equal(out.role, role, query);
+      assert.equal(out.region, 'India, Bangalore', query);
+      assert.equal(adzunaCountry(out.region), 'in', `${query} must reach the India endpoint`);
+    }
+  });
+
+  test('an explicit region wins and a plain role is left alone', () => {
+    assert.deepEqual(parseQuery('Business Analyst', 'India'), { role: 'Business Analyst', region: 'India' });
+    assert.deepEqual(parseQuery('product manager'), { role: 'product manager', region: '' });
+  });
+
+  test('"in" as a preposition is not a place, and experience phrasing is dropped', () => {
+    assert.deepEqual(parseQuery('data analyst jobs in Pune with 2+ years experience'), { role: 'data analyst', region: 'Pune' });
+  });
+
+  test('"remote" is lifted out as a region so Remotive still runs for it', () => {
+    assert.deepEqual(parseQuery('remote product manager'), { role: 'product manager', region: 'Remote' });
+    assert.equal(adzunaCountry('Remote'), null);
+  });
+});
 
 describe('classifyUrl', () => {
   test('board category and search pages are not openings', () => {

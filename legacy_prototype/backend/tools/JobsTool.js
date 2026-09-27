@@ -98,6 +98,48 @@ function adzunaCountry(region) {
   return hit ? hit[1] : null;
 }
 
+// Places worth lifting out of a free-text query. Kept separate from INDIA_RE,
+// whose bare "in" would swallow the preposition in "analyst in Pune".
+const PLACE_RE = /\b(india|bangalore|bengaluru|mumbai|delhi|new delhi|ncr|gurgaon|gurugram|noida|hyderabad|pune|chennai|kolkata|kochi|cochin|trivandrum|thiruvananthapuram|ahmedabad|jaipur|chandigarh|coimbatore|remote|united states|usa|uk|united kingdom|london|canada|toronto|australia|sydney|singapore|germany|berlin|netherlands|amsterdam)\b/gi;
+
+// Words that describe the SEARCH rather than the job title. Adzuna ANDs every
+// word of `what`, so "business analyst early career 0-3 years MNC" matches
+// nothing; and none of these are filters any source here can apply.
+const NOISE_RE = new RegExp([
+  String.raw`\b\d+\s*(?:-|–|to)\s*\d+\s*(?:years?|yrs?)\b`,
+  String.raw`\b\d+\+?\s*(?:years?|yrs?)\b`,
+  String.raw`\b(?:early[- ]career|entry[- ]level|freshers?|experience|exp|mncs?|large|companies|company|jobs?|roles?|openings?|positions?|vacanc(?:y|ies)|hiring|based|near|in|at|for|with)\b`
+].join('|'), 'gi');
+
+/**
+ * Split whatever the model sent into a role and a region.
+ *
+ * The documented shape is {role, region}, but the model often sends one
+ * sentence: {"query":"Business Analyst early career 0-3 years India Bangalore
+ * MNC"}. Read literally, that has no region — so Adzuna, which needs one to pick
+ * a country, was skipped, and Remotive was searched for the whole sentence. The
+ * 2026-09-27 job hunt got the same US remote listings for all three tracks that
+ * way, while the 04:30 run the same morning, which happened to send
+ * {"role","location":"India"}, got real Bangalore postings.
+ */
+function parseQuery(roleText, regionText = '') {
+  const raw = String(roleText || '');
+  const places = [];
+  for (const m of raw.matchAll(PLACE_RE)) {
+    const p = m[1].toLowerCase();
+    if (!places.includes(p)) places.push(p);
+  }
+  // "Associate Product Manager OR Product Manager": Adzuna ANDs words, so send
+  // the broadest alternative — the shortest — rather than all of them joined.
+  const alternatives = raw.replace(PLACE_RE, ' ').split(/\s+(?:or)\s+|\s*[|/]\s*/i)
+    .map(a => a.replace(NOISE_RE, ' ').replace(/[^\p{L}\p{N}&+.#\s-]/gu, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const role = alternatives.sort((a, b) => a.length - b.length)[0] || '';
+  const region = String(regionText || '').trim() ||
+    places.map(p => p.replace(/\b\w/g, c => c.toUpperCase())).join(', ');
+  return { role, region };
+}
+
 function adzunaConfigured() {
   return Boolean((process.env.ADZUNA_APP_ID || '').trim() && (process.env.ADZUNA_APP_KEY || '').trim());
 }
@@ -133,7 +175,10 @@ async function fromAdzuna({ role, company, region, limit, maxDaysOld }) {
   };
   // `where` is a place within the country. Passing the country name itself
   // narrows nothing and can return zero rows, so only send a real locality.
-  const where = String(region).replace(/\b(india|indian|remote india)\b/gi, '').trim();
+  // With several places ("Bangalore, India", "Pune, Mumbai") send the first one;
+  // Adzuna treats the whole string as one locality and matches nothing.
+  const where = String(region).replace(/\b(india|indian|remote)\b/gi, '')
+    .split(/[,;]/).map(s => s.trim()).filter(Boolean)[0] || '';
   if (where) params.where = where;
 
   const res = await axios.get(`https://api.adzuna.com/v1/api/jobs/${country}/search/1`, {
@@ -302,9 +347,9 @@ async function fromWebSearch({ role, company, region }) {
 async function execute(input) {
   let role = '', company = '', region = '', limit = 8, maxDaysOld = null;
   const read = (p) => {
-    role = p.role || p.query || role;
+    role = p.role || p.title || p.query || p.keywords || role;
     company = p.company || '';
-    region = p.region || p.location || '';
+    region = p.region || p.location || p.city || '';
     if (p.limit) limit = +p.limit;
     if (p.maxDaysOld || p.max_days_old) maxDaysOld = +(p.maxDaysOld || p.max_days_old);
   };
@@ -320,6 +365,8 @@ async function execute(input) {
     role = '';
     read(input);
   }
+  const asked = role;
+  ({ role, region } = parseQuery(role, region));
 
   const normalizedRole = normalizeRole(role);
   const results = [];
@@ -379,7 +426,7 @@ async function execute(input) {
   const country = adzunaCountry(region);
 
   return {
-    query: { role, company, region },
+    query: { role, company, region, ...(asked !== role ? { asked } : {}) },
     count: shown.length,
     postingCount: postings,
     listingPageCount: indexPages,
@@ -399,4 +446,4 @@ async function execute(input) {
   };
 }
 
-module.exports = { execute, classifyUrl, adzunaCountry, adzunaConfigured };
+module.exports = { execute, classifyUrl, adzunaCountry, adzunaConfigured, parseQuery };
