@@ -13,6 +13,14 @@
   --rc-mono: var(--mono, 'JetBrains Mono', ui-monospace, monospace);
   width: 100%;
   min-width: 0;
+  container-type: inline-size;
+}
+
+/* Wide columns: two whole cards and a clear slice of the third. A fixed card
+   width let almost exactly two fit, so the second was clipped by a few pixels
+   and read as broken rather than as "swipe for more". */
+@container (min-width: 720px) {
+  .rc-root .rc-track { grid-auto-columns: calc((100% - 28px) / 2.3); }
 }
 
 .rc-track {

@@ -169,6 +169,11 @@
   // definitions are appended to every fragment before it is parsed.
   function md(src, refs) {
     if (!src) return '';
+    // A citation to a reference the model never defined stays as literal
+    // "([3])"; show it as a plain "(3)" instead of stray brackets.
+    var ids = {};
+    refs.forEach(function (r) { ids[r.id] = 1; });
+    src = src.replace(/(?<!\])\[(\d+)\](?![\[(:])/g, function (m, n) { return ids[n] ? m : n; });
     var full = src + (refs.length ? '\n\n' + refs.map(function (r) { return r.raw; }).join('\n') : '');
     if (global.marked && global.DOMPurify) {
       var html = global.DOMPurify.sanitize(global.marked.parse(full), { ADD_ATTR: ['target'] });
@@ -269,33 +274,64 @@
     container.setAttribute('data-report', '1');
   }
 
+  // Step to an exact card rather than scrollBy a width: a second press during
+  // the smooth scroll would otherwise land between two cards.
+  function stepDeck(track, dir) {
+    var cards = track.querySelectorAll('[data-rc-card]');
+    if (!cards.length) return;
+    var base = cards[0].offsetLeft;
+    var target = track.__rcIdx;
+    // Mid-animation, trust the card we are heading to; otherwise the user
+    // may have swiped, so find the card nearest the current scroll.
+    if (!track.__rcMoving || target === undefined) {
+      target = 0;
+      cards.forEach(function (c, k) {
+        if (Math.abs(c.offsetLeft - base - track.scrollLeft) < Math.abs(cards[target].offsetLeft - base - track.scrollLeft)) target = k;
+      });
+    }
+    target = Math.max(0, Math.min(cards.length - 1, target + dir));
+    track.__rcIdx = target;
+    track.__rcMoving = true;
+    clearTimeout(track.__rcTimer);
+    track.__rcTimer = setTimeout(function () { track.__rcMoving = false; }, 600);
+    track.scrollTo({ left: cards[target].offsetLeft - base, behavior: 'smooth' });
+  }
+
+  // The deck the arrow keys drive: the one being interacted with, else the
+  // one taking up most of the viewport (a chat can hold several briefs).
+  function activeTrack() {
+    var focused = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-rc-root]');
+    if (focused) return focused.querySelector('.rc-track');
+    var best = null, bestArea = 0;
+    document.querySelectorAll('[data-rc-root]:not(.rc-textmode) .rc-track').forEach(function (tr) {
+      var r = tr.getBoundingClientRect();
+      var h = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+      if (h > bestArea) { bestArea = h; best = tr; }
+    });
+    return bestArea > 120 ? best : null;
+  }
+
   if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.defaultPrevented) return;
+      // Never steal arrows from text being edited. An EMPTY composer is fair
+      // game: chat keeps it focused, and arrows in an empty box do nothing.
+      var a = document.activeElement;
+      if (a && (a.isContentEditable || a.tagName === 'SELECT')) return;
+      if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.value) return;
+      var track = activeTrack();
+      if (!track) return;
+      ev.preventDefault();
+      stepDeck(track, ev.key === 'ArrowRight' ? 1 : -1);
+    });
+
     document.addEventListener('click', function (ev) {
       var t = ev.target;
       if (!t || !t.closest) return;
       var step = t.closest('[data-rc-step]');
       if (step) {
-        // Step to an exact card rather than scrollBy a width: a second click
-        // during the smooth scroll would otherwise land between two cards.
-        var track = step.closest('[data-rc-root]').querySelector('.rc-track');
-        var cards = track.querySelectorAll('[data-rc-card]');
-        if (!cards.length) return;
-        var base = cards[0].offsetLeft;
-        var target = track.__rcIdx;
-        // Mid-animation, trust the card we are heading to; otherwise the user
-        // may have swiped, so find the card nearest the current scroll.
-        if (!track.__rcMoving || target === undefined) {
-          target = 0;
-          cards.forEach(function (c, k) {
-            if (Math.abs(c.offsetLeft - base - track.scrollLeft) < Math.abs(cards[target].offsetLeft - base - track.scrollLeft)) target = k;
-          });
-        }
-        target = Math.max(0, Math.min(cards.length - 1, target + Number(step.getAttribute('data-rc-step'))));
-        track.__rcIdx = target;
-        track.__rcMoving = true;
-        clearTimeout(track.__rcTimer);
-        track.__rcTimer = setTimeout(function () { track.__rcMoving = false; }, 600);
-        track.scrollTo({ left: cards[target].offsetLeft - base, behavior: 'smooth' });
+        stepDeck(step.closest('[data-rc-root]').querySelector('.rc-track'), Number(step.getAttribute('data-rc-step')));
         return;
       }
       var more = t.closest('[data-rc-more]');
