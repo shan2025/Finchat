@@ -254,13 +254,22 @@
       }
     });
 
-    var plain = md(text, []);
-    return '<div class="rc-root" data-rc-root>' +
+    var plain = md(text, refs);
+    var docName = [d.title || 'Report', d.date].filter(Boolean).join(' - ');
+    return '<div class="rc-root" data-rc-root data-rc-name="' + esc(docName) + '">' +
       '<div class="rc-track" tabindex="0" aria-label="' + esc(d.title || 'Report') + ', ' + n + ' cards">' + out.join('') + '</div>' +
       '<div class="rc-bar">' +
-        '<button type="button" class="rc-nav" data-rc-step="-1" aria-label="Previous card">&#8592;</button>' +
-        '<button type="button" class="rc-nav" data-rc-step="1" aria-label="Next card">&#8594;</button>' +
+        '<button type="button" class="rc-nav" data-rc-step="-1" aria-label="Previous card" title="Previous (&#8592;)">&#8592;</button>' +
+        '<button type="button" class="rc-nav" data-rc-step="1" aria-label="Next card" title="Next (&#8594;)">&#8594;</button>' +
         '<span class="rc-hint">' + n + ' cards</span>' +
+        '<span class="rc-views" role="group" aria-label="Cards per view">' +
+          '<button type="button" class="rc-view" data-rc-view="1" title="One card at a time">1</button>' +
+          '<button type="button" class="rc-view" data-rc-view="2" title="Two cards at a time">2</button>' +
+        '</span>' +
+        '<span class="rc-spacer"></span>' +
+        '<button type="button" class="rc-toggle rc-read-btn" data-rc-reading title="Hide the message box (H), bring it back with C">' +
+          '<span class="rc-read-hide">Hide chat <kbd>H</kbd></span><span class="rc-read-show">Show chat <kbd>C</kbd></span></button>' +
+        '<button type="button" class="rc-toggle" data-rc-pdf title="Save the deck as a PDF, one card per page">Save as PDF</button>' +
         '<button type="button" class="rc-toggle" data-rc-toggle>Read as text</button>' +
       '</div>' +
       '<div class="rc-text markdown-body">' + plain + '</div>' +
@@ -272,29 +281,121 @@
     ensureStyles();
     container.innerHTML = renderToHTML(text);
     container.setAttribute('data-report', '1');
+    if (hasComposer()) html.classList.add('rc-can-read');
+  }
+
+  // ── per-viewer preferences ───────────────────────────────────────
+  // Both live as classes on <html>, not on each deck: chat re-inserts cached
+  // HTML, so a class on <html> reaches every deck, new or restored.
+  var html = typeof document !== 'undefined' ? document.documentElement : null;
+  function pref(key, val) {
+    try {
+      if (val === undefined) return localStorage.getItem(key);
+      localStorage.setItem(key, val);
+    } catch (e) { /* private mode: the default still renders */ }
+    return null;
+  }
+
+  function cardsPerView(track) {
+    var c = track.querySelector('[data-rc-card]');
+    if (!c) return 1;
+    return Math.max(1, Math.round((track.clientWidth + 14) / (c.getBoundingClientRect().width + 14)));
+  }
+
+  function nearestCard(track, cards) {
+    var base = cards[0].offsetLeft, idx = 0;
+    cards.forEach(function (c, k) {
+      if (Math.abs(c.offsetLeft - base - track.scrollLeft) < Math.abs(cards[idx].offsetLeft - base - track.scrollLeft)) idx = k;
+    });
+    return idx;
   }
 
   // Step to an exact card rather than scrollBy a width: a second press during
-  // the smooth scroll would otherwise land between two cards.
+  // the smooth scroll would otherwise land between two cards. Steps a whole
+  // view at a time, so two-up turns two cards like pages of a book.
   function stepDeck(track, dir) {
     var cards = track.querySelectorAll('[data-rc-card]');
     if (!cards.length) return;
-    var base = cards[0].offsetLeft;
-    var target = track.__rcIdx;
+    var per = cardsPerView(track);
     // Mid-animation, trust the card we are heading to; otherwise the user
     // may have swiped, so find the card nearest the current scroll.
-    if (!track.__rcMoving || target === undefined) {
-      target = 0;
-      cards.forEach(function (c, k) {
-        if (Math.abs(c.offsetLeft - base - track.scrollLeft) < Math.abs(cards[target].offsetLeft - base - track.scrollLeft)) target = k;
-      });
-    }
-    target = Math.max(0, Math.min(cards.length - 1, target + dir));
+    var target = (track.__rcMoving && track.__rcIdx !== undefined) ? track.__rcIdx : nearestCard(track, cards);
+    target = Math.max(0, Math.min(Math.max(0, cards.length - per), target + dir * per));
     track.__rcIdx = target;
     track.__rcMoving = true;
     clearTimeout(track.__rcTimer);
     track.__rcTimer = setTimeout(function () { track.__rcMoving = false; }, 600);
-    track.scrollTo({ left: cards[target].offsetLeft - base, behavior: 'smooth' });
+    track.scrollTo({ left: cards[target].offsetLeft - cards[0].offsetLeft, behavior: 'smooth' });
+  }
+
+  function setView(n) {
+    if (!html) return;
+    // Remember where each deck was so switching layout keeps your place.
+    var spots = [];
+    document.querySelectorAll('[data-rc-root] .rc-track').forEach(function (tr) {
+      var cards = tr.querySelectorAll('[data-rc-card]');
+      if (cards.length) spots.push([tr, cards, nearestCard(tr, cards)]);
+    });
+    html.classList.toggle('rc-view-1', n === 1);
+    pref('rc_cards_per_view', String(n));
+    spots.forEach(function (s) {
+      var tr = s[0], cards = s[1], per = cardsPerView(tr);
+      var idx = Math.min(s[2], Math.max(0, cards.length - per));
+      tr.__rcIdx = idx;
+      tr.scrollLeft = cards[idx].offsetLeft - cards[0].offsetLeft;
+    });
+  }
+
+  // Reading mode hides the chat composer so the deck gets the whole column.
+  // Only offered on pages that have one (finchat_chat.html's #composerWrap).
+  function hasComposer() { return !!document.getElementById('composerWrap'); }
+  function setReading(on) {
+    if (!html || (on && !hasComposer())) return;
+    html.classList.toggle('rc-reading', on);
+    if (!on) {
+      var box = document.querySelector('#composerWrap textarea');
+      if (box) box.focus();
+    } else if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#composerWrap')) {
+      document.activeElement.blur();
+    }
+    var pill = document.getElementById('rcShowChat');
+    if (on && !pill) {
+      pill = document.createElement('button');
+      pill.type = 'button';
+      pill.id = 'rcShowChat';
+      pill.className = 'rc-show-chat';
+      pill.setAttribute('data-rc-show-chat', '');
+      pill.innerHTML = 'Show chat <kbd>C</kbd>';
+      document.body.appendChild(pill);
+    }
+  }
+
+  // "Save as PDF" is the browser's print-to-PDF on a copy of this one deck:
+  // real selectable text, one card per page. The copy sits at the top of
+  // <body> and print CSS hides everything else, which sidesteps the chat
+  // column's fixed-height scroller clipping the deck. The document title is
+  // borrowed for the duration because Chrome names the PDF after it.
+  function printDeck(root) {
+    var old = document.getElementById('rcPrintHost');
+    if (old) old.remove();
+    var host = document.createElement('div');
+    host.id = 'rcPrintHost';
+    var copy = root.cloneNode(true);
+    copy.classList.remove('rc-textmode');
+    copy.querySelectorAll('.rc-open').forEach(function (c) { c.classList.remove('rc-open'); });
+    host.appendChild(copy);
+    document.body.appendChild(host);
+    var title = document.title;
+    document.title = root.getAttribute('data-rc-name') || title;
+    html.classList.add('rc-printing');
+    var done = function () {
+      html.classList.remove('rc-printing');
+      document.title = title;
+      host.remove();
+    };
+    window.addEventListener('afterprint', done, { once: true });
+    var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    ready.then(function () { window.print(); });
   }
 
   // The deck the arrow keys drive: the one being interacted with, else the
@@ -312,18 +413,35 @@
   }
 
   if (typeof document !== 'undefined') {
+    if (pref('rc_cards_per_view') === '1') html.classList.add('rc-view-1');
+
     document.addEventListener('keydown', function (ev) {
-      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
-      if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.defaultPrevented) return;
-      // Never steal arrows from text being edited. An EMPTY composer is fair
-      // game: chat keeps it focused, and arrows in an empty box do nothing.
+      if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.defaultPrevented) return;
       var a = document.activeElement;
-      if (a && (a.isContentEditable || a.tagName === 'SELECT')) return;
-      if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.value) return;
-      var track = activeTrack();
-      if (!track) return;
-      ev.preventDefault();
-      stepDeck(track, ev.key === 'ArrowRight' ? 1 : -1);
+      var inField = a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+      var key = ev.key;
+
+      if (key === 'ArrowLeft' || key === 'ArrowRight') {
+        if (ev.shiftKey) return;
+        // Never steal arrows from text being edited. An EMPTY composer is fair
+        // game: chat keeps it focused, and arrows in an empty box do nothing.
+        if (inField && (a.tagName === 'SELECT' || a.isContentEditable || a.value)) return;
+        var track = activeTrack();
+        if (!track) return;
+        ev.preventDefault();
+        stepDeck(track, key === 'ArrowRight' ? 1 : -1);
+        return;
+      }
+
+      // H / C are letters, so they only count when nothing is being typed.
+      if (inField) return;
+      if ((key === 'h' || key === 'H') && !html.classList.contains('rc-reading') && activeTrack()) {
+        ev.preventDefault();
+        setReading(true);
+      } else if ((key === 'c' || key === 'C') && html.classList.contains('rc-reading')) {
+        ev.preventDefault();
+        setReading(false);
+      }
     });
 
     document.addEventListener('click', function (ev) {
@@ -334,6 +452,12 @@
         stepDeck(step.closest('[data-rc-root]').querySelector('.rc-track'), Number(step.getAttribute('data-rc-step')));
         return;
       }
+      var view = t.closest('[data-rc-view]');
+      if (view) { setView(Number(view.getAttribute('data-rc-view'))); return; }
+      if (t.closest('[data-rc-reading]')) { setReading(!html.classList.contains('rc-reading')); return; }
+      if (t.closest('[data-rc-show-chat]')) { setReading(false); return; }
+      var pdf = t.closest('[data-rc-pdf]');
+      if (pdf) { printDeck(pdf.closest('[data-rc-root]')); return; }
       var more = t.closest('[data-rc-more]');
       if (more) {
         var cardEl = more.closest('[data-rc-card]');
@@ -352,3 +476,4 @@
 
   global.ReportCards = { has: isReport, parse: parse, renderToHTML: renderToHTML, render: render };
 })(typeof window !== 'undefined' ? window : globalThis);
+

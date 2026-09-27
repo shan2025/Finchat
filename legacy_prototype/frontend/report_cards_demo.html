@@ -16,6 +16,8 @@
   .rcd-body { margin: 0; padding: 32px 16px; background: var(--bg, #f3ead8); font-family: var(--sans, Figtree, sans-serif); }
   .rcd-wrap { max-width: 840px; margin: 0 auto; }
   .rcd-wrap h1 { font-size: 18px; margin: 0 0 16px; }
+  .rcd-composer { position: sticky; bottom: 0; max-width: 840px; margin: 16px auto 0; }
+  .rcd-composer textarea { width: 100%; box-sizing: border-box; height: 64px; padding: 14px 18px; border-radius: 22px; border: 1px solid #e3d3ba; background: #fffaf0; font: inherit; resize: none; }
 </style>
 </head>
 <body class="rcd-body">
@@ -23,6 +25,8 @@
   <h1>Plato · Daily brief</h1>
   <div id="out"></div>
 </div>
+<!-- Stand-in for chat's composer, so Hide chat (H) / Show chat (C) can be tried here. -->
+<div id="composerWrap" class="rcd-composer"><textarea placeholder="Message Plato..."></textarea></div>
 <script src="report_cards.js"></script>
 <script>
 var text = [
