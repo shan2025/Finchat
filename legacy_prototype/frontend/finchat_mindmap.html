@@ -26,23 +26,29 @@
 <link rel="stylesheet" href="finchat_theme.css">
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 <style>
+/* Whiteboard look (Miro-style, shared with Boards — see board_ui.css): a white
+   dotted canvas, white panels, one blue for actions, and the colour living in
+   the map itself — every branch gets its own (branchColor() below). The light
+   theme keeps the id "warm" so a stored preference still resolves. */
 :root, [data-nm-theme="warm"] {
-  --mm-bg:#f5ead8; --mm-surface:#fffaf0; --mm-surface2:#f4eede;
-  --mm-line:#e7d9be; --mm-line2:#d9c7a6;
-  --mm-fg:#2b2118; --mm-fg2:#5b4a3a; --mm-muted:#8a7d6a;
-  --mm-accent:#c67139; --mm-gold:#d4af37;
-  --mm-shadow:0 8px 28px rgba(46,43,37,.14);
-  --mm-canvas:#f0e4cf;
-  --mm-bubble:#efe4cf;
+  --mm-bg:#ffffff; --mm-surface:#ffffff; --mm-surface2:#f4f5f8;
+  --mm-line:#e3e5ea; --mm-line2:#cfd3da;
+  --mm-fg:#1c1f26; --mm-fg2:#4b5160; --mm-muted:#7c8392;
+  --mm-accent:#4262ff; --mm-gold:#fac710; --mm-select:#4262ff;
+  --mm-shadow:0 1px 2px rgba(20,24,36,.06), 0 8px 26px rgba(20,24,36,.1);
+  --mm-canvas:#f5f6f8;
+  --mm-bubble:#eef1ff;
+  --mm-root:#1c1f26;
 }
 [data-nm-theme="dark"] {
-  --mm-bg:#12100c; --mm-surface:#1d1913; --mm-surface2:#26211a;
-  --mm-line:#352c21; --mm-line2:#4a3d2d;
-  --mm-fg:#f0e7d7; --mm-fg2:#cbbca4; --mm-muted:#9b8d78;
-  --mm-accent:#e08a4e; --mm-gold:#e0c25c;
+  --mm-bg:#16181d; --mm-surface:#1f2229; --mm-surface2:#262a33;
+  --mm-line:#2f343e; --mm-line2:#3b414d;
+  --mm-fg:#eceef2; --mm-fg2:#c3c8d2; --mm-muted:#8b92a1;
+  --mm-accent:#6b83ff; --mm-gold:#fac710; --mm-select:#8ea0ff;
   --mm-shadow:0 10px 34px rgba(0,0,0,.5);
-  --mm-canvas:#171310;
-  --mm-bubble:#2c251c;
+  --mm-canvas:#16181d;
+  --mm-bubble:#262d4d;
+  --mm-root:#eceef2;
 }
 * { box-sizing:border-box; }
 /* Page-level layout hangs off .mm-body, never off a bare `body` selector.
@@ -54,7 +60,8 @@ body.mm-body {
   height:100vh; margin:0; font-family:var(--sans);
   background:var(--mm-bg); color:var(--mm-fg); overflow:hidden;
 }
-.mm-serif { font-family:'Caprasimo',Georgia,serif; font-weight:400; }
+/* Headings in the whiteboard style: heavy sans, not the app's display serif. */
+.mm-serif { font-family:'Figtree',var(--sans),sans-serif; font-weight:800; letter-spacing:-.01em; }
 
 /* layout ---------------------------------------------------------- */
 /* The rail sits outside <main> (the router swaps <main>, so it cannot live
@@ -76,12 +83,12 @@ html.nav-collapsed #mmShell { margin-left:0; }
 
 .mm-btn {
   display:inline-flex; align-items:center; gap:6px;
-  padding:7px 13px; border-radius:999px; cursor:pointer;
-  border:1px solid var(--mm-line2); background:var(--mm-surface2);
-  color:var(--mm-fg2); font-family:inherit; font-size:12.5px; font-weight:700;
+  padding:7px 13px; border-radius:9px; cursor:pointer;
+  border:1px solid var(--mm-line2); background:var(--mm-surface);
+  color:var(--mm-fg); font-family:inherit; font-size:12.5px; font-weight:700;
   transition:background .14s, color .14s, border-color .14s;
 }
-.mm-btn:hover { color:var(--mm-accent); border-color:var(--mm-accent); }
+.mm-btn:hover { color:var(--mm-accent); border-color:var(--mm-accent); background:var(--mm-bubble); }
 .mm-btn:disabled { opacity:.5; cursor:default; }
 .mm-btn-primary { background:var(--mm-accent); border-color:var(--mm-accent); color:#fff; }
 .mm-btn-primary:hover { filter:brightness(1.07); color:#fff; }
@@ -99,29 +106,32 @@ html.nav-collapsed #mmShell { margin-left:0; }
 #mmGrid { pointer-events:none; }
 .mm-grid-dot { fill:var(--mm-line2); opacity:.55; }
 [data-nm-theme="dark"] .mm-grid-dot { opacity:.4; }
-.mm-node.dragging .mm-node-box { stroke:var(--mm-gold); stroke-width:3; }
+.mm-node.dragging .mm-node-box { stroke:var(--mm-select) !important; stroke-width:3; }
 .mm-node.dragging { cursor:grabbing; }
 .mm-node.pinned .mm-node-box { stroke-dasharray:none; }
 /* A node the user placed by hand carries a small anchor so it is obvious why
    it did not move when the branch re-laid itself out. */
 .mm-pin-dot { fill:var(--mm-gold); opacity:.9; }
 
-.mm-link { fill:none; stroke:var(--mm-line2); stroke-width:1.6; }
-.mm-xlink { fill:none; stroke:var(--mm-accent); stroke-width:1.3; stroke-dasharray:5 4; opacity:.75; }
+/* Branch colours are set per element by decorateNode()/paintLink(); these are
+   the fallbacks and the states that sit on top of them. */
+.mm-link { fill:none; stroke:var(--mm-line2); stroke-width:2.2; stroke-linecap:round; }
+.mm-xlink { fill:none; stroke:var(--mm-accent); stroke-width:1.4; stroke-dasharray:5 4; opacity:.75; }
 .mm-node { cursor:pointer; }
 .mm-node-box {
-  fill:var(--mm-surface); stroke:var(--mm-line2); stroke-width:1.4;
+  fill:var(--mm-surface); stroke:var(--mm-line2); stroke-width:1.6;
   transition:stroke .14s, filter .14s;
+  filter:drop-shadow(0 1px 1.5px rgba(20,24,36,.08));
 }
-.mm-node.root .mm-node-box { fill:var(--mm-accent); stroke:var(--mm-accent); }
-.mm-node.selected .mm-node-box { stroke:var(--mm-gold); stroke-width:3; }
-.mm-node:hover .mm-node-box { stroke:var(--mm-accent); }
-.mm-node.ctx .mm-node-box { stroke:var(--mm-gold); stroke-dasharray:5 3; }
+.mm-node.root .mm-node-box { fill:var(--mm-root); stroke:var(--mm-root); }
+.mm-node.selected .mm-node-box { stroke:var(--mm-select) !important; stroke-width:3; }
+.mm-node:hover .mm-node-box { filter:drop-shadow(0 3px 8px rgba(20,24,36,.16)); }
+.mm-node.ctx .mm-node-box { stroke:var(--mm-select) !important; stroke-dasharray:5 3; }
 .mm-node-label {
   font-size:12.5px; font-weight:700; fill:var(--mm-fg);
   pointer-events:none; dominant-baseline:middle;
 }
-.mm-node.root .mm-node-label { fill:#fff; font-size:14px; }
+.mm-node.root .mm-node-label { fill:var(--mm-canvas); font-size:14px; }
 .mm-node.question .mm-node-box { stroke-dasharray:4 3; }
 .mm-toggle-circle { fill:var(--mm-surface2); stroke:var(--mm-line2); stroke-width:1.2; }
 .mm-toggle-sign { font-size:12px; font-weight:800; fill:var(--mm-fg2);
@@ -133,7 +143,7 @@ html.nav-collapsed #mmShell { margin-left:0; }
 @keyframes mmPulse {
   0% { stroke-width:1.4; } 40% { stroke-width:4; } 100% { stroke-width:1.4; }
 }
-.mm-node.fresh .mm-node-box { animation:mmPulse 1.1s ease-out 1; stroke:var(--mm-gold); }
+.mm-node.fresh .mm-node-box { animation:mmPulse 1.1s ease-out 1; stroke:var(--mm-select) !important; }
 
 /* panel ----------------------------------------------------------- */
 #mmPanel {
@@ -249,6 +259,9 @@ html.nav-collapsed #mmShell { margin-left:0; }
 .mm-modal { position:fixed; inset:0; background:rgba(20,16,12,.55);
   display:none; align-items:center; justify-content:center; z-index:60; padding:20px; }
 .mm-modal.open { display:flex; }
+/* The confirm dialog is raised from inside other modals (revoking a share
+   link), so it has to stack above whichever one asked. */
+#mmConfirmModal { z-index:70; }
 .mm-modal-box { background:var(--mm-surface); border:1px solid var(--mm-line);
   border-radius:20px; padding:22px; width:min(520px,100%); box-shadow:var(--mm-shadow);
   max-height:88vh; overflow-y:auto; }
@@ -381,9 +394,18 @@ body.mm-body #navToggle { display:none; }
     <div class="mm-list-head">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <span class="mm-sub">My mind maps</span>
-        <button class="mm-btn" style="padding:5px 9px;" data-act="openGenerate" title="New mind map">
-          <span class="material-symbols-outlined">add</span>
-        </button>
+        <span style="display:flex; gap:6px;">
+          <a class="mm-btn" style="padding:5px 9px; text-decoration:none;" href="finchat_boards.html" title="Kanban boards">
+            <span class="material-symbols-outlined">view_kanban</span>
+          </a>
+          <button class="mm-btn" style="padding:5px 9px;" data-act="pickImport" id="mmImportBtn"
+                  title="Import a map bundle (.zip) someone shared with you">
+            <span class="material-symbols-outlined">upload</span>
+          </button>
+          <button class="mm-btn" style="padding:5px 9px;" data-act="openGenerate" title="New mind map">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </span>
       </div>
     </div>
     <div class="mm-list-body" id="mmListBody">
@@ -403,10 +425,16 @@ body.mm-body #navToggle { display:none; }
         <span class="material-symbols-outlined">fit_screen</span></button>
       <button class="mm-btn" data-act="presentStep" data-arg="1" id="mmPresentBtn" title="Present mode — walk the branches">
         <span class="material-symbols-outlined">slideshow</span></button>
+      <button class="mm-btn" data-act="makeBoard" id="mmMakeBoardBtn" title="Turn this map into a Kanban board — branches become columns, nodes become cards">
+        <span class="material-symbols-outlined">view_kanban</span> Board</button>
+      <button class="mm-btn mm-btn-primary" data-act="openShare" title="Share this map by link">
+        <span class="material-symbols-outlined">group_add</span> Share</button>
       <div class="mm-menu-wrap">
         <button class="mm-btn" data-act="toggleExportMenu" title="Download">
           <span class="material-symbols-outlined">download</span></button>
-        <div class="mm-menu" id="mmExportMenu">
+        <div class="mm-menu" id="mmExportMenu" style="min-width:230px;">
+          <button data-act="exportBundle" title="JSON Canvas map + every attached document. Opens in Obsidian; imports back into FinChat.">
+            <span class="material-symbols-outlined">folder_zip</span> Map + documents (.zip)</button>
           <button data-act="exportPng"><span class="material-symbols-outlined">image</span> PNG image</button>
           <button data-act="exportMap" data-arg="markdown"><span class="material-symbols-outlined">description</span> Markdown</button>
           <button data-act="exportMap" data-arg="opml"><span class="material-symbols-outlined">account_tree</span> OPML outline</button>
@@ -488,13 +516,15 @@ body.mm-body #navToggle { display:none; }
             </div>
             <!-- Typed text is a source in its own right, not a file you have to
                  make first. It lands in the same place an upload does. -->
-            <div style="display:flex; gap:6px; margin-top:8px;">
+            <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+              <button class="mm-btn mm-btn-sm" data-act="openLinks">
+                <span class="material-symbols-outlined">add_link</span> Links &amp; Drive</button>
               <button class="mm-btn mm-btn-sm" data-act="openNoteForm">
                 <span class="material-symbols-outlined">edit_note</span> Write a note</button>
               <button class="mm-btn mm-btn-sm" data-act="openEnrich">
                 <span class="material-symbols-outlined">auto_awesome</span> Add detail with AI</button>
             </div>
-            <div id="mmInheritedDocs"></div>
+            <div id="mmInheritedDocs" style="margin-top:18px;"></div>
           </div>
 
           <!-- Ask AI -->
@@ -717,6 +747,57 @@ body.mm-body #navToggle { display:none; }
   </div>
 </div>
 
+<!-- links: paste them, or find Drive files by name -->
+<div class="mm-modal" id="mmLinksModal" data-act="closeLinks" data-self-only>
+  <div class="mm-modal-box" style="max-width:560px;">
+    <div class="mm-modal-title mm-serif">Add links</div>
+    <div style="font-size:12.5px; color:var(--mm-muted);" id="mmLinksUnder"></div>
+    <div class="mm-label">Paste links</div>
+    <textarea class="mm-field" id="mmLinksText" rows="4" style="resize:vertical; line-height:1.55;"
+              placeholder="One per line, or pasted in a sentence — Google Docs, Drive, YouTube, images, any web page"></textarea>
+    <div class="mm-modal-actions" style="margin-top:8px;">
+      <button class="mm-btn mm-btn-primary" id="mmLinksAttach" data-act="attachPastedLinks">
+        <span class="material-symbols-outlined">add_link</span> Attach links</button>
+    </div>
+    <div class="mm-label">Or find in Google Drive</div>
+    <input class="mm-field" id="mmDriveQ" placeholder="Type part of a file name — e.g. Duxbe POS spec" autocomplete="off">
+    <div id="mmDriveOut" class="mm-doc-meta" style="margin-top:6px;">Searches file names only — FinChat never reads what's inside your files.</div>
+    <div class="mm-modal-actions"><button class="mm-btn" data-act="closeLinks">Done</button></div>
+  </div>
+</div>
+
+<!-- share links -->
+<div class="mm-modal" id="mmShareModal" data-act="closeShare" data-self-only>
+  <div class="mm-modal-box" style="max-width:560px;">
+    <div class="mm-modal-title mm-serif">Share this map</div>
+    <div style="font-size:12.5px; line-height:1.6; color:var(--mm-muted); margin-bottom:4px;">
+      Anyone with the link can view the map and open its documents — no FinChat account needed.
+      It stays live: they see your edits. Node conversations are never shared.
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12.5px; color:var(--mm-fg2); cursor:pointer;">
+      <input type="checkbox" id="mmShareDocs" checked style="width:15px; height:15px; accent-color:var(--mm-accent);">
+      Include attached documents and notes
+    </label>
+    <div class="mm-label">Link expires</div>
+    <select class="mm-field" id="mmShareExpiry">
+      <option value="">Never — until I revoke it</option>
+      <option value="1">After 1 day</option>
+      <option value="7">After 7 days</option>
+      <option value="30">After 30 days</option>
+      <option value="90">After 90 days</option>
+    </select>
+    <div class="mm-modal-actions" style="margin-top:14px;">
+      <button class="mm-btn mm-btn-primary" id="mmShareCreate" data-act="createShare">
+        <span class="material-symbols-outlined">add_link</span> Create link</button>
+    </div>
+    <div class="mm-label" style="margin-top:18px;">Links for this map</div>
+    <div id="mmShareList" style="display:flex; flex-direction:column; gap:8px; max-height:40vh; overflow-y:auto;"></div>
+    <div class="mm-modal-actions">
+      <button class="mm-btn" data-act="closeShare">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- node context menu -->
 <div id="mmCtxMenu">
   <button data-act="ctxAction" data-arg="ask"><span class="material-symbols-outlined">forum</span> Ask AI about this</button>
@@ -736,6 +817,7 @@ body.mm-body #navToggle { display:none; }
        accept=".pdf,.docx,.txt,.md,.csv,.json,.xml,.yml,.yaml,.log,.html,image/*">
 <input type="file" id="mmGenFileInput" multiple style="display:none"
        accept=".pdf,.docx,.txt,.md,.csv,.json,.xml,.yml,.yaml,.log,.html,image/*">
+<input type="file" id="mmImportInput" style="display:none" accept=".zip,application/zip">
 
 <div class="mm-toast" id="mmToast"></div>
 
@@ -815,6 +897,8 @@ function toggleTheme() {
   const next = document.documentElement.getAttribute('data-nm-theme') === 'dark' ? 'warm' : 'dark';
   localStorage.setItem('finchat_mm_theme', next);
   applyTheme(next);
+  // Deeper nodes are tinted against the surface colour, which just changed.
+  if (ROOT) refreshDecor();
 }
 applyTheme(localStorage.getItem('finchat_mm_theme') || 'warm');
 
@@ -865,7 +949,15 @@ function normDoc(d) {
     // Presence only — it decides whether the "open original" button shows. The
     // file itself is fetched by docId through an authenticated route, so the
     // old /uploads/<stored_name> guess is gone rather than kept as a fallback.
-    url: d.url || (d.stored_name ? `/api/mind-maps/docs/${encodeURIComponent(d.docId || d.doc_id)}/file` : null)
+    // has_data covers originals stored in the row with no disk copy at all —
+    // every upload since migration 045 on a fresh host, and every import.
+    // (Never set for a link: a raw link row's `url` is the OUTSIDE address,
+    // not a file of ours — that lives in `href` below.)
+    url: d.kind === 'link' ? null
+      : (d.url || ((d.has_data || d.stored_name) ? `/api/mind-maps/docs/${encodeURIComponent(d.docId || d.doc_id)}/file` : null)),
+    // A link's outside address. Raw rows carry it as `url`; route views as `link.href`.
+    href: d.kind === 'link' ? (d.link ? d.link.href : d.url) : null,
+    provider: d.kind === 'link' ? (d.link ? d.link.provider : d.provider) : null
   };
 }
 
@@ -1234,6 +1326,63 @@ function syncDom(vis) {
   }
 }
 
+// ── branch colours ───────────────────────────────────────────────
+// Whiteboard style: every top-level branch owns a colour and its whole subtree
+// wears it — the branch node filled, deeper nodes a light tint with a coloured
+// outline, and the connecting lines in the same colour. A colour the user set
+// on a node wins for that node; set on a branch, it recolours the branch.
+const BRANCH_COLORS = ['#6631d7', '#2b59c3', '#12a150', '#fb8c00', '#e84fa7',
+  '#0ca789', '#d62d2d', '#d99a00', '#7a5c3e', '#5f6b7a'];
+
+function isLightHex(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return false;
+  const v = parseInt(m[1], 16);
+  return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255 > 0.62;
+}
+/** Blend a toward b by t (0..1). Both #rrggbb. */
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (s) => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t);
+  return '#' + ((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1);
+}
+function surfaceHex() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--mm-surface').trim();
+  return /^#[0-9a-f]{6}$/i.test(v) ? v : '#ffffff';
+}
+/** The top-level branch a node belongs to (itself, for a branch). */
+function branchOf(n) {
+  let cur = n;
+  while (cur && cur.parent_id) {
+    const p = NODES.get(cur.parent_id);
+    if (!p || !p.parent_id) return cur;
+    cur = p;
+  }
+  return cur;
+}
+function branchColor(n) {
+  if (!n || !n.parent_id || !ROOT) return null;
+  const b = branchOf(n);
+  if (b && b.color) return b.color;
+  const i = Math.max(0, ROOT.children.indexOf(b));
+  return BRANCH_COLORS[i % BRANCH_COLORS.length];
+}
+/**
+ * How a node is painted: {fill, stroke, text, link}, or null for the defaults
+ * the stylesheet gives (the root, uncoloured). Shared by the canvas and the
+ * PNG export so the download looks like the screen.
+ */
+function nodePaint(n) {
+  if (!n.parent_id) {
+    return n.color ? { fill: n.color, stroke: n.color, text: isLightHex(n.color) ? '#1c1f26' : '#ffffff', link: n.color } : null;
+  }
+  const c = n.color || branchColor(n);
+  if (!c) return null;
+  const isBranch = NODES.get(n.parent_id) === ROOT;
+  if (isBranch || n.color) return { fill: c, stroke: c, text: isLightHex(c) ? '#1c1f26' : '#ffffff', link: c };
+  return { fill: mixHex(c, surfaceHex(), 0.86), stroke: c, text: null, link: c };
+}
+
 /** Label, size, collapse toggle and document badge — everything but x/y. */
 function decorateNode(g, n) {
   const w = nodeWidth(n), h = nodeHeight(n);
@@ -1263,10 +1412,18 @@ function decorateNode(g, n) {
 
   const box = g.querySelector('.mm-node-box');
   box.setAttribute('width', w); box.setAttribute('height', h); box.setAttribute('rx', h / 2);
-  if (n.color) { box.setAttribute('fill', n.color); box.setAttribute('stroke', n.color); }
-  else { box.removeAttribute('fill'); box.removeAttribute('stroke'); }
+  // Inline style, not fill/stroke attributes: a stylesheet rule always beats a
+  // presentation attribute, which is why a node's own colour never showed.
+  // Selected/ctx/fresh states still win — they are !important in the sheet.
+  const paintSpec = nodePaint(n);
+  box.removeAttribute('fill'); box.removeAttribute('stroke');
+  box.style.fill = paintSpec ? paintSpec.fill : '';
+  box.style.stroke = paintSpec ? paintSpec.stroke : '';
+  const link = DOM.links.get(n.node_id);
+  if (link) link.style.stroke = paintSpec ? paintSpec.link : '';
 
   const label = g.querySelector('.mm-node-label');
+  label.style.fill = paintSpec && paintSpec.text ? paintSpec.text : '';
   label.setAttribute('x', w / 2); label.setAttribute('y', h / 2);
   const max = docs ? 21 : 24;
   label.textContent = n.label.length > max ? n.label.slice(0, max - 1) + '…' : n.label;
@@ -1699,13 +1856,20 @@ function renderMapOverview(n) {
   const sources = MAP.sources || [];
   const meta = MAP.map.meta || {};
   const when = MAP.map.created_at ? new Date(MAP.map.created_at).toLocaleDateString() : '';
+  // A source that is a link renders as the link it is — open it, don't "view its text".
+  const allDocs = [...DOCS_BY_NODE.values()].flat().concat(MAP_DOCS);
+  const linkOf = s => {
+    if (s.type !== 'document') return null;
+    const d = allDocs.find(x => x.docId === s.ref);
+    return d && d.kind === 'link' ? d : null;
+  };
 
   host.innerHTML = `
     <div class="mm-label">Built from</div>
     <div style="font-size:15px; font-weight:800; color:var(--mm-fg); margin-bottom:8px;">
       ${sources.length} source${sources.length === 1 ? '' : 's'}
     </div>
-    ${sources.map(s => `
+    ${sources.map(s => { const link = linkOf(s); return link ? docRow(link, openLinkBtn(link)) : `
       <div class="mm-doc">
         <div class="mm-doc-ico"><span class="material-symbols-outlined">${
           s.type === 'document' ? docIcon(s)
@@ -1718,7 +1882,7 @@ function renderMapOverview(n) {
         ${s.type === 'document'
           ? `<div class="mm-doc-acts"><button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(s.ref)}" title="View">
                <span class="material-symbols-outlined">visibility</span></button></div>` : ''}
-      </div>`).join('') || '<div class="mm-empty-note">No sources recorded.</div>'}
+      </div>`; }).join('') || '<div class="mm-empty-note">No sources recorded.</div>'}
     <div class="mm-doc-meta" style="margin-top:8px;">
       ${MAP.nodes.length} nodes${meta.model ? ' · ' + esc(meta.model) : ''}${when ? ' · ' + esc(when) : ''}
     </div>
@@ -1902,17 +2066,28 @@ function countDescendants(n) {
 }
 
 // ── documents ────────────────────────────────────────────────────
-const docIcon = d => d.kind === 'image' ? 'image' : d.kind === 'text' ? 'edit_note' : 'description';
+// Links (migration 056) carry their own icon and colour by what they point at.
+const LINK_LOOK = {
+  gdoc: ['description', '#1a73e8'], gdrive: ['add_to_drive', '#0f9d58'], youtube: ['smart_display', '#ff0033'],
+  image: ['image', '#e84fa7'], video: ['movie', '#6631d7'], web: ['link', '#5f6b7a']
+};
+const docIcon = d => d.kind === 'link' ? (LINK_LOOK[d.provider] || LINK_LOOK.web)[0]
+  : d.kind === 'image' ? 'image' : d.kind === 'text' ? 'edit_note' : 'description';
+const docTint = d => d.kind === 'link' ? (LINK_LOOK[d.provider] || LINK_LOOK.web)[1]
+  : d.kind === 'text' ? '#d99a00' : d.kind === 'image' ? '#e84fa7' : '#4262ff';
 
 function docRow(d, actions) {
   // A note has no file behind it, so size and "chars read" would be lying about
   // an extraction that never happened — it reports its own length instead.
-  const meta = d.kind === 'text'
+  let host = '';
+  if (d.kind === 'link') { try { host = new URL(d.href).hostname.replace(/^www\./, ''); } catch (e) { host = 'link'; } }
+  const meta = d.kind === 'link' ? `link · ${esc(host)}`
+    : d.kind === 'text'
     ? `note · ${(d.chars || 0).toLocaleString()} characters`
     : `${fmtSize(d.size)}${d.chars ? ' · ' + d.chars.toLocaleString() + ' chars read' : ' · no text extracted'}`;
   return `
     <div class="mm-doc">
-      <div class="mm-doc-ico"><span class="material-symbols-outlined">${docIcon(d)}</span></div>
+      <div class="mm-doc-ico" style="background:${docTint(d)}; color:#fff;"><span class="material-symbols-outlined">${docIcon(d)}</span></div>
       <div class="mm-doc-main">
         <div class="mm-doc-name">${esc(d.filename)}</div>
         <div class="mm-doc-meta">
@@ -1924,12 +2099,28 @@ function docRow(d, actions) {
     </div>`;
 }
 
+/** Opens a link in a new tab. The opener and referrer are cut — it is someone else's site. */
+function openLinkBtn(d) {
+  return `<a class="mm-icon-btn" href="${esc(d.href)}" target="_blank" rel="noopener noreferrer" title="Open ${esc(d.href)}">
+    <span class="material-symbols-outlined">open_in_new</span></a>`;
+}
+
+/** Download works for every document: the original, or its text when no original was kept. */
+function downloadBtn(d) {
+  if (d.kind === 'link') return '';
+  if (!d.url && !d.chars) return '';
+  return `<button class="mm-icon-btn" data-act="downloadDoc" data-arg="${esc(d.docId)}"
+      title="${d.url ? 'Download the file' : 'Download its text (.txt) — the original was not kept'}">
+    <span class="material-symbols-outlined">download</span></button>`;
+}
+
 function renderNodeDocs(n) {
   const mine = docsOn(n.node_id);
   const host = document.getElementById('mmNodeDocs');
   host.innerHTML = mine.length
     ? mine.map(d => docRow(d, `
-        ${d.kind === 'text'
+        ${d.kind === 'link' ? openLinkBtn(d)
+          : d.kind === 'text'
           // A note is meant to be revised — an upload can only be replaced.
           ? `<button class="mm-icon-btn" data-act="editNote" data-arg="${esc(d.docId)}" title="Edit this note">
                <span class="material-symbols-outlined">edit</span></button>`
@@ -1938,6 +2129,7 @@ function renderNodeDocs(n) {
         ${d.url ? `<button class="mm-icon-btn" data-act="openOriginal" data-arg="${esc(d.docId)}"
             title="Open the original file">
           <span class="material-symbols-outlined">open_in_new</span></button>` : ''}
+        ${downloadBtn(d)}
         <button class="mm-icon-btn" data-act="removeDoc" data-arg="${esc(d.docId)}" title="Remove">
           <span class="material-symbols-outlined">close</span></button>`)).join('')
     : '<div class="mm-empty-note">Nothing attached yet. A document you upload or a note you write here becomes the source the AI answers this node from.</div>';
@@ -1946,9 +2138,10 @@ function renderNodeDocs(n) {
   const inherited = inheritedDocsFor(n.node_id).filter(d => d.nodeId !== n.node_id);
   const below = document.getElementById('mmInheritedDocs');
   below.innerHTML = inherited.length
-    ? '<div class="mm-label">Inherited from above</div>' + inherited.map(d => docRow(d, `
+    ? '<div class="mm-label">Inherited from above</div>' + inherited.map(d => docRow(d, d.kind === 'link' ? openLinkBtn(d) : `
         <button class="mm-icon-btn" data-act="viewDoc" data-arg="${esc(d.docId)}" title="View extracted text">
-          <span class="material-symbols-outlined">visibility</span></button>`)).join('')
+          <span class="material-symbols-outlined">visibility</span></button>
+        ${downloadBtn(d)}`)).join('')
     : '';
 
   document.getElementById('mmDocCount').textContent = String(mine.length + inherited.length);
@@ -2085,6 +2278,28 @@ async function openOriginal(docId) {
     if (tab) tab.close();
     toast('Could not open the original: ' + e.message);
   }
+}
+
+/** Save a document to disk. Authenticated like openOriginal, so it goes through a blob too. */
+async function downloadDoc(docId) {
+  if (!docId) return;
+  try {
+    const res = await fetch(API + '/api/mind-maps/docs/' + encodeURIComponent(docId) + '/file?download=1', {
+      headers: { Authorization: 'Bearer ' + TOKEN }
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || ('HTTP ' + res.status));
+    }
+    const cd = res.headers.get('content-disposition') || '';
+    const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+    const plain = /filename="([^"]+)"/i.exec(cd);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = star ? decodeURIComponent(star[1]) : (plain ? plain[1] : 'document');
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) { toast('Could not download: ' + e.message); }
 }
 
 // drag & drop straight onto the node's source list
@@ -2730,6 +2945,272 @@ async function exportMap(format) {
   } catch (e) { toast('Export failed: ' + e.message); }
 }
 
+// ── bundle: the portable file (see backend services/cognitive/mindMapBundle.js)
+// A .zip holding a JSON Canvas map, every attached document, and the lossless
+// finchat-map.json an import reads back. Fetched as a blob: api() would read
+// the zip as text and mangle it.
+async function exportBundle() {
+  document.getElementById('mmExportMenu').classList.remove('open');
+  if (!MAP) { toast('Open a map first'); return; }
+  toast('Packing the map and its documents…');
+  try {
+    const res = await fetch(`${API}/api/mind-maps/${MAP.map.map_id}/export?format=bundle`, {
+      headers: { Authorization: 'Bearer ' + TOKEN }
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || ('HTTP ' + res.status));
+    }
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = name ? name[1] : 'mind-map.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) { toast('Export failed: ' + e.message); }
+}
+
+function pickImport() { document.getElementById('mmImportInput').click(); }
+
+async function importBundleFile(file) {
+  if (!file) return;
+  const btn = document.getElementById('mmImportBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="mm-spin dark"></span>';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const out = await apiUpload('/api/mind-maps/import', fd);
+    const lost = (out.dropped && (out.dropped.nodes || out.dropped.docs))
+      ? ` (skipped ${out.dropped.nodes || 0} broken node(s), ${out.dropped.docs || 0} empty document(s))` : '';
+    toast(`Imported ${out.nodes} nodes and ${out.docs} document${out.docs === 1 ? '' : 's'}${lost}`);
+    await openMap(out.mapId);
+  } catch (e) { toast('Import failed: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = original;
+}
+document.getElementById('mmImportInput').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  importBundleFile(f);
+});
+
+// ── share links ──────────────────────────────────────────────────
+let SHARES = [];
+
+function shareUrl(s) { return location.origin + s.path; }
+
+async function openShare() {
+  if (!MAP) { toast('Open a map first'); return; }
+  document.getElementById('mmShareModal').classList.add('open');
+  document.getElementById('mmShareList').innerHTML =
+    '<div style="font-size:12px; color:var(--mm-muted);">Loading…</div>';
+  try {
+    SHARES = (await api(`/api/mind-maps/${MAP.map.map_id}/shares`)).shares || [];
+    renderShares();
+  } catch (e) {
+    document.getElementById('mmShareList').innerHTML =
+      `<div style="font-size:12px; color:var(--mm-muted);">Could not load links: ${esc(e.message)}</div>`;
+  }
+}
+function closeShare() { document.getElementById('mmShareModal').classList.remove('open'); }
+
+function renderShares() {
+  const list = document.getElementById('mmShareList');
+  if (!SHARES.length) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--mm-muted);">No links yet.</div>';
+    return;
+  }
+  const when = d => d ? new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  list.innerHTML = SHARES.map(s => {
+    const status = s.revokedAt ? 'Revoked ' + when(s.revokedAt)
+      : !s.active ? 'Expired ' + when(s.expiresAt)
+      : s.expiresAt ? 'Expires ' + when(s.expiresAt) : 'No expiry';
+    const bits = [status, s.includeDocs ? 'with documents' : 'map only',
+      `${s.viewCount} view${s.viewCount === 1 ? '' : 's'}`];
+    return `
+      <div style="border:1px solid var(--mm-line); border-radius:12px; padding:9px 11px;
+                  background:var(--mm-surface2); ${s.active ? '' : 'opacity:.55;'}">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input class="mm-field" readonly value="${esc(shareUrl(s))}"
+                 style="flex:1; min-width:0; font-size:11.5px; padding:6px 9px; margin:0;">
+          ${s.active ? `
+            <button class="mm-btn" style="padding:6px 9px;" data-act="copyShare" data-arg="${esc(s.shareId)}" title="Copy link">
+              <span class="material-symbols-outlined">content_copy</span></button>
+            <button class="mm-btn" style="padding:6px 9px;" data-act="revokeShare" data-arg="${esc(s.shareId)}" title="Revoke — the link stops working">
+              <span class="material-symbols-outlined">link_off</span></button>` : ''}
+        </div>
+        <div style="font-size:11.5px; color:var(--mm-muted); margin-top:5px;">${esc(bits.join(' · '))}</div>
+      </div>`;
+  }).join('');
+}
+
+async function createShare() {
+  if (!MAP) return;
+  const btn = document.getElementById('mmShareCreate');
+  btn.disabled = true;
+  try {
+    const expiry = document.getElementById('mmShareExpiry').value;
+    const { share } = await api(`/api/mind-maps/${MAP.map.map_id}/shares`, {
+      method: 'POST',
+      body: JSON.stringify({
+        includeDocs: document.getElementById('mmShareDocs').checked,
+        expiresInDays: expiry ? Number(expiry) : null
+      })
+    });
+    SHARES.unshift(share);
+    renderShares();
+    await copyShare(share.shareId);
+  } catch (e) { toast('Could not create a link: ' + e.message); }
+  btn.disabled = false;
+}
+
+async function copyShare(shareId) {
+  const s = SHARES.find(x => x.shareId === shareId);
+  if (!s) return;
+  try {
+    await navigator.clipboard.writeText(shareUrl(s));
+    toast('Link copied');
+    return;
+  } catch (e) { /* refused: insecure context, or the window lost focus */ }
+  // execCommand still works where the async clipboard is refused, as long as
+  // the text is selected in a field.
+  const field = [...document.querySelectorAll('#mmShareList input')].find(i => i.value === shareUrl(s));
+  if (field) { field.focus(); field.select(); }
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  toast(ok ? 'Link copied' : 'Copy the link from the box');
+}
+
+async function revokeShare(shareId) {
+  const ok = await askConfirm({
+    title: 'Revoke this link?',
+    body: 'Anyone who has it will get "link not valid" from now on. This cannot be undone — create a new link to share again.',
+    okLabel: 'Revoke'
+  });
+  if (!ok) return;
+  try {
+    const { share } = await api(`/api/mind-maps/${MAP.map.map_id}/shares/${encodeURIComponent(shareId)}`, { method: 'DELETE' });
+    SHARES = SHARES.map(s => s.shareId === shareId ? share : s);
+    renderShares();
+    toast('Link revoked');
+  } catch (e) { toast('Could not revoke: ' + e.message); }
+}
+
+// ── links on a node: paste them, or find Drive files by name ─────
+// POST /api/mind-maps/docs/links. Links are stored as documents of kind 'link';
+// nothing is fetched from them (services/linkInfo.js).
+let driveTimer = null, driveSeq = 0, driveFiles = [];
+
+function openLinks() {
+  if (!SELECTED) { toast('Select a node first'); return; }
+  const n = NODES.get(SELECTED);
+  document.getElementById('mmLinksUnder').textContent = 'On “' + (n ? n.label : 'this node') + '”';
+  document.getElementById('mmLinksText').value = '';
+  document.getElementById('mmDriveQ').value = '';
+  document.getElementById('mmDriveOut').innerHTML = 'Searches file names only — FinChat never reads what\'s inside your files.';
+  document.getElementById('mmLinksModal').classList.add('open');
+  setTimeout(() => document.getElementById('mmLinksText').focus(), 60);
+}
+function closeLinks() { document.getElementById('mmLinksModal').classList.remove('open'); }
+
+async function postLinks(body) {
+  const out = await api('/api/mind-maps/docs/links', {
+    method: 'POST', body: JSON.stringify({ mapId: MAP.map.map_id, nodeId: SELECTED, ...body })
+  });
+  await reloadDocs();
+  return out;
+}
+
+async function attachPastedLinks() {
+  const text = document.getElementById('mmLinksText').value;
+  if (!text.trim()) { toast('Paste at least one link'); return; }
+  const btn = document.getElementById('mmLinksAttach');
+  btn.disabled = true;
+  try {
+    const out = await postLinks({ text });
+    toast(`Attached ${out.docs.length} link${out.docs.length === 1 ? '' : 's'}` +
+      (out.rejected && out.rejected.length ? ` — ${out.rejected.length} not a valid link` : ''));
+    closeLinks();
+  } catch (e) { toast('Could not attach: ' + e.message); }
+  btn.disabled = false;
+}
+
+async function searchDrive() {
+  const q = document.getElementById('mmDriveQ').value.trim();
+  const out = document.getElementById('mmDriveOut');
+  const mine = ++driveSeq;
+  out.textContent = 'Searching…';
+  try {
+    // Raw fetch, not api(): the error CODE decides between "connect Drive"
+    // and a plain failure, and api() keeps only the message.
+    const res = await fetch(API + '/api/integrations/google/drive/search?q=' + encodeURIComponent(q), {
+      headers: { Authorization: 'Bearer ' + TOKEN }
+    });
+    const body = await res.json().catch(() => ({}));
+    if (mine !== driveSeq) return;
+    if (!res.ok) {
+      out.innerHTML = body.code === 'not_connected' || body.code === 'not_configured'
+        ? `${esc(body.error)} <a href="finchat_settings.html" style="color:var(--mm-accent); font-weight:700;">Open Settings</a>`
+        : esc(body.error || 'Drive search failed');
+      return;
+    }
+    driveFiles = body.files || [];
+    out.innerHTML = driveFiles.length ? driveFiles.map((f, i) => `
+      <button class="mm-doc" data-act="pickDriveFile" data-arg="${i}" style="width:100%; text-align:left; cursor:pointer; font-family:inherit;">
+        <div class="mm-doc-ico" style="background:#fff; border:1px solid var(--mm-line);">${f.iconLink
+          ? `<img alt="" src="${esc(f.iconLink)}" referrerpolicy="no-referrer" style="width:16px; height:16px;">`
+          : '<span class="material-symbols-outlined">draft</span>'}</div>
+        <div class="mm-doc-main"><div class="mm-doc-name">${esc(f.title)}</div>
+          <div class="mm-doc-meta">${esc(f.kindLabel)}${f.modifiedTime ? ' · edited ' + esc(new Date(f.modifiedTime).toLocaleDateString()) : ''}</div></div>
+        <span class="material-symbols-outlined" style="color:var(--mm-accent)">add_link</span>
+      </button>`).join('') : 'No files with that in the name.';
+  } catch (e) {
+    if (mine === driveSeq) out.textContent = 'Drive search failed: ' + e.message;
+  }
+}
+document.getElementById('mmDriveQ').addEventListener('input', () => {
+  clearTimeout(driveTimer);
+  driveTimer = setTimeout(searchDrive, 300);
+});
+
+async function pickDriveFile(i) {
+  const f = driveFiles[Number(i)];
+  if (!f) return;
+  try {
+    await postLinks({ links: [{ url: f.url, title: f.title }] });
+    toast('Attached ' + f.title);
+  } catch (e) { toast('Could not attach: ' + e.message); }
+}
+
+// ── this map as a Kanban board ───────────────────────────────────
+async function makeBoard() {
+  if (!MAP) { toast('Open a map first'); return; }
+  // A map already turned into a board opens that board — every click used to
+  // mint another copy.
+  try {
+    const { boards } = await api('/api/boards');
+    const mine = (boards || []).find(b => b.sourceMapId === MAP.map.map_id);
+    if (mine) { location.href = 'finchat_boards.html?board=' + encodeURIComponent(mine.boardId); return; }
+  } catch (e) { /* fall through to building one */ }
+  const ok = await askConfirm({
+    title: 'Make a board from this map?',
+    body: 'A new Kanban board: the branches become columns, the nodes under them become cards, and attached files and links come along.',
+    detail: 'The map itself is not changed.',
+    okLabel: 'Make board', danger: false
+  });
+  if (!ok) return;
+  const btn = document.getElementById('mmMakeBoardBtn');
+  btn.disabled = true;
+  toast('Building the board…');
+  try {
+    const out = await api('/api/boards/from-map', { method: 'POST', body: JSON.stringify({ mapId: MAP.map.map_id, reuse: true }) });
+    location.href = 'finchat_boards.html?board=' + encodeURIComponent(out.boardId);
+  } catch (e) {
+    toast('Could not build the board: ' + e.message);
+    btn.disabled = false;
+  }
+}
+
 // ── PNG export ───────────────────────────────────────────────────
 /**
  * Drawn onto a canvas rather than serialised from the SVG. Serialising means
@@ -2744,10 +3225,10 @@ async function exportPng() {
   const css = getComputedStyle(document.documentElement);
   const C = k => css.getPropertyValue(k).trim();
   const col = {
-    bg: C('--mm-canvas') || '#f0e4cf', surface: C('--mm-surface') || '#fff',
-    line: C('--mm-line2') || '#d9c7a6', accent: C('--mm-accent') || '#c67139',
-    gold: C('--mm-gold') || '#d4af37', fg: C('--mm-fg') || '#2b2118',
-    muted: C('--mm-muted') || '#8a7d6a'
+    bg: C('--mm-canvas') || '#f5f6f8', surface: C('--mm-surface') || '#fff',
+    line: C('--mm-line2') || '#cfd3da', accent: C('--mm-accent') || '#4262ff',
+    gold: C('--mm-gold') || '#fac710', fg: C('--mm-fg') || '#1c1f26',
+    muted: C('--mm-muted') || '#7c8392', root: C('--mm-root') || '#1c1f26'
   };
 
   const vis = visibleNodes();
@@ -2767,7 +3248,7 @@ async function exportPng() {
 
   // header
   ctx.fillStyle = col.fg;
-  ctx.font = '700 26px Caprasimo, Georgia, serif';
+  ctx.font = '800 26px Figtree, system-ui, sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillText(MAP.map.title || 'Mind map', b.minX + 34, b.minY - 44);
   ctx.fillStyle = col.muted;
@@ -2777,11 +3258,13 @@ async function exportPng() {
 
   const shown = new Set(vis.map(n => n.node_id));
 
-  // hierarchy links
-  ctx.strokeStyle = col.line; ctx.lineWidth = 1.6;
+  // hierarchy links, in their branch colour as on screen
+  ctx.lineWidth = 2.2; ctx.lineCap = 'round';
   for (const n of vis) {
     if (!n.parent_id || !shown.has(n.parent_id)) continue;
     const p = NODES.get(n.parent_id), mx = (p.x + n.x) / 2;
+    const ps = nodePaint(n);
+    ctx.strokeStyle = ps ? ps.link : col.line;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
     ctx.bezierCurveTo(mx, p.y, mx, n.y, n.x, n.y);
@@ -2806,14 +3289,15 @@ async function exportPng() {
     const nw = nodeWidth(n), nh = nodeHeight(n);
     const x = n.x - nw / 2, y = n.y - nh / 2;
     const isRoot = n.node_type === 'root';
+    const ps = nodePaint(n);
     roundRect(ctx, x, y, nw, nh, nh / 2);
-    ctx.fillStyle = n.color || (isRoot ? col.accent : col.surface);
+    ctx.fillStyle = ps ? ps.fill : (isRoot ? col.root : col.surface);
     ctx.fill();
-    ctx.strokeStyle = n.color || (isRoot ? col.accent : col.line);
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = ps ? ps.stroke : (isRoot ? col.root : col.line);
+    ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    ctx.fillStyle = isRoot ? '#ffffff' : col.fg;
+    ctx.fillStyle = ps && ps.text ? ps.text : (isRoot ? col.bg : col.fg);
     ctx.font = `700 ${isRoot ? 14 : 12.5}px Figtree, system-ui, sans-serif`;
     const docs = docsOn(n.node_id).length;
     const max = docs ? 21 : 24;
@@ -3006,7 +3490,7 @@ async function doGenerate() {
 function onDocKeydown(e) {
   if (e.key === 'Escape') {
     closeCtxMenu(); closeGenerate(); closeChildForm(); closeDoc();
-    closeNoteForm(); closeEnrich();
+    closeNoteForm(); closeEnrich(); closeShare(); closeLinks();
     if (!document.querySelector('.mm-modal.open')) closePanel();
     return;
   }
@@ -3030,7 +3514,10 @@ const MM_ACTIONS = {
   // topbar / rail
   toggleNav, toggleTheme, fitToScreen, toggleExportMenu: (el, e) => toggleExportMenu(e),
   presentStep: (el) => presentStep(Number(el.dataset.arg)),
-  exportPng, exportMap: (el) => exportMap(el.dataset.arg),
+  exportPng, exportMap: (el) => exportMap(el.dataset.arg), exportBundle, pickImport,
+  openShare, closeShare, createShare, makeBoard,
+  openLinks, closeLinks, attachPastedLinks, pickDriveFile: (el) => pickDriveFile(el.dataset.arg),
+  copyShare: (el) => copyShare(el.dataset.arg), revokeShare: (el) => revokeShare(el.dataset.arg),
   // list + generate modal
   openGenerate, closeGenerate, doGenerate, pickGenFiles,
   pickSource: (el) => pickSource(el.dataset.arg),
@@ -3044,6 +3531,7 @@ const MM_ACTIONS = {
   // documents
   pickNodeFiles, viewDoc: (el) => viewDoc(el.dataset.arg), closeDoc,
   openOriginal: (el) => openOriginal(el.dataset.arg),
+  downloadDoc: (el) => downloadDoc(el.dataset.arg),
   removeDoc: (el) => removeDoc(el.dataset.arg), buildMapFromNodeDocs,
   // chat + gaps
   seedAsk, sendChat, composerToMap, dropChip: (el) => dropChip(el.dataset.arg),

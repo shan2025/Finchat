@@ -17,6 +17,7 @@
 // calls to mint the credential. They are listed even when GOOGLE_CLIENT_ID is
 // unset — the header is static, and an origin nothing loads from costs nothing.
 const GOOGLE_GSI = 'https://accounts.google.com';
+const EMBED_ORIGINS = ['https://www.youtube-nocookie.com', 'https://docs.google.com', 'https://drive.google.com'];
 
 module.exports = {
   defaultSrc: ["'self'"],
@@ -33,7 +34,13 @@ module.exports = {
   connectSrc: ["'self'", 'ws:', 'wss:', GOOGLE_GSI],
   // GIS renders the button and the One Tap prompt inside an iframe. Without
   // this it inherits default-src 'self' and the button never paints.
-  frameSrc: ["'self'", GOOGLE_GSI],
+  // The other three are link previews on mind map nodes and board cards
+  // (services/linkInfo.js builds the embed URLs): YouTube through its
+  // no-cookie player, and Google's own Docs/Drive preview pages. Named hosts
+  // only — never https: wholesale, which would let any pasted page be framed.
+  frameSrc: ["'self'", GOOGLE_GSI, ...EMBED_ORIGINS],
+  // <video> previews of pasted .mp4/.webm links. Media cannot run script.
+  mediaSrc: ["'self'", 'https:'],
   frameAncestors: ["'none'"],
   objectSrc: ["'none'"],
   baseUri: ["'self'"],

@@ -188,6 +188,64 @@ const TOOLS = {
     rateLimitPerMinute: 10
   },
 
+  drive: {
+    name: 'drive',
+    description: 'Find the user\'s Google Drive files BY NAME and get their links. {"action":"find","names":["Duxbe POS spec","Q3 budget"]} resolves several names at once — best match per name plus alternatives; {"action":"search","query":"onboarding deck"} lists matching files, newest first (an empty query lists recently modified files); {"action":"status"} says whether Drive is connected. Returns titles, links, file types and modified dates. It sees names and links ONLY — it cannot open, read or summarise what is inside a file, so never claim to have read one. Never invent a link: if a name has no match, say so and offer the alternatives. If it reports connected:false, ask the user to connect Google Drive in Settings → Connected accounts; you cannot do that for them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'find | search | status' },
+        names: { type: 'array', description: 'For find: the file names the user mentioned' },
+        query: { type: 'string', description: 'For search: words that appear in the file name' },
+        limit: { type: 'number', description: 'For search: max files (default 10, max 25)' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        results: { type: 'array', description: 'For find: name, found {title,url,type}, alternatives' },
+        files: { type: 'array', description: 'For search: title, url, type, modified' }
+      }
+    },
+    cacheTTLSeconds: 0, // a Drive changes constantly — never cache
+    rateLimitPerMinute: 20
+  },
+
+  boards: {
+    name: 'boards',
+    description: 'Read and fill the user\'s Kanban boards. Boards, columns and cards are named by title or id. {"action":"list"}; {"action":"get","board":"Duxbe"} shows columns and cards with their tags, dates and attachments; {"action":"create_board","title":"Duxbe launch","columns":["Restaurant","POS","Services"]}; {"action":"add_card","board":"Duxbe","column":"POS","title":"Inventory","summary":"…","tags":["Core","Operations"],"priority":"high","startDate":"2026-10-01","endDate":"2026-10-31","driveNames":["Duxbe POS spec"]}; {"action":"update_card","board":"Duxbe","card":"Inventory","column":"Done"} moves or edits a card; {"action":"attach","board":"Duxbe","card":"Inventory","links":["https://…"],"driveNames":["Q3 pricing sheet"]} puts links on a card. driveNames are looked up in the user\'s Google Drive by name — only real matches are attached, and names with no match come back in notFoundInDrive: tell the user, never invent a link. Priority is high | medium | low; dates are YYYY-MM-DD.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'list | get | create_board | add_card | update_card | attach' },
+        board: { type: 'string', description: 'Board title or id' },
+        column: { type: 'string', description: 'Column title or id (add_card, or update_card to move)' },
+        card: { type: 'string', description: 'Card title or id (update_card, attach)' },
+        title: { type: 'string' },
+        summary: { type: 'string' },
+        tags: { type: 'array', description: 'Tag labels, e.g. ["Core","High"]' },
+        priority: { type: 'string', description: 'high | medium | low' },
+        startDate: { type: 'string', description: 'YYYY-MM-DD' },
+        endDate: { type: 'string', description: 'YYYY-MM-DD' },
+        columns: { type: 'array', description: 'For create_board: column titles' },
+        links: { type: 'array', description: 'URLs to attach' },
+        driveNames: { type: 'array', description: 'Google Drive file names to find and attach' }
+      },
+      required: ['action']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        attached: { type: 'array' },
+        notFoundInDrive: { type: 'array' },
+        cards: { type: 'array' }
+      }
+    },
+    cacheTTLSeconds: 0,
+    rateLimitPerMinute: 30
+  },
+
   portfolio: {
     name: 'portfolio',
     description: 'The user\'s ACTUAL holdings, priced live and totalled in INR (₹) — "watchlist" is only what they follow. Positions come from their connected brokerage accounts (Binance, Zerodha) and from anything recorded by hand; each carries "heldAt" saying which. {"action":"value"} is the full review: refreshes what it can, then returns per-position value and weight, allocation, unrealized P/L, a "sources" list with each account\'s freshness, and "flags". READ THE FLAGS AND REPORT THEM — Zerodha only refreshes when the user logs in, so its numbers are often from the last sync, and presenting stale figures as current is the one failure that matters here. {"action":"sync"} forces a refresh and says which accounts need the user to log in again. {"action":"history","days":30} answers "am I growing" from recorded daily snapshots (change since last, 7/30-day, peak, drawdown, movers) — read its "currency" field rather than assuming. Call "value" before "history"; never estimate past performance from memory. {"action":"add","symbol":"BTC","quantity":0.5,"avgCost":42000} records what the user tells you — never guess a quantity, ask. Also "list" and "remove" (manual entries only). If empty with nothing connected, say so and mention Settings; never review a hypothetical portfolio as theirs. Reads and records only — it NEVER places an order, and the stored Binance key is verified incapable of trading.',

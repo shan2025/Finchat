@@ -158,7 +158,10 @@ describe('CSP admits the Google button', () => {
   });
 
   test('frame-src does not silently widen the policy', () => {
-    assert.deepStrictEqual(csp.frameSrc, ["'self'", GSI]);
+    // GSI, plus the three link-preview hosts (YouTube no-cookie, Docs, Drive)
+    // added deliberately for mind map / board embeds. Never https: wholesale.
+    assert.deepStrictEqual(csp.frameSrc, ["'self'", GSI,
+      'https://www.youtube-nocookie.com', 'https://docs.google.com', 'https://drive.google.com']);
     assert.deepStrictEqual(csp.frameAncestors, ["'none'"], 'we still refuse to be framed');
   });
 

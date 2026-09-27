@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- The share token rides in the URL fragment; this keeps links clicked from
+     here from carrying the page URL along as a Referer. -->
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Shared board | FinChat</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<!--
+  Read-only view of a board share link (routes/sharedBoards.js). No login, no
+  app shell — whoever opens this may have no FinChat account. Rendering is the
+  owner page's own (board_ui.js), so the board looks exactly as its owner sees it.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="board_ui.css">
+<style>
+html, body { height: 100%; margin: 0; }
+body { overflow: hidden; background: #f5f6f8; }
+body[data-theme="dark"] { background: #16181d; }
+#stage { position: fixed; inset: 0; overflow: auto; padding: 84px 28px 80px; }
+#zoomWrap { display: inline-block; min-width: 100%; }
+.topl { position: fixed; top: 14px; left: 14px; z-index: 30; max-width: calc(100% - 28px); padding: 6px 10px 6px 6px; }
+.topr { position: fixed; top: 14px; right: 14px; z-index: 30; }
+.zoombar { position: fixed; right: 14px; bottom: 14px; z-index: 30; }
+.brand-dot { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #4262ff, #6631d7 55%, #e84fa7);
+  display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: none; }
+.title { font-weight: 800; font-size: 16px; margin: 0 4px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.view-only { font-size: 11.5px; font-weight: 700; color: var(--bx-muted); background: var(--bx-surface-2); border: 1px solid var(--bx-line);
+  border-radius: 99px; padding: 3px 9px; white-space: nowrap; }
+.search { border: 1px solid var(--bx-line); background: var(--bx-surface-2); border-radius: 9px; height: 38px; padding: 0 10px 0 34px;
+  font: 500 13.5px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg); width: 190px; outline: none; }
+.search:focus { border-color: var(--bx-blue); background: var(--bx-surface); }
+.search-wrap { position: relative; }
+.search-wrap .material-symbols-outlined { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--bx-muted); font-size: 18px; }
+.zoom-pct { min-width: 52px; text-align: center; font-weight: 700; font-size: 13px; color: var(--bx-fg-2); }
+.foot { position: fixed; left: 14px; bottom: 18px; font-size: 12px; color: var(--bx-muted); z-index: 20; }
+.bx-card { cursor: pointer; }
+@media (max-width: 640px) {
+  #stage { padding: 128px 12px 70px; }
+  .topr { top: 70px; }
+  .search { width: 140px; }
+  .foot { display: none; }
+}
+</style>
+</head>
+<body class="bx">
+<div id="stage" class="bx-canvas"><div id="zoomWrap"><div id="content"><div class="bx-empty">Loading…</div></div></div></div>
+
+<div class="bx-float topl">
+  <span class="brand-dot"><span class="material-symbols-outlined" style="font-size:17px">view_kanban</span></span>
+  <span class="title" id="title">Shared board</span>
+  <span class="view-only">View only</span>
+</div>
+<div class="bx-float topr">
+  <div class="search-wrap"><span class="material-symbols-outlined">search</span><input class="search" id="search" placeholder="Search cards" autocomplete="off"></div>
+  <button class="bx-btn ghost" id="filesBtn" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
+  <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
+</div>
+<div class="bx-float zoombar">
+  <button class="bx-ibtn" id="zoomOut" title="Zoom out"><span class="material-symbols-outlined">remove</span></button>
+  <span class="zoom-pct" id="zoomPct">100%</span>
+  <button class="bx-ibtn" id="zoomIn" title="Zoom in"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="foot">Shared from FinChat</div>
+
+<aside class="bx-drawer" id="drawer">
+  <div class="bx-drawer-head">
+    <span class="where" id="dWhere"></span>
+    <button class="bx-ibtn" id="dClose" title="Close (Esc)"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div class="bx-drawer-body" id="dBody"></div>
+</aside>
+
+<script src="board_ui.js"></script>
+<script>
+(() => {
+  const U = window.BoardUI;
+  const { esc } = U;
+  const $ = (id) => document.getElementById(id);
+  const TOKEN = location.hash.slice(1);
+  const API = `/api/shared/boards/${encodeURIComponent(TOKEN)}`;
+  let B = null;
+  let SELECTED = null;
+  let ZOOM = 1;
+
+  // theme: the reader's own choice, else their system's.
+  let theme = null;
+  try { theme = localStorage.getItem('finchat_board_theme'); } catch (e) {}
+  if (!theme) theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => { document.body.setAttribute('data-theme', theme); $('themeBtn').firstElementChild.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode'; };
+  applyTheme();
+  $('themeBtn').addEventListener('click', () => { theme = theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('finchat_board_theme', theme); } catch (e) {} applyTheme(); });
+
+  const fileUrl = (a, download) => `${API}/attachments/${encodeURIComponent(a.attachmentId)}/file${download ? '?download=1' : ''}`;
+  const adapter = {
+    async blobUrl(a) { return fileUrl(a, false); },
+    async text(a) {
+      const r = await fetch(`${API}/attachments/${encodeURIComponent(a.attachmentId)}`);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || 'HTTP ' + r.status);
+      return b.attachment.text;
+    },
+    async download(a) {
+      const name = await U.saveResponse(await fetch(fileUrl(a, true)), a.filename);
+      U.toast('Downloading ' + name);
+    }
+  };
+
+  function fail(title, body) {
+    $('content').innerHTML = `<div class="bx-empty"><span class="material-symbols-outlined" style="font-size:44px; opacity:.4">link_off</span>
+      <h2>${esc(title)}</h2><div>${esc(body)}</div></div>`;
+  }
+
+  async function load() {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(TOKEN)) return fail('This link is incomplete', 'The address is missing its key. Ask whoever shared it to copy the link again.');
+    let res;
+    try { res = await fetch(API); } catch (e) { return fail('Could not reach FinChat', 'Check your connection and reload.'); }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return fail('This link is not available', body.error || 'It may have been revoked or expired.');
+    B = body;
+    document.title = `${B.board.title} | FinChat`;
+    $('title').textContent = B.board.title;
+    const n = B.attachments.filter(a => !a.cardId).length;
+    $('filesBtn').hidden = !n;
+    $('filesCount').textContent = `Files (${n})`;
+    render();
+  }
+
+  const attsOf = (id) => B.attachments.filter(a => a.cardId === id);
+
+  function render() {
+    const q = $('search').value.trim().toLowerCase();
+    const match = (k) => !q || [k.title, k.summary, k.detail, ...(k.tags || []).map(t => t.label), ...attsOf(k.cardId).map(a => a.filename)]
+      .some(s => String(s || '').toLowerCase().includes(q));
+    const cols = B.columns.slice().sort((a, b) => a.order - b.order);
+    $('content').innerHTML = `<div class="bx-board">${cols.map(c => {
+      const cards = B.cards.filter(k => k.columnId === c.columnId).sort((a, b) => a.order - b.order);
+      const shown = cards.filter(match);
+      return `<section class="bx-col">
+        <div class="bx-col-head"><span class="bx-pill" style="background:${esc(c.color || '#eceff3')}">${esc(c.title)}</span>
+          <span class="bx-count">${q ? shown.length + '/' : ''}${cards.length}</span></div>
+        <div class="bx-cards">${shown.map(k => U.cardHTML(k, attsOf(k.cardId), { selected: k.cardId === SELECTED })).join('')
+          || '<div class="bx-hint" style="padding:4px 6px">No cards</div>'}</div>
+      </section>`;
+    }).join('')}</div>`;
+    document.querySelectorAll('img[data-thumb]').forEach(img => { img.src = fileUrl({ attachmentId: img.dataset.thumb }, false); });
+  }
+
+  function openCard(id) {
+    const k = B.cards.find(c => c.cardId === id);
+    if (!k) return;
+    SELECTED = id;
+    document.querySelectorAll('.bx-card').forEach(el => el.classList.toggle('sel', el.dataset.card === id));
+    const col = B.columns.find(c => c.columnId === k.columnId);
+    $('dWhere').textContent = col ? col.title : '';
+    const range = U.dateRange(k.startDate, k.endDate);
+    const atts = attsOf(id);
+    const meta = [range ? `<span class="bx-date"><span class="material-symbols-outlined">calendar_today</span>${esc(range)}</span>` : '',
+      ...(k.tags || []).map(t => U.tagChip(t)), k.priority ? U.prioChip(k.priority) : ''].filter(Boolean).join('');
+    $('dBody').innerHTML = `
+      <div style="font-size:21px; font-weight:800; line-height:1.3; word-break:break-word;">${esc(k.title)}</div>
+      ${meta ? `<div class="bx-meta" style="margin-top:10px">${meta}</div>` : ''}
+      ${k.summary ? `<div class="bx-label">Summary</div><div class="bx-read">${esc(k.summary)}</div>` : ''}
+      ${k.detail ? `<div class="bx-label">Details</div><div class="bx-read">${esc(k.detail)}</div>` : ''}
+      ${B.includeDocs ? `<div class="bx-label">Files &amp; links (${atts.length})</div>
+        <div id="dAtts">${atts.map(a => U.attachmentHTML(a)).join('') || '<div class="bx-hint">Nothing attached.</div>'}</div>`
+        : '<div class="bx-label">Files</div><div class="bx-hint">This link was shared without files.</div>'}`;
+    $('drawer').classList.add('open');
+  }
+
+  function openFiles() {
+    SELECTED = null;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    const atts = B.attachments.filter(a => !a.cardId);
+    $('dWhere').textContent = 'Board files';
+    $('dBody').innerHTML = `<div style="font-size:21px; font-weight:800">Board files</div>
+      <div class="bx-hint" style="margin-bottom:10px">Files and links for the whole board.</div>
+      <div id="dAtts">${atts.map(a => U.attachmentHTML(a)).join('')}</div>`;
+    $('drawer').classList.add('open');
+  }
+
+  $('content').addEventListener('click', (e) => {
+    const c = e.target.closest('.bx-card');
+    if (c) openCard(c.dataset.card);
+  });
+  $('dBody').addEventListener('click', async (e) => {
+    const v = e.target.closest('[data-view]');
+    const d = e.target.closest('[data-download]');
+    const a = B && B.attachments.find(x => x.attachmentId === ((v || d || {}).dataset || {})[v ? 'view' : 'download']);
+    if (!a) return;
+    if (v) U.togglePreview(e.target.closest('.bx-att'), a, adapter);
+    if (d) { try { await adapter.download(a); } catch (err) { U.toast('Download failed: ' + err.message); } }
+  });
+  $('filesBtn').addEventListener('click', openFiles);
+  $('dClose').addEventListener('click', () => { $('drawer').classList.remove('open'); SELECTED = null; render(); });
+  $('search').addEventListener('input', () => B && render());
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('drawer').classList.remove('open'); SELECTED = null; } });
+
+  function setZoom(z) {
+    ZOOM = Math.max(0.4, Math.min(1.6, Math.round(z * 10) / 10));
+    $('zoomWrap').style.zoom = ZOOM;
+    $('zoomPct').textContent = Math.round(ZOOM * 100) + '%';
+  }
+  $('zoomIn').addEventListener('click', () => setZoom(ZOOM + 0.1));
+  $('zoomOut').addEventListener('click', () => setZoom(ZOOM - 0.1));
+  $('stage').addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(ZOOM * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+  }, { passive: false });
+  window.addEventListener('hashchange', () => location.reload());
+
+  load();
+})();
+</script>
+</body>
+</html>

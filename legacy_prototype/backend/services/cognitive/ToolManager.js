@@ -33,6 +33,8 @@ const TOOL_IMPLEMENTATIONS = {
   mission: require('../../tools/MissionTool'),
   applications: require('../../tools/ApplicationsTool'),
   gmail: require('../../tools/GmailTool'),
+  drive: require('../../tools/DriveTool'),
+  boards: require('../../tools/BoardsTool'),
   notifications: require('../../tools/NotificationsTool'),
   neural_map: require('../../tools/NeuralMapTool'),
   system_status: require('../../tools/SystemStatusTool'),

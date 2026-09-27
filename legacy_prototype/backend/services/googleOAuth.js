@@ -6,17 +6,32 @@
 // mailbox, and therefore needs the client secret, a registered redirect URI, and
 // somewhere safe to keep what comes back.
 //
-// Scope is deliberately minimal and hard-coded: gmail.readonly, nothing else.
-// Not gmail.modify, not send. An agent that can send mail as the user is a
-// different risk category, and nothing here needs it — Rasha drafts, the human
-// sends. Widening this list is a decision, not a configuration change.
+// Scopes are deliberately minimal and hard-coded, one per FEATURE the user
+// switches on separately:
+//
+//   gmail  gmail.readonly — not gmail.modify, not send. An agent that can send
+//          mail as the user is a different risk category, and nothing here
+//          needs it — Rasha drafts, the human sends.
+//   drive  drive.metadata.readonly — file NAMES and links, never contents. It
+//          is what "attach the Duxbe POS spec" needs and no more.
+//
+// Each feature is granted with incremental authorisation, so connecting Drive
+// never asks for mail and vice versa; the stored grant's `scope` records what
+// the user actually said yes to. Widening a scope is a decision, not a
+// configuration change.
 const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { query } = require('../database');
 const { seal, open } = require('./secretBox');
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const FEATURE_SCOPES = {
+  gmail: 'https://www.googleapis.com/auth/gmail.readonly',
+  drive: 'https://www.googleapis.com/auth/drive.metadata.readonly'
+};
+// What a bare connect asks for — the original Gmail-only grant.
+const SCOPES = [FEATURE_SCOPES.gmail];
+const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -74,27 +89,49 @@ function assertConfigured() {
  * without trusting anything in the query string, and its signature is what makes
  * the callback resistant to being invoked with someone else's code.
  */
-function makeState(userId) {
-  return jwt.sign({ uid: userId, n: crypto.randomBytes(8).toString('hex') },
+function makeState(userId, features = ['gmail']) {
+  return jwt.sign({ uid: userId, f: features, n: crypto.randomBytes(8).toString('hex') },
     process.env.JWT_SECRET, { expiresIn: '10m', subject: 'google-oauth-state' });
 }
 
+/** The user a callback belongs to, or null. */
 function readState(state) {
+  const s = readStateFull(state);
+  return s ? s.uid : null;
+}
+
+/** The user AND the features they asked to connect — what the callback must verify was granted. */
+function readStateFull(state) {
   try {
     const payload = jwt.verify(state, process.env.JWT_SECRET, { subject: 'google-oauth-state' });
-    return payload.uid || null;
+    if (!payload.uid) return null;
+    const features = (Array.isArray(payload.f) ? payload.f : ['gmail']).filter(f => FEATURE_SCOPES[f]);
+    return { uid: payload.uid, features: features.length ? features : ['gmail'] };
   } catch (err) {
     return null;
   }
 }
 
-function buildAuthUrl(userId) {
+function normaliseFeatures(features) {
+  const list = (Array.isArray(features) ? features : [features]).filter(f => FEATURE_SCOPES[f]);
+  return list.length ? [...new Set(list)] : ['gmail'];
+}
+
+/** The scopes a set of features needs. */
+function scopesFor(features) {
+  return normaliseFeatures(features).map(f => FEATURE_SCOPES[f]);
+}
+
+function buildAuthUrl(userId, features = ['gmail']) {
   assertConfigured();
+  const want = normaliseFeatures(features);
   const params = new URLSearchParams({
     client_id: clientId(),
     redirect_uri: redirectUri(),
     response_type: 'code',
-    scope: SCOPES.join(' '),
+    // Only what this feature needs. include_granted_scopes below folds in
+    // whatever the user granted before, so the new token covers both.
+    scope: scopesFor(want).join(' '),
     // Without offline access Google returns no refresh token, and the
     // integration silently stops working an hour after it is connected.
     access_type: 'offline',
@@ -103,7 +140,7 @@ function buildAuthUrl(userId) {
     // token and no refresh token, and land in exactly that broken state.
     prompt: 'consent',
     include_granted_scopes: 'true',
-    state: makeState(userId)
+    state: makeState(userId, want)
   });
   return `${AUTH_URL}?${params.toString()}`;
 }
@@ -135,6 +172,13 @@ async function fetchEmail(accessToken) {
     });
     if (res.data && res.data.emailAddress) return res.data.emailAddress;
   } catch (err) { /* fall through to userinfo */ }
+  // A Drive-only grant: drive.metadata.readonly covers about.user.
+  try {
+    const res = await axios.get(DRIVE_ABOUT_URL, {
+      headers: { Authorization: `Bearer ${accessToken}` }, timeout: 10000
+    });
+    if (res.data && res.data.user && res.data.user.emailAddress) return res.data.user.emailAddress;
+  } catch (err) { /* fall through to userinfo */ }
   try {
     const res = await axios.get(USERINFO_URL, {
       headers: { Authorization: `Bearer ${accessToken}` }, timeout: 10000
@@ -143,6 +187,20 @@ async function fetchEmail(accessToken) {
   } catch (err) {
     return null; // cosmetic — the grant works without knowing the address
   }
+}
+
+/** Which features a stored scope string covers. */
+function featuresOf(scope) {
+  const granted = String(scope || '').split(/\s+/);
+  const out = {};
+  for (const [f, s] of Object.entries(FEATURE_SCOPES)) out[f] = granted.includes(s);
+  return out;
+}
+
+/** Has this user granted `feature` ('gmail' | 'drive')? */
+async function hasFeature(userId, feature) {
+  const row = await getGrant(userId);
+  return Boolean(row && featuresOf(row.scope)[feature]);
 }
 
 /** Persist a fresh grant. Called once, from the callback. */
@@ -270,9 +328,12 @@ async function status(userId) {
     connected: Boolean(row),
     email: row ? row.google_email : null,
     scope: row ? row.scope : null,
+    // Per feature — a grant can hold Gmail, Drive, or both.
+    features: featuresOf(row ? row.scope : ''),
     // Stated in the UI so "what does this let it do" is answerable without
     // reading the code.
     access: 'read-only, and only mail matching the job-alert filter',
+    driveAccess: 'file names and links only — never what is inside a file',
     connectedAt: row ? row.connected_at : null,
     lastUsedAt: row ? row.last_used_at : null,
     redirectUri: redirectUri()
@@ -280,6 +341,6 @@ async function status(userId) {
 }
 
 module.exports = {
-  SCOPES, isConfigured, redirectUri, buildAuthUrl, readState, exchangeCode,
-  storeGrant, getGrant, getAccessToken, touch, disconnect, status
+  SCOPES, FEATURE_SCOPES, scopesFor, isConfigured, redirectUri, buildAuthUrl, readState, readStateFull,
+  exchangeCode, storeGrant, getGrant, getAccessToken, touch, disconnect, status, featuresOf, hasFeature
 };

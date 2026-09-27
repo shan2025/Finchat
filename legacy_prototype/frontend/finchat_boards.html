@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boards | FinChat</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<!--
+  Kanban boards (routes/boards.js). Full-bleed, Miro-style: a white dotted
+  canvas, floating toolbars, colour in the cards. Rendering shared with the
+  public view lives in board_ui.js / board_ui.css.
+
+  Standalone page — not on the SPA router — so the canvas owns the whole
+  window the way a whiteboard should. Hand-written; not design-tool managed.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="board_ui.css">
+<style>
+html, body { height: 100%; margin: 0; }
+body { overflow: hidden; background: #f5f6f8; }
+body[data-theme="dark"] { background: #16181d; }
+#stage { position: fixed; inset: 0; overflow: auto; padding: 84px 28px 90px 86px; }
+#zoomWrap { display: inline-block; min-width: 100%; }
+.topl { position: fixed; top: 14px; left: 14px; z-index: 30; max-width: calc(100% - 28px); }
+.topr { position: fixed; top: 14px; right: 14px; z-index: 30; }
+.rail { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); z-index: 30; flex-direction: column; }
+.zoombar { position: fixed; right: 14px; bottom: 14px; z-index: 30; }
+.board-title { border: 1px solid transparent; background: none; font: 700 16px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg);
+  padding: 6px 8px; border-radius: 8px; width: 240px; max-width: 42vw; outline: none; text-overflow: ellipsis; }
+.board-title:hover { border-color: var(--bx-line); }
+.board-title:focus { border-color: var(--bx-blue); box-shadow: 0 0 0 3px var(--bx-blue-soft); }
+.brand { font-weight: 800; font-size: 17px; letter-spacing: -.01em; padding: 0 6px 0 4px; color: var(--bx-fg); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; }
+.brand-dot { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #4262ff, #6631d7 55%, #e84fa7);
+  display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; }
+.search { border: 1px solid var(--bx-line); background: var(--bx-surface-2); border-radius: 9px; height: 38px; padding: 0 10px 0 34px;
+  font: 500 13.5px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg); width: 200px; outline: none; }
+.search:focus { border-color: var(--bx-blue); background: var(--bx-surface); }
+.search-wrap { position: relative; }
+.search-wrap .material-symbols-outlined { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--bx-muted); font-size: 18px; }
+.zoom-pct { min-width: 52px; text-align: center; font-weight: 700; font-size: 13px; color: var(--bx-fg-2); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; max-width: 1100px; }
+.tile { background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 14px; padding: 16px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(20,24,36,.05); min-height: 132px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+.tile:hover { box-shadow: var(--bx-shadow); border-color: var(--bx-line-2); }
+.tile .strip { display: flex; gap: 4px; margin-bottom: 6px; }
+.tile .strip span { height: 8px; flex: 1; border-radius: 4px; }
+.tile h3 { margin: 0; font-size: 16px; }
+.tile p { margin: 0; font-size: 12.5px; color: var(--bx-muted); }
+.tile.new { border-style: dashed; align-items: center; justify-content: center; color: var(--bx-blue); font-weight: 700; box-shadow: none; }
+.tile .del { position: absolute; top: 10px; right: 10px; display: none; }
+.tile:hover .del { display: inline-flex; }
+.col-title-input { font: 700 12.5px 'Figtree', 'Inter', system-ui, sans-serif; border: 1px solid var(--bx-blue); border-radius: 7px; padding: 3px 8px; width: 170px; outline: none; }
+.maplist { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 12px; }
+.maplist button { text-align: left; border: 1px solid var(--bx-line); background: var(--bx-surface); border-radius: 10px; padding: 10px 12px;
+  cursor: pointer; font: 600 14px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg); }
+.maplist button:hover { border-color: var(--bx-blue); background: var(--bx-blue-soft); }
+.maplist small { display: block; font-weight: 500; color: var(--bx-muted); margin-top: 2px; }
+.tagbox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--bx-line-2); border-radius: 9px; padding: 6px 8px; }
+.tagbox input { border: none; outline: none; background: none; font: 14px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg); flex: 1; min-width: 90px; padding: 3px 2px; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatches .sw { width: 24px; height: 24px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; }
+.swatches .sw.on { border-color: var(--bx-fg); }
+.addrow { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 640px) {
+  #stage { padding: 132px 12px 80px 12px; }
+  .rail { top: auto; bottom: 14px; left: 14px; transform: none; flex-direction: row; }
+  .search { width: 130px; }
+  .topr { top: 72px; }
+  .board-title { width: 150px; }
+}
+</style>
+</head>
+<body class="bx">
+<div id="stage" class="bx-canvas">
+  <div id="zoomWrap"><div id="content"></div></div>
+</div>
+
+<div class="bx-float topl">
+  <a class="brand" href="finchat_planning.html" title="Back to Planning"><span class="brand-dot"><span class="material-symbols-outlined" style="font-size:16px">view_kanban</span></span>Boards</a>
+  <div class="bx-sep"></div>
+  <button class="bx-ibtn" id="toGallery" title="All boards"><span class="material-symbols-outlined">grid_view</span></button>
+  <input class="board-title" id="boardTitle" placeholder="Untitled board" maxlength="200" hidden>
+  <button class="bx-ibtn" id="boardMenuBtn" title="Board options" hidden><span class="material-symbols-outlined">more_horiz</span></button>
+</div>
+
+<div class="bx-float topr">
+  <div class="search-wrap" id="searchWrap" hidden>
+    <span class="material-symbols-outlined">search</span>
+    <input class="search" id="search" placeholder="Search cards" autocomplete="off">
+  </div>
+  <button class="bx-btn ghost" id="filesBtn" title="Files and links on the whole board" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
+  <button class="bx-btn ghost" id="mapBtn" title="See this board as a mind map" hidden><span class="material-symbols-outlined">account_tree</span><span id="mapBtnLabel">Mind map</span></button>
+  <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
+  <button class="bx-btn primary" id="shareBtn" hidden><span class="material-symbols-outlined">group_add</span>Share</button>
+</div>
+
+<div class="bx-float rail" id="rail" hidden>
+  <button class="bx-ibtn" id="railCard" title="Add a card"><span class="material-symbols-outlined">note_stack_add</span></button>
+  <button class="bx-ibtn" id="railCol" title="Add a column"><span class="material-symbols-outlined">view_column</span></button>
+  <button class="bx-ibtn" id="railMaps" title="Mind maps"><span class="material-symbols-outlined">account_tree</span></button>
+</div>
+
+<div class="bx-float zoombar" id="zoombar" hidden>
+  <button class="bx-ibtn" id="zoomOut" title="Zoom out"><span class="material-symbols-outlined">remove</span></button>
+  <span class="zoom-pct" id="zoomPct">100%</span>
+  <button class="bx-ibtn" id="zoomIn" title="Zoom in"><span class="material-symbols-outlined">add</span></button>
+  <button class="bx-ibtn" id="zoomFit" title="Fit"><span class="material-symbols-outlined">fit_screen</span></button>
+</div>
+
+<!-- card drawer -->
+<aside class="bx-drawer" id="drawer">
+  <div class="bx-drawer-head">
+    <span class="where" id="dWhere"></span>
+    <button class="bx-ibtn" id="dDelete" title="Delete card"><span class="material-symbols-outlined">delete</span></button>
+    <button class="bx-ibtn" id="dClose" title="Close (Esc)"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div class="bx-drawer-body" id="dBody"></div>
+</aside>
+
+<!-- menus -->
+<div class="bx-menu" id="colMenu"></div>
+<div class="bx-menu" id="boardMenu">
+  <button data-bm="rename"><span class="material-symbols-outlined">edit</span>Rename board</button>
+  <button data-bm="fromMap"><span class="material-symbols-outlined">account_tree</span>New board from a mind map</button>
+  <button data-bm="delete" style="color:var(--bx-danger)"><span class="material-symbols-outlined">delete</span>Delete this board</button>
+</div>
+
+<!-- new board -->
+<div class="bx-modal" id="newModal">
+  <div class="bx-modal-box">
+    <div class="bx-modal-title">New board</div>
+    <div class="bx-label">Name</div>
+    <input class="bx-field" id="newTitle" placeholder="e.g. Duxbe launch plan" maxlength="200">
+    <div class="bx-label">Columns</div>
+    <input class="bx-field" id="newCols" value="To do, In progress, Done">
+    <div class="bx-hint">Comma separated — stages like To do / Done, or groups like Restaurant, POS, Services.</div>
+    <div class="bx-modal-acts">
+      <button class="bx-btn ghost" data-close="newModal">Cancel</button>
+      <button class="bx-btn primary" id="newCreate"><span class="material-symbols-outlined">add</span>Create board</button>
+    </div>
+  </div>
+</div>
+
+<!-- from a mind map -->
+<div class="bx-modal" id="mapModal">
+  <div class="bx-modal-box">
+    <div class="bx-modal-title">Board from a mind map</div>
+    <div class="bx-modal-sub">Branches become columns, their nodes become cards, deeper nodes fold into each card's details. Files and links come along.</div>
+    <div class="maplist" id="mapList">Loading…</div>
+    <div class="bx-modal-acts"><button class="bx-btn ghost" data-close="mapModal">Cancel</button></div>
+  </div>
+</div>
+
+<!-- built by AI -->
+<div class="bx-modal" id="aiModal">
+  <div class="bx-modal-box">
+    <div class="bx-modal-title">Ask AI to build a board</div>
+    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved. You get columns, cards, tags, priorities and dates you can edit.</div>
+    <textarea class="bx-field" id="aiText" rows="5" maxlength="4000" style="margin-top:12px; resize:vertical;"
+      placeholder="e.g. Launch plan for the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing"></textarea>
+    <div class="addrow" id="aiIdeas" style="margin-top:8px;">
+      <button class="bx-chip" data-idea="Product launch in 6 weeks with design, engineering, marketing and support">Product launch</button>
+      <button class="bx-chip" data-idea="Job search for product manager roles over the next month: applications, networking, interview prep">Job search</button>
+      <button class="bx-chip" data-idea="Study plan to learn post-quantum cryptography in 4 weeks">Study plan</button>
+    </div>
+    <div class="bx-hint" id="aiStatus"></div>
+    <div class="bx-modal-acts">
+      <button class="bx-btn ghost" data-close="aiModal">Cancel</button>
+      <button class="bx-btn primary" id="aiBuild"><span class="material-symbols-outlined">auto_awesome</span>Build board</button>
+    </div>
+  </div>
+</div>
+
+<!-- share -->
+<div class="bx-modal" id="shareModal">
+  <div class="bx-modal-box">
+    <div class="bx-modal-title">Share this board</div>
+    <div class="bx-modal-sub">Anyone with the link can view the board and open its files and links — no FinChat account needed. It stays live: they see your changes.</div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:14px; font-size:14px; cursor:pointer;">
+      <input type="checkbox" id="shareDocs" checked style="width:16px; height:16px; accent-color:var(--bx-blue);"> Include attached files, notes and links
+    </label>
+    <div class="bx-label">Link expires</div>
+    <select class="bx-field" id="shareExpiry">
+      <option value="">Never — until I revoke it</option>
+      <option value="1">After 1 day</option><option value="7">After 7 days</option>
+      <option value="30">After 30 days</option><option value="90">After 90 days</option>
+    </select>
+    <div class="bx-modal-acts" style="margin-top:12px;">
+      <button class="bx-btn primary" id="shareCreate"><span class="material-symbols-outlined">add_link</span>Create link</button>
+    </div>
+    <div class="bx-label">Links for this board</div>
+    <div id="shareList" style="display:flex; flex-direction:column; gap:8px;"></div>
+    <div class="bx-modal-acts"><button class="bx-btn" data-close="shareModal">Done</button></div>
+  </div>
+</div>
+
+<!-- confirm -->
+<div class="bx-modal" id="confirmModal">
+  <div class="bx-modal-box" style="width:min(420px,100%)">
+    <div class="bx-modal-title" id="cTitle">Are you sure?</div>
+    <div class="bx-modal-sub" id="cBody"></div>
+    <div class="bx-modal-acts">
+      <button class="bx-btn ghost" id="cNo">Cancel</button>
+      <button class="bx-btn primary" id="cYes" style="background:var(--bx-danger); border-color:var(--bx-danger)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" multiple hidden
+       accept=".pdf,.docx,.txt,.md,.csv,.json,.xlsx,.pptx,image/*">
+
+<script src="board_ui.js"></script>
+<script>
+(() => {
+  const U = window.BoardUI;
+  const { esc } = U;
+  const $ = (id) => document.getElementById(id);
+
+  // ── session ────────────────────────────────────────────────
+  const session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (session && session.token) || '';
+  if (!TOKEN) { location.href = 'finchat_login.html'; return; }
+  const API = location.origin;
+
+  async function api(path, opts = {}) {
+    const res = await fetch(API + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN, ...(opts.headers || {}) }
+    });
+    if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    const body = (res.headers.get('content-type') || '').includes('json') ? await res.json().catch(() => ({})) : {};
+    if (!res.ok) { const e = new Error(body.error || ('HTTP ' + res.status)); e.status = res.status; e.body = body; throw e; }
+    return body;
+  }
+  const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body || {}) });
+  const patch = (path, body) => api(path, { method: 'PATCH', body: JSON.stringify(body || {}) });
+  const del = (path) => api(path, { method: 'DELETE' });
+
+  // ── theme ──────────────────────────────────────────────────
+  function applyTheme(t) {
+    document.body.setAttribute('data-theme', t);
+    $('themeBtn').firstElementChild.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+  }
+  let theme = 'light';
+  try { theme = localStorage.getItem('finchat_board_theme') || 'light'; } catch (e) {}
+  applyTheme(theme);
+  $('themeBtn').addEventListener('click', () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('finchat_board_theme', theme); } catch (e) {}
+    applyTheme(theme);
+  });
+
+  // ── state ──────────────────────────────────────────────────
+  let B = null;             // GET /api/boards/:id
+  let SELECTED = null;      // open card id
+  let ZOOM = 1;
+  const blobCache = new Map();
+  const boardId = () => B && B.board.boardId;
+  const cardsIn = (colId) => B.cards.filter(k => k.columnId === colId).sort((a, b) => a.order - b.order);
+  const attsOf = (cardId) => B.attachments.filter(a => a.cardId === cardId);
+  const cardById = (id) => B.cards.find(k => k.cardId === id);
+
+  // Files come through authenticated routes, so everything is fetched with the
+  // token and handed to the page as an object URL — never a bare <img src>.
+  const adapter = {
+    async blobUrl(a) {
+      if (blobCache.has(a.attachmentId)) return blobCache.get(a.attachmentId);
+      const res = await fetch(`${API}/api/boards/${boardId()}/attachments/${a.attachmentId}/file`, { headers: { Authorization: 'Bearer ' + TOKEN } });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
+      const url = URL.createObjectURL(await res.blob());
+      blobCache.set(a.attachmentId, url);
+      return url;
+    },
+    async text(a) {
+      return (await api(`/api/boards/${boardId()}/attachments/${a.attachmentId}`)).attachment.text;
+    },
+    async download(a) {
+      const res = await fetch(`${API}/api/boards/${boardId()}/attachments/${a.attachmentId}/file?download=1`, { headers: { Authorization: 'Bearer ' + TOKEN } });
+      const name = await U.saveResponse(res, a.filename);
+      U.toast('Downloading ' + name);
+    }
+  };
+
+  // ── gallery ────────────────────────────────────────────────
+  async function showGallery() {
+    B = null; SELECTED = null;
+    closeDrawer();
+    history.replaceState(null, '', 'finchat_boards.html');
+    document.title = 'Boards | FinChat';
+    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn']) $(id).hidden = true;
+    setZoom(1);
+    $('content').innerHTML = '<div class="bx-empty">Loading…</div>';
+    try {
+      const { boards } = await api('/api/boards');
+      $('content').innerHTML = `
+        <div style="max-width:1100px;">
+          <h1 style="font-size:26px; margin:6px 0 4px;">Your boards</h1>
+          <p style="margin:0 0 18px; color:var(--bx-muted);">Plan with columns and cards — attach files, Drive docs, videos and links, and share a read-only link with anyone.</p>
+          <div class="gallery">
+            <div class="tile new" data-new="1"><span class="material-symbols-outlined" style="font-size:28px">add</span>New board</div>
+            <div class="tile new" data-ai="1" style="color:#e84fa7"><span class="material-symbols-outlined" style="font-size:28px">auto_awesome</span>Ask AI to build one</div>
+            <div class="tile new" data-frommap="1" style="color:#6631d7"><span class="material-symbols-outlined" style="font-size:28px">account_tree</span>From a mind map</div>
+            ${boards.map((b, i) => `
+              <div class="tile" data-open="${esc(b.boardId)}">
+                <button class="bx-ibtn del" data-delboard="${esc(b.boardId)}" title="Delete board"><span class="material-symbols-outlined">delete</span></button>
+                <div class="strip">${[0, 1, 2, 3].map(j => `<span style="background:${U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length]}"></span>`).join('')}</div>
+                <h3>${esc(b.title)}</h3>
+                <p>${b.columnCount} columns · ${b.cardCount} cards${b.sourceMapId ? ' · <span style="color:#6631d7; font-weight:700;">has a mind map</span>' : ''}</p>
+                <p>Edited ${esc(new Date(b.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }))}</p>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    } catch (e) {
+      $('content').innerHTML = `<div class="bx-empty"><h2>Could not load boards</h2>${esc(e.message)}</div>`;
+    }
+  }
+
+  $('content').addEventListener('click', async (e) => {
+    const t = e.target;
+    const delB = t.closest('[data-delboard]');
+    if (delB) {
+      e.stopPropagation();
+      if (await confirmBox('Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.')) {
+        try { await del('/api/boards/' + delB.dataset.delboard); U.toast('Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
+      }
+      return;
+    }
+    if (t.closest('[data-new]')) return openModal('newModal', () => $('newTitle').focus());
+    if (t.closest('[data-frommap]')) return openFromMap();
+    if (t.closest('[data-ai]')) return openModal('aiModal', () => $('aiText').focus());
+    const open = t.closest('[data-open]');
+    if (open) return openBoard(open.dataset.open);
+  });
+
+  $('toGallery').addEventListener('click', showGallery);
+
+  // ── board ──────────────────────────────────────────────────
+  async function openBoard(id, { keepSelection = false } = {}) {
+    try {
+      B = await api('/api/boards/' + encodeURIComponent(id));
+    } catch (e) {
+      U.toast('Could not open board: ' + e.message);
+      return showGallery();
+    }
+    history.replaceState(null, '', '?board=' + encodeURIComponent(id));
+    document.title = `${B.board.title} | Boards`;
+    $('boardTitle').value = B.board.title;
+    for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn']) $(x).hidden = false;
+    $('mapBtnLabel').textContent = B.board.sourceMapId ? 'Mind map' : 'Make mind map';
+    const n = B.attachments.filter(a => !a.cardId).length;
+    $('filesCount').textContent = n ? `Files (${n})` : 'Files';
+    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; }
+    render();
+    if (FILES_OPEN) openBoardFiles();
+    else if (SELECTED && cardById(SELECTED)) openDrawer(SELECTED); else closeDrawer();
+  }
+
+  // Files and links on the board itself — what a map's root carried, or
+  // anything that belongs to the whole plan rather than one card.
+  let FILES_OPEN = false;
+  function openBoardFiles() {
+    const keepScroll = FILES_OPEN && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
+    FILES_OPEN = true;
+    SELECTED = null;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    const atts = B.attachments.filter(a => !a.cardId);
+    $('dWhere').textContent = `${B.board.title} › Board files`;
+    $('dDelete').hidden = true;
+    $('dBody').innerHTML = `
+      <div style="font-size:20px; font-weight:800;">Board files</div>
+      <div class="bx-hint" style="margin-bottom:10px">Files and links for the whole board, not one card.</div>
+      <div id="dAtts">${atts.map(a => U.attachmentHTML(a, { canRemove: true })).join('') || '<div class="bx-hint" style="margin:0 0 8px">Nothing here yet.</div>'}</div>
+      <div class="addrow">
+        <button class="bx-btn sm" id="aUpload"><span class="material-symbols-outlined">upload</span>Upload</button>
+        <button class="bx-btn sm" id="aLinks"><span class="material-symbols-outlined">link</span>Paste links</button>
+        <button class="bx-btn sm" id="aDrive"><span class="material-symbols-outlined">add_to_drive</span>From Drive</button>
+        <button class="bx-btn sm" id="aNote"><span class="material-symbols-outlined">sticky_note_2</span>Note</button>
+      </div>
+      <div id="aPanel"></div>`;
+    $('drawer').classList.add('open');
+    $('dBody').scrollTop = keepScroll;
+    wireAttachments({ cardId: null });
+  }
+  $('filesBtn').addEventListener('click', () => (FILES_OPEN ? closeDrawer() : openBoardFiles()));
+
+  function render() {
+    const q = $('search').value.trim().toLowerCase();
+    const match = (k) => !q || [k.title, k.summary, k.detail, ...(k.tags || []).map(t => t.label),
+      ...attsOf(k.cardId).map(a => a.filename)].some(s => String(s || '').toLowerCase().includes(q));
+    const cols = B.columns.slice().sort((a, b) => a.order - b.order);
+    $('content').innerHTML = `<div class="bx-board" id="board">
+      ${cols.map(c => {
+        const cards = cardsIn(c.columnId);
+        const shown = cards.filter(match);
+        return `<section class="bx-col" data-col="${esc(c.columnId)}">
+          <div class="bx-col-head">
+            <span class="bx-pill" style="background:${esc(c.color || '#eceff3')}" data-coltitle="${esc(c.columnId)}" title="Double-click to rename">${esc(c.title)}</span>
+            <span class="bx-count">${q ? `${shown.length}/` : ''}${cards.length}</span>
+            <span class="grow"></span>
+            <button class="bx-ibtn" style="width:28px;height:28px" data-colmenu="${esc(c.columnId)}" title="Column options"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>
+          </div>
+          <div class="bx-cards" data-cards="${esc(c.columnId)}">
+            ${shown.map(k => U.cardHTML(k, attsOf(k.cardId), { selected: k.cardId === SELECTED })).join('')}
+          </div>
+          <button class="bx-add-card" data-addcard="${esc(c.columnId)}"><span class="material-symbols-outlined" style="font-size:18px">add</span>Add card</button>
+        </section>`;
+      }).join('')}
+      <button class="bx-add-col" id="addCol"><span class="material-symbols-outlined">add</span>Add column</button>
+    </div>`;
+    hydrateThumbs();
+  }
+
+  function hydrateThumbs() {
+    document.querySelectorAll('img[data-thumb]').forEach(async (img) => {
+      const a = B.attachments.find(x => x.attachmentId === img.dataset.thumb);
+      if (!a) return;
+      try { img.src = await adapter.blobUrl(a); } catch (e) { img.remove(); }
+    });
+  }
+
+  $('search').addEventListener('input', () => B && render());
+
+  // title
+  $('boardTitle').addEventListener('change', async () => {
+    const title = $('boardTitle').value.trim() || 'Untitled board';
+    try { await patch('/api/boards/' + boardId(), { title }); B.board.title = title; document.title = `${title} | Boards`; }
+    catch (e) { U.toast(e.message); }
+  });
+  $('boardTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+
+  // ── board-level clicks (delegated) ─────────────────────────
+  $('content').addEventListener('click', async (e) => {
+    if (!B) return;
+    const t = e.target;
+    if (t.closest('#addCol')) return addColumn();
+    const add = t.closest('[data-addcard]');
+    if (add) return addCard(add.dataset.addcard);
+    const cm = t.closest('[data-colmenu]');
+    if (cm) return openColMenu(cm.dataset.colmenu, cm);
+  });
+  $('content').addEventListener('dblclick', (e) => {
+    const p = e.target.closest('[data-coltitle]');
+    if (p && B) renameColumnInline(p.dataset.coltitle, p);
+  });
+
+  async function addColumn() {
+    try {
+      const { columnId } = await post(`/api/boards/${boardId()}/columns`, { title: 'New column' });
+      await openBoard(boardId(), { keepSelection: true });
+      const pill = document.querySelector(`[data-coltitle="${columnId}"]`);
+      if (pill) { pill.scrollIntoView({ block: 'nearest', inline: 'end', behavior: 'smooth' }); renameColumnInline(columnId, pill); }
+    } catch (e) { U.toast(e.message); }
+  }
+
+  async function addCard(columnId) {
+    try {
+      const { cardId } = await post(`/api/boards/${boardId()}/cards`, { columnId, title: 'New card' });
+      SELECTED = cardId;
+      await openBoard(boardId(), { keepSelection: true });
+      const input = $('dTitle');
+      if (input) { input.focus(); input.select(); }
+    } catch (e) { U.toast(e.message); }
+  }
+
+  function renameColumnInline(columnId, pill) {
+    const col = B.columns.find(c => c.columnId === columnId);
+    const input = document.createElement('input');
+    input.className = 'col-title-input';
+    input.value = col.title;
+    pill.replaceWith(input);
+    input.focus(); input.select();
+    let done = false;
+    const finish = async (save) => {
+      if (done) return; done = true;
+      const title = input.value.trim();
+      if (save && title && title !== col.title) {
+        try { await patch(`/api/boards/${boardId()}/columns/${columnId}`, { title }); col.title = title; } catch (e) { U.toast(e.message); }
+      }
+      render();
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  // column menu
+  function openColMenu(columnId, anchor) {
+    const col = B.columns.find(c => c.columnId === columnId);
+    const cols = B.columns.slice().sort((a, b) => a.order - b.order);
+    const i = cols.findIndex(c => c.columnId === columnId);
+    const m = $('colMenu');
+    m.innerHTML = `
+      <button data-cm="rename"><span class="material-symbols-outlined">edit</span>Rename</button>
+      <div class="swatches">${U.COLUMN_COLORS.map(c => `<span class="sw" data-cm-color="${c}" style="background:${c}"></span>`).join('')}</div>
+      ${i > 0 ? '<button data-cm="left"><span class="material-symbols-outlined">arrow_back</span>Move left</button>' : ''}
+      ${i < cols.length - 1 ? '<button data-cm="right"><span class="material-symbols-outlined">arrow_forward</span>Move right</button>' : ''}
+      <button data-cm="delete" style="color:var(--bx-danger)"><span class="material-symbols-outlined">delete</span>Delete column</button>`;
+    m.dataset.col = columnId;
+    placeMenu(m, anchor);
+    m._handler = async (e) => {
+      const sw = e.target.closest('[data-cm-color]');
+      const act = e.target.closest('[data-cm]');
+      if (!sw && !act) return;
+      closeMenus();
+      try {
+        if (sw) { await patch(`/api/boards/${boardId()}/columns/${columnId}`, { color: sw.dataset.cmColor }); col.color = sw.dataset.cmColor; render(); }
+        else if (act.dataset.cm === 'rename') { const p = document.querySelector(`[data-coltitle="${columnId}"]`); if (p) renameColumnInline(columnId, p); }
+        else if (act.dataset.cm === 'left' || act.dataset.cm === 'right') {
+          const j = act.dataset.cm === 'left' ? i - 1 : i + 1;
+          [cols[i], cols[j]] = [cols[j], cols[i]];
+          cols.forEach((c, k) => { c.order = k; });
+          render();
+          await post(`/api/boards/${boardId()}/columns/order`, { columnIds: cols.map(c => c.columnId) });
+        } else if (act.dataset.cm === 'delete') {
+          const n = cardsIn(columnId).length;
+          if (await confirmBox(`Delete "${col.title}"?`, n ? `Its ${n} card${n === 1 ? '' : 's'} and their files are deleted too. This cannot be undone.` : 'The column is empty.')) {
+            await del(`/api/boards/${boardId()}/columns/${columnId}`);
+            await openBoard(boardId());
+          }
+        }
+      } catch (err) { U.toast(err.message); }
+    };
+  }
+  $('colMenu').addEventListener('click', (e) => $('colMenu')._handler && $('colMenu')._handler(e));
+
+  function placeMenu(m, anchor) {
+    const r = anchor.getBoundingClientRect();
+    m.classList.add('open');
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
+    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 6)) + 'px';
+  }
+  function closeMenus() { document.querySelectorAll('.bx-menu.open').forEach(m => m.classList.remove('open')); }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.bx-menu') && !e.target.closest('[data-colmenu]') && !e.target.closest('#boardMenuBtn')) closeMenus();
+  });
+
+  // board menu
+  $('boardMenuBtn').addEventListener('click', (e) => placeMenu($('boardMenu'), e.currentTarget));
+  $('boardMenu').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-bm]');
+    if (!b) return;
+    closeMenus();
+    if (b.dataset.bm === 'rename') { $('boardTitle').focus(); $('boardTitle').select(); }
+    if (b.dataset.bm === 'fromMap') openFromMap();
+    if (b.dataset.bm === 'delete' && await confirmBox('Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.')) {
+      try { await del('/api/boards/' + boardId()); U.toast('Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
+    }
+  });
+
+  // rail
+  $('railCol').addEventListener('click', addColumn);
+  $('railCard').addEventListener('click', () => {
+    const first = B.columns.slice().sort((a, b) => a.order - b.order)[0];
+    if (first) addCard(first.columnId); else addColumn();
+  });
+  $('railMaps').addEventListener('click', () => { location.href = 'finchat_mindmap.html'; });
+
+  // ── drag and drop ──────────────────────────────────────────
+  // Pointer events rather than HTML5 drag: the same code works with a mouse,
+  // a pen or a finger, and the drop marker can sit exactly between two cards.
+  let drag = null;
+  $('content').addEventListener('pointerdown', (e) => {
+    const card = e.target.closest('.bx-card');
+    if (!card || e.button !== 0 || !B) return;
+    drag = { el: card, id: card.dataset.card, x: e.clientX, y: e.clientY, started: false, pointerId: e.pointerId };
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (!drag.started) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+      drag.started = true;
+      const r = drag.el.getBoundingClientRect();
+      drag.dx = e.clientX - r.left; drag.dy = e.clientY - r.top;
+      drag.ghost = drag.el.cloneNode(true);
+      drag.ghost.classList.add('bx-ghost');
+      drag.ghost.style.width = r.width + 'px';
+      document.body.appendChild(drag.ghost);
+      drag.el.classList.add('dragging');
+      drag.marker = document.createElement('div');
+      drag.marker.className = 'bx-drop';
+    }
+    drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
+    drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
+    placeMarker(e.clientX, e.clientY);
+    autoScroll(e.clientX, e.clientY);
+  });
+
+  function placeMarker(x, y) {
+    drag.ghost.style.display = 'none';
+    const under = document.elementFromPoint(x, y);
+    drag.ghost.style.display = '';
+    const col = under && under.closest('.bx-col');
+    if (!col) return;
+    const list = col.querySelector('.bx-cards');
+    const cards = [...list.querySelectorAll('.bx-card:not(.dragging)')];
+    const before = cards.find(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+    if (before) list.insertBefore(drag.marker, before); else list.appendChild(drag.marker);
+  }
+
+  function autoScroll(x, y) {
+    const s = $('stage'), edge = 60, step = 18;
+    if (x > innerWidth - edge) s.scrollLeft += step; else if (x < edge) s.scrollLeft -= step;
+    if (y > innerHeight - edge) s.scrollTop += step; else if (y < edge + 40) s.scrollTop -= step;
+  }
+
+  // A touch that turns into a scroll cancels the pointer; drop the half-drag.
+  window.addEventListener('pointercancel', () => {
+    if (!drag) return;
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.marker) drag.marker.remove();
+    drag.el.classList.remove('dragging');
+    drag = null;
+  });
+
+  window.addEventListener('pointerup', async () => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (!d.started) { openDrawer(d.id); return; }
+    d.ghost.remove();
+    d.el.classList.remove('dragging');
+    if (!d.marker.parentNode) return;
+    const list = d.marker.parentNode;
+    const from = cardById(d.id).columnId;
+    const to = list.dataset.cards;
+    list.insertBefore(d.el, d.marker);
+    d.marker.remove();
+    // The DOM is now the truth for the columns involved; read the order back.
+    const ids = (colId) => [...document.querySelectorAll(`[data-cards="${colId}"] .bx-card`)].map(c => c.dataset.card);
+    const payload = [...new Set([from, to])].map(columnId => ({ columnId, cardIds: ids(columnId) }));
+    // Hidden (search-filtered) cards keep their place at the end of the order.
+    if ($('search').value.trim()) {
+      for (const p of payload) {
+        const hidden = cardsIn(p.columnId).map(k => k.cardId).filter(id => !p.cardIds.includes(id) && id !== d.id);
+        p.cardIds.push(...hidden);
+      }
+    }
+    for (const p of payload) p.cardIds.forEach((id, i) => { const k = cardById(id); k.columnId = p.columnId; k.order = i; });
+    render();
+    try { await post(`/api/boards/${boardId()}/cards/order`, { columns: payload }); }
+    catch (e) { U.toast('Could not save the move: ' + e.message); openBoard(boardId(), { keepSelection: true }); }
+  });
+
+  // ── zoom ───────────────────────────────────────────────────
+  function setZoom(z) {
+    ZOOM = Math.max(0.4, Math.min(1.6, Math.round(z * 10) / 10));
+    $('zoomWrap').style.zoom = ZOOM;
+    $('zoomPct').textContent = Math.round(ZOOM * 100) + '%';
+  }
+  $('zoomIn').addEventListener('click', () => setZoom(ZOOM + 0.1));
+  $('zoomOut').addEventListener('click', () => setZoom(ZOOM - 0.1));
+  $('zoomFit').addEventListener('click', () => {
+    const board = $('board');
+    if (!board) return;
+    const avail = $('stage').clientWidth - 120;
+    setZoom(Math.min(1, avail / (board.scrollWidth * 1 || 1) * ZOOM));
+  });
+  // Ctrl/⌘ + wheel (and trackpad pinch, which arrives as one) zooms; a plain
+  // wheel or two-finger swipe scrolls the canvas, as it would anywhere else.
+  $('stage').addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(ZOOM * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+  }, { passive: false });
+
+  // ── card drawer ────────────────────────────────────────────
+  function openDrawer(cardId, { focus = null } = {}) {
+    const k = cardById(cardId);
+    if (!k) return;
+    // Re-rendering the same card (after a tag, a colour, an attachment) keeps
+    // the reader where they were instead of jumping back to the top.
+    const keepScroll = SELECTED === cardId && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
+    SELECTED = cardId;
+    FILES_OPEN = false;
+    $('dDelete').hidden = false;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    const el = document.querySelector(`[data-card="${cardId}"]`);
+    if (el) el.classList.add('sel');
+    const col = B.columns.find(c => c.columnId === k.columnId);
+    $('dWhere').textContent = `${B.board.title} › ${col ? col.title : ''}`;
+    const atts = attsOf(cardId);
+    const palette = B.board.tagPalette || [];
+    $('dBody').innerHTML = `
+      <input class="bx-field bx-title-input" id="dTitle" value="${esc(k.title)}" maxlength="200" aria-label="Card title">
+      <div class="bx-label">Summary</div>
+      <textarea class="bx-field" id="dSummary" rows="2" maxlength="600" placeholder="One or two lines shown on the card">${esc(k.summary)}</textarea>
+      <div class="bx-row">
+        <div><div class="bx-label">Column</div>
+          <select class="bx-field" id="dColumn">${B.columns.slice().sort((a, b) => a.order - b.order).map(c =>
+            `<option value="${esc(c.columnId)}"${c.columnId === k.columnId ? ' selected' : ''}>${esc(c.title)}</option>`).join('')}</select></div>
+        <div><div class="bx-label">Priority</div>
+          <select class="bx-field" id="dPriority">
+            <option value="">None</option>
+            ${Object.entries(U.PRIORITY).map(([v, p]) => `<option value="${v}"${k.priority === v ? ' selected' : ''}>${p.label}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="bx-row">
+        <div><div class="bx-label">Start</div><input class="bx-field" type="date" id="dStart" value="${esc(k.startDate || '')}"></div>
+        <div><div class="bx-label">End</div><input class="bx-field" type="date" id="dEnd" value="${esc(k.endDate || '')}"></div>
+      </div>
+      <div class="bx-label">Tags</div>
+      <div class="tagbox" id="dTags">${(k.tags || []).map(t => U.tagChip(t, { removable: true })).join('')}
+        <input id="dTagInput" list="dTagList" placeholder="${(k.tags || []).length ? '' : 'Add a tag, press Enter'}" maxlength="40"></div>
+      <datalist id="dTagList">${palette.map(t => `<option value="${esc(t.label)}">`).join('')}</datalist>
+      <div class="bx-label">Card colour</div>
+      <div class="swatches" id="dColor">
+        <span class="sw${!k.color ? ' on' : ''}" data-color="" title="None" style="background:var(--bx-surface-2); border-color:${!k.color ? 'var(--bx-fg)' : 'var(--bx-line-2)'}"></span>
+        ${U.TAG_COLORS.map(c => `<span class="sw${k.color === c ? ' on' : ''}" data-color="${c}" style="background:${c}"></span>`).join('')}
+      </div>
+      <div class="bx-label">Details</div>
+      <textarea class="bx-field" id="dDetail" rows="5" maxlength="4000" placeholder="Notes, acceptance criteria, anything longer">${esc(k.detail)}</textarea>
+
+      <div class="bx-label">Files &amp; links <span style="text-transform:none; letter-spacing:0; font-weight:600;">(${atts.length})</span></div>
+      <div id="dAtts">${atts.map(a => U.attachmentHTML(a, { canRemove: true })).join('') || '<div class="bx-hint" style="margin:0 0 8px">Nothing attached yet.</div>'}</div>
+      <div class="addrow">
+        <button class="bx-btn sm" id="aUpload"><span class="material-symbols-outlined">upload</span>Upload</button>
+        <button class="bx-btn sm" id="aLinks"><span class="material-symbols-outlined">link</span>Paste links</button>
+        <button class="bx-btn sm" id="aDrive"><span class="material-symbols-outlined">add_to_drive</span>From Drive</button>
+        <button class="bx-btn sm" id="aNote"><span class="material-symbols-outlined">sticky_note_2</span>Note</button>
+      </div>
+      <div id="aPanel"></div>`;
+    $('drawer').classList.add('open');
+    $('dBody').scrollTop = keepScroll;
+    wireDrawer(k);
+    if (focus && $(focus)) $(focus).focus();
+  }
+
+  function closeDrawer() {
+    $('drawer').classList.remove('open');
+    SELECTED = null;
+    FILES_OPEN = false;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+  }
+  $('dClose').addEventListener('click', closeDrawer);
+
+  async function saveCard(k, fields) {
+    try {
+      await patch(`/api/boards/${boardId()}/cards/${k.cardId}`, fields);
+      Object.assign(k, fields);
+      if (fields.tags) {
+        // The server assigns colours; re-read so chips match what was stored.
+        const fresh = await api('/api/boards/' + boardId());
+        B.board.tagPalette = fresh.board.tagPalette;
+        Object.assign(k, fresh.cards.find(c => c.cardId === k.cardId) || {});
+      }
+      render();
+      return true;
+    } catch (e) { U.toast(e.message); return false; }
+  }
+
+  function wireDrawer(k) {
+    const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+    on('dTitle', 'change', () => saveCard(k, { title: $('dTitle').value.trim() || 'Untitled card' }).then(() => { $('dWhere').textContent = $('dWhere').textContent; }));
+    on('dTitle', 'keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+    on('dSummary', 'change', () => saveCard(k, { summary: $('dSummary').value }));
+    on('dDetail', 'change', () => saveCard(k, { detail: $('dDetail').value }));
+    on('dPriority', 'change', () => saveCard(k, { priority: $('dPriority').value || null }));
+    on('dStart', 'change', () => saveCard(k, { startDate: $('dStart').value || null }));
+    on('dEnd', 'change', () => saveCard(k, { endDate: $('dEnd').value || null }));
+    on('dColumn', 'change', async () => {
+      // A move through the select goes to the bottom of the other column, via
+      // the same ordered write a drag uses.
+      const to = $('dColumn').value, from = k.columnId;
+      const toIds = [...cardsIn(to).map(c => c.cardId).filter(id => id !== k.cardId), k.cardId];
+      const fromIds = cardsIn(from).map(c => c.cardId).filter(id => id !== k.cardId);
+      try {
+        await post(`/api/boards/${boardId()}/cards/order`, { columns: [{ columnId: from, cardIds: fromIds }, { columnId: to, cardIds: toIds }] });
+        await openBoard(boardId(), { keepSelection: true });
+      } catch (e) { U.toast(e.message); }
+    });
+    on('dColor', 'click', (e) => {
+      const sw = e.target.closest('[data-color]');
+      if (sw) saveCard(k, { color: sw.dataset.color || null }).then(ok => ok && openDrawer(k.cardId));
+    });
+    on('dTagInput', 'keydown', async (e) => {
+      if (e.key !== 'Enter' && e.key !== ',') return;
+      e.preventDefault();
+      const label = e.target.value.trim();
+      if (!label) return;
+      if (await saveCard(k, { tags: [...(k.tags || []), { label }] })) openDrawer(k.cardId, { focus: 'dTagInput' });
+    });
+    on('dTags', 'click', async (e) => {
+      const x = e.target.closest('[data-untag]');
+      if (!x) return;
+      if (await saveCard(k, { tags: (k.tags || []).filter(t => t.label !== x.dataset.untag) })) openDrawer(k.cardId, { focus: 'dTagInput' });
+    });
+    wireAttachments(k);
+  }
+
+  /** The attachment list and the four "add" buttons — for a card, or ({cardId:null}) the board. */
+  function wireAttachments(k) {
+    $('dAtts').addEventListener('click', (e) => attachmentAction(e, k));
+    $('aUpload').addEventListener('click', () => { $('fileInput').dataset.card = k.cardId || ''; $('fileInput').click(); });
+    $('aLinks').addEventListener('click', () => showLinkPanel(k));
+    $('aDrive').addEventListener('click', () => showDrivePanel(k));
+    $('aNote').addEventListener('click', () => showNotePanel(k));
+  }
+
+  $('dDelete').addEventListener('click', async () => {
+    const k = cardById(SELECTED);
+    if (!k) return;
+    if (!await confirmBox(`Delete "${k.title}"?`, 'The card and its attached files are deleted. This cannot be undone.')) return;
+    try { await del(`/api/boards/${boardId()}/cards/${k.cardId}`); closeDrawer(); await openBoard(boardId()); }
+    catch (e) { U.toast(e.message); }
+  });
+
+  async function attachmentAction(e, k) {
+    const view = e.target.closest('[data-view]');
+    const dl = e.target.closest('[data-download]');
+    const rm = e.target.closest('[data-remove]');
+    const id = (view || dl || rm || {}).dataset;
+    if (!id) return;
+    const a = B.attachments.find(x => x.attachmentId === (id.view || id.download || id.remove));
+    if (!a) return;
+    if (view) return U.togglePreview(e.target.closest('.bx-att'), a, adapter);
+    if (dl) { try { await adapter.download(a); } catch (err) { U.toast('Download failed: ' + err.message); } return; }
+    if (rm && await confirmBox(`Remove "${a.filename}"?`, a.kind === 'link' ? 'Only the link is removed from the card.' : 'The file is deleted from this board.')) {
+      try { await del(`/api/boards/${boardId()}/attachments/${a.attachmentId}`); await openBoard(boardId(), { keepSelection: true }); }
+      catch (err) { U.toast(err.message); }
+    }
+  }
+
+  // uploads
+  $('fileInput').addEventListener('change', async (e) => {
+    const files = [...(e.target.files || [])];
+    const cardId = e.target.dataset.card;
+    e.target.value = '';
+    if (!files.length) return;
+    const fd = new FormData();
+    if (cardId) fd.append('cardId', cardId);
+    files.forEach(f => fd.append('files', f));
+    U.toast(`Uploading ${files.length} file${files.length === 1 ? '' : 's'}…`);
+    try {
+      const res = await fetch(`${API}/api/boards/${boardId()}/attachments`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
+      U.toast('Attached ' + body.attachments.map(a => a.filename).join(', '));
+      await openBoard(boardId(), { keepSelection: true });
+    } catch (err) { U.toast('Upload failed: ' + err.message); }
+  });
+
+  function showLinkPanel(k) {
+    $('aPanel').innerHTML = `
+      <div class="bx-label">Paste links</div>
+      <textarea class="bx-field" id="lText" rows="4" placeholder="One per line, or pasted in a sentence — Google Docs, Drive, YouTube, images, any web page"></textarea>
+      <div class="bx-hint">Google Docs and YouTube get a preview; Drive links are named from your Drive when it's connected.</div>
+      <div class="bx-modal-acts" style="margin-top:8px"><button class="bx-btn sm primary" id="lGo"><span class="material-symbols-outlined">add_link</span>Attach links</button></div>`;
+    $('lText').focus();
+    $('lGo').addEventListener('click', async () => {
+      try {
+        const out = await post(`/api/boards/${boardId()}/attachments/links`, { cardId: k.cardId, text: $('lText').value });
+        U.toast(`Attached ${out.attachments.length} link${out.attachments.length === 1 ? '' : 's'}` +
+          (out.rejected && out.rejected.length ? ` (${out.rejected.length} not a valid link)` : ''));
+        await openBoard(boardId(), { keepSelection: true });
+      } catch (e) { U.toast(e.message); }
+    });
+  }
+
+  function showNotePanel(k) {
+    $('aPanel').innerHTML = `
+      <div class="bx-label">Note</div>
+      <input class="bx-field" id="nTitle" placeholder="Title (optional)" maxlength="200" style="margin-bottom:6px">
+      <textarea class="bx-field" id="nText" rows="5" placeholder="Anything worth keeping with this card"></textarea>
+      <div class="bx-modal-acts" style="margin-top:8px"><button class="bx-btn sm primary" id="nGo"><span class="material-symbols-outlined">check</span>Save note</button></div>`;
+    $('nText').focus();
+    $('nGo').addEventListener('click', async () => {
+      try {
+        await post(`/api/boards/${boardId()}/attachments/text`, { cardId: k.cardId, title: $('nTitle').value, text: $('nText').value });
+        await openBoard(boardId(), { keepSelection: true });
+      } catch (e) { U.toast(e.message); }
+    });
+  }
+
+  function showDrivePanel(k) {
+    $('aPanel').innerHTML = `
+      <div class="bx-label">Find in Google Drive</div>
+      <input class="bx-field" id="gQ" placeholder="Type part of a file name — e.g. Duxbe POS spec" autocomplete="off">
+      <div id="gOut" class="bx-hint">Searches file names only. FinChat never reads what's inside your files.</div>`;
+    $('gQ').focus();
+    let timer = null, seq = 0;
+    const run = async () => {
+      const q = $('gQ').value.trim();
+      const mine = ++seq;
+      $('gOut').innerHTML = '<div class="bx-hint">Searching…</div>';
+      try {
+        const { files } = await api('/api/integrations/google/drive/search?q=' + encodeURIComponent(q));
+        if (mine !== seq) return;
+        $('gOut').innerHTML = files.length ? `<div class="bx-results">${files.map((f, i) => `
+          <div class="bx-result" data-pick="${i}">
+            ${f.iconLink ? `<img alt="" src="${esc(f.iconLink)}" referrerpolicy="no-referrer">` : '<span class="material-symbols-outlined">draft</span>'}
+            <span class="t">${esc(f.title)}</span><span class="s">${esc(f.kindLabel)}</span>
+          </div>`).join('')}</div><div class="bx-hint">Click a file to attach its link.</div>` : '<div class="bx-hint">No files with that in the name.</div>';
+        $('gOut').onclick = async (e) => {
+          const p = e.target.closest('[data-pick]');
+          if (!p) return;
+          const f = files[Number(p.dataset.pick)];
+          try {
+            await post(`/api/boards/${boardId()}/attachments/links`, { cardId: k.cardId, links: [{ url: f.url, title: f.title }] });
+            U.toast('Attached ' + f.title);
+            await openBoard(boardId(), { keepSelection: true });
+          } catch (err) { U.toast(err.message); }
+        };
+      } catch (e) {
+        if (mine !== seq) return;
+        if (e.body && (e.body.code === 'not_connected' || e.body.code === 'not_configured')) {
+          $('gOut').innerHTML = `<div class="bx-hint" style="margin-bottom:8px">${esc(e.message)}</div>
+            <a class="bx-btn sm primary" href="finchat_settings.html"><span class="material-symbols-outlined">add_to_drive</span>Connect Google Drive</a>`;
+        } else {
+          $('gOut').innerHTML = `<div class="bx-hint">${esc(e.message)}</div>`;
+        }
+      }
+    };
+    $('gQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 300); });
+    run();
+  }
+
+  // ── new board / from a mind map ────────────────────────────
+  function openModal(id, then) { $(id).classList.add('open'); if (then) setTimeout(then, 30); }
+  function closeModal(id) { $(id).classList.remove('open'); }
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-close]');
+    if (c) closeModal(c.dataset.close);
+    if (e.target.classList && e.target.classList.contains('bx-modal') && e.target.id !== 'confirmModal') e.target.classList.remove('open');
+  });
+
+  $('newCreate').addEventListener('click', async () => {
+    try {
+      const columns = $('newCols').value.split(',').map(s => s.trim()).filter(Boolean);
+      const { boardId: id } = await post('/api/boards', { title: $('newTitle').value.trim() || 'Untitled board', columns });
+      closeModal('newModal');
+      $('newTitle').value = '';
+      openBoard(id);
+    } catch (e) { U.toast(e.message); }
+  });
+  $('newTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('newCreate').click(); });
+
+  async function openFromMap() {
+    openModal('mapModal');
+    $('mapList').textContent = 'Loading…';
+    try {
+      const [{ maps }, { boards }] = await Promise.all([api('/api/mind-maps'), api('/api/boards')]);
+      const paired = new Set(boards.map(b => b.sourceMapId).filter(Boolean));
+      $('mapList').innerHTML = maps.length ? maps.map(m => `<button data-map="${esc(m.map_id)}">${esc(m.title || m.topic || 'Untitled')}
+        <small>${m.node_count} nodes${Number(m.doc_count) ? ` · ${m.doc_count} files` : ''}${
+          paired.has(m.map_id) ? ' · <b style="color:#6631d7">has a board — opens it</b>' : ''}</small></button>`).join('')
+        : '<div class="bx-hint">You have no mind maps yet.</div>';
+    } catch (e) { $('mapList').textContent = e.message; }
+  }
+  $('mapList').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-map]');
+    if (!b) return;
+    b.disabled = true;
+    b.insertAdjacentHTML('beforeend', ' <small>Opening…</small>');
+    try {
+      // reuse: a map that already has a board opens it, rather than a second copy.
+      const { boardId: id } = await post('/api/boards/from-map', { mapId: b.dataset.map, reuse: true });
+      closeModal('mapModal');
+      openBoard(id);
+    } catch (err) { U.toast(err.message); b.disabled = false; }
+  });
+
+  // ── board ⇄ mind map ───────────────────────────────────────
+  $('mapBtn').addEventListener('click', async () => {
+    if (!B) return;
+    if (!B.board.sourceMapId && !(await confirmBox('Make a mind map from this board?',
+      'The board becomes the centre, columns become branches and cards become nodes — files and links come along. It is a copy: the board itself is not changed.',
+      'Make mind map', { danger: false }))) return;
+    $('mapBtn').disabled = true;
+    try {
+      const { mapId } = await post(`/api/boards/${boardId()}/mind-map`);
+      location.href = 'finchat_mindmap.html?map=' + encodeURIComponent(mapId);
+    } catch (err) { U.toast(err.message); $('mapBtn').disabled = false; }
+  });
+
+  // ── built by AI ────────────────────────────────────────────
+  $('aiIdeas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-idea]');
+    if (b) { $('aiText').value = b.dataset.idea; $('aiText').focus(); }
+  });
+  $('aiBuild').addEventListener('click', async () => {
+    const instruction = $('aiText').value.trim();
+    if (instruction.length < 3) { $('aiText').focus(); return U.toast('Describe what the board should plan'); }
+    $('aiBuild').disabled = true;
+    $('aiStatus').textContent = 'Planning your board — this usually takes 10 to 30 seconds…';
+    try {
+      const { boardId: id } = await post('/api/boards/generate', { instruction });
+      closeModal('aiModal');
+      $('aiText').value = '';
+      openBoard(id);
+      U.toast('Board built — edit anything that is not right');
+    } catch (err) {
+      U.toast(err.message);
+    } finally {
+      $('aiBuild').disabled = false;
+      $('aiStatus').textContent = '';
+    }
+  });
+
+  // ── share ──────────────────────────────────────────────────
+  let SHARES = [];
+  const shareUrl = (s) => location.origin + s.path;
+  $('shareBtn').addEventListener('click', async () => {
+    openModal('shareModal');
+    $('shareList').innerHTML = '<div class="bx-hint">Loading…</div>';
+    try { SHARES = (await api(`/api/boards/${boardId()}/shares`)).shares; renderShares(); }
+    catch (e) { $('shareList').innerHTML = `<div class="bx-hint">${esc(e.message)}</div>`; }
+  });
+  function renderShares() {
+    if (!SHARES.length) { $('shareList').innerHTML = '<div class="bx-hint">No links yet.</div>'; return; }
+    const when = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    $('shareList').innerHTML = SHARES.map(s => {
+      const status = s.revokedAt ? 'Revoked ' + when(s.revokedAt) : !s.active ? 'Expired ' + when(s.expiresAt)
+        : s.expiresAt ? 'Expires ' + when(s.expiresAt) : 'No expiry';
+      return `<div style="border:1px solid var(--bx-line); border-radius:11px; padding:9px 10px; ${s.active ? '' : 'opacity:.55'}">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input class="bx-field" readonly value="${esc(shareUrl(s))}" style="flex:1; min-width:0; font-size:12px; padding:6px 9px;">
+          ${s.active ? `<button class="bx-ibtn" data-copy="${esc(s.shareId)}" title="Copy link"><span class="material-symbols-outlined">content_copy</span></button>
+          <button class="bx-ibtn" data-revoke="${esc(s.shareId)}" title="Revoke"><span class="material-symbols-outlined">link_off</span></button>` : ''}
+        </div>
+        <div class="bx-hint" style="margin-top:5px">${esc([status, s.includeDocs ? 'with files' : 'cards only', `${s.viewCount} view${s.viewCount === 1 ? '' : 's'}`].join(' · '))}</div>
+      </div>`;
+    }).join('');
+  }
+  async function copyShare(id) {
+    const s = SHARES.find(x => x.shareId === id);
+    if (!s) return;
+    try { await navigator.clipboard.writeText(shareUrl(s)); U.toast('Link copied'); return; } catch (e) { /* fall back */ }
+    const field = [...$('shareList').querySelectorAll('input')].find(i => i.value === shareUrl(s));
+    if (field) { field.focus(); field.select(); }
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    U.toast(ok ? 'Link copied' : 'Copy the link from the box');
+  }
+  $('shareCreate').addEventListener('click', async () => {
+    try {
+      const v = $('shareExpiry').value;
+      const { share } = await post(`/api/boards/${boardId()}/shares`, { includeDocs: $('shareDocs').checked, expiresInDays: v ? Number(v) : null });
+      SHARES.unshift(share);
+      renderShares();
+      copyShare(share.shareId);
+    } catch (e) { U.toast(e.message); }
+  });
+  $('shareList').addEventListener('click', async (e) => {
+    const c = e.target.closest('[data-copy]');
+    const r = e.target.closest('[data-revoke]');
+    if (c) return copyShare(c.dataset.copy);
+    if (r && await confirmBox('Revoke this link?', 'Anyone who has it will see "link not valid" from now on.', 'Revoke')) {
+      try {
+        const { share } = await del(`/api/boards/${boardId()}/shares/${r.dataset.revoke}`);
+        SHARES = SHARES.map(s => s.shareId === share.shareId ? share : s);
+        renderShares();
+        U.toast('Link revoked');
+      } catch (err) { U.toast(err.message); }
+    }
+  });
+
+  // ── confirm ────────────────────────────────────────────────
+  function confirmBox(title, body, yes = 'Delete', { danger = true } = {}) {
+    $('cTitle').textContent = title;
+    $('cBody').textContent = body;
+    $('cYes').textContent = yes;
+    $('cYes').style.background = $('cYes').style.borderColor = danger ? 'var(--bx-danger)' : '';
+    $('confirmModal').classList.add('open');
+    return new Promise((resolve) => {
+      const done = (v) => { $('confirmModal').classList.remove('open'); $('cYes').onclick = $('cNo').onclick = null; resolve(v); };
+      $('cYes').onclick = () => done(true);
+      $('cNo').onclick = () => done(false);
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if ($('confirmModal').classList.contains('open')) return;
+    const open = document.querySelector('.bx-modal.open');
+    if (open) return open.classList.remove('open');
+    closeMenus();
+    if ($('drawer').classList.contains('open')) closeDrawer();
+  });
+
+  // ── boot ───────────────────────────────────────────────────
+  const want = new URLSearchParams(location.search).get('board');
+  if (want) openBoard(want); else showGallery();
+})();
+</script>
+</body>
+</html>

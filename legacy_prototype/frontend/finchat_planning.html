@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Planning</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<!--
+  Planning — the rail's one entry for mind maps AND boards. Pick which kind of
+  plan you want, ask the AI to build one, or turn one kind into the other.
+  Mind maps (finchat_mindmap.html) and boards (finchat_boards.html) stay their
+  own pages; this is the door to both. On the SPA router: everything lives in
+  <main>, no inline on*=, every rule is scoped under .pl or the .bx board kit.
+-->
+<link rel="stylesheet" href="finchat_tw.css">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caprasimo&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
+<link rel="stylesheet" href="board_ui.css">
+<style>
+ .pl-main { min-height: 100vh; }
+ .pl-wrap { max-width: 1080px; margin: 0 auto; padding: 44px 28px 64px; }
+ .pl-eyebrow { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--bx-muted); }
+ .pl-h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin: 6px 0 6px; color: var(--bx-fg); line-height: 1.15; }
+ .pl-sub { margin: 0; font-size: 15px; color: var(--bx-fg-2); max-width: 640px; line-height: 1.55; }
+
+ .pl-choices { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 28px; }
+ .pl-choice { display: flex; flex-direction: column; background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 18px;
+   padding: 0; text-decoration: none; color: inherit; overflow: hidden; box-shadow: 0 1px 2px rgba(20,24,36,.05);
+   transition: box-shadow .15s, transform .15s, border-color .15s; }
+ .pl-choice:hover { box-shadow: var(--bx-shadow-lg); transform: translateY(-2px); border-color: var(--bx-line-2); }
+ .pl-choice:focus-visible { outline: 3px solid var(--bx-blue); outline-offset: 2px; }
+ .pl-art { height: 168px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--bx-line);
+   background-color: var(--bx-canvas); background-image: radial-gradient(var(--bx-dot) 1.1px, transparent 1.2px); background-size: 18px 18px; }
+ .pl-art svg { width: 100%; max-width: 360px; height: 150px; }
+ .pl-choice-body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+ .pl-choice h2 { margin: 0; font-size: 21px; font-weight: 800; color: var(--bx-fg); display: flex; align-items: center; gap: 8px; }
+ .pl-choice p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--bx-fg-2); }
+ .pl-points { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+ .pl-points li { font-size: 13px; color: var(--bx-fg-2); display: flex; gap: 7px; align-items: flex-start; }
+ .pl-points li .material-symbols-outlined { font-size: 17px; }
+ .pl-cta { margin-top: auto; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+ .pl-cta b { font-size: 14px; display: inline-flex; align-items: center; gap: 4px; }
+ .pl-count { font-size: 12.5px; color: var(--bx-muted); font-weight: 600; }
+
+ .pl-card { background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 18px; padding: 20px 22px; margin-top: 18px;
+   box-shadow: 0 1px 2px rgba(20,24,36,.05); }
+ .pl-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+ .pl-card h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--bx-fg); display: flex; align-items: center; gap: 8px; }
+ .pl-seg { display: inline-flex; background: var(--bx-surface-2); border: 1px solid var(--bx-line); border-radius: 10px; padding: 3px; gap: 2px; }
+ .pl-seg button { border: none; background: none; border-radius: 8px; padding: 6px 12px; font: 700 13px 'Figtree', 'Inter', system-ui, sans-serif;
+   color: var(--bx-fg-2); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+ .pl-seg button.on { background: var(--bx-surface); color: var(--bx-blue); box-shadow: 0 1px 3px rgba(20,24,36,.12); }
+ .pl-ai-row { display: flex; gap: 10px; align-items: flex-end; margin-top: 12px; }
+ .pl-ai-row textarea { flex: 1; resize: vertical; min-height: 76px; }
+ .pl-ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+ .pl-lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+ .pl-lists .pl-card { margin-top: 18px; }
+ .pl-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+ .pl-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bx-line); border-radius: 12px; padding: 9px 10px 9px 12px;
+   background: var(--bx-surface); }
+ .pl-row:hover { border-color: var(--bx-line-2); background: var(--bx-surface-2); }
+ .pl-row-ico { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex: none; color: #fff; }
+ .pl-row-main { flex: 1; min-width: 0; cursor: pointer; }
+ .pl-row-title { font-size: 14px; font-weight: 700; color: var(--bx-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .pl-row-meta { font-size: 12px; color: var(--bx-muted); margin-top: 1px; }
+ .pl-pair { color: #6631d7; font-weight: 700; }
+ .pl-row .bx-btn { flex: none; white-space: nowrap; }
+ .pl-empty { font-size: 13px; color: var(--bx-muted); padding: 10px 2px; }
+ .pl-more { display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--bx-blue); text-decoration: none; }
+
+ .pl-toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); background: var(--bx-fg); color: var(--bx-surface);
+   padding: 11px 18px; border-radius: 11px; font-size: 13.5px; font-weight: 600; opacity: 0; pointer-events: none; transition: .25s; z-index: 9999; }
+ .pl-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+ @media (max-width:1023px){ #sideNav{transform:translateX(-100%);position:fixed;transition:transform .25s;z-index:60;} #sideNav.open{transform:translateX(0);} }
+ @media (max-width: 760px) {
+   .pl-wrap { padding: 24px 16px 48px; }
+   .pl-h1 { font-size: 27px; }
+   .pl-choices, .pl-lists { grid-template-columns: minmax(0, 1fr); }
+   .pl-art { height: 132px; }
+   .pl-art svg { height: 118px; }
+   .pl-ai-row { flex-direction: column; align-items: stretch; }
+ }
+</style>
+</head>
+<body class="min-h-screen">
+
+<nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
+
+<main class="flex-1 lg:ml-64 bx bx-canvas pl-main">
+ <div class="pl-wrap">
+  <div class="pl-eyebrow"><span class="material-symbols-outlined" style="font-size:18px">schema</span>Planning</div>
+  <h1 class="pl-h1">What are you planning?</h1>
+  <p class="pl-sub">Think an idea through as a mind map, or plan the work as a Kanban board. Either one can become the other, files and links included.</p>
+
+  <div class="pl-choices">
+   <a class="pl-choice" href="finchat_mindmap.html" id="plGoMaps">
+    <div class="pl-art" aria-hidden="true">
+     <svg viewBox="0 0 360 150">
+      <g fill="none" stroke-width="2.5" stroke-linecap="round">
+       <path d="M180 75 C150 75 140 34 104 34" stroke="#6631d7"/><path d="M180 75 C150 75 140 116 104 116" stroke="#12a150"/>
+       <path d="M180 75 C210 75 220 34 256 34" stroke="#2b59c3"/><path d="M180 75 C210 75 220 116 256 116" stroke="#fb8c00"/>
+       <path d="M62 34 C50 34 46 18 34 18" stroke="#6631d7" opacity=".6"/><path d="M62 34 C50 34 46 50 34 50" stroke="#6631d7" opacity=".6"/>
+       <path d="M298 116 C310 116 314 100 326 100" stroke="#fb8c00" opacity=".6"/><path d="M298 116 C310 116 314 132 326 132" stroke="#fb8c00" opacity=".6"/>
+      </g>
+      <rect x="140" y="61" width="80" height="28" rx="9" fill="#1c1f26"/>
+      <rect x="62" y="23" width="44" height="22" rx="7" fill="#6631d7"/><rect x="62" y="105" width="44" height="22" rx="7" fill="#12a150"/>
+      <rect x="254" y="23" width="44" height="22" rx="7" fill="#2b59c3"/><rect x="254" y="105" width="44" height="22" rx="7" fill="#fb8c00"/>
+      <rect x="8" y="11" width="28" height="14" rx="5" fill="#eae2f9" stroke="#6631d7"/><rect x="8" y="43" width="28" height="14" rx="5" fill="#eae2f9" stroke="#6631d7"/>
+      <rect x="324" y="93" width="28" height="14" rx="5" fill="#feefdb" stroke="#fb8c00"/><rect x="324" y="125" width="28" height="14" rx="5" fill="#feefdb" stroke="#fb8c00"/>
+      <rect x="156" y="72" width="48" height="6" rx="3" fill="#fff" opacity=".85"/>
+     </svg>
+    </div>
+    <div class="pl-choice-body">
+     <h2><span class="material-symbols-outlined" style="color:#6631d7">account_tree</span>Mind map</h2>
+     <p>Break a topic or an idea into branches — for studying, research and thinking it through.</p>
+     <ul class="pl-points">
+      <li><span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span>AI builds it from a topic, a chat or your documents</li>
+      <li><span class="material-symbols-outlined" style="color:#2b59c3">attach_file</span>Files, Drive links, videos and notes on every node</li>
+      <li><span class="material-symbols-outlined" style="color:#12a150">group_add</span>Share a live, view-only link with anyone</li>
+     </ul>
+     <div class="pl-cta"><b style="color:#6631d7">Open mind maps<span class="material-symbols-outlined">arrow_forward</span></b><span class="pl-count" id="plMapCount"></span></div>
+    </div>
+   </a>
+
+   <a class="pl-choice" href="finchat_boards.html" id="plGoBoards">
+    <div class="pl-art" aria-hidden="true">
+     <svg viewBox="0 0 360 150">
+      <g>
+       <rect x="22" y="12" width="100" height="128" rx="12" fill="#fff" stroke="#e3e5ea"/>
+       <rect x="32" y="22" width="52" height="14" rx="7" fill="#fff3a3"/>
+       <rect x="32" y="44" width="80" height="36" rx="7" fill="#fff" stroke="#e3e5ea"/><rect x="40" y="52" width="26" height="6" rx="3" fill="#6631d7"/><rect x="40" y="64" width="56" height="5" rx="2.5" fill="#cfd3da"/>
+       <rect x="32" y="88" width="80" height="36" rx="7" fill="#fff" stroke="#e3e5ea"/><rect x="40" y="96" width="26" height="6" rx="3" fill="#d62d2d"/><rect x="40" y="108" width="48" height="5" rx="2.5" fill="#cfd3da"/>
+      </g>
+      <g>
+       <rect x="130" y="12" width="100" height="128" rx="12" fill="#fff" stroke="#e3e5ea"/>
+       <rect x="140" y="22" width="60" height="14" rx="7" fill="#ffcd9e"/>
+       <rect x="140" y="44" width="80" height="44" rx="7" fill="#fff" stroke="#4262ff" stroke-width="1.5"/><rect x="148" y="52" width="26" height="6" rx="3" fill="#2b59c3"/><rect x="178" y="52" width="20" height="6" rx="3" fill="#12a150"/><rect x="148" y="64" width="60" height="5" rx="2.5" fill="#cfd3da"/><rect x="148" y="74" width="40" height="5" rx="2.5" fill="#cfd3da"/>
+      </g>
+      <g>
+       <rect x="238" y="12" width="100" height="128" rx="12" fill="#fff" stroke="#e3e5ea"/>
+       <rect x="248" y="22" width="40" height="14" rx="7" fill="#c6f1d0"/>
+       <rect x="248" y="44" width="80" height="36" rx="7" fill="#fff" stroke="#e3e5ea"/><rect x="256" y="52" width="26" height="6" rx="3" fill="#0ca789"/><rect x="256" y="64" width="50" height="5" rx="2.5" fill="#cfd3da"/>
+      </g>
+     </svg>
+    </div>
+    <div class="pl-choice-body">
+     <h2><span class="material-symbols-outlined" style="color:#4262ff">view_kanban</span>Kanban board</h2>
+     <p>Plan the work in columns and cards — tasks you can drag from To do to Done.</p>
+     <ul class="pl-points">
+      <li><span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span>AI builds it from a sentence, or start from a mind map</li>
+      <li><span class="material-symbols-outlined" style="color:#d62d2d">sell</span>Coloured tags, priorities and start–end dates</li>
+      <li><span class="material-symbols-outlined" style="color:#fb8c00">smart_display</span>Images, videos, Drive docs and files on cards</li>
+     </ul>
+     <div class="pl-cta"><b style="color:#4262ff">Open boards<span class="material-symbols-outlined">arrow_forward</span></b><span class="pl-count" id="plBoardCount"></span></div>
+    </div>
+   </a>
+  </div>
+
+  <section class="pl-card" aria-labelledby="plAiTitle">
+   <div class="pl-card-head">
+    <h3 id="plAiTitle"><span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span>Ask AI to build it</h3>
+    <div class="pl-seg" role="tablist" id="plKind">
+     <button class="on" data-kind="board" role="tab" aria-selected="true"><span class="material-symbols-outlined">view_kanban</span>Kanban board</button>
+     <button data-kind="map" role="tab" aria-selected="false"><span class="material-symbols-outlined">account_tree</span>Mind map</button>
+    </div>
+   </div>
+   <div class="pl-ai-row">
+    <textarea class="bx-field" id="plAiText" rows="3" maxlength="4000"></textarea>
+    <button class="bx-btn primary" id="plAiBuild"><span class="material-symbols-outlined">auto_awesome</span><span id="plAiBuildLabel">Build board</span></button>
+   </div>
+   <div class="pl-ideas" id="plIdeas"></div>
+   <div class="bx-hint" id="plAiStatus"></div>
+  </section>
+
+  <div class="pl-lists">
+   <section class="pl-card">
+    <h3><span class="material-symbols-outlined" style="color:#6631d7">account_tree</span>Your mind maps</h3>
+    <div class="bx-hint">Open one, or turn it into a board. A map that already has a board opens that board.</div>
+    <div class="pl-list" id="plMaps"><div class="pl-empty">Loading…</div></div>
+   </section>
+   <section class="pl-card">
+    <h3><span class="material-symbols-outlined" style="color:#4262ff">view_kanban</span>Your boards</h3>
+    <div class="bx-hint">Open one, or see it as a mind map. Conversions are copies — the original is never changed.</div>
+    <div class="pl-list" id="plBoards"><div class="pl-empty">Loading…</div></div>
+   </section>
+  </div>
+ </div>
+
+ <div class="pl-toast" id="plToast" role="status"></div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
+  const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (session && session.token) || '';
+  if (!TOKEN) { location.href = 'finchat_login.html'; return; }
+  const API = location.protocol.indexOf('http') === 0 ? location.origin : 'http://127.0.0.1:3000';
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function toast(msg) {
+    const t = $('plToast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+  async function api(path, opts = {}) {
+    const res = await fetch(API + path, {
+      ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN, ...(opts.headers || {}) }
+    });
+    if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    const body = (res.headers.get('content-type') || '').includes('json') ? await res.json().catch(() => ({})) : {};
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    return body;
+  }
+  const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body || {}) });
+  const goMap = (id) => { location.href = 'finchat_mindmap.html?map=' + encodeURIComponent(id); };
+  const goBoard = (id) => { location.href = 'finchat_boards.html?board=' + encodeURIComponent(id); };
+  const day = (d) => { try { return new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
+
+  // ── ask AI ─────────────────────────────────────────────────
+  const KINDS = {
+    board: {
+      label: 'Build board',
+      placeholder: 'What should the board plan? e.g. Launch the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing',
+      ideas: [
+        ['Product launch', 'Product launch in 6 weeks with design, engineering, marketing and support'],
+        ['Job search', 'Job search for product manager roles over the next month: applications, networking, interview prep'],
+        ['Study plan', 'Study plan to learn post-quantum cryptography in 4 weeks'],
+        ['Event', 'Organise a 100-person community meetup in 3 weeks: venue, speakers, promotion, day-of logistics']
+      ]
+    },
+    map: {
+      label: 'Build mind map',
+      placeholder: 'What should the map explore? e.g. How UPI payments work in India',
+      ideas: [
+        ['A topic to study', 'Post-quantum cryptography'],
+        ['A business idea', 'A subscription POS for small restaurants in Kerala'],
+        ['A decision', 'Should I move from growth to a product manager role?'],
+        ['A market', 'The Indian fintech lending market']
+      ]
+    }
+  };
+  let kind = 'board';
+  try { if (localStorage.getItem('finchat_plan_kind') === 'map') kind = 'map'; } catch (e) {}
+
+  function paintKind() {
+    const k = KINDS[kind];
+    $('plKind').querySelectorAll('button').forEach(b => {
+      const on = b.dataset.kind === kind;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $('plAiText').placeholder = k.placeholder;
+    $('plAiBuildLabel').textContent = k.label;
+    $('plIdeas').innerHTML = k.ideas.map(([label, text]) => `<button class="bx-chip" data-idea="${esc(text)}">${esc(label)}</button>`).join('');
+  }
+  $('plKind').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-kind]');
+    if (!b || b.dataset.kind === kind) return;
+    kind = b.dataset.kind;
+    try { localStorage.setItem('finchat_plan_kind', kind); } catch (err) {}
+    paintKind();
+  });
+  $('plIdeas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-idea]');
+    if (b) { $('plAiText').value = b.dataset.idea; $('plAiText').focus(); }
+  });
+  $('plAiText').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); build(); }
+  });
+  $('plAiBuild').addEventListener('click', build);
+
+  let building = false;
+  async function build() {
+    if (building) return;
+    const text = $('plAiText').value.trim();
+    if (text.length < 3) { $('plAiText').focus(); return toast(kind === 'board' ? 'Describe what the board should plan' : 'Name a topic for the map'); }
+    building = true;
+    $('plAiBuild').disabled = true;
+    $('plAiStatus').textContent = kind === 'board'
+      ? 'Planning your board — this usually takes 10 to 30 seconds…'
+      : 'Building your mind map — this usually takes 15 to 40 seconds…';
+    try {
+      if (kind === 'board') {
+        const out = await post('/api/boards/generate', { instruction: text });
+        goBoard(out.boardId);
+      } else {
+        // A short line is a topic; anything longer is material to organise.
+        const out = text.length <= 400
+          ? await post('/api/mind-maps/generate', { sourceType: 'topic', topic: text })
+          : await post('/api/mind-maps/generate', { sourceType: 'text', text });
+        goMap(out.mapId);
+      }
+    } catch (e) {
+      toast(e.message);
+      $('plAiStatus').textContent = '';
+      $('plAiBuild').disabled = false;
+      building = false;
+    }
+  }
+
+  // ── lists + conversions ────────────────────────────────────
+  const SHOW = 6;
+  let MAPS = [], BOARDS = [];
+
+  function mapRow(m, boardId) {
+    return `<div class="pl-row">
+      <div class="pl-row-ico" style="background:#6631d7"><span class="material-symbols-outlined">account_tree</span></div>
+      <div class="pl-row-main" data-openmap="${esc(m.map_id)}">
+        <div class="pl-row-title">${esc(m.title || m.topic || 'Untitled map')}</div>
+        <div class="pl-row-meta">${Number(m.node_count) || 0} nodes${Number(m.doc_count) ? ` · ${m.doc_count} files` : ''} · ${esc(day(m.updated_at))}${
+          boardId ? ' · <span class="pl-pair">has a board</span>' : ''}</div>
+      </div>
+      ${boardId
+        ? `<button class="bx-btn ghost" data-openboard="${esc(boardId)}"><span class="material-symbols-outlined">view_kanban</span>Open board</button>`
+        : `<button class="bx-btn ghost" data-toboard="${esc(m.map_id)}"><span class="material-symbols-outlined">view_kanban</span>Make board</button>`}
+    </div>`;
+  }
+  function boardRow(b) {
+    const hasMap = b.sourceMapId && MAPS.some(m => m.map_id === b.sourceMapId);
+    return `<div class="pl-row">
+      <div class="pl-row-ico" style="background:#4262ff"><span class="material-symbols-outlined">view_kanban</span></div>
+      <div class="pl-row-main" data-openboard="${esc(b.boardId)}">
+        <div class="pl-row-title">${esc(b.title)}</div>
+        <div class="pl-row-meta">${b.columnCount} columns · ${b.cardCount} cards · ${esc(day(b.updatedAt))}${
+          hasMap ? ' · <span class="pl-pair">has a mind map</span>' : ''}</div>
+      </div>
+      ${hasMap
+        ? `<button class="bx-btn ghost" data-openmap="${esc(b.sourceMapId)}"><span class="material-symbols-outlined">account_tree</span>Open map</button>`
+        : `<button class="bx-btn ghost" data-tomap="${esc(b.boardId)}"><span class="material-symbols-outlined">account_tree</span>Make mind map</button>`}
+    </div>`;
+  }
+
+  function paintLists() {
+    const boardOfMap = new Map();
+    for (const b of BOARDS) if (b.sourceMapId && !boardOfMap.has(b.sourceMapId)) boardOfMap.set(b.sourceMapId, b.boardId);
+    $('plMaps').innerHTML = MAPS.length
+      ? MAPS.slice(0, SHOW).map(m => mapRow(m, boardOfMap.get(m.map_id))).join('')
+        + (MAPS.length > SHOW ? `<a class="pl-more" href="finchat_mindmap.html">All ${MAPS.length} mind maps →</a>` : '')
+      : '<div class="pl-empty">No mind maps yet — ask the AI above, or open Mind maps to build one from a chat or your documents.</div>';
+    $('plBoards').innerHTML = BOARDS.length
+      ? BOARDS.slice(0, SHOW).map(boardRow).join('')
+        + (BOARDS.length > SHOW ? `<a class="pl-more" href="finchat_boards.html">All ${BOARDS.length} boards →</a>` : '')
+      : '<div class="pl-empty">No boards yet — ask the AI above, or turn one of your mind maps into a board.</div>';
+    $('plMapCount').textContent = MAPS.length ? `${MAPS.length} map${MAPS.length === 1 ? '' : 's'}` : '';
+    $('plBoardCount').textContent = BOARDS.length ? `${BOARDS.length} board${BOARDS.length === 1 ? '' : 's'}` : '';
+  }
+
+  async function load() {
+    const [maps, boards] = await Promise.allSettled([api('/api/mind-maps'), api('/api/boards')]);
+    MAPS = maps.status === 'fulfilled' ? (maps.value.maps || []) : [];
+    BOARDS = boards.status === 'fulfilled' ? (boards.value.boards || []) : [];
+    paintLists();
+    if (maps.status === 'rejected') $('plMaps').innerHTML = `<div class="pl-empty">Could not load mind maps: ${esc(maps.reason.message)}</div>`;
+    if (boards.status === 'rejected') $('plBoards').innerHTML = `<div class="pl-empty">Could not load boards: ${esc(boards.reason.message)}</div>`;
+  }
+
+  async function convert(btn, run, busyLabel) {
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = `<span class="material-symbols-outlined">hourglass_top</span>${busyLabel}`;
+    try { await run(); }
+    catch (e) { toast(e.message); btn.disabled = false; btn.innerHTML = label; }
+  }
+
+  document.querySelector('.pl-lists').addEventListener('click', (e) => {
+    const t = e.target;
+    let el;
+    if ((el = t.closest('[data-toboard]'))) {
+      return convert(el, async () => {
+        const out = await post('/api/boards/from-map', { mapId: el.dataset.toboard, reuse: true });
+        goBoard(out.boardId);
+      }, 'Building…');
+    }
+    if ((el = t.closest('[data-tomap]'))) {
+      return convert(el, async () => {
+        const out = await post(`/api/boards/${encodeURIComponent(el.dataset.tomap)}/mind-map`);
+        goMap(out.mapId);
+      }, 'Building…');
+    }
+    if ((el = t.closest('[data-openboard]'))) return goBoard(el.dataset.openboard);
+    if ((el = t.closest('[data-openmap]'))) return goMap(el.dataset.openmap);
+  });
+
+  paintKind();
+  load();
+})();
+</script>
+<script src="sidebar_nav.js"></script>
+<script src="sidebar_collapse.js"></script>
+<script src="spa_router.js"></script>
+<script src="notifications_widget.js"></script>
+</body>
+</html>

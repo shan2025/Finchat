@@ -627,9 +627,56 @@
      ${skelLine('68%')}
    </div>`;
 
+ // Google Drive — its own consent (drive.metadata.readonly) on the same Google
+ // grant as Gmail. Names and links only; never contents.
+ function driveCard(g) {
+   if (!g) return skelCard();
+   if (!g.configured) return '';
+   const on = g.features && g.features.drive;
+   if (on) {
+     return `
+     <div class="set-card" style="padding:22px;">
+       <div style="display:flex; align-items:flex-start; gap:14px;">
+         <div style="flex:1; min-width:0;">
+           <div style="display:flex; align-items:center; gap:10px;">
+             <span style="font-size:16px; font-weight:700; color:var(--text);">Google Drive — file links</span>
+             <span class="stag stag-on">connected</span>
+           </div>
+           <div style="font-size:13px; color:var(--text-2); margin-top:4px;">Find files by name and attach their links to board cards and mind map nodes — from the board, or by asking Plato.</div>
+         </div>
+         <button class="sb sb-danger" data-gdrive="disconnect">Disconnect</button>
+       </div>
+       <div class="set-grid2" style="margin-top:18px;">
+         <div style="background:rgba(79,138,82,.1); border-radius:var(--radius); padding:13px 16px;">
+           <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ok); margin-bottom:5px;">Can</div>
+           <div style="font-size:12.5px; color:var(--text);">See file names, types and links, to find the one you mean.</div>
+         </div>
+         <div style="background:rgba(176,71,46,.09); border-radius:var(--radius); padding:13px 16px;">
+           <div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--danger); margin-bottom:5px;">Cannot</div>
+           <div style="font-size:12.5px; color:var(--text);">Open or read what is inside a file, change sharing, edit, upload or delete anything.</div>
+         </div>
+       </div>
+       <div style="display:flex; gap:26px; margin-top:16px; font-size:12px; color:var(--text-3); flex-wrap:wrap;">
+         ${g.email ? `<span>Account <b style="color:var(--text); font-weight:600;">${esc(g.email)}</b></span>` : ''}
+         <span>Scope <b style="color:var(--text); font-weight:600;">drive.metadata.readonly</b></span>
+       </div>
+     </div>`;
+   }
+   return `
+     <div class="set-card" style="border-style:dashed; padding:20px; display:flex; align-items:center; gap:16px;">
+       <div style="flex:1;">
+         <div style="font-size:14.5px; font-weight:600; color:var(--text);">Google Drive — file links</div>
+         <div style="font-size:12.5px; color:var(--text-3); margin-top:2px;">Not connected. Connect it to find Drive files by name and put their links on boards — FinChat sees names and links, never file contents.</div>
+       </div>
+       <button class="sb sb-primary" data-gdrive="connect">Connect Drive (links only)</button>
+     </div>`;
+ }
+
  function secConnections() {
    const g = state.gStatus;
    let gmailCard;
+   // A grant can hold Drive without Gmail, so "connected" alone is not "Gmail connected".
+   const gmailOn = g && g.connected && (!g.features || g.features.gmail);
    if (!g) {
      gmailCard = skelCard();
    } else if (!g.configured) {
@@ -640,7 +687,7 @@
          Set <span style="color:var(--accent-warm);">GOOGLE_CLIENT_SECRET</span> and register <span style="color:var(--accent-warm);">${esc(g.redirectUri || '')}</span> as a redirect URI in the Google Cloud console.
        </div>
      </div>`;
-   } else if (g.connected) {
+   } else if (gmailOn) {
      gmailCard = `
      <div class="set-card" style="padding:22px;">
        <div style="display:flex; align-items:flex-start; gap:14px;">
@@ -682,6 +729,7 @@
    return `
    <div class="set-sec-head"><h2>Connected accounts</h2><p>Outside services FinChat may read on your behalf. Each one states exactly what it can see; you can disconnect at any time.</p></div>
    ${gmailCard}
+   ${driveCard(g)}
    ${secBrokers()}
    <div>
      <h3 style="font-family:var(--serif); font-size:17px; margin:0 0 12px; color:var(--text);">Available</h3>
@@ -1434,19 +1482,37 @@
  }
 
  // ── Gmail connect / disconnect ──
- async function connectGoogle() {
+ async function connectGoogle(feature = 'gmail') {
+   const name = feature === 'drive' ? 'Google Drive' : 'Gmail';
    try {
-     const d = await (await fetch(API + '/api/integrations/google/connect', { headers: AUTH })).json();
+     const d = await (await fetch(API + '/api/integrations/google/connect?feature=' + feature, { headers: AUTH })).json();
      if (!d.url) throw new Error(d.error || 'could not start');
      location.href = d.url;
-   } catch (e) { showToast('Could not connect Gmail: ' + e.message); }
+   } catch (e) { showToast(`Could not connect ${name}: ` + e.message); }
+ }
+ // Google revokes a grant as a whole, so disconnecting Drive also ends Gmail
+ // (and vice versa) — the dialog says so rather than surprising anyone.
+ function askDisconnectDrive() {
+   const both = state.gStatus && state.gStatus.features && state.gStatus.features.gmail;
+   $('dialogHost').innerHTML = `
+     <div class="dlg-back" id="dlgBack">
+       <div class="dlg">
+         <div class="dlg-title">Disconnect Google Drive?</div>
+         <div class="dlg-body">FinChat stops finding Drive files immediately and the permission is revoked at Google.${both ? ' Google revokes access as one grant, so <b>Gmail disconnects too</b> — reconnect it afterwards if you still want job mail read.' : ''} Links already on your boards keep working.</div>
+         <div class="dlg-actions">
+           <button class="sb sb-secondary" data-dlg="close">Keep connected</button>
+           <button class="sb sb-primary" data-dlg="confirm">Disconnect</button>
+         </div>
+       </div>
+     </div>`;
  }
  function askDisconnectGmail() {
+   const both = state.gStatus && state.gStatus.features && state.gStatus.features.drive;
    $('dialogHost').innerHTML = `
      <div class="dlg-back" id="dlgBack">
        <div class="dlg">
          <div class="dlg-title">Disconnect Gmail?</div>
-         <div class="dlg-body">FinChat will stop reading job mail immediately, and the permission is revoked at Google. You can reconnect at any time.</div>
+         <div class="dlg-body">FinChat will stop reading job mail immediately, and the permission is revoked at Google.${both ? ' Google revokes access as one grant, so <b>Google Drive disconnects too</b>.' : ''} You can reconnect at any time.</div>
          <div class="dlg-actions">
            <button class="sb sb-secondary" data-dlg="close">Keep connected</button>
            <button class="sb sb-primary" data-dlg="confirm">Disconnect</button>
@@ -1459,7 +1525,7 @@
    try {
      const r = await fetch(API + '/api/integrations/google', { method: 'DELETE', headers: AUTH });
      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'failed');
-     showToast('Gmail disconnected'); await loadIntegrations();
+     showToast('Google disconnected — Gmail and Drive access revoked'); await loadIntegrations();
    } catch (e) { showToast('Disconnect failed: ' + e.message); }
  }
  function reportOAuthOutcome() {
@@ -1467,9 +1533,10 @@
    const g = q.get('google');
    const z = q.get('zerodha');
    if (!g && !z) return;
-   if (g === 'connected') showToast('Gmail connected' + (q.get('account') ? ' — ' + q.get('account') : ''));
-   else if (g === 'cancelled') showToast('Gmail connection cancelled');
-   else if (g) showToast('Gmail connection failed: ' + (q.get('reason') || 'unknown error'));
+   const gName = (q.get('feature') || '').includes('drive') ? 'Google Drive' : 'Gmail';
+   if (g === 'connected') showToast(gName + ' connected' + (q.get('account') ? ' — ' + q.get('account') : ''));
+   else if (g === 'cancelled') showToast('Google connection cancelled');
+   else if (g) showToast('Google connection failed: ' + (q.get('reason') || 'unknown error'));
 
    // Kite sends the browser back here after the daily login.
    if (z === 'connected') showToast(`Zerodha connected — ${q.get('holdings') || 0} holding(s) synced. Kite clears the session each morning, so you'll log in again tomorrow.`);
@@ -1529,7 +1596,8 @@
    if ((el = t.closest('[data-avatar]'))) {
      return el.dataset.avatar === 'remove' ? removeAvatar() : $('avatarFile').click();
    }
-   if ((el = t.closest('[data-gmail]'))) return el.dataset.gmail === 'connect' ? connectGoogle() : askDisconnectGmail();
+   if ((el = t.closest('[data-gmail]'))) return el.dataset.gmail === 'connect' ? connectGoogle('gmail') : askDisconnectGmail();
+   if ((el = t.closest('[data-gdrive]'))) return el.dataset.gdrive === 'connect' ? connectGoogle('drive') : askDisconnectDrive();
    if ((el = t.closest('[data-broker-connect]'))) return connectBroker(el.dataset.brokerConnect);
    if ((el = t.closest('[data-broker-login]'))) return zerodhaLogin();
    if ((el = t.closest('[data-broker-sync]'))) return syncBroker(el.dataset.brokerSync);

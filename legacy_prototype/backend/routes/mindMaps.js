@@ -15,12 +15,20 @@
 //   POST   /:mapId/edges                  add a cross-link
 //   DELETE /:mapId/edges/:edgeId          remove a cross-link
 //   POST   /:mapId/layout                 bulk position save
-//   GET    /:mapId/export?format=         markdown | opml
+//   GET    /:mapId/export?format=         markdown | opml | bundle (.zip, see mindMapBundle.js)
+//   POST   /import                        multipart "file": a bundle → a new map
+//
+//   GET    /:mapId/shares                 the map's share links
+//   POST   /:mapId/shares                 {includeDocs, expiresInDays} → a new link
+//   DELETE /:mapId/shares/:shareId        revoke a link
+//   (the public side of a link is routes/sharedMindMaps.js)
 //
 //   POST   /docs                          upload documents (multipart, "files")
 //   POST   /docs/text                     save typed / pasted text as a source
+//   POST   /docs/links                    attach Drive/Docs/YouTube/image/web links
 //   GET    /docs                          the caller's document library
 //   GET    /docs/:docId                   one document + its extracted text
+//   GET    /docs/:docId/file              the file: viewed in place, or ?download=1
 //   PATCH  /docs/:docId                   attach / move to a map or node
 //   PATCH  /docs/:docId/text              rewrite a text note in place
 //   DELETE /docs/:docId                   forget a document
@@ -35,9 +43,13 @@ const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const Engine = require('../services/cognitive/MindMapEngine');
+const Bundle = require('../services/cognitive/mindMapBundle');
+const { sendDocFile } = require('../services/cognitive/mindMapDocFile');
+const { prepareLinks, linkView } = require('../services/linkAttach');
 const { extractFromUpload, persistUpload, UPLOAD_DIR } = require('../services/attachments');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const NODE_TYPES = ['root', 'branch', 'leaf', 'question', 'task'];
 const LAYOUTS = ['radial', 'tree', 'freeform'];
@@ -62,7 +74,34 @@ const DOC_DB_MAX_BYTES = Number(process.env.MIND_MAP_DOC_DB_MAX_BYTES) || 8 * 10
 const CHAT_DOC_CHARS = 4000;
 const CHAT_DOC_LIMIT = 4;
 
+// A bundle is the map plus its originals, so it gets the per-original ceiling
+// with room for a handful of them.
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 40 * 1024 * 1024, files: 1 }
+});
+
+const SHARE_EXPIRY_DAYS = [1, 7, 30, 90];
+
 const clean = (v, max = 400) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+
+/** What the owner sees about a share link. The token is theirs to copy again. */
+function shareView(row) {
+  const expired = row.expires_at && new Date(row.expires_at) <= new Date();
+  return {
+    shareId: row.share_id,
+    // The token rides in the fragment: browsers never send a fragment to a
+    // server, so it stays out of access logs and Referer headers.
+    path: `/finchat_mindmap_share.html#${row.token}`,
+    includeDocs: row.include_docs,
+    expiresAt: row.expires_at,
+    revokedAt: row.revoked_at,
+    active: !row.revoked_at && !expired,
+    viewCount: row.view_count,
+    lastViewedAt: row.last_viewed_at,
+    createdAt: row.created_at
+  };
+}
 
 /**
  * Turn a generator refusal into something the user can act on.
@@ -109,6 +148,8 @@ function docView(row, withText = false) {
       ? `/api/mind-maps/docs/${encodeURIComponent(row.doc_id)}/file` : null,
     createdAt: row.created_at
   };
+  // A link (migration 056): `link` carries the outside URL and how to show it.
+  if (row.kind === 'link') view.link = linkView(row.url, row.provider);
   if (withText) view.text = row.extracted || '';
   return view;
 }
@@ -301,6 +342,42 @@ router.post('/docs/text', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /docs/links ───────────────────────────────────────────
+// Attach links — Google Docs/Drive, YouTube, images, any web page — to a map or
+// a node. Body: {mapId, nodeId?, links?: [{url, title?}], text?: "pasted…"}.
+// Links are stored as rows of kind 'link'; nothing is fetched from them.
+router.post('/docs/links', requireAuth, async (req, res) => {
+  try {
+    const mapId = clean(req.body?.mapId, 80) || null;
+    const nodeId = clean(req.body?.nodeId, 80) || null;
+    if (!mapId) return res.status(400).json({ error: 'mapId is required' });
+    const scopeError = await checkDocScope(req.user.id, mapId, nodeId);
+    if (scopeError) return res.status(scopeError.status).json({ error: scopeError.error });
+
+    const { links, rejected } = await prepareLinks(req.user.id, {
+      links: req.body?.links, text: req.body?.text
+    });
+    if (!links.length) {
+      return res.status(400).json({ error: 'No usable links — paste full http(s) addresses.', rejected });
+    }
+    const saved = [];
+    for (const l of links) {
+      const r = await query(`
+        INSERT INTO mind_map_docs
+          (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes, kind, url, provider)
+        VALUES ($1,$2,$3,$4,$5,'',0,'link',$6,$7)
+        RETURNING *
+      `, ['mmd_' + uuidv4(), req.user.id, mapId, nodeId, l.title, l.url, l.provider]);
+      saved.push(docView(r.rows[0]));
+    }
+    await Engine.touchMap(mapId);
+    res.status(201).json({ ok: true, docs: saved, rejected });
+  } catch (err) {
+    console.error('Mind map link attach error:', err);
+    res.status(500).json({ error: 'Failed to attach links', details: err.message });
+  }
+});
+
 // ── PATCH /docs/:docId/text ────────────────────────────────────
 // Notes are editable in place — that is the whole difference between a note and
 // an upload. Re-titling alone is allowed, so `text` is optional.
@@ -367,23 +444,24 @@ router.get('/docs/:docId/file', requireAuth, async (req, res) => {
   try {
     const doc = await requireOwnedDoc(req, res, { withData: true });
     if (!doc) return;
-
-    const setHeaders = () => {
-      res.set('Content-Type', doc.mimetype || 'application/octet-stream');
-      res.set('Cache-Control', 'private, max-age=3600');
-      res.set('Content-Disposition',
-        `inline; filename="${String(doc.filename || 'document').replace(/["\r\n]/g, '')}"`);
-    };
+    // ?download=1 → always an attachment; otherwise safe types render in place
+    // (see services/cognitive/mindMapDocFile.js — the share link uses the same).
+    const download = req.query.download === '1';
+    res.set('Cache-Control', 'private, max-age=3600');
 
     // The row is the source of truth since migration 045.
-    if (doc.data) {
-      setHeaders();
-      return res.send(doc.data);
-    }
+    if (doc.data) return sendDocFile(res, doc, { download });
+
+    // No original anywhere: a download still gets the extracted text as .txt,
+    // so every document on a map can be saved.
+    const textOnly = () => sendDocFile(res, { ...doc, data: null }, { download: true });
 
     // Rows written before that still point at a disk file. On a host that has
     // not redeployed since, those bytes are still there.
-    if (!doc.stored_name) return res.status(404).json({ error: 'Original file not stored' });
+    if (!doc.stored_name) {
+      if (download && textOnly()) return;
+      return res.status(404).json({ error: 'Original file not stored' });
+    }
 
     // stored_name comes from our own writer, but it reaches the filesystem here,
     // so treat it as hostile: basename only, never a path that can climb out.
@@ -393,6 +471,7 @@ router.get('/docs/:docId/file', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Original file not stored' });
     }
     if (!fs.existsSync(full)) {
+      if (download && textOnly()) return;
       // Uploaded before migration 045 and since wiped by a deploy. Say that
       // plainly instead of a bare 404 the UI would report as "missing".
       return res.status(410).json({
@@ -400,8 +479,9 @@ router.get('/docs/:docId/file', requireAuth, async (req, res) => {
       });
     }
 
-    setHeaders();
-    fs.createReadStream(full).pipe(res);
+    // Bounded by multer's 15MB at upload, so reading it whole is fine — and it
+    // lets the disk copy go through the same headers as a stored one.
+    sendDocFile(res, { ...doc, data: fs.readFileSync(full) }, { download });
   } catch (err) {
     console.error('Mind map doc file error:', err);
     res.status(500).json({ error: 'Failed to read document' });
@@ -455,6 +535,30 @@ router.delete('/docs/:docId', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Mind map doc delete error:', err);
     res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
+// ── POST /import ───────────────────────────────────────────────
+// A bundle from GET /:mapId/export?format=bundle (or a shared link's download)
+// becomes a new map owned by the caller. Registered ahead of /:mapId.
+router.post('/import', requireAuth, (req, res, next) => {
+  importUpload.single('file')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'That bundle is over 40 MB.' });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded (field name: "file")' });
+  try {
+    const parsed = await Bundle.parseBundle(req.file.buffer);
+    const out = await Engine.importBundle(req.user.id, parsed);
+    res.status(201).json({ ok: true, ...out, dropped: parsed.dropped });
+  } catch (err) {
+    if (err instanceof Bundle.BundleError) return res.status(422).json({ error: err.message });
+    console.error('Mind map import error:', err);
+    res.status(500).json({ error: 'Failed to import that bundle', details: err.message });
   }
 });
 
@@ -887,7 +991,13 @@ router.get('/:mapId/export', requireAuth, async (req, res) => {
     const full = await Engine.getMap(req.params.mapId, req.user.id);
     if (!full) return res.status(404).json({ error: 'Map not found' });
 
-    if (format === 'markdown') {
+    if (format === 'bundle') {
+      const docs = await Engine.mapDocsWithData(full.map.map_id);
+      const { buffer, filename } = await Bundle.buildBundle({ ...full, docs });
+      res.set('Content-Type', 'application/zip');
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } else if (format === 'markdown') {
       res.type('text/markdown').send(toMarkdown(full));
     } else if (format === 'opml') {
       res.type('text/x-opml').send(toOpml(full));
@@ -895,11 +1005,64 @@ router.get('/:mapId/export', requireAuth, async (req, res) => {
       // PNG is a canvas render — the browser owns it, the server has no canvas.
       res.status(501).json({ error: 'PNG export happens client-side from the canvas' });
     } else {
-      res.status(400).json({ error: 'format must be markdown or opml' });
+      res.status(400).json({ error: 'format must be markdown, opml or bundle' });
     }
   } catch (err) {
     console.error('Mind map export error:', err);
     res.status(500).json({ error: 'Failed to export mind map' });
+  }
+});
+
+// ── Share links ────────────────────────────────────────────────
+
+router.get('/:mapId/shares', requireAuth, async (req, res) => {
+  try {
+    const map = await requireOwnedMap(req, res);
+    if (!map) return;
+    const r = await query(
+      'SELECT * FROM mind_map_shares WHERE map_id = $1 ORDER BY created_at DESC LIMIT 50', [map.map_id]);
+    res.json({ shares: r.rows.map(shareView) });
+  } catch (err) {
+    console.error('Mind map share list error:', err);
+    res.status(500).json({ error: 'Failed to load share links' });
+  }
+});
+
+router.post('/:mapId/shares', requireAuth, async (req, res) => {
+  try {
+    const map = await requireOwnedMap(req, res);
+    if (!map) return;
+    const includeDocs = req.body?.includeDocs !== false;
+    const days = req.body?.expiresInDays == null ? null : Number(req.body.expiresInDays);
+    if (days !== null && !SHARE_EXPIRY_DAYS.includes(days)) {
+      return res.status(400).json({ error: `expiresInDays must be null or one of ${SHARE_EXPIRY_DAYS.join(', ')}` });
+    }
+    const r = await query(`
+      INSERT INTO mind_map_shares (share_id, token, map_id, user_id, include_docs, expires_at)
+      VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + make_interval(days => $6::int) END)
+      RETURNING *
+    `, ['mms_' + uuidv4(), crypto.randomBytes(32).toString('base64url'), map.map_id, req.user.id,
+        includeDocs, days]);
+    res.status(201).json({ ok: true, share: shareView(r.rows[0]) });
+  } catch (err) {
+    console.error('Mind map share create error:', err);
+    res.status(500).json({ error: 'Failed to create a share link' });
+  }
+});
+
+router.delete('/:mapId/shares/:shareId', requireAuth, async (req, res) => {
+  try {
+    const map = await requireOwnedMap(req, res);
+    if (!map) return;
+    const r = await query(`
+      UPDATE mind_map_shares SET revoked_at = COALESCE(revoked_at, now())
+       WHERE share_id = $1 AND map_id = $2 RETURNING *
+    `, [req.params.shareId, map.map_id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Share link not found' });
+    res.json({ ok: true, share: shareView(r.rows[0]) });
+  } catch (err) {
+    console.error('Mind map share revoke error:', err);
+    res.status(500).json({ error: 'Failed to revoke the share link' });
   }
 });
 

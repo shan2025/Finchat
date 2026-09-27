@@ -867,7 +867,7 @@ async function analyseGaps(mapId, opts = {}) {
 // for a list nobody asked to download — `has_data` is all a caller needs to know
 // that an original exists. Only the file-serving route reads `data` itself.
 const DOC_FIELDS = ['doc_id', 'user_id', 'map_id', 'node_id', 'filename', 'mimetype',
-  'size_bytes', 'stored_name', 'kind', 'extracted', 'char_count', 'created_at'];
+  'size_bytes', 'stored_name', 'kind', 'extracted', 'char_count', 'url', 'provider', 'created_at'];
 const docCols = (alias = '') => {
   const p = alias ? `${alias}.` : '';
   return `${DOC_FIELDS.map(c => p + c).join(', ')}, (${p}data IS NOT NULL) AS has_data`;
@@ -979,9 +979,9 @@ async function adoptDocs(mapId, userId, docs) {
     await query(`
       INSERT INTO mind_map_docs
         (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
-         stored_name, kind, extracted, char_count, data)
+         stored_name, kind, extracted, char_count, data, url, provider)
       SELECT $1, $2, $3, NULL, filename, mimetype, size_bytes,
-             stored_name, kind, extracted, char_count, data
+             stored_name, kind, extracted, char_count, data, url, provider
         FROM mind_map_docs WHERE doc_id = $4 AND user_id = $2
     `, ['mmd_' + uuidv4(), userId, mapId, d.doc_id]);
   }
@@ -991,7 +991,7 @@ async function adoptDocs(mapId, userId, docs) {
 async function mapDocs(mapId) {
   const res = await query(`
     SELECT doc_id, map_id, node_id, filename, mimetype, size_bytes, stored_name,
-           kind, char_count, created_at, (data IS NOT NULL) AS has_data
+           kind, char_count, url, provider, created_at, (data IS NOT NULL) AS has_data
       FROM mind_map_docs WHERE map_id = $1 ORDER BY created_at ASC
   `, [mapId]);
   return res.rows;
@@ -1103,6 +1103,80 @@ async function getMap(mapId, userId) {
   return { map, nodes: nodes.rows, edges: edges.rows, docs, sources: buildSources(map, docs) };
 }
 
+/**
+ * Every document on a map WITH its original bytes — for building an export
+ * bundle, the one reader that genuinely needs all of them at once.
+ */
+async function mapDocsWithData(mapId) {
+  const res = await query(
+    `SELECT ${DOC_COLS}, data FROM mind_map_docs WHERE map_id = $1 ORDER BY created_at ASC`, [mapId]);
+  return res.rows;
+}
+
+/**
+ * Create a new map owned by `userId` from a bundle mindMapBundle.parseBundle
+ * has already validated. Every id is minted fresh — the bundle's ids are only
+ * refs for wiring parents, cross-links and documents together — so importing
+ * the same bundle twice gives two independent maps.
+ */
+async function importBundle(userId, parsed) {
+  const mapId = await createMap({
+    userId, title: parsed.map.title, topic: parsed.map.topic, sourceType: 'topic',
+    meta: { importedFrom: 'bundle', importedAt: new Date().toISOString() }
+  });
+  try {
+    await query('UPDATE mind_maps SET layout = $2, theme = $3 WHERE map_id = $1',
+      [mapId, parsed.map.layout, parsed.map.theme]);
+    return await fillImportedMap(userId, mapId, parsed);
+  } catch (err) {
+    // No transaction helper here, so undo by hand: the cascade takes every
+    // node, edge and document with it. Half a map is worse than an error.
+    await query('DELETE FROM mind_maps WHERE map_id = $1', [mapId]).catch(() => {});
+    throw err;
+  }
+}
+
+async function fillImportedMap(userId, mapId, parsed) {
+  const idFor = new Map(parsed.nodes.map(n => [n.ref, 'mmn_' + uuidv4()]));
+
+  // parseBundle emits parents before children, so chunks in order keep the
+  // self-FK satisfied. 400 rows × 13 params stays far under Postgres's limit.
+  const cols = ['node_id', 'map_id', 'parent_id', 'label', 'summary', 'detail',
+    'node_type', 'color', 'icon', 'collapsed', 'x', 'y', 'order_index'];
+  for (let i = 0; i < parsed.nodes.length; i += 400) {
+    const chunk = parsed.nodes.slice(i, i + 400);
+    const values = [];
+    const tuples = chunk.map((n, j) => {
+      values.push(idFor.get(n.ref), mapId, n.parentRef ? idFor.get(n.parentRef) : null,
+        n.label, n.summary, n.detail, n.type, n.color, n.icon, n.collapsed, n.x, n.y, n.order);
+      const base = j * cols.length;
+      return '(' + cols.map((_, c) => `$${base + c + 1}`).join(',') + ')';
+    });
+    await query(`INSERT INTO mind_map_nodes (${cols.join(',')}) VALUES ${tuples.join(',')}`, values);
+  }
+
+  for (const e of parsed.edges) {
+    await query(`
+      INSERT INTO mind_map_edges (edge_id, map_id, from_node, to_node, label, style)
+      VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (map_id, from_node, to_node) DO NOTHING
+    `, ['mme_' + uuidv4(), mapId, idFor.get(e.fromRef), idFor.get(e.toRef), e.label, e.style]);
+  }
+
+  for (const d of parsed.docs) {
+    const size = d.data ? d.data.length : Buffer.byteLength(d.text, 'utf8');
+    await query(`
+      INSERT INTO mind_map_docs
+        (doc_id, user_id, map_id, node_id, filename, mimetype, size_bytes,
+         stored_name, kind, extracted, char_count, data, url, provider)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9,$10,$11,$12,$13)
+    `, ['mmd_' + uuidv4(), userId, mapId, d.nodeRef ? idFor.get(d.nodeRef) : null,
+        d.filename, d.mimetype, size, d.kind, d.text, d.text.length, d.data,
+        d.url || null, d.provider || null]);
+  }
+
+  return { mapId, nodes: parsed.nodes.length, edges: parsed.edges.length, docs: parsed.docs.length };
+}
+
 async function listMaps(userId) {
   const res = await query(`
     SELECT m.*,
@@ -1135,6 +1209,8 @@ module.exports = {
   updateTextNote,
   inheritedDocs,
   mapDocs,
+  mapDocsWithData,
+  importBundle,
   sourceBlock,
   buildSources,
   // exported for tests

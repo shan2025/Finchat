@@ -47,7 +47,10 @@
     ['finchat_neuralmap', 'neuralmap'],
     ['finchat_neuralnetwork', 'neuralmap'], // Model Lab lives under Neural Map
     ['finchat_brainmodel', 'brainmodel'],
+    // Planning is one rail item over three pages: the chooser, mind maps, boards.
+    ['finchat_planning', 'mindmap'],
     ['finchat_mindmap', 'mindmap'],
+    ['finchat_board', 'mindmap'],
     ['finchat_knowledge', 'knowledge'],
     ['finchat_reports', 'reports'],
     // Blockchain + Audit Logs were pulled out of the top-level rail and now live
@@ -338,7 +341,7 @@
           navItem('neuralspace', 'finchat_neuralspace.html', 'scatter_plot', 'Neural Space') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
           navItem('brainmodel', 'finchat_brainmodel.html', 'travel_explore', 'Agent Map') +
-          navItem('mindmap', 'finchat_mindmap.html', 'schema', 'Mind Maps') +
+          navItem('mindmap', 'finchat_planning.html', 'schema', 'Planning') +
           navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
           navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +
           soonItem('account_balance', 'Governance') +

@@ -19,13 +19,16 @@ const TOOL_DISTRICT = {
   neural_map: ['knowledge', 'Knowledge', 'a'],
   notifications: ['ops', 'Operations', 'n'], apply_draft: ['ops', 'Operations', 'n'],
   mission: ['ops', 'Operations', 'n'], gmail: ['ops', 'Operations', 's'],
+  drive: ['ops', 'Operations', 's'], boards: ['ops', 'Operations', 'n'],
   bash: ['system', 'System', 'n'], file_read: ['system', 'System', 'n'],
   file_write: ['system', 'System', 'n'], file_edit: ['system', 'System', 'n'],
   glob: ['system', 'System', 'n']
 };
 const DEFAULT_DISTRICT = ['tools', 'Tools', 'n'];
 // Generic tools every agent carries — they say nothing about where it lives.
-const GENERIC_TOOLS = new Set(['search', 'fetch', 'crawl', 'mission']);
+// drive and boards are workspace utilities, not a specialism — Plato carrying
+// them must not move him off the hub.
+const GENERIC_TOOLS = new Set(['search', 'fetch', 'crawl', 'mission', 'drive', 'boards']);
 
 // An agent's home district: where its own non-generic tools mostly land.
 // Returns { home: [id, name, tone] | null, districts: [{ d, n }] by count desc };

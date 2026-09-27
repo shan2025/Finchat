@@ -49,7 +49,8 @@
     'finchat_knowledge.html',
     'finchat_reports.html',
     'finchat_settings.html',
-    'finchat_mindmap.html'
+    'finchat_mindmap.html',
+    'finchat_planning.html'
   ]);
 
   const pageOf = (url) => {
