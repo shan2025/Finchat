@@ -1398,6 +1398,15 @@
     // per conversation (the server remembers it in ai_session_meta), so
     // reopening a study chat restores the toggle.
     window.studyMode = localStorage.getItem('finchat_study_mode') === 'on';
+    // Feynman always teaches in Study Mode (the backend forces it too). While
+    // Feynman is open the toggle shows on and is locked; the saved preference
+    // is left alone and comes back when you switch to another agent.
+    const STUDY_ALWAYS_ON = new Set(['feynman']);
+    function syncStudyModeForPersona(personaId) {
+      window.studyMode = STUDY_ALWAYS_ON.has(personaId)
+        || localStorage.getItem('finchat_study_mode') === 'on';
+      renderStudyToggle();
+    }
     function renderStudyToggle() {
       const btn = document.getElementById('studyToggle');
       const track = document.getElementById('studyTrack');
@@ -1407,6 +1416,8 @@
       if (knob) knob.style.transform = window.studyMode ? 'translateX(14px)' : 'translateX(0)';
     }
     function setStudyMode(on, { silent = false } = {}) {
+      // Reopening an old Feynman chat saved with study off must not unlock it.
+      if (STUDY_ALWAYS_ON.has(activePersona)) { syncStudyModeForPersona(activePersona); return; }
       window.studyMode = !!on;
       localStorage.setItem('finchat_study_mode', window.studyMode ? 'on' : 'off');
       renderStudyToggle();
@@ -1416,7 +1427,13 @@
           : 'Study Mode off — back to normal answers', 'info');
       }
     }
-    function toggleStudyMode() { setStudyMode(!window.studyMode); }
+    function toggleStudyMode() {
+      if (STUDY_ALWAYS_ON.has(activePersona)) {
+        if (typeof showToast === 'function') showToast('Feynman always answers in Study Mode', 'info');
+        return;
+      }
+      setStudyMode(!window.studyMode);
+    }
     renderStudyToggle();
 
     // Render an assistant message body: study cards when the reply contains
@@ -1564,6 +1581,7 @@
 
       activePersona = personaId;
       const p = PERSONAS[personaId];
+      syncStudyModeForPersona(personaId);
 
       // Update token balance for active persona
       tokenBalance = personaBalances[personaId] || 1000;

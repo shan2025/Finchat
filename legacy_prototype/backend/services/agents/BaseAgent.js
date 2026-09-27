@@ -67,7 +67,9 @@ class BaseAgent {
       agentName: this.agentId,
       conversationHistory,
       allowWeb,
-      studyMode,
+      // Feynman is the tutor, so Feynman's chat answers are always study cards.
+      // Missions and reports keep plain text — they go out as email/Telegram.
+      studyMode: studyMode || (this.agentId === 'feynman' && workload === 'chat'),
       budget,
       approvedTools,
       workload,
