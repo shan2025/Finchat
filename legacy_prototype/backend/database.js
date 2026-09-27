@@ -34,6 +34,18 @@ function destroyPool() {
   }
 }
 
+// Supabase's session pooler allows 15 connections per user+database IN TOTAL,
+// shared by production and every local dev server (they use the same
+// DATABASE_URL). At a flat max of 10 each, production plus a few local servers
+// could claim 40, and on 2026-09-27 a scheduled mission died on its first query
+// with EMAXCONNSESSION while 14 of the 15 sat idle in pools. Production keeps
+// most of the budget; a dev server needs very few.
+function poolMax() {
+  const explicit = parseInt(process.env.PG_POOL_MAX, 10);
+  if (explicit > 0) return explicit;
+  return (process.env.NODE_ENV === 'production' || process.env.RENDER) ? 8 : 3;
+}
+
 function getPool() {
   if (!pool) {
     if (!connectionString) {
@@ -43,7 +55,7 @@ function getPool() {
     pool = new Pool({
       connectionString,
       ssl: isLocalDb ? false : { rejectUnauthorized: false },
-      max: 10,
+      max: poolMax(),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000 // bumped from 10s — Supabase can be slow
     });
