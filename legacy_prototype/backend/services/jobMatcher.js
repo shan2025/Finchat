@@ -1,7 +1,9 @@
-// services/inboxJobMatcher.js — job alerts in the inbox → postings scored
-// against the stored resume → application drafts for the strong ones.
+// services/jobMatcher.js — postings scored against the stored resume →
+// application drafts for the strong ones. Two front ends share one tail:
+//   matchInbox  — job alerts in the inbox (gmail {"action":"match"})
+//   matchSearch — a job-board search (apply_draft {"search":{…}})
 //
-// This is one tool call on purpose. The daily hunt used to chain it by hand:
+// Each is one tool call on purpose. The daily hunt used to chain it by hand:
 // gmail list → gmail read → score → apply_draft. But a mission writes its whole
 // plan before any step runs, so the read step could only name "the most
 // relevant message" and the draft step "the top match" — placeholders. Every
@@ -48,6 +50,9 @@ function canonicalUrl(raw) {
   if (host.includes('indeed.') && u.searchParams.get('jk')) {
     return `https://${host}/viewjob?jk=${u.searchParams.get('jk')}`;
   }
+  // Adzuna's `se` is a per-search session id: the same ad came back as
+  // se=6ikEJ… in one run and se=updXEV… in the next.
+  if (host.includes('adzuna.')) u.searchParams.delete('se');
   for (const k of [...u.searchParams.keys()]) {
     if (/^(utm_|trk|tracking|refid|ref$|src$|mid$|midtoken|eid$|otptoken)/i.test(k)) u.searchParams.delete(k);
   }
@@ -108,7 +113,7 @@ async function defaultInfer({ messages, userId }) {
   const { runInference } = require('./inference');
   const r = await runInference({
     messages, temperature: 0.1, jsonMode: true,
-    workload: 'mission', feature: 'inbox_job_match', agentId: 'rasha', userId
+    workload: 'mission', feature: 'job_match', agentId: 'rasha', userId
   });
   return { content: r && r.content, tokens: (r && r.tokens) || 0 };
 }
@@ -117,14 +122,23 @@ async function defaultInfer({ messages, userId }) {
 async function defaultKnown(userId, postings) {
   const { query } = require('../database');
   const res = await query(`
-    SELECT url, lower(role) AS role, lower(COALESCE(company, '')) AS company
+    SELECT url, lower(role) AS role, lower(COALESCE(company, '')) AS company, status, (draft IS NOT NULL) AS has_draft
       FROM job_applications
      WHERE user_id = $1 AND created_at > now() - interval '60 days'`, [userId]);
-  const urls = new Set(res.rows.map(r => r.url).filter(Boolean));
-  const names = new Set(res.rows.map(r => `${r.role}|${r.company}`));
-  return postings.map(p =>
-    (p.url && urls.has(p.url)) || names.has(`${p.title.toLowerCase()}|${(p.company || '').toLowerCase()}`));
+  const byUrl = new Map(res.rows.filter(r => r.url).map(r => [r.url, r]));
+  const byName = new Map(res.rows.map(r => [`${r.role}|${r.company}`, r]));
+  return postings.map(p => {
+    const row = (p.url && byUrl.get(p.url)) || byName.get(`${p.title.toLowerCase()}|${(p.company || '').toLowerCase()}`);
+    if (!row) return false;
+    // Logged but never written: chat runs logged postings as "drafted" with no
+    // letter (Kyndryl, 2026-09-24), and treating those as done meant the
+    // strongest match never got one. Draft it, onto the SAME row via its url.
+    return { handled: row.has_draft || DONE_STATES.has(row.status), url: row.url };
+  });
 }
+
+// Ledger states that mean "leave this posting alone".
+const DONE_STATES = new Set(['skipped', 'applied', 'interviewing', 'rejected', 'offer', 'withdrawn']);
 
 /**
  * @param {object} opts
@@ -201,8 +215,44 @@ async function matchInbox(opts = {}, deps = {}) {
   }
 
   const postings = normalizePostings(parsed.postings, emails);
-  const seen = await known(userId, postings);
-  postings.forEach((p, i) => { p.alreadyInLedger = !!seen[i]; });
+  const outcome = await draftAndLog(postings, { context, minScore, maxDrafts }, { known, draft, log });
+
+  return {
+    action: 'match',
+    connected: true,
+    scanned: listed.count,
+    read: emails.length,
+    postingsFound: postings.length,
+    minScore,
+    ...outcome
+  };
+}
+
+/**
+ * The shared tail: skip what the ledger already holds, draft the strongest
+ * linked postings, log every strong one with its score, and report them
+ * WITHOUT the letters.
+ *
+ * Letters stay out of the result. Every tool result in a run shares one
+ * 12k-char budget (ContextBuilder), and three letters are ~10k on their own: on
+ * 2026-09-27 the pack cut the result after the first match and the report
+ * listed one match of three. The letters are in the ledger, and a mission
+ * appends the ones its run drafted to the report itself.
+ */
+async function draftAndLog(postings, { context, minScore, maxDrafts }, { known, draft, log }) {
+  // `known` answers per posting: false (new), true (handled), or
+  // {handled, url} — a row that exists but still needs its letter, whose url
+  // the draft reuses so the ledger updates that row instead of adding a twin.
+  const seen = await known(context.userId, postings);
+  postings.forEach((p, i) => {
+    const s = seen[i];
+    if (s && typeof s === 'object') {
+      p.alreadyInLedger = !!s.handled;
+      if (!s.handled && s.url) p.url = s.url;
+    } else {
+      p.alreadyInLedger = !!s;
+    }
+  });
 
   const strong = postings.filter(p => p.score >= minScore);
   const toDraft = strong.filter(p => p.url && !p.alreadyInLedger).slice(0, maxDrafts);
@@ -238,17 +288,6 @@ async function matchInbox(opts = {}, deps = {}) {
   for (const p of strong) if (!p.status) p.status = p.alreadyInLedger ? 'already_in_ledger' : 'no_link';
 
   return {
-    action: 'match',
-    connected: true,
-    scanned: listed.count,
-    read: emails.length,
-    postingsFound: postings.length,
-    minScore,
-    // Letters stay OUT of this result. Every tool result in a run shares one
-    // 12k-char budget (ContextBuilder), and three letters are ~10k on their own:
-    // on 2026-09-27 the pack cut this result after the first match and the
-    // report listed one match of three. The letters are in the ledger, and a
-    // mission appends the ones its run drafted to the report itself.
     matches: strong.map(p => ({
       title: p.title, company: p.company, location: p.location, url: p.url, source: p.source,
       score: p.score, why: p.why, gaps: p.gaps, status: p.status,
@@ -256,8 +295,94 @@ async function matchInbox(opts = {}, deps = {}) {
     })),
     belowThreshold: postings.filter(p => p.score < minScore)
       .slice(0, 8).map(p => ({ title: p.title, company: p.company, score: p.score, gaps: p.gaps })),
-    note: 'Drafted and shortlisted postings are logged in the applications ledger. Cover letters are saved there and attached to a scheduled report automatically — do not rewrite them. Nothing was submitted — the user applies from each url.'
+    note: 'Drafted and shortlisted postings are logged in the applications ledger. Cover letters are saved there and attached to a scheduled report automatically — do not rewrite them. To show one in chat, use the applications tool {"action":"get"}. Nothing was submitted — the user applies from each url.'
   };
 }
 
-module.exports = { matchInbox, normalizePostings, canonicalUrl, parseJson, MATCH_PROMPT };
+const SCORE_PROMPT = `You score job postings for one candidate.
+
+For EVERY posting below return {"index": n, "score": 0-100, "why": "...", "gaps": "..."}:
+- "score": fit against the RESUME and the INTERESTS. Seniority matters: a posting whose title or text asks for far more experience than the resume shows (Senior, Lead, VP, Manager II, 5+ years) scores under 50. A role outside the interests scores under 50.
+- "why": one sentence naming the resume evidence that fits
+- "gaps": one short phrase on what the resume lacks for it ("" if nothing)
+Reply with JSON only: {"scores":[...]}`;
+
+/**
+ * Job-board search → postings scored against the stored resume → letters for
+ * the strongest.
+ *
+ * Same reason as the inbox path: a plan cannot pass step 1's search results to
+ * a later apply_draft, so drafting against a search has to happen in the call
+ * that searched.
+ *
+ * @param {object} opts  { userId, missionId, role, region, company, interests, minScore=70, maxDrafts=1 }
+ * @param {object} [deps] { search, infer, loadResume, known, draft, log } for tests
+ */
+async function matchSearch(opts = {}, deps = {}) {
+  const userId = opts.userId;
+  const context = { userId, missionId: opts.missionId || null };
+  const minScore = Math.min(Math.max(Number(opts.minScore) || 70, 40), 95);
+  const maxDrafts = Math.min(Math.max(Number(opts.maxDrafts ?? 1), 0), 3);
+  const interests = String(opts.interests || '').slice(0, 600);
+
+  const search = deps.search || (input => require('../tools/JobsTool').execute(input));
+  const loadResume = deps.loadResume || (id => require('../tools/ResumeTool').loadStored(id));
+  const infer = deps.infer || defaultInfer;
+  const known = deps.known || defaultKnown;
+  const draft = deps.draft || ((input, ctx) => require('../tools/ApplyDraftTool').execute(input, ctx));
+  const log = deps.log || ((input, ctx) => require('../tools/ApplicationsTool').execute(input, ctx));
+
+  const resume = await loadResume(userId);
+  if (!resume || !String(resume.content || '').trim()) {
+    return { action: 'search', matches: [], error: 'No resume on file, so there is nothing to score the postings against. Ask the user to share their resume and save it with the resume tool.' };
+  }
+  if (!String(opts.role || '').trim()) {
+    return { action: 'search', matches: [], error: 'A search needs a role, e.g. {"search":{"role":"Business Analyst","region":"Bangalore, India"}}.' };
+  }
+
+  const found = await search({ role: opts.role, region: opts.region, company: opts.company });
+  // Only single openings can be drafted against; a board's search page is a lead, not a job.
+  const listed = (found.results || []).filter(j => j.kind !== 'listing_page' && j.url).slice(0, 10);
+  if (!listed.length) {
+    return { action: 'search', query: found.query, sources: found.sources, matches: [], note: 'The search returned no individual postings to score.' };
+  }
+
+  const block = listed.map((j, i) =>
+    `POSTING ${i}: ${j.title} — ${j.company || 'company not given'} — ${j.location || ''}` +
+    `${j.postedAt ? ` — posted ${String(j.postedAt).slice(0, 10)}` : ''}\n${String(j.snippet || '').slice(0, 400)}`).join('\n\n');
+  const out = await infer({
+    userId,
+    messages: [
+      { role: 'system', content: SCORE_PROMPT },
+      {
+        role: 'user',
+        content: `RESUME:\n${String(resume.content).slice(0, RESUME_CHARS)}\n\n` +
+          `INTERESTS: ${interests || resume.target_role || 'infer from the resume'}\n\n${block}`
+      }
+    ]
+  });
+  const parsed = parseJson(out && out.content);
+  if (!parsed || !Array.isArray(parsed.scores)) {
+    throw new Error('The scorer returned no readable scores (model output was not JSON).');
+  }
+  const byIndex = new Map(parsed.scores.map(s => [Number(s.index), s]));
+  const postings = listed.map((j, i) => {
+    const s = byIndex.get(i) || {};
+    return {
+      title: String(j.title || '').trim(),
+      company: j.company || null,
+      location: j.location || null,
+      url: canonicalUrl(j.url),
+      source: String(j.board || j.source || 'search').toLowerCase(),
+      summary: String(j.snippet || '').slice(0, 240),
+      score: clampScore(s.score),
+      why: String(s.why || '').slice(0, 300),
+      gaps: String(s.gaps || '').slice(0, 160)
+    };
+  }).filter(p => p.title).sort((a, b) => b.score - a.score);
+
+  const outcome = await draftAndLog(postings, { context, minScore, maxDrafts }, { known, draft, log });
+  return { action: 'search', query: found.query, scanned: listed.length, minScore, ...outcome };
+}
+
+module.exports = { matchInbox, matchSearch, normalizePostings, canonicalUrl, parseJson, MATCH_PROMPT, SCORE_PROMPT };

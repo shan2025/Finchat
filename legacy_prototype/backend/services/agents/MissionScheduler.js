@@ -127,7 +127,7 @@ async function draftsFromRun(mission, since) {
     const res = await query(`
       SELECT role, company, url, match_score, draft FROM job_applications
        WHERE mission_id = $1 AND user_id = $2 AND draft IS NOT NULL AND updated_at >= $3
-       ORDER BY match_score DESC NULLS LAST, updated_at ASC LIMIT 5`,
+       ORDER BY match_score DESC NULLS LAST, updated_at ASC LIMIT 8`,
     // A few seconds of slack: `since` is this server's clock, updated_at the DB's.
     [mission.mission_id, mission.user_id, new Date(since - 5000)]);
     return res.rows;

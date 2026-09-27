@@ -22,7 +22,7 @@ function parseInput(input) {
   if (s.startsWith('{')) {
     try { return JSON.parse(s); } catch (e) { /* fall through */ }
   }
-  const m = s.match(/^(log|list|stats|update|delete)\b\s*(.*)$/i);
+  const m = s.match(/^(log|list|stats|get|update|delete)\b\s*(.*)$/i);
   if (m) return { action: m[1].toLowerCase(), application: m[2].trim() || undefined };
   return { action: 'stats' };
 }
@@ -38,6 +38,7 @@ function view(r) {
     status: r.status,
     matchScore: r.match_score,
     notes: r.notes,
+    hasDraft: !!r.draft,
     appliedAt: r.applied_at,
     loggedAt: r.created_at
   };
@@ -172,6 +173,22 @@ async function execute(input, context = {}) {
     };
   }
 
+  // One application with its saved draft. The daily hunt stores every cover
+  // letter here, and before this nothing — no page, no tool — could read one
+  // back, so a letter that missed the report was simply lost to the user.
+  if (action === 'get') {
+    const { row, error } = await resolve(userId, opts.application || opts.url || opts.applicationId || opts.company);
+    if (error) return { action, error };
+    return {
+      action,
+      application: view(row),
+      draft: row.draft || null,
+      note: row.draft
+        ? 'Show the draft to the user as written. It has NOT been sent — they review it and apply from the url themselves.'
+        : 'No draft saved for this one. Offer to write it with apply_draft.'
+    };
+  }
+
   if (action === 'update') {
     const { row, error } = await resolve(userId, opts.application || opts.url || opts.applicationId);
     if (error) return { action, error };
@@ -203,7 +220,7 @@ async function execute(input, context = {}) {
     return { action, deleted: true, role: row.role, company: row.company };
   }
 
-  throw new Error(`Unknown applications action "${action}". Use log, list, stats, update or delete.`);
+  throw new Error(`Unknown applications action "${action}". Use log, list, stats, get, update or delete.`);
 }
 
 module.exports = { execute };

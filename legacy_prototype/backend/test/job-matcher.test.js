@@ -9,7 +9,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { matchInbox, normalizePostings, canonicalUrl } = require('../services/inboxJobMatcher');
+const { matchInbox, matchSearch, normalizePostings, canonicalUrl } = require('../services/jobMatcher');
 
 const RESUME = { content: 'Business Analyst. SQL, Power BI, stakeholder workshops, 1 year experience.' };
 
@@ -48,6 +48,86 @@ test('LinkedIn alert tracking is stripped so the same job dedupes across days', 
     canonicalUrl('https://in.indeed.com/rc/clk?jk=9f8e7d&from=ja&utm_source=x'),
     'https://in.indeed.com/viewjob?jk=9f8e7d');
   assert.strictEqual(canonicalUrl('not a url'), 'not a url');
+  // Adzuna's `se` changes per search; the ad id and `v` do not.
+  assert.strictEqual(
+    canonicalUrl('https://www.adzuna.in/land/ad/5885765169?se=updXEVa68RGd&utm_medium=api&utm_source=7b8713db&v=BEA6'),
+    'https://www.adzuna.in/land/ad/5885765169?v=BEA6');
+});
+
+// ── Search path: apply_draft {"search":{…}} ─────────────────────────────
+
+const SEARCH_RESULTS = {
+  query: { role: 'Business Analyst', region: 'Bangalore, India' },
+  results: [
+    { board: 'Adzuna', kind: 'posting', title: 'Business Analyst', company: 'Kyndryl', location: 'Bangalore', url: 'https://www.adzuna.in/land/ad/1?se=a', snippet: 'Requirements gathering' },
+    { board: 'Adzuna', kind: 'posting', title: 'Lead Business Analyst – VP', company: 'Deutsche Bank', location: 'Bangalore', url: 'https://www.adzuna.in/land/ad/2?se=a', snippet: '12+ years' },
+    { board: 'Naukri', kind: 'listing_page', title: 'Business Analyst Jobs in Bangalore', url: 'https://www.naukri.com/business-analyst-jobs-in-bangalore' }
+  ]
+};
+
+test('a search is scored per posting and only the strongest gets a letter', async () => {
+  const scored = [];
+  const drafted = [];
+  const out = await matchSearch({ userId: 'u1', role: 'Business Analyst', region: 'Bangalore, India' }, {
+    loadResume: async () => RESUME,
+    search: async () => SEARCH_RESULTS,
+    infer: async ({ messages }) => {
+      scored.push(messages[1].content);
+      return { content: JSON.stringify({ scores: [
+        { index: 0, score: 84, why: 'BA workshops', gaps: '' },
+        { index: 1, score: 25, why: '', gaps: 'VP level' }
+      ] }) };
+    },
+    known: async (_u, postings) => postings.map(() => false),
+    draft: async (input) => { drafted.push(input.job); return { draft: 'letter' }; },
+    log: async () => ({})
+  });
+
+  // The board's search page is a lead, not a job — never scored or drafted.
+  assert.ok(!scored[0].includes('naukri.com'));
+  assert.deepStrictEqual(drafted.map(j => j.company), ['Kyndryl']);
+  assert.strictEqual(drafted[0].url, 'https://www.adzuna.in/land/ad/1');
+  assert.deepStrictEqual(out.matches.map(m => [m.company, m.status, m.score]), [['Kyndryl', 'drafted', 84]]);
+  assert.deepStrictEqual(out.belowThreshold.map(p => p.company), ['Deutsche Bank']);
+  assert.ok(!JSON.stringify(out).includes('"letter"'), 'letters stay in the ledger, not the result');
+});
+
+test('a posting the scorer skipped gets score 0 rather than inheriting another row', async () => {
+  const out = await matchSearch({ userId: 'u1', role: 'Business Analyst', maxDrafts: 0 }, {
+    loadResume: async () => RESUME,
+    search: async () => SEARCH_RESULTS,
+    infer: async () => ({ content: '{"scores":[{"index":1,"score":90}]}' }),
+    known: async (_u, p) => p.map(() => false),
+    draft: async () => { throw new Error('maxDrafts 0 must not draft'); },
+    log: async () => ({})
+  });
+  assert.deepStrictEqual(out.matches.map(m => [m.company, m.status]), [['Deutsche Bank', 'shortlisted']]);
+  assert.deepStrictEqual(out.belowThreshold.map(p => [p.company, p.score]), [['Kyndryl', 0]]);
+});
+
+test('a posting logged without a letter still gets one, on its existing ledger row', async () => {
+  const drafted = [];
+  const out = await matchSearch({ userId: 'u1', role: 'Business Analyst' }, {
+    loadResume: async () => RESUME,
+    search: async () => SEARCH_RESULTS,
+    infer: async () => ({ content: '{"scores":[{"index":0,"score":82},{"index":1,"score":80}]}' }),
+    // Kyndryl: logged earlier under an older URL, no draft. Deutsche Bank: skipped.
+    known: async () => [{ handled: false, url: 'https://www.adzuna.in/land/ad/1?v=OLD' }, { handled: true, url: 'x' }],
+    draft: async (input) => { drafted.push(input.job); return { draft: 'letter' }; },
+    log: async () => ({})
+  });
+  assert.deepStrictEqual(drafted.map(j => [j.company, j.url]), [['Kyndryl', 'https://www.adzuna.in/land/ad/1?v=OLD']]);
+  assert.deepStrictEqual(out.matches.map(m => [m.company, m.status]), [['Kyndryl', 'drafted'], ['Deutsche Bank', 'already_in_ledger']]);
+});
+
+test('a search with no role or no resume stops before searching', async () => {
+  let searched = false;
+  const search = async () => { searched = true; return SEARCH_RESULTS; };
+  const noRole = await matchSearch({ userId: 'u1' }, { loadResume: async () => RESUME, search });
+  const noResume = await matchSearch({ userId: 'u1', role: 'BA' }, { loadResume: async () => null, search });
+  assert.strictEqual(searched, false);
+  assert.match(noRole.error, /needs a role/);
+  assert.match(noResume.error, /No resume on file/);
 });
 
 test('a link id the email did not contain becomes null, never a guessed URL', () => {

@@ -46,7 +46,30 @@ function looksLikePlaceholder(s) {
 }
 
 async function execute(input, context = {}) {
-  const opts = coerceJob(parseInput(input));
+  const raw = parseInput(input);
+
+  // {"search":{"role","region"}} — search, score every posting against the
+  // stored resume, and draft for the best, in this one call. A plan cannot hand
+  // a jobs result to a later apply_draft step (it is written before either
+  // runs), which is why drafting against the job-search results only ever
+  // produced placeholder errors. See services/jobMatcher.js.
+  if (raw.search && typeof raw.search === 'object') {
+    if (!context.userId || context.userId === 'system') {
+      throw new Error('Drafting against a search needs a signed-in user with a stored resume.');
+    }
+    return require('../services/jobMatcher').matchSearch({
+      userId: context.userId,
+      missionId: raw.missionId || context.missionId || null,
+      role: raw.search.role || raw.search.query,
+      region: raw.search.region || raw.search.location,
+      company: raw.search.company,
+      interests: raw.interests,
+      minScore: raw.minScore,
+      maxDrafts: raw.maxDrafts
+    });
+  }
+
+  const opts = coerceJob(raw);
   const job = typeof opts.job === 'object' ? JSON.stringify(opts.job, null, 1) : String(opts.job || '');
   // Fall back to the stored resume. A scheduled 4am run has no one to paste one
   // in, and a cover letter full of [FILL IN: …] placeholders is not a report.

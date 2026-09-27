@@ -151,10 +151,10 @@ async function execute(input, context = {}) {
 
   // List → read → score against the stored resume → draft the strong ones, in
   // one call. It goes back through this tool's own list/read, so the sender
-  // filter applies unchanged. See services/inboxJobMatcher.js for why a plan
+  // filter applies unchanged. See services/jobMatcher.js for why a plan
   // cannot chain these steps itself.
   if (action === 'match') {
-    const { matchInbox } = require('../services/inboxJobMatcher');
+    const { matchInbox } = require('../services/jobMatcher');
     return matchInbox({
       userId,
       missionId: context.missionId,
