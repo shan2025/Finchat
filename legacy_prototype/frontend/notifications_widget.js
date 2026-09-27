@@ -235,6 +235,11 @@
           '<div class="markdown-body" style="padding:20px 24px;overflow-y:auto;font-size:14px;line-height:1.55;color:#3a2e23;">' + body + '</div>' +
         '</div>';
       document.body.appendChild(ov);
+      // Briefs and mission reports read as a card deck when the page has
+      // report_cards.js loaded; otherwise the markdown above stands.
+      if (window.ReportCards && window.ReportCards.has(n.content || '')) {
+        window.ReportCards.render(ov.querySelector('.markdown-body'), n.content);
+      }
       const close = () => ov.remove();
       ov.addEventListener('click', e => { if (e.target === ov) close(); });
       $('notifReportClose').onclick = close;

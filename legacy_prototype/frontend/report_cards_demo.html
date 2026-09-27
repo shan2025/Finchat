@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Cards Demo</title>
+<!--
+  Preview for report_cards.js: a brief in the exact shape BRIEFING_GOAL asks
+  for, rendered as the chat renders it. Open at /report_cards_demo.html.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="finchat_theme.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+<style>
+  .rcd-body { margin: 0; padding: 32px 16px; background: var(--bg, #f3ead8); font-family: var(--sans, Figtree, sans-serif); }
+  .rcd-wrap { max-width: 840px; margin: 0 auto; }
+  .rcd-wrap h1 { font-size: 18px; margin: 0 0 16px; }
+</style>
+</head>
+<body class="rcd-body">
+<div class="rcd-wrap">
+  <h1>Plato · Daily brief</h1>
+  <div id="out"></div>
+</div>
+<script src="report_cards.js"></script>
+<script>
+var text = [
+  '# 🧠 Frontier Intelligence Brief — September 27, 2026',
+  '',
+  '## Executive Summary',
+  '- 📈 **Apple (AAPL) rallies 1.5%** as the market prices in the next wave of AI-enabled services. ([3])',
+  '- 📉 **Tesla (TSLA) slides 1.5%** on mixed signals from autonomous-driving regulatory reviews. ([3])',
+  '- 🧠 **China\'s consumer sector enters a "lost decade"** as AI investment pulls capital from retail. ([1])',
+  '- ₿ **Bitcoin steadies at $84,486** (+0.07% 24h) in a risk-off tape. ([2])',
+  '',
+  '## China\'s Consumer Stocks Face a Lost Decade',
+  '### AI\'s Shadow Over Traditional Retail',
+  '#### Capital is leaving apparel and food service for model labs',
+  'China\'s consumer-goods sector is confronting a structural shift: capital that once fuelled apparel, food-service and lifestyle brands is being redirected toward artificial-intelligence ventures. Bloomberg notes the singular focus on AI has left consumer stocks trapped, with earnings growth flattening and valuations compressing ([Bloomberg][1]).',
+  '',
+  'The reallocation reflects both government priorities and investor appetite. Consumer names that cannot tell an AI story are being re-rated as utilities, while domestic demand stays soft. For global brands with China exposure the read-through is a slower, more expensive customer.',
+  '',
+  '**Why it matters** — A multi-year de-rating of Chinese consumer equities changes the calculus for any portfolio using them as a growth sleeve.',
+  '*In short: Growth moved, not vanished*',
+  '',
+  '## 📈 Markets & Funding',
+  '### Apple and Tesla split on AI',
+  '#### One sells the story, one waits on the regulator',
+  'Apple rose 1.5% as investors priced in AI-enabled services revenue, while Tesla fell by the same amount on autonomous-driving review headlines ([CNBC][3]).',
+  '',
+  '**Why it matters** — The market is paying for AI that ships inside existing products, and discounting AI that still needs a permit.',
+  '*In short: Shipped beats promised*',
+  '',
+  '### FinTech funding contracts 44% YoY',
+  'Global fintech allocation now sits at 13% of total startup capital ([Crunchbase][6]).',
+  '',
+  '**Why it matters** — Less capital for AI-powered financial services pipelines through 2027.',
+  '',
+  '## 🎯 Key Takeaway',
+  'Capital is concentrating on AI that is already in customers\' hands — in Cupertino and in Shanghai alike — and draining from everything that is not.',
+  '',
+  '[1]: https://www.bloomberg.com/news/example "China Consumer Stocks Trapped in Lost Decade"',
+  '[2]: https://www.coingecko.com/en/coins/bitcoin "Bitcoin price"',
+  '[3]: https://www.cnbc.com/markets "Markets wrap"',
+  '[6]: https://news.crunchbase.com/fintech "Fintech funding Q3"'
+].join('\n');
+ReportCards.render(document.getElementById('out'), text);
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="api_client.js"></script>
 <script src="study_blocks.js"></script>
+<script src="report_cards.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Caprasimo&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="finchat_theme.css">
@@ -211,6 +212,7 @@ function paintReportBodies(reports){
   if(!el) continue;
   const text=r.summary||'';
   if(window.StudyBlocks && window.StudyBlocks.has(text)) window.StudyBlocks.render(el,text);
+  else if(window.ReportCards && window.ReportCards.has(text)) window.ReportCards.render(el,text);
   else if(window.marked && window.DOMPurify) el.innerHTML=DOMPurify.sanitize(marked.parse(text),{ADD_ATTR:['target']});
   else el.textContent=text;
  }

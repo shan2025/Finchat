@@ -94,6 +94,10 @@
   .bubble { padding:13px 16px; border-radius:4px 18px 18px 18px; font-size:14.5px; line-height:1.6; word-break:break-word; text-wrap:pretty; }
   .user .bubble { background:var(--user-bubble); color:var(--user-text); border-radius:18px 4px 18px 18px; }
   .bot .bubble { background:var(--bot-bubble); color:#33302b; border:1px solid var(--border); border-radius:4px 18px 18px 18px; }
+  /* A report deck needs the full column width, not a 78% bubble. */
+  .bot .bubble[data-report] { background:transparent; border:none; padding:0; width:100%; }
+  .msg-row:has(> .msg-content > .bubble[data-report]) { max-width:100%; width:100%; }
+  .msg-content:has(> .bubble[data-report]) { flex:1; }
   .bubble.flagged { border:1.5px solid #991b1b !important; background:#2d1215 !important; color:var(--text) !important; }
   .bubble.warned { border:1.5px solid #92400e !important; background:#2d2305 !important; color:var(--text) !important; }
 
@@ -813,6 +817,7 @@
     <script src="notifications_widget.js"></script>
     <script src="mascot_nap.js"></script>
     <script src="study_blocks.js"></script>
+    <script src="report_cards.js"></script>
     <script src="car_road_anim.js?v=minimal_v7"></script>
 
 
@@ -1483,8 +1488,14 @@
           '<button type="button" class="sb-action" data-sb-export>' +
             '<span class="material-symbols-outlined" style="font-size:14px">print</span>Export</button>';
         el.appendChild(actions);
+      } else if (window.ReportCards && window.ReportCards.has(text)) {
+        // Daily briefs and mission reports: a swipeable card deck instead of
+        // one long bubble. The bubble drops its own chrome (see .bubble[data-report]).
+        el.removeAttribute('data-study');
+        window.ReportCards.render(el, text);
       } else {
         el.removeAttribute('data-study');
+        el.removeAttribute('data-report');
         el.innerHTML = DOMPurify.sanitize(marked.parse(text || ''), { ADD_ATTR: ['target'] });
         el.querySelectorAll('table').forEach(t => {
           const scroller = document.createElement('div');

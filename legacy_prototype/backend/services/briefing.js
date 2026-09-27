@@ -92,6 +92,8 @@ For each section:
 #### [Descriptive one-line subtitle]
 1-2 paragraphs of ANALYSIS (not just facts — explain context, implications, competitive dynamics). Reference sources inline as markdown links: ([Source Name][N]).
 **Why it matters** — A short paragraph explaining the strategic significance for investors, builders, or researchers.
+*In short: [a 3-6 word tagline, e.g. "Same format, different intent"]*
+(The chat shows each ### story as its own card, so keep the analysis to ~120 words; the tagline is printed at the foot of the card.)
 
 ## 📈 Markets & Funding (if relevant data found)
 Synthesize market moves and startup funding into strategic narrative, not raw numbers.
