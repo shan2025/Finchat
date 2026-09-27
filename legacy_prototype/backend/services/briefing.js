@@ -30,12 +30,21 @@ const FAILED_REASONS = new Set(['error', 'budget_exceeded', 'failed', 'timeout']
 // leaving the user with no briefing until the next one is due.
 //
 // 6 hours, not 20: the schedule is three briefings a day (08:00/14:00/20:00
-// IST), i.e. one every 8 hours. A 20-hour floor would have delivered the
+// IST), i.e. one every 6 hours. A 20-hour floor would have delivered the
 // morning brief and then silently swallowed midday and evening — the guard
-// against a runaway cron must sit comfortably below the real interval, not
-// above it. 6h still collapses a 15-minute trigger to at most 4 runs a day.
+// against a runaway cron must sit below the real interval, not above it. 6h
+// still collapses a 15-minute trigger to at most 4 runs a day.
 const MIN_INTERVAL_HOURS = Number(process.env.BRIEFING_MIN_INTERVAL_HOURS) || 6;
 const RETRY_INTERVAL_MINUTES = Number(process.env.BRIEFING_RETRY_MINUTES) || 60;
+
+// The floor is measured against the previous brief's NOTIFICATION, which lands
+// when that run finishes — a minute or several after its trigger fired. With
+// triggers exactly 6h apart, the next one therefore always arrived at 5h59m and
+// was skipped: the midday brief was never delivered, every single day, while the
+// evening one (12h after the morning) always was. Subtracting a grace for the
+// run's own duration measures trigger-to-trigger instead, so a floor equal to
+// the schedule's spacing admits the next slot.
+const DELIVERY_GRACE_MINUTES = 30;
 
 // Timezone that decides which calendar day a briefing belongs to, so all of a
 // day's runs land in one chat. The schedule is set in IST, so the UTC date
@@ -146,9 +155,9 @@ async function _recentlyRun(dbQuery, userId) {
   const delivered = await dbQuery(`
     SELECT created_at FROM notifications
     WHERE user_id = $1 AND type = 'briefing'
-      AND created_at > now() - ($2 || ' hours')::interval
+      AND created_at > now() - ($2 || ' hours')::interval + ($3 || ' minutes')::interval
     ORDER BY created_at DESC LIMIT 1
-  `, [userId, String(MIN_INTERVAL_HOURS)]);
+  `, [userId, String(MIN_INTERVAL_HOURS), String(DELIVERY_GRACE_MINUTES)]);
   if (delivered.rows.length) {
     return `a briefing was already delivered at ${delivered.rows[0].created_at.toISOString()} ` +
       `(minimum ${MIN_INTERVAL_HOURS}h between briefings)`;
@@ -344,5 +353,6 @@ async function runMorningBriefing({ userId = 'system', requestedAt = null, force
 
 module.exports = {
   runMorningBriefing, briefingSessionTitle, briefingSlotLabel,
-  briefingSessionId, briefingDayKey, BRIEFING_GOAL
+  briefingSessionId, briefingDayKey, BRIEFING_GOAL,
+  _recentlyRun, MIN_INTERVAL_HOURS, DELIVERY_GRACE_MINUTES
 };

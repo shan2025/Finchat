@@ -1,6 +1,7 @@
 // tools/GlobTool.js — List files using glob patterns
 const { glob } = require('glob');
 const path = require('path');
+const { resolveReadable, denialReason } = require('./fsSandbox');
 
 /**
  * Find files using a glob pattern.
@@ -26,8 +27,17 @@ async function execute(input) {
 
   if (!pattern) return { error: 'No pattern provided (e.g. "**/*.js")' };
 
+  // Confined like file_read (see fsSandbox.js). The pattern is checked too: an
+  // absolute or `..` pattern would walk out of `dir` whatever `dir` is.
+  if (path.isAbsolute(pattern) || String(pattern).split(/[\\/]/).includes('..')) {
+    return { error: 'Access denied: the pattern must be relative and must not contain ".."' };
+  }
+
   try {
-    const files = await glob(pattern, { cwd: dir, nodir: true });
+    dir = resolveReadable(dir);
+    const files = (await glob(pattern, {
+      cwd: dir, nodir: true, follow: false, ignore: ['**/node_modules/**', '**/.git/**']
+    })).filter(f => !denialReason(path.resolve(dir, f)));
     // Limit to 200 files to avoid blowing up context
     const limit = 200;
     const isTruncated = files.length > limit;

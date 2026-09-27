@@ -1,5 +1,6 @@
 // tools/FileReadTool.js — Read file contents from the local filesystem
 const fs = require('fs').promises;
+const { resolveReadable } = require('./fsSandbox');
 
 /**
  * Read file contents with line pagination to avoid blowing up the token context.
@@ -30,7 +31,8 @@ async function execute(input) {
   if (!file_path) return { error: 'No file_path provided' };
 
   try {
-    const data = await fs.readFile(file_path, 'utf8');
+    // Confined to the app's code, secrets refused — see fsSandbox.js.
+    const data = await fs.readFile(resolveReadable(file_path), 'utf8');
     const lines = data.split('\n');
     
     // Bound the values
