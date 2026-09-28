@@ -31,6 +31,8 @@
 //   GET    /:boardId/members                  owner + editors
 //   POST   /:boardId/members                  {identifier: email or username} → edit access (owner only)
 //   DELETE /:boardId/members/:userId          owner removes anyone; an editor may remove themselves
+//   POST   /:boardId/assistant                {message, history?} → {reply, ops[{…, line}]} — writes nothing
+//   POST   /:boardId/assistant/apply          {ops, message} → runs the approved ops
 //   GET    /:boardId/activity                 ?before=ISO — who changed what, newest first
 //   GET    /:boardId/stamp                    {updatedAt, byName} — "has someone else changed it?"
 //
@@ -42,6 +44,7 @@ const router = express.Router();
 const multer = require('multer');
 const { requireAuth } = require('../middleware/auth');
 const Boards = require('../services/boards');
+const Assistant = require('../services/boardAssistant');
 const { extractFromUpload } = require('../services/attachments');
 const { sendDocFile, capabilities } = require('../services/cognitive/mindMapDocFile');
 const { prepareLinks, linkView } = require('../services/linkAttach');
@@ -335,6 +338,19 @@ router.post('/:boardId/members', requireAuth, handle('invite them', async (req, 
 router.delete('/:boardId/members/:userId', requireAuth, handle('remove them', async (req, res) => {
   await Boards.removeMember(req.params.boardId, req.user.id, req.params.userId);
   res.json({ ok: true });
+}));
+
+// ── AI assistant ───────────────────────────────────────────────
+// Plan first (nothing written), apply only what the user approved.
+
+router.post('/:boardId/assistant', requireAuth, handle('ask the AI', async (req, res) => {
+  const out = await Assistant.plan(req.params.boardId, req.user.id, req.body?.message, req.body?.history);
+  res.json({ ok: true, ...out });
+}));
+
+router.post('/:boardId/assistant/apply', requireAuth, handle('apply the changes', async (req, res) => {
+  const out = await Assistant.apply(req.params.boardId, req.user.id, req.body?.ops, req.body?.message);
+  res.json({ ok: true, ...out });
 }));
 
 // ── history ────────────────────────────────────────────────────

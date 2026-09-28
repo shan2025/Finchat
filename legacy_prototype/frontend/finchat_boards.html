@@ -86,8 +86,33 @@ body[data-theme="dark"] { background: #16181d; }
 .htext small { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--bx-muted); margin-top: 2px; }
 .htext small .material-symbols-outlined { font-size: 14px; }
 .tile .shared { font-size: 12px; font-weight: 700; color: #0ca789; }
+/* Ask AI */
+.aichat { display: flex; flex-direction: column; min-height: 100%; }
+.aimsgs { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+.aimsg { max-width: 92%; padding: 10px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; word-break: break-word; }
+.aimsg.me, .aitext { white-space: pre-wrap; }
+.aimsg.me { align-self: flex-end; background: var(--bx-blue); color: #fff; border-bottom-right-radius: 4px; }
+.aimsg.ai { align-self: flex-start; background: var(--bx-surface-2); border: 1px solid var(--bx-line); color: var(--bx-fg); border-bottom-left-radius: 4px; }
+.aimsg.thinking { color: var(--bx-muted); font-style: italic; }
+.aiops { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+.aiops li { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; color: var(--bx-fg-2);
+  background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 8px; padding: 6px 8px; }
+.aiops li .material-symbols-outlined { font-size: 16px; color: var(--bx-blue); flex: none; margin-top: 1px; }
+.aiops li.danger .material-symbols-outlined { color: var(--bx-danger); }
+.aiacts { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; white-space: normal; }
+.aistate { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--bx-muted); margin-top: 8px; white-space: normal; }
+.aistate.ok { color: #12a150; font-weight: 700; }
+.aistate.bad { color: var(--bx-danger); }
+.aistate .material-symbols-outlined { font-size: 16px; }
+.aimsg .bx-btn.sm { margin-top: 8px; }
+.aiex { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.aiex .bx-chip { text-align: left; }
+.aicompose { position: sticky; bottom: -22px; display: flex; gap: 8px; align-items: flex-end; background: var(--bx-surface);
+  padding: 10px 0 22px; margin-bottom: -22px; border-top: 1px solid var(--bx-line); }
+.aicompose textarea { resize: none; min-height: 44px; max-height: 140px; }
+.aicompose .bx-btn { height: 44px; flex: none; }
 @media (max-width: 640px) {
-  #historyBtn span:last-child { display: none; }
+  #historyBtn span:last-child, #aiBtn span:last-child { display: none; }
   #stage { padding: 132px 12px 80px 12px; }
   .rail { top: auto; bottom: 14px; left: 14px; transform: none; flex-direction: row; }
   .search { width: 130px; }
@@ -115,6 +140,7 @@ body[data-theme="dark"] { background: #16181d; }
     <input class="search" id="search" placeholder="Search cards" autocomplete="off">
   </div>
   <button class="bx-btn ghost" id="filesBtn" title="Files and links on the whole board" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
+  <button class="bx-btn ghost" id="aiBtn" title="Tell the AI what to change on this board" hidden><span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span><span>Ask AI</span></button>
   <button class="bx-btn ghost" id="historyBtn" title="History — who changed what" hidden><span class="material-symbols-outlined">history</span><span>History</span></button>
   <button class="bx-btn ghost" id="mapBtn" title="See this board as a mind map" hidden><span class="material-symbols-outlined">account_tree</span><span id="mapBtnLabel">Mind map</span></button>
   <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
@@ -148,7 +174,8 @@ body[data-theme="dark"] { background: #16181d; }
 <div class="bx-menu" id="colMenu"></div>
 <div class="bx-menu" id="boardMenu">
   <button data-bm="rename"><span class="material-symbols-outlined">edit</span>Rename board</button>
-  <button data-bm="fromMap"><span class="material-symbols-outlined">account_tree</span>New board from a mind map</button>
+  <button data-bm="toMap"><span class="material-symbols-outlined">account_tree</span>Convert to a mind map</button>
+  <button data-bm="fromMap"><span class="material-symbols-outlined">add_box</span>New board from a mind map</button>
   <button data-bm="delete" style="color:var(--bx-danger)"><span class="material-symbols-outlined">delete</span>Delete this board</button>
 </div>
 
@@ -334,7 +361,7 @@ body[data-theme="dark"] { background: #16181d; }
     closeDrawer();
     history.replaceState(null, '', 'finchat_boards.html');
     document.title = 'Boards | FinChat';
-    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn']) $(id).hidden = true;
+    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn', 'aiBtn']) $(id).hidden = true;
     setZoom(1);
     $('content').innerHTML = '<div class="bx-empty">Loading…</div>';
     try {
@@ -402,16 +429,17 @@ body[data-theme="dark"] { background: #16181d; }
     history.replaceState(null, '', '?board=' + encodeURIComponent(id));
     document.title = `${B.board.title} | Boards`;
     $('boardTitle').value = B.board.title;
-    for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn']) $(x).hidden = false;
+    for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn', 'aiBtn']) $(x).hidden = false;
     $('mapBtnLabel').textContent = B.board.sourceMapId ? 'Mind map' : 'Make mind map';
     const n = B.attachments.filter(a => !a.cardId).length;
     $('filesCount').textContent = n ? `Files (${n})` : 'Files';
-    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; HISTORY_OPEN = false; }
+    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; HISTORY_OPEN = false; AI_OPEN = false; }
     LAST_STAMP = B.board.updatedAt;
     // Editors do everything but delete the board — that and sharing stay the owner's.
     document.querySelector('[data-bm="delete"]').hidden = B.board.access !== 'owner';
     render();
-    if (HISTORY_OPEN) openHistory();
+    if (AI_OPEN) openAssistant();
+    else if (HISTORY_OPEN) openHistory();
     else if (FILES_OPEN) openBoardFiles();
     else if (SELECTED && cardById(SELECTED)) openDrawer(SELECTED); else closeDrawer();
   }
@@ -429,14 +457,14 @@ body[data-theme="dark"] { background: #16181d; }
     add_column: 'view_column', rename_column: 'edit', color_column: 'palette', delete_column: 'delete', order_columns: 'swap_horiz',
     order_cards: 'swap_vert', attach: 'attach_file', detach: 'link_off', rename_board: 'edit', edit_board: 'edit',
     add_member: 'person_add', remove_member: 'person_remove', join: 'person_add', share_link: 'add_link', revoke_link: 'link_off',
-    to_mind_map: 'account_tree'
+    to_mind_map: 'account_tree', ai_edit: 'auto_awesome'
   };
 
   async function openHistory({ more = false } = {}) {
     // Already showing History (a live refresh): keep it on screen while the new
     // rows load. Coming from a card or the files panel: clear that first.
     const refreshing = HISTORY_OPEN && $('drawer').classList.contains('open');
-    HISTORY_OPEN = true; FILES_OPEN = false; SELECTED = null;
+    HISTORY_OPEN = true; FILES_OPEN = false; AI_OPEN = false; SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     $('dWhere').textContent = `${B.board.title} › History`;
     $('dDelete').hidden = true;
@@ -483,6 +511,130 @@ body[data-theme="dark"] { background: #16181d; }
   });
   $('historyBtn').addEventListener('click', () => (HISTORY_OPEN ? closeDrawer() : openHistory()));
 
+  // ── Ask AI: change the board by saying so ──────────────────
+  // The AI proposes; nothing changes until Apply. Conversations live per board
+  // for this tab only — the History panel is the durable record of what happened.
+  let AI_OPEN = false, AI_BUSY = false;
+  const CHATS = new Map();
+  const chat = () => { if (!CHATS.has(boardId())) CHATS.set(boardId(), []); return CHATS.get(boardId()); };
+  const AI_EXAMPLES = [
+    'Which High cards end this week?',
+    'Push every date in the first column by 2 days',
+    'Add a column "Blocked" and move the domain cards there',
+    'Set everything tagged Regression to Medium',
+    'Make a mind map of this board'
+  ];
+
+  function openAssistant() {
+    const refreshing = AI_OPEN && $('drawer').classList.contains('open');
+    const draft = refreshing && $('aiMsg') ? $('aiMsg').value : '';
+    AI_OPEN = true; HISTORY_OPEN = false; FILES_OPEN = false; SELECTED = null;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    $('dWhere').textContent = `${B.board.title} › Ask AI`;
+    $('dDelete').hidden = true;
+    paintAssistant(draft);
+    $('drawer').classList.add('open');
+    if (!refreshing) setTimeout(() => $('aiMsg') && $('aiMsg').focus(), 60);
+  }
+
+  function aiBubble(m, i) {
+    if (m.role === 'user') return `<div class="aimsg me">${esc(m.text)}</div>`;
+    if (m.pending) return '<div class="aimsg ai thinking">thinking</div>';
+    const ops = m.ops || [];
+    const list = ops.length ? `<ul class="aiops">${ops.map(o =>
+      `<li class="${o.danger ? 'danger' : ''}"><span class="material-symbols-outlined">${o.danger ? 'delete' : o.op === 'to_mind_map' ? 'account_tree' : o.op.startsWith('add') ? 'add' : 'edit'}</span>${esc(o.line)}</li>`).join('')}</ul>` : '';
+    let acts = '';
+    if (ops.length && m.state === 'proposed') {
+      acts = `<div class="aiacts">
+        <button class="bx-btn primary sm" data-aiapply="${i}"><span class="material-symbols-outlined">check</span>Apply ${ops.length} change${ops.length === 1 ? '' : 's'}</button>
+        <button class="bx-btn sm" data-aidiscard="${i}">Discard</button></div>`;
+    } else if (m.state === 'applying') {
+      acts = '<div class="aistate">Applying…</div>';
+    } else if (m.state === 'applied') {
+      acts = `<div class="aistate ok"><span class="material-symbols-outlined">check_circle</span>Applied ${m.applied} change${m.applied === 1 ? '' : 's'}${
+        m.failed && m.failed.length ? ` · ${m.failed.length} could not be applied` : ''}</div>
+        ${(m.failed || []).map(f => `<div class="aistate bad">${esc(f.line)} — ${esc(f.error)}</div>`).join('')}
+        ${m.mapId ? `<a class="bx-btn sm" href="finchat_mindmap.html?map=${encodeURIComponent(m.mapId)}"><span class="material-symbols-outlined">account_tree</span>Open the mind map</a>` : ''}`;
+    } else if (m.state === 'discarded') {
+      acts = '<div class="aistate">Discarded — nothing was changed.</div>';
+    }
+    return `<div class="aimsg ai"><span class="aitext">${esc(m.text)}</span>${list}${acts}</div>`;
+  }
+
+  function paintAssistant(draft = '') {
+    const msgs = chat();
+    $('dBody').innerHTML = `
+      <div class="aichat">
+        <div class="aimsgs" id="aiMsgs">
+          ${msgs.length ? msgs.map(aiBubble).join('') : `
+            <div style="font-size:20px; font-weight:800;">Ask AI</div>
+            <div class="bx-hint" style="margin:4px 0 12px">Tell it what to change on this board, or ask about it. It shows you every change first — nothing happens until you press Apply, and applied changes appear in History under your name.</div>
+            <div class="aiex">${AI_EXAMPLES.map(t => `<button class="bx-chip" data-aiex="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
+        </div>
+        <div class="aicompose">
+          <textarea class="bx-field" id="aiMsg" rows="2" maxlength="2000" placeholder="e.g. Move all the Domain tests to Done">${esc(draft)}</textarea>
+          <button class="bx-btn primary" id="aiSend" title="Send (Enter)" ${AI_BUSY ? 'disabled' : ''}><span class="material-symbols-outlined">send</span></button>
+        </div>
+      </div>`;
+    $('dBody').scrollTop = $('dBody').scrollHeight;
+  }
+
+  async function aiSend(text) {
+    text = String(text || '').trim();
+    if (!text || AI_BUSY || !B) return;
+    const id = boardId();
+    const msgs = chat();
+    const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.text }));
+    msgs.push({ role: 'user', text }, { role: 'assistant', pending: true });
+    AI_BUSY = true;
+    paintAssistant('');
+    try {
+      const out = await post(`/api/boards/${id}/assistant`, { message: text, history });
+      msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: out.reply, ops: out.ops || [], ask: text,
+        state: (out.ops || []).length ? 'proposed' : 'none' });
+    } catch (e) {
+      msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: 'That did not work: ' + e.message, ops: [], state: 'none' });
+    } finally {
+      AI_BUSY = false;
+      if (AI_OPEN && boardId() === id) paintAssistant('');
+    }
+  }
+
+  async function aiApply(i) {
+    const m = chat()[i];
+    if (!m || m.state !== 'proposed') return;
+    const dangerous = m.ops.filter(o => o.danger).length;
+    if (dangerous && !(await confirmBox(`Apply ${m.ops.length} changes?`,
+      `${dangerous} of them delete${dangerous === 1 ? 's' : ''} something. Deleted cards and columns cannot be brought back.`, 'Apply'))) return;
+    m.state = 'applying';
+    paintAssistant($('aiMsg') ? $('aiMsg').value : '');
+    try {
+      const out = await post(`/api/boards/${boardId()}/assistant/apply`, { ops: m.ops, message: m.ask });
+      Object.assign(m, { state: 'applied', applied: out.applied, failed: out.failed || [], mapId: out.mapId || null });
+    } catch (e) {
+      Object.assign(m, { state: 'proposed' });
+      U.toast(e.message);
+    }
+    await openBoard(boardId(), { keepSelection: true });   // re-renders the board and this panel
+  }
+
+  $('dBody').addEventListener('click', (e) => {
+    if (!AI_OPEN) return;
+    let el;
+    if ((el = e.target.closest('[data-aiex]'))) return aiSend(el.dataset.aiex);
+    if ((el = e.target.closest('[data-aiapply]'))) return aiApply(Number(el.dataset.aiapply));
+    if ((el = e.target.closest('[data-aidiscard]'))) {
+      const m = chat()[Number(el.dataset.aidiscard)];
+      if (m) { m.state = 'discarded'; paintAssistant($('aiMsg') ? $('aiMsg').value : ''); }
+      return;
+    }
+    if (e.target.closest('#aiSend')) return aiSend($('aiMsg').value);
+  });
+  $('dBody').addEventListener('keydown', (e) => {
+    if (AI_OPEN && e.target.id === 'aiMsg' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(e.target.value); }
+  });
+  $('aiBtn').addEventListener('click', () => (AI_OPEN ? closeDrawer() : openAssistant()));
+
   // ── other editors' changes ─────────────────────────────────
   // No sockets for boards: a cheap stamp every 20s while the tab is visible.
   // Someone else changed it → reload quietly, unless you are mid-edit (typing
@@ -511,6 +663,7 @@ body[data-theme="dark"] { background: #16181d; }
     const keepScroll = FILES_OPEN && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
     FILES_OPEN = true;
     HISTORY_OPEN = false;
+    AI_OPEN = false;
     SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const atts = B.attachments.filter(a => !a.cardId);
@@ -692,6 +845,7 @@ body[data-theme="dark"] { background: #16181d; }
     closeMenus();
     if (b.dataset.bm === 'rename') { $('boardTitle').focus(); $('boardTitle').select(); }
     if (b.dataset.bm === 'fromMap') openFromMap();
+    if (b.dataset.bm === 'toMap') $('mapBtn').click();
     if (b.dataset.bm === 'delete' && await confirmBox('Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.')) {
       try { await del('/api/boards/' + boardId()); U.toast('Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
     }
@@ -823,6 +977,7 @@ body[data-theme="dark"] { background: #16181d; }
     SELECTED = cardId;
     FILES_OPEN = false;
     HISTORY_OPEN = false;
+    AI_OPEN = false;
     $('dDelete').hidden = false;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const el = document.querySelector(`[data-card="${cardId}"]`);
@@ -881,6 +1036,7 @@ body[data-theme="dark"] { background: #16181d; }
     SELECTED = null;
     FILES_OPEN = false;
     HISTORY_OPEN = false;
+    AI_OPEN = false;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
   }
   $('dClose').addEventListener('click', closeDrawer);
