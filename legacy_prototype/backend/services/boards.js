@@ -994,7 +994,7 @@ async function readFilesForPlan(files) {
     const x = await extractFromUpload(f);
     const text = String(x.text || '');
     if (x.kind !== 'document' || /^\[(Unsupported|Could not|File appears)/.test(text)) {
-      throw bad(`Could not read ${q(name)} — use a PDF, Word (.docx), text, Markdown or CSV file, or an image`);
+      throw bad(`Could not read ${q(name)} — use a PDF, Word, PowerPoint, Excel, text, Markdown or CSV file, or an image`);
     }
     out.push({ name, kind: 'DOCUMENT', text: text.slice(0, each) });
   }
@@ -1111,6 +1111,6 @@ module.exports = {
   addCard, updateCard, deleteCard, reorderCards,
   requireCard, insertAttachment, getAttachment, deleteAttachment, attachmentsWithData,
   fromMindMap, boardForMap, toMindMap, generateBoard,
-  listActivity, listMembers, addMember, removeMember, joinByLink, boardStamp, record,
+  listActivity, listMembers, addMember, removeMember, joinByLink, boardStamp, record, readFilesForPlan,
   normTags, isoDate, normalizePlan, planPalette, mapRowsFromBoard, describeCardChange
 };

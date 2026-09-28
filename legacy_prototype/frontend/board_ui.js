@@ -279,12 +279,28 @@
     }
   }
 
-  // Documents the board builder can read — the same set chat attachments
-  // extract (services/attachments.js). Spreadsheets and slides are not in it.
-  const PLAN_DOC_EXTS = ['.pdf', '.docx', '.txt', '.md', '.csv', '.json'];
+  // Documents the AI can read — the same set chat attachments extract
+  // (services/attachments.js): text only from slides and sheets, not layout.
+  const PLAN_DOC_EXTS = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv', '.json'];
   const PLAN_FILES_MAX = 5;
   const extOf = (name) => (String(name || '').match(/\.[^.]+$/) || [''])[0].toLowerCase();
   const isImage = (f) => PLAN_IMAGE_TYPES.includes(f.type);
+
+  /**
+   * One file for an AI chat message: images scaled down, documents checked.
+   * @returns {Promise<File>}  @throws {Error} with a message fit to show
+   */
+  async function preparePlanFile(f) {
+    if (isImage(f)) {
+      const small = await shrinkImage(f);
+      if (small.size > 8 * 1024 * 1024) throw new Error(`${f.name} is over 8 MB — use a smaller image`);
+      return small;
+    }
+    if (!PLAN_DOC_EXTS.includes(extOf(f.name))) throw new Error(`${f.name || 'That file'}: use an image, PDF, Word, PowerPoint, Excel, text or CSV`);
+    if (f.size > 15 * 1024 * 1024) throw new Error(`${f.name} is over 15 MB`);
+    return f;
+  }
+  const PLAN_ACCEPT = [...PLAN_IMAGE_TYPES, ...PLAN_DOC_EXTS].join(',');
 
   /**
    * Files to build a board from: images (a whiteboard photo, a screenshot) and
@@ -298,7 +314,7 @@
       <button type="button" class="bx-imgpick-zone">
         <span class="material-symbols-outlined">upload_file</span>
         <span><b>Add files</b> — click, drop, or paste an image (Ctrl+V).
-          <small>Images, PDF, Word (.docx), text, Markdown or CSV · up to ${PLAN_FILES_MAX}. A whiteboard photo, a brief, meeting notes, a spec.</small></span>
+          <small>Images, PDF, Word, PowerPoint, Excel, text or CSV · up to ${PLAN_FILES_MAX}. A whiteboard photo, a brief, a deck, a task sheet.</small></span>
       </button>
       <input type="file" multiple accept="${[...PLAN_IMAGE_TYPES, ...PLAN_DOC_EXTS].join(',')}" hidden>`;
     const list = host.querySelector('.bx-imgpick-list');
@@ -329,7 +345,7 @@
           if (f.size > 15 * 1024 * 1024) { toast(`${f.name} is over 15 MB`); continue; }
           files.push({ file: f, url: null });
         } else {
-          toast(`${f.name || 'That file'}: use an image, PDF, Word (.docx), text, Markdown or CSV`);
+          toast(`${f.name || 'That file'}: use an image, PDF, Word, PowerPoint, Excel, text or CSV`);
         }
       }
       paint();
@@ -369,6 +385,6 @@
 
   window.BoardUI = {
     esc, isLight, fmtDate, dateRange, fmtSize, attIcon, tagChip, prioChip, cardHTML, attachmentHTML,
-    togglePreview, toast, saveResponse, planFilesPicker, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
+    togglePreview, toast, saveResponse, planFilesPicker, preparePlanFile, PLAN_ACCEPT, PLAN_FILES_MAX, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
   };
 })();

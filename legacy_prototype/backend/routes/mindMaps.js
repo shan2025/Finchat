@@ -985,6 +985,40 @@ router.post('/:mapId/layout', requireAuth, async (req, res) => {
 });
 
 // ── GET /:mapId/export ─────────────────────────────────────────
+// ── Ask AI on the whole map ────────────────────────────────────
+// Plan (writes nothing) → the user reviews each change → apply what they kept.
+// JSON {message, history}, or multipart with up to 5 "files" (history as a JSON string).
+const MapAssistant = require('../services/cognitive/mindMapAssistant');
+const assistFail = (res, err, label) => {
+  if (err instanceof MapAssistant.MapAssistError || (err.status && err.status < 500)) {
+    return res.status(err.status || 400).json({ error: err.message });
+  }
+  console.error(`Mind map assistant ${label} error:`, err);
+  res.status(500).json({ error: `Failed to ${label}` });
+};
+
+router.post('/:mapId/assistant', requireAuth, (req, res, next) => {
+  upload.array('files', 5)(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Each file must be under 15 MB.' });
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    let history = req.body?.history;
+    if (typeof history === 'string') { try { history = JSON.parse(history); } catch (e) { history = []; } }
+    const out = await MapAssistant.plan(req.params.mapId, req.user.id, req.body?.message, history, { files: req.files || [] });
+    res.json({ ok: true, ...out });
+  } catch (err) { assistFail(res, err, 'ask the AI'); }
+});
+
+router.post('/:mapId/assistant/apply', requireAuth, async (req, res) => {
+  try {
+    const out = await MapAssistant.apply(req.params.mapId, req.user.id, req.body?.ops, req.body?.message);
+    res.json({ ok: true, ...out });
+  } catch (err) { assistFail(res, err, 'apply the changes'); }
+});
+
 router.get('/:mapId/export', requireAuth, async (req, res) => {
   const format = String(req.query.format || 'markdown').toLowerCase();
   try {

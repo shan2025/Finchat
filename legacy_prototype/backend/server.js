@@ -260,6 +260,7 @@ app.use('/api/mind-maps', require('./routes/mindMaps'));
 app.use('/api/shared/mind-maps', require('./routes/sharedMindMaps'));
 // Kanban boards, and their share links (same no-JWT contract as above).
 app.use('/api/boards', require('./routes/boards'));
+app.use('/api/voice', require('./routes/voice'));
 app.use('/api/shared/boards', require('./routes/sharedBoards'));
 // External-scheduler triggers (shared-secret auth, not user JWT) — lets missions
 // and briefings fire on a host that sleeps when idle. See routes/cron.js.

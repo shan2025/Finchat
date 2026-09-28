@@ -343,8 +343,18 @@ router.delete('/:boardId/members/:userId', requireAuth, handle('remove them', as
 // ── AI assistant ───────────────────────────────────────────────
 // Plan first (nothing written), apply only what the user approved.
 
-router.post('/:boardId/assistant', requireAuth, handle('ask the AI', async (req, res) => {
-  const out = await Assistant.plan(req.params.boardId, req.user.id, req.body?.message, req.body?.history);
+// JSON {message, history}, or multipart with up to 5 "files" (history as a JSON string).
+router.post('/:boardId/assistant', requireAuth, (req, res, next) => {
+  planUpload.array('files', 5)(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Each file must be under 15 MB.' });
+    if (err && err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ error: 'Attach at most 5 files.' });
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, handle('ask the AI', async (req, res) => {
+  let history = req.body?.history;
+  if (typeof history === 'string') { try { history = JSON.parse(history); } catch (e) { history = []; } }
+  const out = await Assistant.plan(req.params.boardId, req.user.id, req.body?.message, history, { files: req.files || [] });
   res.json({ ok: true, ...out });
 }));
 

@@ -107,10 +107,20 @@ body[data-theme="dark"] { background: #16181d; }
 .aimsg .bx-btn.sm { margin-top: 8px; }
 .aiex { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .aiex .bx-chip { text-align: left; }
-.aicompose { position: sticky; bottom: -22px; display: flex; gap: 8px; align-items: flex-end; background: var(--bx-surface);
+.aicompose { position: sticky; bottom: -22px; background: var(--bx-surface);
   padding: 10px 0 22px; margin-bottom: -22px; border-top: 1px solid var(--bx-line); }
-.aicompose textarea { resize: none; min-height: 44px; max-height: 140px; }
-.aicompose .bx-btn { height: 44px; flex: none; }
+.airow { display: flex; gap: 6px; align-items: flex-end; }
+.airow textarea { resize: none; min-height: 44px; max-height: 140px; }
+.airow .bx-btn { height: 44px; flex: none; }
+.airow .bx-ibtn { height: 44px; width: 38px; }
+.aimic.recording { background: #fde8e8; color: var(--bx-danger); animation: aipulse 1.1s ease-in-out infinite; }
+@keyframes aipulse { 50% { box-shadow: 0 0 0 6px rgba(214, 45, 45, .15); } }
+.aifiles { display: flex; flex-wrap: wrap; gap: 6px; }
+.aifiles:not(:empty) { margin-bottom: 8px; }
+.aifile { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: 12.5px; font-weight: 600;
+  background: var(--bx-surface-2); border: 1px solid var(--bx-line); border-radius: 999px; padding: 3px 4px 3px 9px; color: var(--bx-fg-2); }
+.aifile .material-symbols-outlined { font-size: 15px; }
+.aifile button { border: none; background: none; cursor: pointer; color: var(--bx-muted); display: inline-flex; padding: 1px; }
 @media (max-width: 640px) {
   #historyBtn span:last-child, #aiBtn span:last-child { display: none; }
   #stage { padding: 132px 12px 80px 12px; }
@@ -284,6 +294,7 @@ body[data-theme="dark"] { background: #16181d; }
        accept=".pdf,.docx,.txt,.md,.csv,.json,.xlsx,.pptx,image/*">
 
 <script src="board_ui.js"></script>
+<script src="voice_input.js"></script>
 <script>
 (() => {
   const U = window.BoardUI;
@@ -572,26 +583,69 @@ body[data-theme="dark"] { background: #16181d; }
             <div class="aiex">${AI_EXAMPLES.map(t => `<button class="bx-chip" data-aiex="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
         </div>
         <div class="aicompose">
-          <textarea class="bx-field" id="aiMsg" rows="2" maxlength="2000" placeholder="e.g. Move all the Domain tests to Done">${esc(draft)}</textarea>
-          <button class="bx-btn primary" id="aiSend" title="Send (Enter)" ${AI_BUSY ? 'disabled' : ''}><span class="material-symbols-outlined">send</span></button>
+          <div class="aifiles" id="aiFiles">${AI_FILES.map((f, i) => `<span class="aifile"><span class="material-symbols-outlined">${/^image\//.test(f.type) ? 'image' : 'description'}</span>${esc(f.name || 'image')}<button data-aiunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('')}</div>
+          <div class="airow">
+            <button class="bx-ibtn" id="aiAttach" title="Attach files — images, PDF, Word, PowerPoint, Excel, text"><span class="material-symbols-outlined">attach_file</span></button>
+            <button class="bx-ibtn aimic ${VOICE_STATE}" id="aiMic" title="${VOICE_STATE === 'recording' ? 'Stop and send' : 'Speak your request'}" ${VOICE_STATE === 'transcribing' ? 'disabled' : ''}><span class="material-symbols-outlined">${VOICE_STATE === 'transcribing' ? 'hourglass_top' : VOICE_STATE === 'recording' ? 'stop_circle' : 'mic'}</span></button>
+            <textarea class="bx-field" id="aiMsg" rows="2" maxlength="2000" placeholder="${VOICE_STATE === 'recording' ? 'Listening… press stop when you are done' : VOICE_STATE === 'transcribing' ? 'Turning your voice into text…' : 'e.g. Move all the Domain tests to Done'}">${esc(draft)}</textarea>
+            <button class="bx-btn primary" id="aiSend" title="Send (Enter)" ${AI_BUSY ? 'disabled' : ''}><span class="material-symbols-outlined">send</span></button>
+          </div>
+          <input type="file" id="aiFileInput" multiple hidden accept="${U.PLAN_ACCEPT}">
         </div>
       </div>`;
     $('dBody').scrollTop = $('dBody').scrollHeight;
   }
 
-  async function aiSend(text) {
+  // Files waiting to go with the next message, and the voice recorder.
+  let AI_FILES = [];
+  let VOICE_STATE = 'idle';
+  async function aiAddFiles(list) {
+    for (const f of [...(list || [])]) {
+      if (AI_FILES.length >= U.PLAN_FILES_MAX) { U.toast(`At most ${U.PLAN_FILES_MAX} files per message`); break; }
+      try { AI_FILES.push(await U.preparePlanFile(f)); } catch (e) { U.toast(e.message); }
+    }
+    if (AI_OPEN) paintAssistant($('aiMsg') ? $('aiMsg').value : '');
+  }
+  const voice = window.FcVoice ? window.FcVoice.create({
+    token: TOKEN,
+    onState: (s) => {
+      if (s === VOICE_STATE) return;
+      VOICE_STATE = s;
+      if (AI_OPEN) paintAssistant($('aiMsg') ? $('aiMsg').value : '');
+    },
+    onText: (t) => aiSend(t, { spoken: true }),
+    onError: (m) => U.toast(m)
+  }) : null;
+
+  async function aiSend(text, { spoken = false } = {}) {
     text = String(text || '').trim();
-    if (!text || AI_BUSY || !B) return;
+    const files = AI_FILES.slice();
+    if ((!text && !files.length) || AI_BUSY || !B) return;
     const id = boardId();
     const msgs = chat();
     const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.text }));
-    msgs.push({ role: 'user', text }, { role: 'assistant', pending: true });
+    const shown = text + (files.length ? `${text ? '\n' : ''}Attached: ${files.map(f => f.name || 'image').join(', ')}` : '');
+    msgs.push({ role: 'user', text: shown }, { role: 'assistant', pending: true });
+    AI_FILES = [];
     AI_BUSY = true;
     paintAssistant('');
     try {
-      const out = await post(`/api/boards/${id}/assistant`, { message: text, history });
-      msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: out.reply, ops: out.ops || [], ask: text,
+      let out;
+      if (files.length) {
+        const fd = new FormData();
+        fd.append('message', text);
+        fd.append('history', JSON.stringify(history));
+        for (const f of files) fd.append('files', f, f.name || 'image');
+        const r = await fetch(`${API}/api/boards/${id}/assistant`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+        out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out.error || 'HTTP ' + r.status);
+      } else {
+        out = await post(`/api/boards/${id}/assistant`, { message: text, history });
+      }
+      msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: out.reply, ops: out.ops || [], ask: text || files.map(f => f.name).join(', '),
         state: (out.ops || []).length ? 'proposed' : 'none' });
+      // You spoke, so it answers out loud — a real voice conversation.
+      if (spoken && window.FcVoice) window.FcVoice.speak(out.reply);
     } catch (e) {
       msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: 'That did not work: ' + e.message, ops: [], state: 'none' });
     } finally {
@@ -629,9 +683,34 @@ body[data-theme="dark"] { background: #16181d; }
       return;
     }
     if (e.target.closest('#aiSend')) return aiSend($('aiMsg').value);
+    if (e.target.closest('#aiAttach')) return $('aiFileInput').click();
+    if ((el = e.target.closest('[data-aiunfile]'))) {
+      AI_FILES.splice(Number(el.dataset.aiunfile), 1);
+      return paintAssistant($('aiMsg') ? $('aiMsg').value : '');
+    }
+    if (e.target.closest('#aiMic')) {
+      if (!voice) return U.toast('Voice is not available in this browser');
+      if (window.FcVoice) window.FcVoice.stop();
+      return voice.toggle();
+    }
   });
   $('dBody').addEventListener('keydown', (e) => {
     if (AI_OPEN && e.target.id === 'aiMsg' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(e.target.value); }
+  });
+  $('dBody').addEventListener('change', (e) => {
+    if (AI_OPEN && e.target.id === 'aiFileInput') { aiAddFiles(e.target.files); e.target.value = ''; }
+  });
+  // Paste a screenshot, or drop files anywhere on the panel.
+  $('dBody').addEventListener('paste', (e) => {
+    if (!AI_OPEN) return;
+    const files = [...((e.clipboardData && e.clipboardData.items) || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+    if (files.length) { e.preventDefault(); aiAddFiles(files); }
+  });
+  $('drawer').addEventListener('dragover', (e) => { if (AI_OPEN) e.preventDefault(); });
+  $('drawer').addEventListener('drop', (e) => {
+    if (!AI_OPEN) return;
+    e.preventDefault();
+    aiAddFiles(e.dataTransfer && e.dataTransfer.files);
   });
   $('aiBtn').addEventListener('click', () => (AI_OPEN ? closeDrawer() : openAssistant()));
 

@@ -47,7 +47,8 @@ test('ops map back to real ids; unknown ids and junk are dropped, not guessed', 
   assert.strictEqual(ops[2].cardId, 'cardY');
   assert.strictEqual(ops[2].danger, true);
   assert.strictEqual(ops[3].columnId, 'colB');
-  assert.strictEqual(ops[3].line, 'Add “UC-19 Voice login” to Done');
+  // The preview line shows what the new card will carry, not just its title.
+  assert.strictEqual(ops[3].line, 'Add “UC-19 Voice login” to Done (… → 2026-10-05, tags: Onboarding)');
 });
 
 test('a change that changes nothing is not offered', () => {
