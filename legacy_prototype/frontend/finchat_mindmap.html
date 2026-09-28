@@ -176,6 +176,28 @@ html.nav-collapsed #mmShell { margin-left:0; }
 .mm-aex button { border:1px solid var(--mm-line2); background:var(--mm-surface); color:var(--mm-fg2); border-radius:999px;
   padding:5px 12px; font:600 12.5px 'Figtree', 'Inter', system-ui, sans-serif; cursor:pointer; text-align:left; }
 .mm-aex button:hover { border-color:var(--mm-accent); color:var(--mm-accent); }
+.mm-athinking { display:inline-flex; align-items:center; gap:9px; color:var(--mm-muted); font-size:13px; }
+.mm-adots { display:inline-flex; gap:4px; }
+.mm-adots i { width:7px; height:7px; border-radius:50%; background:linear-gradient(135deg, #4262ff, #e84fa7);
+  animation:mmAdot 1.2s ease-in-out infinite; }
+.mm-adots i:nth-child(2) { animation-delay:.15s; }
+.mm-adots i:nth-child(3) { animation-delay:.3s; }
+@keyframes mmAdot { 0%, 60%, 100% { transform:translateY(0); opacity:.45; } 30% { transform:translateY(-5px); opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .mm-adots i { animation:none; opacity:.7; } }
+.mm-athumbs { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.mm-msg.user .mm-athumbs:first-child { margin-top:0; }
+.mm-athumb { position:relative; display:inline-flex; padding:0; border:1px solid var(--mm-line); border-radius:10px;
+  overflow:hidden; background:var(--mm-surface); cursor:zoom-in; }
+.mm-athumb img { display:block; width:120px; height:84px; object-fit:cover; }
+.mm-athumb.pending { cursor:default; }
+.mm-athumb.pending .mm-athumb-img { border:none; padding:0; background:none; cursor:zoom-in; display:block; }
+.mm-athumb.pending img { width:112px; height:78px; }
+.mm-athumb-x { position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(20,24,36,.7); color:#fff; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.mm-athumb-x .material-symbols-outlined { font-size:14px; }
+.mm-azoom { position:fixed; inset:0; z-index:200; background:rgba(12,14,20,.82); display:flex; align-items:center;
+  justify-content:center; padding:24px; cursor:zoom-out; }
+.mm-azoom img { max-width:100%; max-height:100%; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
 #mmAssistMic.recording { color:#d62d2d; background:#fde8e8; border-color:#f3b4b4; animation:mmMicPulse 1.1s ease-in-out infinite; }
 @keyframes mmMicPulse { 50% { box-shadow:0 0 0 5px rgba(214,45,45,.15); } }
 .mm-panel-head { padding:14px 18px 10px; border-bottom:1px solid var(--mm-line); }
@@ -3297,9 +3319,48 @@ function closeAssist() {
   if (window.FcVoice) window.FcVoice.stop();
 }
 
+// Object URLs for attached images, so a thumbnail shows before and after sending.
+const ASSIST_PREVIEWS = new WeakMap();
+const assistPreview = (f) => {
+  if (!/^image\//.test(f.type || '')) return null;
+  if (!ASSIST_PREVIEWS.has(f)) ASSIST_PREVIEWS.set(f, URL.createObjectURL(f));
+  return ASSIST_PREVIEWS.get(f);
+};
+const assistThumbs = (items) => items.length ? `<div class="mm-athumbs">${items.map(x => x.url
+  ? `<button class="mm-athumb" data-act="assistZoom" data-arg="${esc(x.url)}" title="${esc(x.name)} — click to enlarge"><img src="${esc(x.url)}" alt="${esc(x.name)}"></button>`
+  : `<span class="mm-chip"><span class="material-symbols-outlined" style="font-size:14px">description</span>${esc(x.name)}</span>`).join('')}</div>` : '';
+
+// Reading attached files first (vision can take a while), then thinking — with
+// a seconds counter so a long wait reads as work, not a hang.
+const assistPendingLabel = (m) => {
+  const s = Math.floor((Date.now() - m.startedAt) / 1000);
+  const reading = m.fileNames && m.fileNames.length && s < 3 + 6 * m.fileNames.length;
+  const what = reading ? `reading ${m.fileNames.length === 1 ? m.fileNames[0] : m.fileNames.length + ' files'}` : 'thinking';
+  if (s >= 25) return `${what} · ${s}s — the AI service is slow right now, still working`;
+  return s >= 3 ? `${what} · ${s}s` : what;
+};
+setInterval(() => {
+  const el = document.getElementById('mmAssistPending');
+  const m = ASSIST_OPEN && assistChat().find(x => x.pending);
+  if (el && m) el.textContent = assistPendingLabel(m);
+}, 500);
+
+function assistZoom(url) {
+  const o = document.createElement('div');
+  o.className = 'mm-azoom';
+  o.innerHTML = `<img src="${esc(url)}" alt="">`;
+  const close = () => { o.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  o.addEventListener('click', close);
+  document.addEventListener('keydown', onKey, true);
+  document.body.appendChild(o);
+}
+
 function assistBubble(m, i) {
-  if (m.role === 'user') return `<div class="mm-msg user">${esc(m.text)}</div>`;
-  if (m.pending) return '<div class="mm-msg ai"><div class="mm-msg-who">AI</div>thinking</div>';
+  if (m.role === 'user') return `<div class="mm-msg user">${m.text ? esc(m.text) : ''}${assistThumbs(m.files || [])}</div>`;
+  if (m.pending) {
+    return `<div class="mm-msg ai"><div class="mm-msg-who">AI</div><div class="mm-athinking"><span class="mm-adots"><i></i><i></i><i></i></span><span id="mmAssistPending">${esc(assistPendingLabel(m))}</span></div></div>`;
+  }
   const ops = m.ops || [];
   const icon = (o) => (o.danger ? 'delete' : o.op === 'to_board' ? 'view_kanban' : o.op === 'add_node' ? 'add' : o.op === 'move_node' ? 'open_with' : 'edit');
   const list = ops.length ? `<ul class="mm-aops">${ops.map(o =>
@@ -3330,8 +3391,9 @@ function renderAssist() {
     : `<div class="mm-empty-note">Try one of these, attach a file, or press the mic and just say it.</div>
        <div class="mm-aex">${ASSIST_EXAMPLES.map(t => `<button data-act="assistExample" data-arg="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
   body.scrollTop = body.scrollHeight;
-  document.getElementById('mmAssistFiles').innerHTML = ASSIST_FILES.map((f, i) =>
-    `<span class="mm-chip"><span class="material-symbols-outlined" style="font-size:14px">${/^image\//.test(f.type) ? 'image' : 'description'}</span>${esc(f.name || 'image')}<button data-act="assistUnfile" data-arg="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('');
+  document.getElementById('mmAssistFiles').innerHTML = ASSIST_FILES.map((f, i) => assistPreview(f)
+    ? `<span class="mm-athumb pending"><button class="mm-athumb-img" data-act="assistZoom" data-arg="${esc(assistPreview(f))}" title="${esc(f.name || 'image')} — click to enlarge"><img src="${esc(assistPreview(f))}" alt=""></button><button class="mm-athumb-x" data-act="assistUnfile" data-arg="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`
+    : `<span class="mm-chip"><span class="material-symbols-outlined" style="font-size:14px">description</span>${esc(f.name || 'file')}<button data-act="assistUnfile" data-arg="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('');
   const mic = document.getElementById('mmAssistMic');
   mic.classList.toggle('recording', ASSIST_VOICE === 'recording');
   mic.disabled = ASSIST_VOICE === 'transcribing';
@@ -3361,9 +3423,11 @@ async function assistSend(text, { spoken = false } = {}) {
   if ((!text && !files.length) || ASSIST_BUSY || !MAP) return;
   const mapId = MAP.map.map_id;
   const msgs = assistChat();
-  const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.text }));
-  msgs.push({ role: 'user', text: text + (files.length ? `${text ? '\n' : ''}Attached: ${files.map(f => f.name || 'image').join(', ')}` : '') },
-    { role: 'assistant', pending: true });
+  const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.historyText || m.text }));
+  // The bubble shows the attachments themselves; the model's history gets a note.
+  msgs.push({ role: 'user', text, files: files.map(f => ({ name: f.name || 'image', url: assistPreview(f) })),
+      historyText: text + (files.length ? `${text ? '\n' : ''}[attached: ${files.map(f => f.name || 'image').join(', ')}]` : '') },
+    { role: 'assistant', pending: true, startedAt: Date.now(), fileNames: files.map(f => f.name || 'image') });
   ASSIST_FILES = [];
   ASSIST_BUSY = true;
   input.value = '';
@@ -3740,6 +3804,7 @@ const MM_ACTIONS = {
   // Ask AI (whole map)
   openAssist, closeAssist, assistSend: () => assistSend(),
   assistExample: (el) => assistSend(el.dataset.arg),
+  assistZoom: (el) => assistZoom(el.dataset.arg),
   assistApply: (el) => assistApply(Number(el.dataset.arg)),
   assistDiscard: (el) => { const m = assistChat()[Number(el.dataset.arg)]; if (m) { m.state = 'discarded'; renderAssist(); } },
   assistAttach: () => document.getElementById('mmAssistFileInput').click(),

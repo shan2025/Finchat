@@ -286,8 +286,10 @@ const WORKLOAD_MODEL_HINTS = {
 // limit: the 5s/15s/30s ladder that rescues a background research run is a
 // minute of dead air in a chat window, and there is another provider one line
 // down that can answer immediately. Patience is for work nobody is watching.
+// `vision` joined 2026-09-28: every image read (chat attachments, board and
+// mind map AI) has a person watching a spinner.
 const IMPATIENT_WORKLOADS = new Set(
-  (process.env.INFERENCE_IMPATIENT_WORKLOADS || 'chat')
+  (process.env.INFERENCE_IMPATIENT_WORKLOADS || 'chat,vision')
     .split(',').map(s => s.trim()).filter(Boolean)
 );
 
@@ -711,8 +713,13 @@ async function _runProviderChain({
         // Please try again later", which is an explicit instruction to retry;
         // giving up on it immediately abandoned a working provider over a
         // wobble that had usually passed within seconds.
-        if (status >= 500 && status < 600 && attempt < 3) {
-          const delayMs = Math.min((retryAfterSec || [2, 6, 15][attempt] || 15) * 1000, 15_000);
+        // Someone watching (IMPATIENT_WORKLOADS) gets ONE quick retry, then the
+        // next model: 2s+6s+15s of backoff was 23s of a spinner before a board
+        // AI reading a pasted image even reached its fallback (2026-09-28).
+        if (status >= 500 && status < 600 && attempt < (patient ? 3 : 1)) {
+          const delayMs = patient
+            ? Math.min((retryAfterSec || [2, 6, 15][attempt] || 15) * 1000, 15_000)
+            : 2000;
           console.warn(`⚠️ ${providerName} ${status} on "${gModel}" (attempt ${attempt + 1}/3) — provider-side, waiting ${delayMs}ms before retry [${feature}]`);
           await _sleep(delayMs);
           continue; // retry same model

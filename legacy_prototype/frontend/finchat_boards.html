@@ -93,7 +93,29 @@ body[data-theme="dark"] { background: #16181d; }
 .aimsg.me, .aitext { white-space: pre-wrap; }
 .aimsg.me { align-self: flex-end; background: var(--bx-blue); color: #fff; border-bottom-right-radius: 4px; }
 .aimsg.ai { align-self: flex-start; background: var(--bx-surface-2); border: 1px solid var(--bx-line); color: var(--bx-fg); border-bottom-left-radius: 4px; }
-.aimsg.thinking { color: var(--bx-muted); font-style: italic; }
+.aimsg.thinking { color: var(--bx-muted); display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; }
+.aidots { display: inline-flex; gap: 4px; }
+.aidots i { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg, #4262ff, #e84fa7);
+  animation: aidot 1.2s ease-in-out infinite; }
+.aidots i:nth-child(2) { animation-delay: .15s; }
+.aidots i:nth-child(3) { animation-delay: .3s; }
+@keyframes aidot { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-5px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .aidots i { animation: none; opacity: .7; } }
+.aithumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.aimsg.me .aithumbs:first-child { margin-top: 0; }
+.aimsg.me .aifile { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.3); color: #fff; }
+.aithumb { position: relative; display: inline-flex; padding: 0; border: 1px solid var(--bx-line); border-radius: 10px;
+  overflow: hidden; background: var(--bx-surface); cursor: zoom-in; }
+.aithumb img { display: block; width: 120px; height: 84px; object-fit: cover; }
+.aithumb.pending { cursor: default; }
+.aithumb.pending .aithumb-img { border: none; padding: 0; background: none; cursor: zoom-in; display: block; }
+.aithumb.pending img { width: 112px; height: 78px; }
+.aithumb-x { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(20, 24, 36, .7); color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.aithumb-x .material-symbols-outlined { font-size: 14px; }
+.aizoom { position: fixed; inset: 0; z-index: 200; background: rgba(12, 14, 20, .82); display: flex; align-items: center;
+  justify-content: center; padding: 24px; cursor: zoom-out; }
+.aizoom img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 .aiops { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
 .aiops li { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; color: var(--bx-fg-2);
   background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 8px; padding: 6px 8px; }
@@ -548,9 +570,37 @@ body[data-theme="dark"] { background: #16181d; }
     if (!refreshing) setTimeout(() => $('aiMsg') && $('aiMsg').focus(), 60);
   }
 
+  // Object URLs for attached images, so a thumbnail can show before and after sending.
+  const PREVIEW_URLS = new WeakMap();
+  const previewOf = (f) => {
+    if (!/^image\//.test(f.type || '')) return null;
+    if (!PREVIEW_URLS.has(f)) PREVIEW_URLS.set(f, URL.createObjectURL(f));
+    return PREVIEW_URLS.get(f);
+  };
+  const thumbsHTML = (items) => items.length ? `<div class="aithumbs">${items.map(x => x.url
+    ? `<button class="aithumb" data-aizoom="${esc(x.url)}" title="${esc(x.name)} — click to enlarge"><img src="${esc(x.url)}" alt="${esc(x.name)}"></button>`
+    : `<span class="aifile"><span class="material-symbols-outlined">description</span>${esc(x.name)}</span>`).join('')}</div>` : '';
+
+  // What the "thinking" bubble says: reading files first (vision can take a
+  // while), then thinking — with a seconds counter so a long wait reads as work.
+  const pendingLabel = (m) => {
+    const s = Math.floor((Date.now() - m.startedAt) / 1000);
+    const reading = m.fileNames && m.fileNames.length && s < 3 + 6 * m.fileNames.length;
+    const what = reading ? `reading ${m.fileNames.length === 1 ? m.fileNames[0] : m.fileNames.length + ' files'}` : 'thinking';
+    if (s >= 25) return `${what} · ${s}s — the AI service is slow right now, still working`;
+    return s >= 3 ? `${what} · ${s}s` : what;
+  };
+  setInterval(() => {
+    const el = document.getElementById('aiPendingLabel');
+    const m = AI_OPEN && B && chat().find(x => x.pending);
+    if (el && m) el.textContent = pendingLabel(m);
+  }, 500);
+
   function aiBubble(m, i) {
-    if (m.role === 'user') return `<div class="aimsg me">${esc(m.text)}</div>`;
-    if (m.pending) return '<div class="aimsg ai thinking">thinking</div>';
+    if (m.role === 'user') return `<div class="aimsg me">${m.text ? `<span class="aitext">${esc(m.text)}</span>` : ''}${thumbsHTML(m.files || [])}</div>`;
+    if (m.pending) {
+      return `<div class="aimsg ai thinking"><span class="aidots"><i></i><i></i><i></i></span><span id="aiPendingLabel">${esc(pendingLabel(m))}</span></div>`;
+    }
     const ops = m.ops || [];
     const list = ops.length ? `<ul class="aiops">${ops.map(o =>
       `<li class="${o.danger ? 'danger' : ''}"><span class="material-symbols-outlined">${o.danger ? 'delete' : o.op === 'to_mind_map' ? 'account_tree' : o.op.startsWith('add') ? 'add' : 'edit'}</span>${esc(o.line)}</li>`).join('')}</ul>` : '';
@@ -583,7 +633,9 @@ body[data-theme="dark"] { background: #16181d; }
             <div class="aiex">${AI_EXAMPLES.map(t => `<button class="bx-chip" data-aiex="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
         </div>
         <div class="aicompose">
-          <div class="aifiles" id="aiFiles">${AI_FILES.map((f, i) => `<span class="aifile"><span class="material-symbols-outlined">${/^image\//.test(f.type) ? 'image' : 'description'}</span>${esc(f.name || 'image')}<button data-aiunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('')}</div>
+          <div class="aifiles" id="aiFiles">${AI_FILES.map((f, i) => previewOf(f)
+            ? `<span class="aithumb pending"><button class="aithumb-img" data-aizoom="${esc(previewOf(f))}" title="${esc(f.name || 'image')} — click to enlarge"><img src="${esc(previewOf(f))}" alt=""></button><button class="aithumb-x" data-aiunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`
+            : `<span class="aifile"><span class="material-symbols-outlined">description</span>${esc(f.name || 'file')}<button data-aiunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('')}</div>
           <div class="airow">
             <button class="bx-ibtn" id="aiAttach" title="Attach files — images, PDF, Word, PowerPoint, Excel, text"><span class="material-symbols-outlined">attach_file</span></button>
             <button class="bx-ibtn aimic ${VOICE_STATE}" id="aiMic" title="${VOICE_STATE === 'recording' ? 'Stop and send' : 'Speak your request'}" ${VOICE_STATE === 'transcribing' ? 'disabled' : ''}><span class="material-symbols-outlined">${VOICE_STATE === 'transcribing' ? 'hourglass_top' : VOICE_STATE === 'recording' ? 'stop_circle' : 'mic'}</span></button>
@@ -623,9 +675,12 @@ body[data-theme="dark"] { background: #16181d; }
     if ((!text && !files.length) || AI_BUSY || !B) return;
     const id = boardId();
     const msgs = chat();
-    const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.text }));
-    const shown = text + (files.length ? `${text ? '\n' : ''}Attached: ${files.map(f => f.name || 'image').join(', ')}` : '');
-    msgs.push({ role: 'user', text: shown }, { role: 'assistant', pending: true });
+    const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.historyText || m.text }));
+    // The bubble shows the text and the attachments themselves (thumbnails);
+    // the model's history gets a plain note of what was attached.
+    const noted = text + (files.length ? `${text ? '\n' : ''}[attached: ${files.map(f => f.name || 'image').join(', ')}]` : '');
+    msgs.push({ role: 'user', text, historyText: noted, files: files.map(f => ({ name: f.name || 'image', url: previewOf(f) })) },
+      { role: 'assistant', pending: true, startedAt: Date.now(), fileNames: files.map(f => f.name || 'image') });
     AI_FILES = [];
     AI_BUSY = true;
     paintAssistant('');
@@ -684,6 +739,7 @@ body[data-theme="dark"] { background: #16181d; }
     }
     if (e.target.closest('#aiSend')) return aiSend($('aiMsg').value);
     if (e.target.closest('#aiAttach')) return $('aiFileInput').click();
+    if ((el = e.target.closest('[data-aizoom]'))) return zoomImage(el.dataset.aizoom);
     if ((el = e.target.closest('[data-aiunfile]'))) {
       AI_FILES.splice(Number(el.dataset.aiunfile), 1);
       return paintAssistant($('aiMsg') ? $('aiMsg').value : '');
@@ -694,6 +750,18 @@ body[data-theme="dark"] { background: #16181d; }
       return voice.toggle();
     }
   });
+  // Full-size look at an attached image; click anywhere or press Esc to close.
+  function zoomImage(url) {
+    const o = document.createElement('div');
+    o.className = 'aizoom';
+    o.innerHTML = `<img src="${esc(url)}" alt="">`;
+    const close = () => { o.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    o.addEventListener('click', close);
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(o);
+  }
+
   $('dBody').addEventListener('keydown', (e) => {
     if (AI_OPEN && e.target.id === 'aiMsg' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(e.target.value); }
   });
