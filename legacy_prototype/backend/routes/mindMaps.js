@@ -987,7 +987,8 @@ router.post('/:mapId/layout', requireAuth, async (req, res) => {
 // ── GET /:mapId/export ─────────────────────────────────────────
 // ── Ask AI on the whole map ────────────────────────────────────
 // Plan (writes nothing) → the user reviews each change → apply what they kept.
-// JSON {message, history}, or multipart with up to 5 "files" (history as a JSON string).
+// JSON {message, history, focusNodeIds?}, or multipart with up to 5 "files"
+// (history and focusNodeIds as JSON strings). focusNodeIds = the node(s) asked about.
 const MapAssistant = require('../services/cognitive/mindMapAssistant');
 const assistFail = (res, err, label) => {
   if (err instanceof MapAssistant.MapAssistError || (err.status && err.status < 500)) {
@@ -1005,9 +1006,10 @@ router.post('/:mapId/assistant', requireAuth, (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    let history = req.body?.history;
-    if (typeof history === 'string') { try { history = JSON.parse(history); } catch (e) { history = []; } }
-    const out = await MapAssistant.plan(req.params.mapId, req.user.id, req.body?.message, history, { files: req.files || [] });
+    // Multipart sends arrays as JSON strings.
+    const parse = (v) => { if (typeof v !== 'string') return v; try { return JSON.parse(v); } catch (e) { return []; } };
+    const out = await MapAssistant.plan(req.params.mapId, req.user.id, req.body?.message, parse(req.body?.history),
+      { files: req.files || [], focusNodeIds: parse(req.body?.focusNodeIds) });
     res.json({ ok: true, ...out });
   } catch (err) { assistFail(res, err, 'ask the AI'); }
 });

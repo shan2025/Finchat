@@ -154,8 +154,34 @@ html.nav-collapsed #mmShell { margin-left:0; }
   display:flex; flex-direction:column; z-index:20;
 }
 #mmPanel.open { transform:translateX(0); }
+/* Ask AI — the same look as the board's panel (finchat_boards.html .aimsg). */
+.mm-ahead { display:flex; align-items:center; gap:8px; padding:14px 14px 12px 20px; border-bottom:1px solid var(--mm-line); }
+.mm-ahead-path { flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--mm-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mm-ahead .mm-icon-btn { width:34px; height:34px; }
+.mm-abody { padding:18px 20px; }
+.mm-aintro-title { font-size:21px; font-weight:800; color:var(--mm-fg); }
+.mm-aintro-hint { font-size:13px; line-height:1.55; color:var(--mm-muted); margin:5px 0 14px; }
+.mm-athread { display:flex; flex-direction:column; gap:10px; }
+.mm-abub { max-width:92%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.55; word-break:break-word; }
+.mm-abub.me { align-self:flex-end; background:#4262ff; color:#fff; border-bottom-right-radius:4px; white-space:pre-wrap; }
+.mm-abub.ai { align-self:flex-start; background:var(--mm-surface2); border:1px solid var(--mm-line); color:var(--mm-fg);
+  border-bottom-left-radius:4px; }
+.mm-abub .mm-atext { white-space:pre-wrap; }
+.mm-abub.me .mm-chip { background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.3); color:#fff; }
+.mm-abub .mm-aabout { display:block; font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:3px; }
+.mm-acompose { padding:10px 16px 16px; }
+.mm-acompose .mm-composer-row { gap:6px; }
+.mm-acompose .mm-icon-btn { width:38px; height:44px; border-radius:10px; }
+.mm-acompose .mm-icon-btn .material-symbols-outlined { font-size:20px; }
+.mm-acompose #mmAssistSend { height:44px; padding:0 14px; border-radius:10px; }
+#mmAssistInput { min-height:44px; font-size:14px; border-radius:10px; }
+.mm-afocus { display:flex; flex-wrap:wrap; gap:6px; }
+.mm-afocus:not(:empty) { margin-bottom:8px; }
+.mm-afocus .mm-chip { background:#eef1ff; border-color:#c9d2ff; color:#2a3fc2; font-size:12px; }
+.mm-aex button { font-size:13.5px !important; padding:6px 13px !important; }
 #mmAssist {
-  position:absolute; top:0; right:0; bottom:0; width:min(440px, 96vw);
+  position:absolute; top:0; right:0; bottom:0; width:min(460px, 96vw);
   background:var(--mm-surface); border-left:1px solid var(--mm-line);
   box-shadow:var(--mm-shadow); transform:translateX(102%);
   transition:transform .22s cubic-bezier(.22,.9,.28,1);
@@ -164,8 +190,8 @@ html.nav-collapsed #mmShell { margin-left:0; }
 #mmAssist.open { transform:translateX(0); }
 #mmAssistInput { flex:1; resize:none; max-height:140px; min-height:40px; line-height:1.45; }
 .mm-aops { list-style:none; margin:9px 0 0; padding:0; display:flex; flex-direction:column; gap:4px; }
-.mm-aops li { display:flex; gap:6px; align-items:flex-start; font-size:12.5px; color:var(--mm-fg2);
-  background:var(--mm-bg); border:1px solid var(--mm-line); border-radius:9px; padding:6px 8px; }
+.mm-aops li { display:flex; gap:6px; align-items:flex-start; font-size:13px; color:var(--mm-fg2);
+  background:var(--mm-surface); border:1px solid var(--mm-line); border-radius:9px; padding:6px 8px; }
 .mm-aops li .material-symbols-outlined { font-size:15px; color:var(--mm-accent); flex-shrink:0; margin-top:1px; }
 .mm-aops li.danger .material-symbols-outlined { color:#d62d2d; }
 .mm-astate { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--mm-muted); margin-top:8px; }
@@ -176,7 +202,7 @@ html.nav-collapsed #mmShell { margin-left:0; }
 .mm-aex button { border:1px solid var(--mm-line2); background:var(--mm-surface); color:var(--mm-fg2); border-radius:999px;
   padding:5px 12px; font:600 12.5px 'Figtree', 'Inter', system-ui, sans-serif; cursor:pointer; text-align:left; }
 .mm-aex button:hover { border-color:var(--mm-accent); color:var(--mm-accent); }
-.mm-athinking { display:inline-flex; align-items:center; gap:9px; color:var(--mm-muted); font-size:13px; }
+.mm-athinking { display:inline-flex; align-items:center; gap:9px; color:var(--mm-muted); font-size:13.5px; }
 .mm-adots { display:inline-flex; gap:4px; }
 .mm-adots i { width:7px; height:7px; border-radius:50%; background:linear-gradient(135deg, #4262ff, #e84fa7);
   animation:mmAdot 1.2s ease-in-out infinite; }
@@ -522,13 +548,13 @@ body.mm-body #navToggle { display:none; }
 
       <!-- Ask AI about the WHOLE map (the node panel's "Ask AI" tab talks about one node). -->
       <aside id="mmAssist" aria-label="Ask AI about this map">
-        <div class="mm-panel-head">
-          <div class="mm-panel-path"><span>Ask AI · whole map</span>
-            <button class="mm-icon-btn" data-act="closeAssist" title="Close"><span class="material-symbols-outlined">close</span></button></div>
-          <div class="mm-empty-note" style="font-size:12px;">Tell it what to change, or ask about the map. It shows each change first — nothing happens until you press Apply.</div>
+        <div class="mm-ahead">
+          <span class="mm-ahead-path" id="mmAssistPath">Ask AI</span>
+          <button class="mm-icon-btn" data-act="closeAssist" title="Close (Esc)"><span class="material-symbols-outlined">close</span></button>
         </div>
-        <div class="mm-panel-body" id="mmAssistBody"></div>
-        <div class="mm-composer">
+        <div class="mm-panel-body mm-abody" id="mmAssistBody"></div>
+        <div class="mm-composer mm-acompose">
+          <div class="mm-afocus" id="mmAssistFocus"></div>
           <div class="mm-chips" id="mmAssistFiles"></div>
           <div class="mm-composer-row">
             <button class="mm-icon-btn" data-act="assistAttach" title="Attach files — images, PDF, Word, PowerPoint, Excel, text">
@@ -563,8 +589,9 @@ body.mm-body #navToggle { display:none; }
           <button class="mm-tab" data-tab="docs" data-act="showTab" data-arg="docs">
             <span class="material-symbols-outlined">description</span> Sources
             <span class="mm-tab-count" id="mmDocCount">0</span></button>
-          <button class="mm-tab" data-tab="chat" data-act="showTab" data-arg="chat">
-            <span class="material-symbols-outlined">forum</span> Ask AI</button>
+          <!-- Opens the one Ask AI panel, focused on this node (the old per-node chat merged into it). -->
+          <button class="mm-tab" data-act="assistAboutNode" title="Ask AI about this node">
+            <span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span> Ask AI</button>
         </div>
 
         <div class="mm-panel-body" id="mmPanelBody">
@@ -1217,7 +1244,8 @@ function buildNodeEl(n) {
     if (Date.now() - DRAG.endedAt < 250) return;
     selectNode(n.node_id);
   });
-  g.addEventListener('dblclick', ev => { ev.stopPropagation(); pushNodeToChat(n.node_id); });
+  // Double-click = ask AI about this node; with Ask AI already open it ADDS the node.
+  g.addEventListener('dblclick', ev => { ev.stopPropagation(); assistFocusNode(n.node_id, { add: true }); });
   g.addEventListener('contextmenu', ev => { ev.preventDefault(); openCtxMenu(ev, n.node_id); });
   // setPointerCapture in startNodeDrag routes the rest of the gesture here,
   // so the node keeps following the cursor even past the canvas edge.
@@ -2689,20 +2717,6 @@ document.getElementById('mmChatInput').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
 });
 
-/** Double-clicking a node drops it into the composer as extra context. */
-function pushNodeToChat(nodeId) {
-  const n = NODES.get(nodeId);
-  if (!n) return;
-  if (!SELECTED) selectNode(nodeId);
-  else if (nodeId !== CHAT.nodeId && !CTX_CHIPS.some(c => c.nodeId === nodeId)) {
-    CTX_CHIPS.push({ nodeId, label: n.label });
-  }
-  showTab('chat');
-  renderChips();
-  refreshDecor();
-  flyTo(n.x, n.y, Math.max(view.k, 0.8));
-  document.getElementById('mmChatInput').focus();
-}
 
 function renderChips() {
   const host = document.getElementById('mmChips');
@@ -2882,7 +2896,8 @@ function ctxAction(what) {
   if (what === 'child') { openChildForm(id); return; }
   if (what === 'unpin') { unpinNode(id); return; }
   if (what === 'tidy') { tidyMap(); return; }
-  selectNode(id, { tab: what === 'docs' || what === 'note' ? 'docs' : what === 'ask' ? 'chat' : 'details' });
+  if (what === 'ask') { assistFocusNode(id); return; }
+  selectNode(id, { tab: what === 'docs' || what === 'note' ? 'docs' : 'details' });
   if (what === 'expand') expandCurrent();
   if (what === 'enrich') openEnrich('');
   if (what === 'note') openNoteForm();
@@ -3305,13 +3320,33 @@ const ASSIST_EXAMPLES = [
 ];
 const ASSIST_EXTS = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv', '.json'];
 
+// Nodes the next question is ABOUT — set by the node panel's Ask AI, a
+// double-click, or the right-click menu. One Ask AI for the whole map; a focus
+// chip is what used to be a separate per-node chat.
+let ASSIST_FOCUS = [];
+
 function openAssist() {
   if (!MAP) { toast('Open a map first'); return; }
   if (document.getElementById('mmPanel').classList.contains('open')) closePanel();
   ASSIST_OPEN = true;
   document.getElementById('mmAssist').classList.add('open');
   renderAssist();
-  setTimeout(() => document.getElementById('mmAssistInput').focus(), 80);
+  // preventScroll: focusing while the panel is still sliding in from off-screen
+  // made the browser scroll #mmCanvasWrap sideways to "reveal" it, shoving the
+  // whole map and both panels ~390px left. Undo any such shift as well.
+  setTimeout(() => {
+    document.getElementById('mmAssistInput').focus({ preventScroll: true });
+    document.getElementById('mmCanvasWrap').scrollLeft = 0;
+  }, 80);
+}
+
+/** Ask about a node: open Ask AI with it as the focus (added to any already chosen). */
+function assistFocusNode(nodeId, { add = false } = {}) {
+  const n = NODES.get(nodeId);
+  if (!n) return;
+  ASSIST_FOCUS = add && ASSIST_OPEN ? ASSIST_FOCUS.filter(id => id !== nodeId).concat(nodeId).slice(-5) : [nodeId];
+  openAssist();
+  flyTo(n.x, n.y, Math.max(view.k, 0.8));
 }
 function closeAssist() {
   ASSIST_OPEN = false;
@@ -3357,9 +3392,12 @@ function assistZoom(url) {
 }
 
 function assistBubble(m, i) {
-  if (m.role === 'user') return `<div class="mm-msg user">${m.text ? esc(m.text) : ''}${assistThumbs(m.files || [])}</div>`;
+  if (m.role === 'user') {
+    return `<div class="mm-abub me">${m.about && m.about.length ? `<span class="mm-aabout">About ${esc(m.about.map(l => `“${l}”`).join(', '))}</span>` : ''}${
+      m.text ? `<span class="mm-atext">${esc(m.text)}</span>` : ''}${assistThumbs(m.files || [])}</div>`;
+  }
   if (m.pending) {
-    return `<div class="mm-msg ai"><div class="mm-msg-who">AI</div><div class="mm-athinking"><span class="mm-adots"><i></i><i></i><i></i></span><span id="mmAssistPending">${esc(assistPendingLabel(m))}</span></div></div>`;
+    return `<div class="mm-abub ai"><div class="mm-athinking"><span class="mm-adots"><i></i><i></i><i></i></span><span id="mmAssistPending">${esc(assistPendingLabel(m))}</span></div></div>`;
   }
   const ops = m.ops || [];
   const icon = (o) => (o.danger ? 'delete' : o.op === 'to_board' ? 'view_kanban' : o.op === 'add_node' ? 'add' : o.op === 'move_node' ? 'open_with' : 'edit');
@@ -3380,17 +3418,35 @@ function assistBubble(m, i) {
   } else if (m.state === 'discarded') {
     acts = '<div class="mm-astate">Discarded — nothing was changed.</div>';
   }
-  return `<div class="mm-msg ai"><div class="mm-msg-who">AI</div><span style="white-space:pre-wrap;">${esc(m.text)}</span>${list}${acts}</div>`;
+  return `<div class="mm-abub ai"><span class="mm-atext">${esc(m.text)}</span>${list}${acts}</div>`;
 }
+
+const ASSIST_NODE_EXAMPLES = [
+  'Explain this in simple words',
+  'What do my documents say about this?',
+  'Add three sub-topics under this',
+  'Rewrite the summary so it is clearer'
+];
 
 function renderAssist() {
   const msgs = assistChat();
   const body = document.getElementById('mmAssistBody');
+  ASSIST_FOCUS = ASSIST_FOCUS.filter(id => NODES.has(id));
+  const focusLabels = ASSIST_FOCUS.map(id => NODES.get(id).label);
+  document.getElementById('mmAssistPath').textContent =
+    `${MAP ? MAP.map.title || 'Mind map' : 'Mind map'} › Ask AI${focusLabels.length === 1 ? ` › ${focusLabels[0]}` : ''}`;
+  const examples = focusLabels.length ? ASSIST_NODE_EXAMPLES : ASSIST_EXAMPLES;
   body.innerHTML = msgs.length
-    ? `<div class="mm-thread">${msgs.map(assistBubble).join('')}</div>`
-    : `<div class="mm-empty-note">Try one of these, attach a file, or press the mic and just say it.</div>
-       <div class="mm-aex">${ASSIST_EXAMPLES.map(t => `<button data-act="assistExample" data-arg="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
+    ? `<div class="mm-athread">${msgs.map(assistBubble).join('')}</div>`
+    : `<div class="mm-aintro-title">Ask AI</div>
+       <div class="mm-aintro-hint">${focusLabels.length
+         ? `Ask about “${esc(focusLabels.join('”, “'))}”, or tell it what to change there. It answers from the node and its documents.`
+         : 'Tell it what to change on this map, or ask about it. Double-click a node to ask about that node.'}
+         It shows every change first — nothing happens until you press Apply.</div>
+       <div class="mm-aex">${examples.map(t => `<button data-act="assistExample" data-arg="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
   body.scrollTop = body.scrollHeight;
+  document.getElementById('mmAssistFocus').innerHTML = ASSIST_FOCUS.map(id =>
+    `<span class="mm-chip" title="The AI answers about this node"><span class="material-symbols-outlined" style="font-size:14px">my_location</span>About: ${esc(NODES.get(id).label)}<button data-act="assistUnfocus" data-arg="${esc(id)}" title="Stop asking about this node"><span class="material-symbols-outlined">close</span></button></span>`).join('');
   document.getElementById('mmAssistFiles').innerHTML = ASSIST_FILES.map((f, i) => assistPreview(f)
     ? `<span class="mm-athumb pending"><button class="mm-athumb-img" data-act="assistZoom" data-arg="${esc(assistPreview(f))}" title="${esc(f.name || 'image')} — click to enlarge"><img src="${esc(assistPreview(f))}" alt=""></button><button class="mm-athumb-x" data-act="assistUnfile" data-arg="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`
     : `<span class="mm-chip"><span class="material-symbols-outlined" style="font-size:14px">description</span>${esc(f.name || 'file')}<button data-act="assistUnfile" data-arg="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('');
@@ -3400,7 +3456,9 @@ function renderAssist() {
   mic.firstElementChild.textContent = ASSIST_VOICE === 'recording' ? 'stop_circle' : ASSIST_VOICE === 'transcribing' ? 'hourglass_top' : 'mic';
   mic.title = ASSIST_VOICE === 'recording' ? 'Stop and send' : 'Speak your request';
   document.getElementById('mmAssistInput').placeholder = ASSIST_VOICE === 'recording' ? 'Listening… press stop when you are done'
-    : ASSIST_VOICE === 'transcribing' ? 'Turning your voice into text…' : 'e.g. Expand “GCC markets” into four sub-topics';
+    : ASSIST_VOICE === 'transcribing' ? 'Turning your voice into text…'
+    : ASSIST_FOCUS.length ? 'Ask about this node, or say what to change'
+    : 'e.g. Expand “GCC markets” into four sub-topics';
   document.getElementById('mmAssistSend').disabled = ASSIST_BUSY;
 }
 
@@ -3424,8 +3482,10 @@ async function assistSend(text, { spoken = false } = {}) {
   const mapId = MAP.map.map_id;
   const msgs = assistChat();
   const history = msgs.filter(m => !m.pending).map(m => ({ role: m.role, text: m.historyText || m.text }));
+  const focusNodeIds = ASSIST_FOCUS.filter(id => NODES.has(id));
+  const about = focusNodeIds.map(id => NODES.get(id).label);
   // The bubble shows the attachments themselves; the model's history gets a note.
-  msgs.push({ role: 'user', text, files: files.map(f => ({ name: f.name || 'image', url: assistPreview(f) })),
+  msgs.push({ role: 'user', text, about, files: files.map(f => ({ name: f.name || 'image', url: assistPreview(f) })),
       historyText: text + (files.length ? `${text ? '\n' : ''}[attached: ${files.map(f => f.name || 'image').join(', ')}]` : '') },
     { role: 'assistant', pending: true, startedAt: Date.now(), fileNames: files.map(f => f.name || 'image') });
   ASSIST_FILES = [];
@@ -3438,10 +3498,11 @@ async function assistSend(text, { spoken = false } = {}) {
       const fd = new FormData();
       fd.append('message', text);
       fd.append('history', JSON.stringify(history));
+      fd.append('focusNodeIds', JSON.stringify(focusNodeIds));
       for (const f of files) fd.append('files', f, f.name || 'image');
       out = await apiUpload(`/api/mind-maps/${mapId}/assistant`, fd);
     } else {
-      out = await api(`/api/mind-maps/${mapId}/assistant`, { method: 'POST', body: JSON.stringify({ message: text, history }) });
+      out = await api(`/api/mind-maps/${mapId}/assistant`, { method: 'POST', body: JSON.stringify({ message: text, history, focusNodeIds }) });
     }
     msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: out.reply, ops: out.ops || [], ask: text || files.map(f => f.name).join(', '),
       state: (out.ops || []).length ? 'proposed' : 'none' });
@@ -3805,6 +3866,8 @@ const MM_ACTIONS = {
   openAssist, closeAssist, assistSend: () => assistSend(),
   assistExample: (el) => assistSend(el.dataset.arg),
   assistZoom: (el) => assistZoom(el.dataset.arg),
+  assistAboutNode: () => { if (SELECTED) assistFocusNode(SELECTED); else openAssist(); },
+  assistUnfocus: (el) => { ASSIST_FOCUS = ASSIST_FOCUS.filter(id => id !== el.dataset.arg); renderAssist(); },
   assistApply: (el) => assistApply(Number(el.dataset.arg)),
   assistDiscard: (el) => { const m = assistChat()[Number(el.dataset.arg)]; if (m) { m.state = 'discarded'; renderAssist(); } },
   assistAttach: () => document.getElementById('mmAssistFileInput').click(),
