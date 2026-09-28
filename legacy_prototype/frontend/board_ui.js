@@ -257,8 +257,96 @@
     return a.download;
   }
 
+  // ── an image to build a board from ─────────────────────────
+  // Click, paste (Ctrl+V anywhere in `pasteRoot`) or drop. Big photos are
+  // scaled down in the browser first: a 12 MP phone shot is ~5 MB of pixels
+  // the vision model does not need, and the server caps uploads at 8 MB.
+  const PLAN_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+  async function shrinkImage(file) {
+    if (file.size <= 3.5 * 1024 * 1024 || file.type === 'image/gif') return file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * scale);
+      c.height = Math.round(bmp.height * scale);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+      return blob ? new File([blob], (file.name || 'image').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+    } catch (e) {
+      return file;
+    }
+  }
+
+  function planImagePicker(host, { pasteRoot = host, onChange } = {}) {
+    let file = null, url = null;
+    host.classList.add('bx-imgpick');
+    host.innerHTML = `
+      <button type="button" class="bx-imgpick-zone" data-pick>
+        <span class="material-symbols-outlined">add_photo_alternate</span>
+        <span><b>Add an image</b> — click, paste (Ctrl+V) or drop it here.
+          <small>A whiteboard photo, sticky notes, a screenshot of a list or another board, a sketch.</small></span>
+      </button>
+      <div class="bx-imgpick-prev" hidden>
+        <img alt="">
+        <div class="bx-imgpick-meta"><b></b><small></small></div>
+        <button type="button" class="bx-ibtn" data-clear title="Remove image"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <input type="file" accept="${PLAN_IMAGE_TYPES.join(',')}" hidden>`;
+    const zone = host.querySelector('.bx-imgpick-zone');
+    const prev = host.querySelector('.bx-imgpick-prev');
+    const input = host.querySelector('input');
+
+    function paint() {
+      zone.hidden = !!file;
+      prev.hidden = !file;
+      if (!file) return;
+      prev.querySelector('img').src = url;
+      prev.querySelector('b').textContent = file.name || 'Pasted image';
+      prev.querySelector('small').textContent = fmtSize(file.size) + ' · the board will be built from this';
+    }
+    async function set(f) {
+      if (!f) return;
+      if (!PLAN_IMAGE_TYPES.includes(f.type)) { toast('Use a PNG, JPEG, WebP or GIF image'); return; }
+      const small = await shrinkImage(f);
+      if (small.size > 8 * 1024 * 1024) { toast('That image is over 8 MB — use a smaller one'); return; }
+      if (url) URL.revokeObjectURL(url);
+      file = small;
+      url = URL.createObjectURL(file);
+      paint();
+      if (onChange) onChange(file);
+    }
+    function clear() {
+      if (url) URL.revokeObjectURL(url);
+      file = null; url = null; input.value = '';
+      paint();
+      if (onChange) onChange(null);
+    }
+
+    zone.addEventListener('click', () => input.click());
+    prev.querySelector('[data-clear]').addEventListener('click', clear);
+    input.addEventListener('change', () => { set(input.files && input.files[0]); input.value = ''; });
+    host.addEventListener('dragover', (e) => { e.preventDefault(); host.classList.add('drag'); });
+    host.addEventListener('dragleave', () => host.classList.remove('drag'));
+    host.addEventListener('drop', (e) => {
+      e.preventDefault();
+      host.classList.remove('drag');
+      set(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+    // Only an IMAGE on the clipboard is taken; pasted text still lands in the textarea.
+    pasteRoot.addEventListener('paste', (e) => {
+      const item = [...((e.clipboardData && e.clipboardData.items) || [])].find(i => i.kind === 'file' && i.type.startsWith('image/'));
+      if (!item) return;
+      e.preventDefault();
+      set(item.getAsFile());
+    });
+    paint();
+    return { get file() { return file; }, set, clear };
+  }
+
   window.BoardUI = {
     esc, isLight, fmtDate, dateRange, fmtSize, attIcon, tagChip, prioChip, cardHTML, attachmentHTML,
-    togglePreview, toast, saveResponse, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
+    togglePreview, toast, saveResponse, planImagePicker, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
   };
 })();

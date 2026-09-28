@@ -628,20 +628,93 @@ function normalizePlan(raw, fallbackTitle = 'New board') {
   };
 }
 
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+const IMAGE_READ_PROMPT = `The user wants a KANBAN BOARD built from this image. It may be a photo of a whiteboard or sticky notes,
+a handwritten list, a screenshot of another board, a sketch, a timetable, a document or a slide.
+
+Write down, as plain text, everything in it that could become part of a plan:
+- every heading, list, column or group, and which items sit under each one
+- every task, item or note, in the image's own words
+- any names, owners, dates, deadlines, priorities, labels or arrows that link items
+- colours ONLY when a legend or the layout shows they mean something (e.g. "red = urgent"); otherwise leave colours out
+Keep the image's structure: if it already has columns or lists, say so and keep items under them.
+If handwriting is unclear, give your best reading. If the image has nothing plan-like, describe what it shows.
+Plain text only, no preamble.`;
+
+/**
+ * What the image says, as text, via a vision model (Gemini — see the vision
+ * route in inference.js). Transcribing first and planning second keeps the
+ * board itself on the same JSON path as a typed instruction, which is far
+ * steadier than asking a vision model for structured output directly.
+ */
+async function readImageForPlan(userId, image) {
+  if (!image || !image.buffer || !image.buffer.length) return '';
+  const mimetype = String(image.mimetype || '').toLowerCase();
+  if (!IMAGE_TYPES.has(mimetype)) throw bad('Use a PNG, JPEG, WebP or GIF image');
+  if (image.buffer.length > IMAGE_MAX_BYTES) throw bad('That image is over 8 MB — use a smaller one');
+  const { runInference } = require('./inference');
+  // No userId, on purpose — the same as chat attachments (attachments.js):
+  // reading an image runs on the shared vision key. With a userId, a BYOK user
+  // who holds a DeepSeek key but no Gemini key, and whose shared allowance is
+  // spent, resolves to NO vision provider at all ("No vision-capable provider",
+  // seen 2026-09-28). Planning the board from the transcript still bills the
+  // user's own keys in generateBoard.
+  const ask = () => runInference({
+    workload: 'vision', feature: 'vision', temperature: 0.1,
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: IMAGE_READ_PROMPT },
+      { type: 'image_url', image_url: { url: `data:${mimetype};base64,${image.buffer.toString('base64')}` } }
+    ] }]
+  });
+  // Gemini is the only vision provider, and its "model overloaded" 503s come in
+  // short bursts (measured 2026-09-28: two 503s, then an answer). inference.js
+  // already retries each model; one more full pass after a pause rides out a
+  // burst that outlasted those retries.
+  let res;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      res = await ask();
+      break;
+    } catch (e) {
+      console.warn(`⚠️ Board from image: vision attempt ${attempt} failed — ${e.message}`);
+      if (attempt >= 2) {
+        throw new BoardError(503, "Google's image reader is busy right now — try again in a minute, or describe the plan in words");
+      }
+      await new Promise(r => setTimeout(r, 4000));
+    }
+  }
+  const text = cleanLong(res && res.content, 8000);
+  if (!text) throw new BoardError(422, 'Nothing readable was found in that image');
+  return text;
+}
+
 /**
  * Build a board from a plain-language instruction ("launch plan for the POS
- * app, 6 weeks, design / backend / marketing"). One model call, then the same
- * batched inserts as fromMindMap.
+ * app, 6 weeks, design / backend / marketing"), an image of a plan, or both.
+ * One model call (two with an image), then the same batched inserts as fromMindMap.
  */
-async function generateBoard(userId, instruction, { today = new Date() } = {}) {
+async function generateBoard(userId, instruction, { today = new Date(), image = null } = {}) {
   const text = cleanLong(instruction, GEN_LIMITS.instruction);
-  if (text.length < 3) throw bad('Describe what the board should plan');
+  const hasImage = !!(image && image.buffer && image.buffer.length);
+  if (text.length < 3 && !hasImage) throw bad('Describe what the board should plan, or add an image');
+  const fromImage = hasImage ? await readImageForPlan(userId, image) : '';
   const { runInference } = require('./inference');
   const iso = isoDate(today);
+  const ask = [
+    `TODAY: ${iso}`,
+    `WHAT TO PLAN:\n${text || 'Turn the attached image into a board.'}`,
+    fromImage ? `FROM THE IMAGE THE USER ATTACHED (transcribed):\n${fromImage}\n\n` +
+      'Build the board from this image. Where it already has columns, lists or groups, those are the columns; ' +
+      'its items are the cards, in its own words. Do not drop items, and do not invent work the image does not imply ' +
+      'beyond what the user asked for above. A deadline or dates written in the image count as the user\'s timeframe. ' +
+      'Never put sticky-note or marker colours in card text.' : ''
+  ].filter(Boolean).join('\n\n');
   const res = await runInference({
     messages: [
       { role: 'system', content: BOARD_PROMPT },
-      { role: 'user', content: `TODAY: ${iso}\n\nWHAT TO PLAN:\n${text}` }
+      { role: 'user', content: ask }
     ],
     temperature: 0.4, jsonMode: true, feature: 'board', userId
   });

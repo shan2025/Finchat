@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caprasimo&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="finchat_theme.css">
 <link rel="stylesheet" href="board_ui.css">
+<script src="board_ui.js"></script>
 <style>
  .pl-main { min-height: 100vh; }
  .pl-wrap { max-width: 1080px; margin: 0 auto; padding: 44px 28px 64px; }
@@ -171,6 +172,7 @@
     <textarea class="bx-field" id="plAiText" rows="3" maxlength="4000"></textarea>
     <button class="bx-btn primary" id="plAiBuild"><span class="material-symbols-outlined">auto_awesome</span><span id="plAiBuildLabel">Build board</span></button>
    </div>
+   <div id="plImage"></div>
    <div class="pl-ideas" id="plIdeas"></div>
    <div class="bx-hint" id="plAiStatus"></div>
   </section>
@@ -254,6 +256,8 @@
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     $('plAiText').placeholder = k.placeholder;
+    // Building from an image is a board feature; a map is built from words.
+    $('plImage').hidden = kind !== 'board';
     $('plAiBuildLabel').textContent = k.label;
     $('plIdeas').innerHTML = k.ideas.map(([label, text]) => `<button class="bx-chip" data-idea="${esc(text)}">${esc(label)}</button>`).join('');
   }
@@ -273,19 +277,38 @@
   });
   $('plAiBuild').addEventListener('click', build);
 
+  const picker = window.BoardUI ? window.BoardUI.planImagePicker($('plImage'), { pasteRoot: $('plAiText').closest('.pl-card') }) : null;
+
+  /** Multipart, so no JSON Content-Type — the browser sets the boundary. */
+  async function generateFromImage(instruction, image) {
+    const fd = new FormData();
+    fd.append('instruction', instruction);
+    fd.append('image', image, image.name || 'image');
+    const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+    if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    return body;
+  }
+
   let building = false;
   async function build() {
     if (building) return;
     const text = $('plAiText').value.trim();
-    if (text.length < 3) { $('plAiText').focus(); return toast(kind === 'board' ? 'Describe what the board should plan' : 'Name a topic for the map'); }
+    const image = kind === 'board' && picker ? picker.file : null;
+    if (text.length < 3 && !image) {
+      $('plAiText').focus();
+      return toast(kind === 'board' ? 'Describe what the board should plan, or add an image' : 'Name a topic for the map');
+    }
     building = true;
     $('plAiBuild').disabled = true;
-    $('plAiStatus').textContent = kind === 'board'
-      ? 'Planning your board — this usually takes 10 to 30 seconds…'
-      : 'Building your mind map — this usually takes 15 to 40 seconds…';
+    $('plAiStatus').textContent = kind !== 'board'
+      ? 'Building your mind map — this usually takes 15 to 40 seconds…'
+      : image ? 'Reading the image and planning your board — this usually takes 20 to 45 seconds…'
+        : 'Planning your board — this usually takes 10 to 30 seconds…';
     try {
       if (kind === 'board') {
-        const out = await post('/api/boards/generate', { instruction: text });
+        const out = image ? await generateFromImage(text, image) : await post('/api/boards/generate', { instruction: text });
         goBoard(out.boardId);
       } else {
         // A short line is a topic; anything longer is material to organise.

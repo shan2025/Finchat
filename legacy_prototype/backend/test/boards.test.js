@@ -80,6 +80,15 @@ test('an AI plan never exceeds the card cap, and its tags share one palette', ()
   assert.strictEqual(new Set(palette.map(t => t.color)).size, 4);
 });
 
+test('an AI board needs words or an image, and only a raster image', async () => {
+  await assert.rejects(Boards.generateBoard('u1', '  '), /Describe what the board should plan, or add an image/);
+  // SVG can carry script and is not something a vision model reads — refused before any model call.
+  await assert.rejects(Boards.generateBoard('u1', '', { image: { buffer: Buffer.from('<svg/>'), mimetype: 'image/svg+xml' } }),
+    /PNG, JPEG, WebP or GIF/);
+  await assert.rejects(Boards.generateBoard('u1', '', { image: { buffer: Buffer.alloc(8 * 1024 * 1024 + 1), mimetype: 'image/png' } }),
+    /over 8 MB/);
+});
+
 test('a board becomes a map: board → root, columns → branches, cards → leaves with their facts', () => {
   let n = 0;
   const rows = Boards.mapRowsFromBoard('mm_1',

@@ -3,7 +3,7 @@
 //   GET    /                                  the caller's boards
 //   POST   /                                  {title, description?, columns?: [title]}
 //   POST   /from-map                          {mapId, reuse?} → a board built from a mind map (reuse: its existing one)
-//   POST   /generate                          {instruction} → a board the AI plans
+//   POST   /generate                          {instruction} or multipart {instruction?, image} → a board the AI plans
 //   POST   /:boardId/mind-map                 the board as a mind map (its paired map if it has one)
 //   GET    /:boardId                          board + columns + cards + attachments
 //   PATCH  /:boardId                          {title?, description?}
@@ -120,8 +120,17 @@ router.post('/from-map', requireAuth, handle('build a board from that map', asyn
   res.status(201).json({ ok: true, boardId, existed: false });
 }));
 
-router.post('/generate', requireAuth, handle('build the board', async (req, res) => {
-  const out = await Boards.generateBoard(req.user.id, req.body?.instruction);
+// JSON {instruction}, or multipart with an "image" (+ instruction) — a photo of
+// a whiteboard, a screenshot of a list — that the board is built from.
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+router.post('/generate', requireAuth, (req, res, next) => {
+  imageUpload.single('image')(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'That image is over 8 MB — use a smaller one.' });
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, handle('build the board', async (req, res) => {
+  const out = await Boards.generateBoard(req.user.id, req.body?.instruction, { image: req.file || null });
   res.status(201).json({ ok: true, ...out });
 }));
 

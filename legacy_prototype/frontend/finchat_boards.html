@@ -157,9 +157,10 @@ body[data-theme="dark"] { background: #16181d; }
 <div class="bx-modal" id="aiModal">
   <div class="bx-modal-box">
     <div class="bx-modal-title">Ask AI to build a board</div>
-    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved. You get columns, cards, tags, priorities and dates you can edit.</div>
-    <textarea class="bx-field" id="aiText" rows="5" maxlength="4000" style="margin-top:12px; resize:vertical;"
+    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved — or add an image of a plan. You get columns, cards, tags, priorities and dates you can edit.</div>
+    <textarea class="bx-field" id="aiText" rows="4" maxlength="4000" style="margin-top:12px; resize:vertical;"
       placeholder="e.g. Launch plan for the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing"></textarea>
+    <div id="aiImage"></div>
     <div class="addrow" id="aiIdeas" style="margin-top:8px;">
       <button class="bx-chip" data-idea="Product launch in 6 weeks with design, engineering, marketing and support">Product launch</button>
       <button class="bx-chip" data-idea="Job search for product manager roles over the next month: applications, networking, interview prep">Job search</button>
@@ -975,19 +976,35 @@ body[data-theme="dark"] { background: #16181d; }
   });
 
   // ── built by AI ────────────────────────────────────────────
+  // Multipart, so no JSON Content-Type — the browser sets the boundary.
+  async function generateFromImage(instruction, image) {
+    const fd = new FormData();
+    fd.append('instruction', instruction);
+    fd.append('image', image, image.name || 'image');
+    const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+    if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    return body;
+  }
   $('aiIdeas').addEventListener('click', (e) => {
     const b = e.target.closest('[data-idea]');
     if (b) { $('aiText').value = b.dataset.idea; $('aiText').focus(); }
   });
+  const aiImage = U.planImagePicker($('aiImage'), { pasteRoot: $('aiModal') });
   $('aiBuild').addEventListener('click', async () => {
     const instruction = $('aiText').value.trim();
-    if (instruction.length < 3) { $('aiText').focus(); return U.toast('Describe what the board should plan'); }
+    const image = aiImage.file;
+    if (instruction.length < 3 && !image) { $('aiText').focus(); return U.toast('Describe what the board should plan, or add an image'); }
     $('aiBuild').disabled = true;
-    $('aiStatus').textContent = 'Planning your board — this usually takes 10 to 30 seconds…';
+    $('aiStatus').textContent = image
+      ? 'Reading the image and planning your board — this usually takes 20 to 45 seconds…'
+      : 'Planning your board — this usually takes 10 to 30 seconds…';
     try {
-      const { boardId: id } = await post('/api/boards/generate', { instruction });
+      const { boardId: id } = image ? await generateFromImage(instruction, image) : await post('/api/boards/generate', { instruction });
       closeModal('aiModal');
       $('aiText').value = '';
+      aiImage.clear();
       openBoard(id);
       U.toast('Board built — edit anything that is not right');
     } catch (err) {
