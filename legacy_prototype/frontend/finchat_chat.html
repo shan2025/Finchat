@@ -98,12 +98,19 @@
   .bot .bubble[data-report] { background:transparent; border:none; padding:0; width:100%; }
   .msg-row:has(> .msg-content > .bubble[data-report]) { max-width:100%; width:100%; }
   .msg-content:has(> .bubble[data-report]) { flex:1; }
-  .bubble.flagged { border:1.5px solid #991b1b !important; background:#2d1215 !important; color:var(--text) !important; }
-  .bubble.warned { border:1.5px solid #92400e !important; background:#2d2305 !important; color:var(--text) !important; }
+  /* Light-theme colours by default; the old dark-only values made the text
+     (var(--text), dark brown) unreadable on a near-black red background. */
+  .bubble.flagged { border:1.5px solid #dc2626 !important; background:#fef2f2 !important; color:#7f1d1d !important; }
+  .bubble.warned { border:1.5px solid #d97706 !important; background:#fffbeb !important; color:#78350f !important; }
+  .bubble.flagged *, .bubble.warned * { color:inherit !important; }
 
   .fraud-notice { display:flex; align-items:center; gap:6px; font-size:11px; padding:5px 10px; border-radius:6px; margin-bottom:4px; font-weight:500; }
-  .fraud-notice.high { background:#2d1215; color:#fca5a5; border:1px solid #7f1d1d; }
-  .fraud-notice.medium { background:#2d2305; color:#fcd34d; border:1px solid #78350f; }
+  .fraud-notice.high { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+  .fraud-notice.medium { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+  :root[data-theme="dark"] .bubble.flagged { background:#2d1215 !important; color:#fecaca !important; border-color:#991b1b !important; }
+  :root[data-theme="dark"] .bubble.warned { background:#2d2305 !important; color:#fde68a !important; border-color:#92400e !important; }
+  :root[data-theme="dark"] .fraud-notice.high { background:#2d1215; color:#fca5a5; border-color:#7f1d1d; }
+  :root[data-theme="dark"] .fraud-notice.medium { background:#2d2305; color:#fcd34d; border-color:#78350f; }
 
   .msg-footer { display:flex; align-items:center; gap:6px; padding:0 4px; }
   .msg-group.user .msg-footer { justify-content:flex-end; }

@@ -4,24 +4,32 @@ const { query } = require('../../database');
 const { eventBus } = require('../cognitive/EventBus');
 const { checkBudget } = require('../cognitive/ExecutionManager');
 
-// EXTREME fraud patterns — direct credential theft, wire fraud, impersonation
+// The words in each pattern must sit close together (G = up to ~25 chars,
+// never across a sentence or line) and form a request, not a mention. The old
+// `a.*b` forms spanned whole messages, so a long pasted document containing
+// "account" and, paragraphs later, "details" wiped a user's balance.
+const G = "[^.!?\\n]{0,25}";
+const rx = (src) => new RegExp(src, 'i');
+
+// EXTREME fraud patterns — asking for credentials, urgent money movement,
+// building attack tooling
 const EXTREME_PATTERNS = [
-  /send.*otp|share.*otp|give.*otp/i,
-  /credit.*card|cvv|pin.*number/i,
-  /your.*password|your.*ssn|your.*aadhaar/i,
-  /wire.*transfer|western.*union|urgent.*pay/i,
-  /send.*money.*urgent|transfer.*immediately/i,
-  /bank.*account.*number|account.*details/i,
-  /impersonat|pretend.*to.*be/i,
-  /phishing|malware|ransom/i
+  rx(`\\b(send|share|give|tell|forward)\\s+(me\\s+|us\\s+)?(the\\s+|your\\s+|that\\s+|this\\s+)?(otp|one[\\s-]time\\s+(password|code))\\b`),
+  rx(`\\b(send|share|give|tell|enter)\\b${G}\\b(cvv|card\\s+number|atm\\s+pin|upi\\s+pin)\\b`),
+  rx(`\\b(send|share|give|tell|enter)\\b${G}\\byour\\s+(password|ssn|aadhaar|pin)\\b`),
+  rx(`\\b(send|share|give|tell)\\b${G}\\b(bank\\s+)?account\\s+(number|details|credentials)\\b`),
+  rx(`\\bsend\\b${G}\\bmoney\\b${G}\\burgent(ly)?\\b|\\burgent(ly)?\\s+(pay|payment|wire)\\b|\\btransfer\\b${G}\\bimmediately\\b`),
+  rx(`\\bvia\\s+western\\s+union\\b`),
+  rx(`\\bpretend\\s+to\\s+be\\s+(my|a|an|the)\\s+(bank|officer|police|manager|ceo|government)\\b`),
+  rx(`\\b(write|create|build|make|generate|code)\\b${G}\\b(phishing|malware|ransomware|keylogger)\\b`)
 ];
 
-// HIGH fraud patterns — suspicious but less severe
+// HIGH fraud patterns — scam phrasing, suspicious but less severe
 const HIGH_PATTERNS = [
-  /click.*link|verify.*http|password.*reset/i,
-  /won.*lottery|claim.*prize|inheritance/i,
-  /don'?t.*tell.*anyone|keep.*secret/i,
-  /guaranteed.*return|no.*risk.*invest|100%.*profit/i
+  rx(`\\bclick\\s+(on\\s+)?(this|the\\s+link|here)\\b${G}\\b(verify|claim|unlock|reset)\\b|\\bverify\\b${G}https?:\\/\\/`),
+  rx(`\\byou('ve|\\s+have)?\\s+won\\b${G}\\b(lottery|prize|jackpot)\\b|\\bclaim\\s+your\\s+prize\\b`),
+  rx(`\\bdon'?t\\s+tell\\s+anyone\\b|\\bkeep\\s+(this|it)\\s+(a\\s+)?secret\\b`),
+  rx(`\\bguaranteed\\s+(\\d+%\\s+)?returns?\\b|\\bno[\\s-]risk\\s+investment\\b|\\b100%\\s+profit\\b`)
 ];
 
 /**

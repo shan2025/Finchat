@@ -224,7 +224,10 @@ router.post('/send', requireAuth, async (req, res) => {
 
       const severity = classifyFraudSeverity(message);
       const isExtreme = severity === 'EXTREME';
-      const penalty = isExtreme ? newBalance : 20;
+      // A regex match flags the message; it never takes the whole balance. The
+      // old "EXTREME = zero the account and freeze it" rule froze a real user
+      // over a false positive in a pasted document.
+      const penalty = 20;
       newBalance = Math.max(0, newBalance - penalty);
       await query('UPDATE users SET token_balance = $1 WHERE user_id = $2', [newBalance, userId]);
       await query(`
@@ -232,9 +235,7 @@ router.post('/send', requireAuth, async (req, res) => {
         VALUES ($1, $2, $3, $4, 'penalty', $5)
       `, [
         uuidv4(), userId, -penalty, newBalance,
-        isExtreme
-          ? 'EXTREME FRAUD — all tokens removed by AI persona'
-          : 'Risky message detected — 20 token penalty by AI persona'
+        `${isExtreme ? 'Severe' : 'Risky'} message detected — ${penalty} token penalty by AI persona`
       ]);
 
       const accountFrozen = newBalance <= 0;
@@ -263,7 +264,7 @@ router.post('/send', requireAuth, async (req, res) => {
         type: 'fraud',
         title: `🚨 Fraud detected (${severity})`,
         content: accountFrozen
-          ? `Extreme fraud flagged by ${persona.name}. All tokens removed and account frozen.`
+          ? `Risky activity flagged by ${persona.name}. ${penalty} tokens deducted; balance is now zero and messaging is frozen.`
           : `Risky activity flagged by ${persona.name}. ${penalty} tokens deducted.`
       });
 
@@ -272,8 +273,8 @@ router.post('/send', requireAuth, async (req, res) => {
         severity,
         penalty,
         accountFrozen,
-        message: isExtreme
-          ? 'Extreme fraud detected. All tokens removed and account frozen.'
+        message: accountFrozen
+          ? `Risky activity detected. ${penalty} tokens deducted; balance is now zero and messaging is frozen.`
           : `Risky activity detected. ${penalty} tokens deducted. Remaining balance: ${newBalance}.`,
         proof: {
           hash: fraudProofObj.hash,
