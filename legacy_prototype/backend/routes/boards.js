@@ -26,9 +26,17 @@
 //   GET    /:boardId/attachments/:id/file     view it, or ?download=1
 //   DELETE /:boardId/attachments/:id
 //
-//   GET    /:boardId/shares  ·  POST /:boardId/shares {includeDocs, expiresInDays}  ·  DELETE /:boardId/shares/:shareId
+//   GET    /:boardId/shares  ·  POST /:boardId/shares {includeDocs, expiresInDays, role}  ·  DELETE /:boardId/shares/:shareId
 //
-// Someone else's board is 404, never 403 — a 403 would confirm it exists.
+//   GET    /:boardId/members                  owner + editors
+//   POST   /:boardId/members                  {identifier: email or username} → edit access (owner only)
+//   DELETE /:boardId/members/:userId          owner removes anyone; an editor may remove themselves
+//   GET    /:boardId/activity                 ?before=ISO — who changed what, newest first
+//   GET    /:boardId/stamp                    {updatedAt, byName} — "has someone else changed it?"
+//
+// Editors (migration 057) use every card/column/file route like the owner;
+// deleting the board, share links and people are the owner's alone.
+// A board you have no access to is 404, never 403 — a 403 would confirm it exists.
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -39,7 +47,7 @@ const { sendDocFile, capabilities } = require('../services/cognitive/mindMapDocF
 const { prepareLinks, linkView } = require('../services/linkAttach');
 const { shareLinks } = require('../services/shareLinks');
 
-const shares = shareLinks({ table: 'board_shares', idCol: 'board_id', prefix: 'bsh', page: 'finchat_board_share.html' });
+const shares = shareLinks({ table: 'board_shares', idCol: 'board_id', prefix: 'bsh', page: 'finchat_board_share.html', roles: true });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 6 } });
 const DB_MAX_BYTES = Number(process.env.MIND_MAP_DOC_DB_MAX_BYTES) || 8 * 1024 * 1024;
@@ -66,6 +74,8 @@ function boardView({ board, columns, cards, attachments }, { includeDocs = true 
     board: {
       boardId: board.board_id, title: board.title, description: board.description,
       tagPalette: board.tag_palette || [], sourceMapId: board.source_map_id || null,
+      // 'owner' | 'editor' for a signed-in member; absent on a public share read.
+      access: board.access || undefined,
       createdAt: board.created_at, updatedAt: board.updated_at
     },
     columns: columns.map(c => ({ columnId: c.column_id, title: c.title, color: c.color, order: c.order_index })),
@@ -98,7 +108,10 @@ const handle = (label, fn) => async (req, res) => {
 router.get('/', requireAuth, handle('list boards', async (req, res) => {
   const rows = await Boards.listBoards(req.user.id);
   res.json({ boards: rows.map(b => ({
-    boardId: b.board_id, title: b.title, description: b.description, sourceMapId: b.source_map_id || null,
+    boardId: b.board_id, title: b.title, description: b.description,
+    // A shared board's source map is the owner's, not something this user can open.
+    sourceMapId: b.access === 'owner' ? (b.source_map_id || null) : null,
+    access: b.access, ownerName: b.access === 'owner' ? null : b.owner_name, memberCount: b.member_count,
     columnCount: b.column_count, cardCount: b.card_count, updatedAt: b.updated_at
   })) });
 }));
@@ -120,17 +133,22 @@ router.post('/from-map', requireAuth, handle('build a board from that map', asyn
   res.status(201).json({ ok: true, boardId, existed: false });
 }));
 
-// JSON {instruction}, or multipart with an "image" (+ instruction) — a photo of
-// a whiteboard, a screenshot of a list — that the board is built from.
-const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+// JSON {instruction}, or multipart with "files" (up to 5: images, PDFs, Word,
+// text) and/or a single "image" (the first version of this form), plus
+// instruction. Images are capped at 8 MB in the service; documents at 15 MB here.
+const planUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 6 } });
 router.post('/generate', requireAuth, (req, res, next) => {
-  imageUpload.single('image')(req, res, (err) => {
-    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'That image is over 8 MB — use a smaller one.' });
+  planUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'files', maxCount: 5 }])(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Each file must be under 15 MB.' });
+    if (err && err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ error: 'Attach at most 5 files.' });
     if (err) return res.status(400).json({ error: err.message });
     next();
   });
 }, handle('build the board', async (req, res) => {
-  const out = await Boards.generateBoard(req.user.id, req.body?.instruction, { image: req.file || null });
+  const f = req.files || {};
+  const out = await Boards.generateBoard(req.user.id, req.body?.instruction, {
+    image: (f.image && f.image[0]) || null, files: f.files || []
+  });
   res.status(201).json({ ok: true, ...out });
 }));
 
@@ -253,14 +271,14 @@ router.post('/:boardId/attachments/links', requireAuth, handle('attach the links
 }));
 
 router.get('/:boardId/attachments/:id', requireAuth, handle('load the attachment', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, req.user.id, 'view');
   const a = await Boards.getAttachment(req.params.boardId, req.params.id);
   if (!a) return res.status(404).json({ error: 'Attachment not found' });
   res.json({ attachment: { ...attView(a), text: a.extracted || '' } });
 }));
 
 router.get('/:boardId/attachments/:id/file', requireAuth, handle('load the file', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, req.user.id, 'view');
   const a = await Boards.getAttachment(req.params.boardId, req.params.id, { withData: true });
   if (!a) return res.status(404).json({ error: 'Attachment not found' });
   res.set('Cache-Control', 'private, max-age=3600');
@@ -276,24 +294,63 @@ router.delete('/:boardId/attachments/:id', requireAuth, handle('remove the attac
 
 // ── share links ────────────────────────────────────────────────
 
+// Links are the owner's to make and revoke — an edit link hands out edit
+// access, and deciding who gets that is the owner's call.
 router.get('/:boardId/shares', requireAuth, handle('load share links', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, req.user.id, 'owner');
   res.json({ shares: await shares.list(req.params.boardId) });
 }));
 
 router.post('/:boardId/shares', requireAuth, handle('create a share link', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, req.user.id, 'owner');
+  const role = req.body?.role === 'edit' ? 'edit' : 'view';
   const share = await shares.create(req.params.boardId, req.user.id, {
-    includeDocs: req.body?.includeDocs !== false, expiresInDays: req.body?.expiresInDays ?? null
+    includeDocs: req.body?.includeDocs !== false, expiresInDays: req.body?.expiresInDays ?? null, role
   });
+  await Boards.record(req.params.boardId, req.user.id, 'share_link',
+    role === 'edit' ? 'created an edit link' : 'created a view-only link', { shareId: share.shareId, role });
   res.status(201).json({ ok: true, share });
 }));
 
 router.delete('/:boardId/shares/:shareId', requireAuth, handle('revoke the share link', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, req.user.id, 'owner');
   const share = await shares.revoke(req.params.boardId, req.params.shareId);
   if (!share) return res.status(404).json({ error: 'Share link not found' });
+  await Boards.record(req.params.boardId, req.user.id, 'revoke_link',
+    `turned off ${share.role === 'edit' ? 'an edit' : 'a view-only'} link`, { shareId: share.shareId });
   res.json({ ok: true, share });
+}));
+
+// ── people ─────────────────────────────────────────────────────
+
+router.get('/:boardId/members', requireAuth, handle('load who has access', async (req, res) => {
+  res.json(await Boards.listMembers(req.params.boardId, req.user.id));
+}));
+
+router.post('/:boardId/members', requireAuth, handle('invite them', async (req, res) => {
+  const member = await Boards.addMember(req.params.boardId, req.user.id, { identifier: req.body?.identifier });
+  res.status(member.added ? 201 : 200).json({ ok: true, member });
+}));
+
+router.delete('/:boardId/members/:userId', requireAuth, handle('remove them', async (req, res) => {
+  await Boards.removeMember(req.params.boardId, req.user.id, req.params.userId);
+  res.json({ ok: true });
+}));
+
+// ── history ────────────────────────────────────────────────────
+
+router.get('/:boardId/activity', requireAuth, handle('load the history', async (req, res) => {
+  const rows = await Boards.listActivity(req.params.boardId, req.user.id, { before: req.query.before, limit: req.query.limit });
+  res.json({ activity: rows.map(a => ({
+    activityId: a.activity_id, userId: a.user_id, userName: a.user_name || 'Someone', you: a.user_id === req.user.id,
+    action: a.action, summary: a.summary, details: a.details || {}, at: a.created_at
+  })) });
+}));
+
+router.get('/:boardId/stamp', requireAuth, handle('check the board', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const s = await Boards.boardStamp(req.params.boardId, req.user.id);
+  res.json({ updatedAt: s.updatedAt, byName: s.byName, byYou: s.byId === req.user.id });
 }));
 
 module.exports = router;

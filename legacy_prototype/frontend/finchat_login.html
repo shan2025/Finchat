@@ -578,6 +578,12 @@
         method: data.user.auth_method || 'password'
       };
       window.fcAuth.persist(user, data.token, remember, identifier || data.user.email);
+      // Someone who opened a board EDIT link while signed out goes back to it.
+      // Only that exact page shape is honoured — anything else in storage is
+      // ignored, so this can never become an open redirect.
+      let back = null;
+      try { back = sessionStorage.getItem('finchat_after_login'); sessionStorage.removeItem('finchat_after_login'); } catch (e) {}
+      if (back && /^finchat_board_share\.html#[A-Za-z0-9_-]{43}$/.test(back)) { window.location.href = back; return; }
       // Land in chat: it is where the work actually happens. Neural Space is a
       // lens over that work, reachable from the rail like any other module —
       // not the front door you have to travel through to reach the thing.

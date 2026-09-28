@@ -256,7 +256,7 @@
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     $('plAiText').placeholder = k.placeholder;
-    // Building from an image is a board feature; a map is built from words.
+    // Building from files is the board builder's; Mind maps has its own document flow.
     $('plImage').hidden = kind !== 'board';
     $('plAiBuildLabel').textContent = k.label;
     $('plIdeas').innerHTML = k.ideas.map(([label, text]) => `<button class="bx-chip" data-idea="${esc(text)}">${esc(label)}</button>`).join('');
@@ -277,13 +277,13 @@
   });
   $('plAiBuild').addEventListener('click', build);
 
-  const picker = window.BoardUI ? window.BoardUI.planImagePicker($('plImage'), { pasteRoot: $('plAiText').closest('.pl-card') }) : null;
+  const picker = window.BoardUI ? window.BoardUI.planFilesPicker($('plImage'), { pasteRoot: $('plAiText').closest('.pl-card') }) : null;
 
   /** Multipart, so no JSON Content-Type — the browser sets the boundary. */
-  async function generateFromImage(instruction, image) {
+  async function generateFromFiles(instruction, files) {
     const fd = new FormData();
     fd.append('instruction', instruction);
-    fd.append('image', image, image.name || 'image');
+    for (const f of files) fd.append('files', f, f.name || 'image');
     const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
     if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
     const body = await res.json().catch(() => ({}));
@@ -295,20 +295,20 @@
   async function build() {
     if (building) return;
     const text = $('plAiText').value.trim();
-    const image = kind === 'board' && picker ? picker.file : null;
-    if (text.length < 3 && !image) {
+    const files = kind === 'board' && picker ? picker.files : [];
+    if (text.length < 3 && !files.length) {
       $('plAiText').focus();
-      return toast(kind === 'board' ? 'Describe what the board should plan, or add an image' : 'Name a topic for the map');
+      return toast(kind === 'board' ? 'Describe what the board should plan, or add a file' : 'Name a topic for the map');
     }
     building = true;
     $('plAiBuild').disabled = true;
     $('plAiStatus').textContent = kind !== 'board'
       ? 'Building your mind map — this usually takes 15 to 40 seconds…'
-      : image ? 'Reading the image and planning your board — this usually takes 20 to 45 seconds…'
+      : files.length ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and planning your board — this usually takes 20 to 60 seconds…`
         : 'Planning your board — this usually takes 10 to 30 seconds…';
     try {
       if (kind === 'board') {
-        const out = image ? await generateFromImage(text, image) : await post('/api/boards/generate', { instruction: text });
+        const out = files.length ? await generateFromFiles(text, files) : await post('/api/boards/generate', { instruction: text });
         goBoard(out.boardId);
       } else {
         // A short line is a topic; anything longer is material to organise.
@@ -349,7 +349,8 @@
       <div class="pl-row-main" data-openboard="${esc(b.boardId)}">
         <div class="pl-row-title">${esc(b.title)}</div>
         <div class="pl-row-meta">${b.columnCount} columns · ${b.cardCount} cards · ${esc(day(b.updatedAt))}${
-          hasMap ? ' · <span class="pl-pair">has a mind map</span>' : ''}</div>
+          hasMap ? ' · <span class="pl-pair">has a mind map</span>' : ''}${
+          b.access && b.access !== 'owner' ? ` · <span class="pl-pair" style="color:#0ca789">shared by ${esc(b.ownerName || 'someone')}</span>` : ''}</div>
       </div>
       ${hasMap
         ? `<button class="bx-btn ghost" data-openmap="${esc(b.sourceMapId)}"><span class="material-symbols-outlined">account_tree</span>Open map</button>`

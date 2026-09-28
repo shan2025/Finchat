@@ -279,74 +279,96 @@
     }
   }
 
-  function planImagePicker(host, { pasteRoot = host, onChange } = {}) {
-    let file = null, url = null;
+  // Documents the board builder can read — the same set chat attachments
+  // extract (services/attachments.js). Spreadsheets and slides are not in it.
+  const PLAN_DOC_EXTS = ['.pdf', '.docx', '.txt', '.md', '.csv', '.json'];
+  const PLAN_FILES_MAX = 5;
+  const extOf = (name) => (String(name || '').match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  const isImage = (f) => PLAN_IMAGE_TYPES.includes(f.type);
+
+  /**
+   * Files to build a board from: images (a whiteboard photo, a screenshot) and
+   * documents (a PDF brief, a Word spec, notes). Click, drop, or paste an image.
+   */
+  function planFilesPicker(host, { pasteRoot = host, onChange } = {}) {
+    let files = [];   // [{file, url}] — url only for images (the thumbnail)
     host.classList.add('bx-imgpick');
     host.innerHTML = `
-      <button type="button" class="bx-imgpick-zone" data-pick>
-        <span class="material-symbols-outlined">add_photo_alternate</span>
-        <span><b>Add an image</b> — click, paste (Ctrl+V) or drop it here.
-          <small>A whiteboard photo, sticky notes, a screenshot of a list or another board, a sketch.</small></span>
+      <div class="bx-imgpick-list"></div>
+      <button type="button" class="bx-imgpick-zone">
+        <span class="material-symbols-outlined">upload_file</span>
+        <span><b>Add files</b> — click, drop, or paste an image (Ctrl+V).
+          <small>Images, PDF, Word (.docx), text, Markdown or CSV · up to ${PLAN_FILES_MAX}. A whiteboard photo, a brief, meeting notes, a spec.</small></span>
       </button>
-      <div class="bx-imgpick-prev" hidden>
-        <img alt="">
-        <div class="bx-imgpick-meta"><b></b><small></small></div>
-        <button type="button" class="bx-ibtn" data-clear title="Remove image"><span class="material-symbols-outlined">close</span></button>
-      </div>
-      <input type="file" accept="${PLAN_IMAGE_TYPES.join(',')}" hidden>`;
+      <input type="file" multiple accept="${[...PLAN_IMAGE_TYPES, ...PLAN_DOC_EXTS].join(',')}" hidden>`;
+    const list = host.querySelector('.bx-imgpick-list');
     const zone = host.querySelector('.bx-imgpick-zone');
-    const prev = host.querySelector('.bx-imgpick-prev');
     const input = host.querySelector('input');
 
     function paint() {
-      zone.hidden = !!file;
-      prev.hidden = !file;
-      if (!file) return;
-      prev.querySelector('img').src = url;
-      prev.querySelector('b').textContent = file.name || 'Pasted image';
-      prev.querySelector('small').textContent = fmtSize(file.size) + ' · the board will be built from this';
+      list.innerHTML = files.map((x, i) => {
+        const ic = isImage(x.file) ? null : attIcon({ kind: 'document', filename: x.file.name, mimetype: x.file.type });
+        return `<div class="bx-imgpick-prev">
+          ${x.url ? `<img alt="" src="${esc(x.url)}">`
+            : `<span class="bx-att-ico" style="background:${ic.color}; width:44px; height:44px;"><span class="material-symbols-outlined">${ic.icon}</span></span>`}
+          <div class="bx-imgpick-meta"><b>${esc(x.file.name || 'Pasted image')}</b><small>${fmtSize(x.file.size)}</small></div>
+          <button type="button" class="bx-ibtn" data-remove="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button>
+        </div>`;
+      }).join('');
+      zone.hidden = files.length >= PLAN_FILES_MAX;
+      if (onChange) onChange(files.map(x => x.file));
     }
-    async function set(f) {
-      if (!f) return;
-      if (!PLAN_IMAGE_TYPES.includes(f.type)) { toast('Use a PNG, JPEG, WebP or GIF image'); return; }
-      const small = await shrinkImage(f);
-      if (small.size > 8 * 1024 * 1024) { toast('That image is over 8 MB — use a smaller one'); return; }
-      if (url) URL.revokeObjectURL(url);
-      file = small;
-      url = URL.createObjectURL(file);
+    async function add(fileList) {
+      for (const f of [...(fileList || [])]) {
+        if (files.length >= PLAN_FILES_MAX) { toast(`At most ${PLAN_FILES_MAX} files`); break; }
+        if (isImage(f)) {
+          const small = await shrinkImage(f);
+          if (small.size > 8 * 1024 * 1024) { toast(`${f.name} is over 8 MB — use a smaller image`); continue; }
+          files.push({ file: small, url: URL.createObjectURL(small) });
+        } else if (PLAN_DOC_EXTS.includes(extOf(f.name))) {
+          if (f.size > 15 * 1024 * 1024) { toast(`${f.name} is over 15 MB`); continue; }
+          files.push({ file: f, url: null });
+        } else {
+          toast(`${f.name || 'That file'}: use an image, PDF, Word (.docx), text, Markdown or CSV`);
+        }
+      }
       paint();
-      if (onChange) onChange(file);
     }
     function clear() {
-      if (url) URL.revokeObjectURL(url);
-      file = null; url = null; input.value = '';
+      files.forEach(x => x.url && URL.revokeObjectURL(x.url));
+      files = []; input.value = '';
       paint();
-      if (onChange) onChange(null);
     }
 
     zone.addEventListener('click', () => input.click());
-    prev.querySelector('[data-clear]').addEventListener('click', clear);
-    input.addEventListener('change', () => { set(input.files && input.files[0]); input.value = ''; });
+    list.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-remove]');
+      if (!b) return;
+      const [gone] = files.splice(Number(b.dataset.remove), 1);
+      if (gone && gone.url) URL.revokeObjectURL(gone.url);
+      paint();
+    });
+    input.addEventListener('change', () => { add(input.files); input.value = ''; });
     host.addEventListener('dragover', (e) => { e.preventDefault(); host.classList.add('drag'); });
     host.addEventListener('dragleave', () => host.classList.remove('drag'));
     host.addEventListener('drop', (e) => {
       e.preventDefault();
       host.classList.remove('drag');
-      set(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+      add(e.dataTransfer && e.dataTransfer.files);
     });
-    // Only an IMAGE on the clipboard is taken; pasted text still lands in the textarea.
+    // Only FILES on the clipboard are taken; pasted text still lands in the textarea.
     pasteRoot.addEventListener('paste', (e) => {
-      const item = [...((e.clipboardData && e.clipboardData.items) || [])].find(i => i.kind === 'file' && i.type.startsWith('image/'));
-      if (!item) return;
+      const got = [...((e.clipboardData && e.clipboardData.items) || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+      if (!got.length) return;
       e.preventDefault();
-      set(item.getAsFile());
+      add(got);
     });
     paint();
-    return { get file() { return file; }, set, clear };
+    return { get files() { return files.map(x => x.file); }, add, clear };
   }
 
   window.BoardUI = {
     esc, isLight, fmtDate, dateRange, fmtSize, attIcon, tagChip, prioChip, cardHTML, attachmentHTML,
-    togglePreview, toast, saveResponse, planImagePicker, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
+    togglePreview, toast, saveResponse, planFilesPicker, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
   };
 })();

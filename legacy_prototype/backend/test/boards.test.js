@@ -81,12 +81,42 @@ test('an AI plan never exceeds the card cap, and its tags share one palette', ()
 });
 
 test('an AI board needs words or an image, and only a raster image', async () => {
-  await assert.rejects(Boards.generateBoard('u1', '  '), /Describe what the board should plan, or add an image/);
+  await assert.rejects(Boards.generateBoard('u1', '  '), /Describe what the board should plan, or add a file or image/);
+  const six = Array.from({ length: 6 }, (_, i) => ({ buffer: Buffer.from('x'), originalname: `f${i}.txt`, mimetype: 'text/plain' }));
+  await assert.rejects(Boards.generateBoard('u1', 'plan', { files: six }), /at most 5 files/);
   // SVG can carry script and is not something a vision model reads — refused before any model call.
   await assert.rejects(Boards.generateBoard('u1', '', { image: { buffer: Buffer.from('<svg/>'), mimetype: 'image/svg+xml' } }),
     /PNG, JPEG, WebP or GIF/);
   await assert.rejects(Boards.generateBoard('u1', '', { image: { buffer: Buffer.alloc(8 * 1024 * 1024 + 1), mimetype: 'image/png' } }),
     /over 8 MB/);
+});
+
+test('History says what changed on a card, in words', () => {
+  const cur = { card_id: 'k1', title: 'Hire baristas', column_id: 'a', priority: null, start_date: null, end_date: null,
+    tags: [{ label: 'Hiring', color: '#6631d7' }], summary: 's', detail: 'd', color: null };
+
+  let c = Boards.describeCardChange(cur, { column_id: 'b' }, { from: 'To do', to: 'Doing' });
+  assert.strictEqual(c.summary, 'moved “Hire baristas” from To do to Doing');
+  assert.strictEqual(c.key, null);
+
+  c = Boards.describeCardChange(cur, { title: 'Hire 2 baristas' });
+  assert.strictEqual(c.summary, 'renamed “Hire baristas” to “Hire 2 baristas”');
+
+  c = Boards.describeCardChange(cur, { priority: 'high' });
+  assert.strictEqual(c.summary, 'set the priority of “Hire baristas” to high');
+
+  // Several at once are one line, listing each.
+  c = Boards.describeCardChange(cur, { priority: 'low', start_date: '2026-10-01', end_date: '2026-10-15',
+    tags: [{ label: 'Ops', color: '#2b59c3' }] });
+  assert.strictEqual(c.summary, 'updated “Hire baristas” — priority low, dates 1 Oct → 15 Oct, +Ops −Hiring');
+
+  // Text edits coalesce (a key) so autosave bursts are one History line.
+  c = Boards.describeCardChange(cur, { detail: 'new steps' });
+  assert.strictEqual(c.summary, 'edited the description of “Hire baristas”');
+  assert.strictEqual(c.key, 'text:k1');
+
+  // Saving the same values is not a change at all.
+  assert.strictEqual(Boards.describeCardChange(cur, { title: 'Hire baristas', summary: 's', priority: null }), null);
 });
 
 test('a board becomes a map: board → root, columns → branches, cards → leaves with their facts', () => {

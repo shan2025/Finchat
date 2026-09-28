@@ -1,6 +1,7 @@
 // routes/sharedBoards.js — the public side of a board share link. No login.
 //
-//   GET /:token                          the board, read-only
+//   GET /:token                          the board, read-only (+ role: view | edit)
+//   POST /:token/join                    signed in + edit link → become an editor
 //   GET /:token/attachments/:id          one attachment's text
 //   GET /:token/attachments/:id/file     view it, or ?download=1
 //
@@ -11,6 +12,7 @@ const router = express.Router();
 const Boards = require('../services/boards');
 const { sendDocFile } = require('../services/cognitive/mindMapDocFile');
 const { publicHeaders } = require('../services/shareLinks');
+const { requireAuth } = require('../middleware/auth');
 const { boardView, attView, shares } = require('./boards');
 
 const NOT_FOUND = { error: 'This link is not valid any more — ask for a new one.' };
@@ -35,11 +37,30 @@ router.get('/:token', async (req, res) => {
     if (!share) return;
     const full = await Boards.getBoard(share.target_id, null);
     shares.seen(share.share_id);
-    res.json({ ...boardView(full, { includeDocs: share.include_docs }), expiresAt: share.expires_at });
+    // role 'edit' only tells the page to offer "Open to edit" — the edit itself
+    // happens on the owner's page after /join, as a signed-in, named user.
+    res.json({ ...boardView(full, { includeDocs: share.include_docs }), expiresAt: share.expires_at, role: share.role || 'view' });
   } catch (err) {
     if (err instanceof Boards.BoardError) return res.status(404).json(NOT_FOUND);
     console.error('Shared board read error:', err);
     res.status(500).json({ error: 'Failed to load the shared board' });
+  }
+});
+
+// An EDIT link opened by someone signed in: they become an editor and go to
+// the real board. Signing in is the point — every change in History has a
+// name on it, which an anonymous edit link could never give.
+router.post('/:token/join', requireAuth, async (req, res) => {
+  try {
+    const share = await resolve(req, res);
+    if (!share) return;
+    if (share.role !== 'edit') return res.status(403).json({ error: 'This link is view-only — ask the owner for edit access.' });
+    const out = await Boards.joinByLink(share.target_id, req.user.id);
+    res.json({ ok: true, boardId: share.target_id, joined: out.joined });
+  } catch (err) {
+    if (err instanceof Boards.BoardError) return res.status(404).json(NOT_FOUND);
+    console.error('Shared board join error:', err);
+    res.status(500).json({ error: 'Failed to join the board' });
   }
 });
 

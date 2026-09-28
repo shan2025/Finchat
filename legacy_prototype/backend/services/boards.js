@@ -95,27 +95,49 @@ function mergePalette(palette, tags) {
 const ATT_COLS = `attachment_id, board_id, card_id, kind, filename, mimetype, size_bytes, url, provider,
   char_count, order_index, created_at, (data IS NOT NULL) AS has_data`;
 
-async function requireBoard(boardId, userId) {
-  const r = await query('SELECT * FROM boards WHERE board_id = $1 AND user_id = $2', [boardId, userId]);
-  if (!r.rows.length) throw notFound('Board');
-  return r.rows[0];
+/**
+ * The board, if the caller may use it — its owner, or a member (migration 057).
+ *   need 'view' | 'edit'  owner or editor (members are all editors today; the
+ *                         two stay distinct so a viewer role is one line)
+ *   need 'owner'          delete the board, manage people and share links
+ * No access at all is 404, never 403 — a 403 would confirm the board exists.
+ * The row comes back with `access` = 'owner' | 'editor'.
+ */
+async function requireBoard(boardId, userId, need = 'edit') {
+  const r = await query(`
+    SELECT b.*, CASE WHEN b.user_id = $2 THEN 'owner' ELSE m.role END AS access
+      FROM boards b
+      LEFT JOIN board_members m ON m.board_id = b.board_id AND m.user_id = $2
+     WHERE b.board_id = $1 AND (b.user_id = $2 OR m.user_id IS NOT NULL)
+  `, [boardId, userId]);
+  const board = r.rows[0];
+  if (!board) throw notFound('Board');
+  if (need === 'owner' && board.access !== 'owner') throw new BoardError(403, 'Only the board owner can do that');
+  return board;
 }
 
 async function listBoards(userId) {
   const r = await query(`
     SELECT b.board_id, b.title, b.description, b.updated_at, b.created_at, b.source_map_id,
+           CASE WHEN b.user_id = $1 THEN 'owner' ELSE m.role END AS access,
+           u.name AS owner_name,
            (SELECT COUNT(*) FROM board_columns c WHERE c.board_id = b.board_id)::int AS column_count,
-           (SELECT COUNT(*) FROM board_cards k WHERE k.board_id = b.board_id)::int AS card_count
-      FROM boards b WHERE b.user_id = $1 ORDER BY b.updated_at DESC LIMIT 100
+           (SELECT COUNT(*) FROM board_cards k WHERE k.board_id = b.board_id)::int AS card_count,
+           (SELECT COUNT(*) FROM board_members bm WHERE bm.board_id = b.board_id)::int AS member_count
+      FROM boards b
+      LEFT JOIN board_members m ON m.board_id = b.board_id AND m.user_id = $1
+      LEFT JOIN users u ON u.user_id = b.user_id
+     WHERE b.user_id = $1 OR m.user_id IS NOT NULL
+     ORDER BY b.updated_at DESC LIMIT 100
   `, [userId]);
   return r.rows;
 }
 
-/** The whole board. `userId` null skips the ownership check — only share routes, which resolved a token, pass null. */
+/** The whole board. `userId` null skips the access check — only share routes, which resolved a token, pass null. */
 async function getBoard(boardId, userId) {
   const board = userId === null
     ? (await query('SELECT * FROM boards WHERE board_id = $1', [boardId])).rows[0]
-    : await requireBoard(boardId, userId);
+    : await requireBoard(boardId, userId, 'view');
   if (!board) throw notFound('Board');
   const [cols, cards, atts] = await Promise.all([
     query('SELECT * FROM board_columns WHERE board_id = $1 ORDER BY order_index, created_at', [boardId]),
@@ -125,13 +147,114 @@ async function getBoard(boardId, userId) {
   return { board, columns: cols.rows, cards: cards.rows, attachments: atts.rows };
 }
 
-async function touch(boardId) {
-  await query('UPDATE boards SET updated_at = now() WHERE board_id = $1', [boardId]);
+// ── history ────────────────────────────────────────────────────
+
+const q = (s) => `“${clean(s, 80)}”`;
+
+/**
+ * One change, in the History panel's words, AND the board's updated_at bump —
+ * a single statement, so history costs no extra round trip over the old touch().
+ *
+ * `key` coalesces a burst: typing in a card's description saves several times
+ * a minute, and History should say "edited the description" once, not twelve
+ * times. The same user repeating the same keyed change within two minutes
+ * updates the last row instead of adding one.
+ */
+async function record(boardId, userId, action, summary, details = {}, { key = null } = {}) {
+  await query(`
+    WITH last AS (
+      SELECT activity_id FROM board_activity WHERE board_id = $1 ORDER BY created_at DESC LIMIT 1
+    ), upd AS (
+      UPDATE board_activity a SET summary = $5, details = $6, created_at = now()
+        FROM last
+       WHERE a.activity_id = last.activity_id AND a.user_id = $3 AND $7::text IS NOT NULL
+         AND a.details->>'key' = $7 AND a.created_at > now() - interval '2 minutes'
+      RETURNING a.activity_id
+    ), bump AS (
+      UPDATE boards SET updated_at = now() WHERE board_id = $1
+    )
+    INSERT INTO board_activity (activity_id, board_id, user_id, action, summary, details)
+    SELECT $2, $1, $3, $4, $5, $6 WHERE NOT EXISTS (SELECT 1 FROM upd)
+  `, [boardId, 'bac_' + uuidv4(), userId || null, action, clean(summary, 400),
+      JSON.stringify(key ? { ...details, key } : details), key]);
+}
+
+/** Newest first; `before` (an ISO time) pages back. Any member may read it. */
+async function listActivity(boardId, userId, { before = null, limit = 50 } = {}) {
+  await requireBoard(boardId, userId, 'view');
+  const n = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const r = await query(`
+    SELECT a.activity_id, a.user_id, a.action, a.summary, a.details, a.created_at, u.name AS user_name
+      FROM board_activity a LEFT JOIN users u ON u.user_id = a.user_id
+     WHERE a.board_id = $1 AND ($2::timestamptz IS NULL OR a.created_at < $2::timestamptz)
+     ORDER BY a.created_at DESC LIMIT $3
+  `, [boardId, before && !Number.isNaN(Date.parse(before)) ? before : null, n]);
+  return r.rows;
+}
+
+/**
+ * What changed on a card, in words. Pure; exported for tests.
+ * @param cur   the card row before the update
+ * @param f     the normalised fields being written (see cardFields)
+ * @param cols  {from, to} column titles when the card moved
+ * @returns {{summary:string, changes:object, key:string|null} | null}  null = nothing changed
+ */
+function describeCardChange(cur, f, cols = {}) {
+  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const curDate = (d) => (d ? isoDate(d) : null);
+  const changes = {};
+  if (f.title !== undefined && f.title !== cur.title) changes.title = { from: cur.title, to: f.title };
+  if (f.column_id !== undefined && f.column_id !== cur.column_id) changes.column = { from: cols.from || null, to: cols.to || null };
+  if (f.priority !== undefined && f.priority !== (cur.priority || null)) changes.priority = { from: cur.priority || null, to: f.priority };
+  if ((f.start_date !== undefined && f.start_date !== curDate(cur.start_date)) ||
+      (f.end_date !== undefined && f.end_date !== curDate(cur.end_date))) {
+    changes.dates = {
+      from: [curDate(cur.start_date), curDate(cur.end_date)],
+      to: [f.start_date !== undefined ? f.start_date : curDate(cur.start_date), f.end_date !== undefined ? f.end_date : curDate(cur.end_date)]
+    };
+  }
+  if (f.tags !== undefined) {
+    const before = (cur.tags || []).map(t => t.label), after = f.tags.map(t => t.label);
+    const low = (xs) => xs.map(x => x.toLowerCase());
+    const added = after.filter(t => !low(before).includes(t.toLowerCase()));
+    const removed = before.filter(t => !low(after).includes(t.toLowerCase()));
+    if (added.length || removed.length) changes.tags = { added, removed };
+  }
+  if (f.summary !== undefined && f.summary !== cur.summary) changes.summary = true;
+  if (f.detail !== undefined && f.detail !== cur.detail) changes.detail = true;
+  if (f.color !== undefined && !same(f.color, cur.color || null)) changes.color = { from: cur.color || null, to: f.color };
+
+  const keys = Object.keys(changes);
+  if (!keys.length) return null;
+  const name = q(changes.title ? changes.title.to : cur.title);
+  const fmtDay = (d) => (d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '…');
+  const phrase = {
+    title: () => `renamed from ${q(changes.title.from)}`,
+    column: () => `moved from ${changes.column.from || '?'} to ${changes.column.to || '?'}`,
+    priority: () => (changes.priority.to ? `priority ${changes.priority.to}` : 'priority removed'),
+    dates: () => (changes.dates.to[0] || changes.dates.to[1]
+      ? `dates ${fmtDay(changes.dates.to[0])} → ${fmtDay(changes.dates.to[1])}` : 'dates removed'),
+    tags: () => [...changes.tags.added.map(t => `+${t}`), ...changes.tags.removed.map(t => `−${t}`)].join(' '),
+    summary: () => 'summary edited',
+    detail: () => 'details edited',
+    color: () => 'colour changed'
+  };
+
+  let summary;
+  if (keys.length === 1 && changes.column) summary = `moved ${name} from ${changes.column.from || '?'} to ${changes.column.to || '?'}`;
+  else if (keys.length === 1 && changes.title) summary = `renamed ${q(changes.title.from)} to ${q(changes.title.to)}`;
+  else if (keys.length === 1 && changes.priority) summary = changes.priority.to ? `set the priority of ${name} to ${changes.priority.to}` : `removed the priority from ${name}`;
+  else if (keys.every(k => k === 'summary' || k === 'detail')) summary = `edited the description of ${name}`;
+  else summary = `updated ${name} — ${keys.map(k => phrase[k]()).join(', ')}`;
+
+  // Only text edits coalesce: a burst of autosaves is one change to a reader.
+  const key = keys.every(k => k === 'summary' || k === 'detail') ? `text:${cur.card_id}` : null;
+  return { summary, changes, key };
 }
 
 // ── boards ─────────────────────────────────────────────────────
 
-async function createBoard(userId, { title, description, columns } = {}) {
+async function createBoard(userId, { title, description, columns, origin = null, originDetails = {} } = {}) {
   const boardId = 'brd_' + uuidv4();
   await query('INSERT INTO boards (board_id, user_id, title, description) VALUES ($1,$2,$3,$4)',
     [boardId, userId, clean(title, LIMITS.title) || 'Untitled board', cleanLong(description, 2000)]);
@@ -147,18 +270,26 @@ async function createBoard(userId, { title, description, columns } = {}) {
     `, [boardId, names.map(() => 'bcl_' + uuidv4()), names,
         names.map((_, i) => COLUMN_COLORS[i % COLUMN_COLORS.length])]);
   }
+  await record(boardId, userId, 'create_board', origin || 'created the board', originDetails);
   return boardId;
 }
 
 async function updateBoard(boardId, userId, { title, description }) {
-  await requireBoard(boardId, userId);
-  await query(`UPDATE boards SET title = COALESCE($2, title), description = COALESCE($3, description),
-               updated_at = now() WHERE board_id = $1`,
-    [boardId, title !== undefined ? (clean(title, LIMITS.title) || 'Untitled board') : null,
-     description !== undefined ? cleanLong(description, 2000) : null]);
+  const cur = await requireBoard(boardId, userId);
+  const newTitle = title !== undefined ? (clean(title, LIMITS.title) || 'Untitled board') : null;
+  const newDesc = description !== undefined ? cleanLong(description, 2000) : null;
+  await query('UPDATE boards SET title = COALESCE($2, title), description = COALESCE($3, description) WHERE board_id = $1',
+    [boardId, newTitle, newDesc]);
+  if (newTitle !== null && newTitle !== cur.title) {
+    await record(boardId, userId, 'rename_board', `renamed the board from ${q(cur.title)} to ${q(newTitle)}`,
+      { from: cur.title, to: newTitle });
+  } else if (newDesc !== null && newDesc !== cur.description) {
+    await record(boardId, userId, 'edit_board', 'edited the board description', {}, { key: `boarddesc:${boardId}` });
+  }
 }
 
 async function deleteBoard(boardId, userId) {
+  await requireBoard(boardId, userId, 'owner');
   const r = await query('DELETE FROM boards WHERE board_id = $1 AND user_id = $2', [boardId, userId]);
   if (!r.rowCount) throw notFound('Board');
 }
@@ -170,28 +301,39 @@ async function addColumn(boardId, userId, { title, color }) {
   const count = await query('SELECT COUNT(*)::int AS n, COALESCE(MAX(order_index)+1,0) AS next FROM board_columns WHERE board_id = $1', [boardId]);
   if (count.rows[0].n >= LIMITS.columns) throw bad(`A board holds at most ${LIMITS.columns} columns`);
   const columnId = 'bcl_' + uuidv4();
+  const name = clean(title, 120) || 'New column';
   await query('INSERT INTO board_columns (column_id, board_id, title, color, order_index) VALUES ($1,$2,$3,$4,$5)',
-    [columnId, boardId, clean(title, 120) || 'New column',
+    [columnId, boardId, name,
      HEX.test(color || '') ? color : COLUMN_COLORS[count.rows[0].n % COLUMN_COLORS.length], count.rows[0].next]);
-  await touch(boardId);
+  await record(boardId, userId, 'add_column', `added the column ${q(name)}`, { columnId });
   return columnId;
 }
 
 async function updateColumn(boardId, userId, columnId, { title, color }) {
   await requireBoard(boardId, userId);
   if (color !== undefined && color !== null && !HEX.test(color)) throw bad('color must be #rrggbb');
-  const r = await query(`UPDATE board_columns SET title = COALESCE($3, title), color = COALESCE($4, color)
-                         WHERE column_id = $1 AND board_id = $2`,
+  // The old title rides along from the same statement (FROM sees the row before the update).
+  const r = await query(`
+    UPDATE board_columns c SET title = COALESCE($3, c.title), color = COALESCE($4, c.color)
+      FROM (SELECT title AS old_title FROM board_columns WHERE column_id = $1) o
+     WHERE c.column_id = $1 AND c.board_id = $2
+    RETURNING c.title, o.old_title`,
     [columnId, boardId, title !== undefined ? (clean(title, 120) || 'Untitled') : null, color || null]);
   if (!r.rowCount) throw notFound('Column');
-  await touch(boardId);
+  const { title: now, old_title: was } = r.rows[0];
+  if (now !== was) await record(boardId, userId, 'rename_column', `renamed the column ${q(was)} to ${q(now)}`, { columnId, from: was, to: now });
+  else if (color) await record(boardId, userId, 'color_column', `changed the colour of ${q(now)}`, { columnId, color });
 }
 
 async function deleteColumn(boardId, userId, columnId) {
   await requireBoard(boardId, userId);
-  const r = await query('DELETE FROM board_columns WHERE column_id = $1 AND board_id = $2', [columnId, boardId]);
+  const r = await query(`
+    DELETE FROM board_columns WHERE column_id = $1 AND board_id = $2
+    RETURNING title, (SELECT COUNT(*) FROM board_cards WHERE column_id = $1)::int AS cards`, [columnId, boardId]);
   if (!r.rowCount) throw notFound('Column');
-  await touch(boardId);
+  const { title, cards } = r.rows[0];
+  await record(boardId, userId, 'delete_column',
+    `deleted the column ${q(title)}${cards ? ` and its ${cards} card${cards === 1 ? '' : 's'}` : ''}`, { columnId, title, cards });
 }
 
 /** Set column order from a full list of ids. Unknown ids are ignored. */
@@ -202,14 +344,16 @@ async function orderColumns(boardId, userId, columnIds) {
   await query(`UPDATE board_columns c SET order_index = t.i
                  FROM unnest($2::text[]) WITH ORDINALITY AS t(id, i)
                 WHERE c.column_id = t.id AND c.board_id = $1`, [boardId, ids]);
-  await touch(boardId);
+  await record(boardId, userId, 'order_columns', 'reordered the columns', {}, { key: `colorder:${boardId}` });
 }
 
 // ── cards ──────────────────────────────────────────────────────
 
+/** The column's title, or a 400 when it is not on this board. */
 async function requireColumn(boardId, columnId) {
-  const r = await query('SELECT column_id FROM board_columns WHERE column_id = $1 AND board_id = $2', [columnId, boardId]);
+  const r = await query('SELECT column_id, title FROM board_columns WHERE column_id = $1 AND board_id = $2', [columnId, boardId]);
   if (!r.rows.length) throw bad('columnId is not a column on this board');
+  return r.rows[0].title;
 }
 
 async function saveTags(board, tags) {
@@ -243,7 +387,7 @@ function cardFields(input, board) {
 
 async function addCard(boardId, userId, input = {}) {
   const board = await requireBoard(boardId, userId);
-  await requireColumn(boardId, input.columnId);
+  const colTitle = await requireColumn(boardId, input.columnId);
   const n = await query('SELECT COUNT(*)::int AS n FROM board_cards WHERE board_id = $1', [boardId]);
   if (n.rows[0].n >= LIMITS.cards) throw bad(`A board holds at most ${LIMITS.cards} cards`);
   const f = cardFields({ title: input.title || 'Untitled card', ...input }, board);
@@ -257,20 +401,23 @@ async function addCard(boardId, userId, input = {}) {
   `, [cardId, boardId, input.columnId, f.title, f.summary || '', f.detail || '', JSON.stringify(f.tags || []),
       f.priority || null, f.start_date || null, f.end_date || null, f.color || null, Number(next.rows[0].next) || 0]);
   await saveTags(board, f.tags);
-  await touch(boardId);
+  await record(boardId, userId, 'add_card', `added the card ${q(f.title)} to ${colTitle}`, { cardId, columnId: input.columnId });
   return cardId;
 }
 
 async function updateCard(boardId, userId, cardId, input = {}) {
   const board = await requireBoard(boardId, userId);
-  const cur = (await query('SELECT * FROM board_cards WHERE card_id = $1 AND board_id = $2', [cardId, boardId])).rows[0];
+  const cur = (await query(`SELECT k.*, c.title AS column_title FROM board_cards k
+                              JOIN board_columns c ON c.column_id = k.column_id
+                             WHERE k.card_id = $1 AND k.board_id = $2`, [cardId, boardId])).rows[0];
   if (!cur) throw notFound('Card');
   const f = cardFields(input, board);
   const start = f.start_date !== undefined ? f.start_date : (cur.start_date ? isoDate(cur.start_date) : null);
   const end = f.end_date !== undefined ? f.end_date : (cur.end_date ? isoDate(cur.end_date) : null);
   if (start && end && end < start) throw bad('endDate is before startDate');
+  let toColumn = null;
   if (input.columnId !== undefined && input.columnId !== cur.column_id) {
-    await requireColumn(boardId, input.columnId);
+    toColumn = await requireColumn(boardId, input.columnId);
     f.column_id = input.columnId;
   }
   const keys = Object.keys(f);
@@ -280,7 +427,10 @@ async function updateCard(boardId, userId, cardId, input = {}) {
   await query(`UPDATE board_cards SET ${sets.join(', ')}, updated_at = now() WHERE card_id = $1 AND board_id = $2`,
     [cardId, boardId, ...vals]);
   await saveTags(board, f.tags);
-  await touch(boardId);
+  const change = describeCardChange(cur, f, { from: cur.column_title, to: toColumn });
+  if (change) {
+    await record(boardId, userId, 'update_card', change.summary, { cardId, changes: change.changes }, { key: change.key });
+  }
 }
 
 function isoDate(d) {
@@ -292,9 +442,9 @@ function isoDate(d) {
 
 async function deleteCard(boardId, userId, cardId) {
   await requireBoard(boardId, userId);
-  const r = await query('DELETE FROM board_cards WHERE card_id = $1 AND board_id = $2', [cardId, boardId]);
+  const r = await query('DELETE FROM board_cards WHERE card_id = $1 AND board_id = $2 RETURNING title', [cardId, boardId]);
   if (!r.rowCount) throw notFound('Card');
-  await touch(boardId);
+  await record(boardId, userId, 'delete_card', `deleted the card ${q(r.rows[0].title)}`, { cardId, title: r.rows[0].title });
 }
 
 /**
@@ -312,16 +462,35 @@ async function reorderCards(boardId, userId, columns) {
   }
   if (!ids.length) return;
   const colSet = [...new Set(cols)];
-  const okCols = await query('SELECT column_id FROM board_columns WHERE board_id = $1 AND column_id = ANY($2::text[])', [boardId, colSet]);
-  if (okCols.rows.length !== colSet.length) throw bad('a column in that move is not on this board');
-  const okCards = await query('SELECT COUNT(*)::int AS n FROM board_cards WHERE board_id = $1 AND card_id = ANY($2::text[])', [boardId, ids]);
-  if (okCards.rows[0].n !== new Set(ids).size) throw bad('a card in that move is not on this board');
+  // Validate and read the "before" in one go: which column each card sat in,
+  // and every column's title, so History can say "moved X from A to B".
+  const [okCols, before] = await Promise.all([
+    query('SELECT column_id, title FROM board_columns WHERE board_id = $1', [boardId]),
+    query('SELECT card_id, column_id, title FROM board_cards WHERE board_id = $1 AND card_id = ANY($2::text[])', [boardId, ids])
+  ]);
+  const colTitle = new Map(okCols.rows.map(c => [c.column_id, c.title]));
+  if (!colSet.every(c => colTitle.has(c))) throw bad('a column in that move is not on this board');
+  if (before.rows.length !== new Set(ids).size) throw bad('a card in that move is not on this board');
   await query(`
     UPDATE board_cards k SET column_id = t.col, order_index = t.i, updated_at = now()
       FROM unnest($2::text[], $3::text[], $4::int[]) AS t(id, col, i)
      WHERE k.card_id = t.id AND k.board_id = $1
   `, [boardId, ids, cols, idx]);
-  await touch(boardId);
+
+  const target = new Map(ids.map((id, i) => [id, cols[i]]));
+  const moved = before.rows.filter(k => target.get(k.card_id) !== k.column_id);
+  if (moved.length === 1) {
+    const k = moved[0];
+    await record(boardId, userId, 'move_card',
+      `moved ${q(k.title)} from ${colTitle.get(k.column_id)} to ${colTitle.get(target.get(k.card_id))}`,
+      { cardId: k.card_id, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) });
+  } else if (moved.length > 1) {
+    await record(boardId, userId, 'move_card', `moved ${moved.length} cards`,
+      { cards: moved.map(k => ({ cardId: k.card_id, title: k.title, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) })) });
+  } else {
+    const where = colTitle.get(colSet[0]);
+    await record(boardId, userId, 'order_cards', `reordered the cards in ${where}`, {}, { key: `order:${colSet[0]}` });
+  }
 }
 
 // ── attachments ────────────────────────────────────────────────
@@ -341,7 +510,14 @@ async function insertAttachment(row) {
     RETURNING ${ATT_COLS}
   `, ['bat_' + uuidv4(), row.boardId, row.cardId || null, row.userId, row.kind, row.filename, row.mimetype || '',
       row.size || 0, row.url || null, row.provider || null, row.text || '', (row.text || '').length, row.data || null]);
-  return r.rows[0];
+  const a = r.rows[0];
+  const where = row.cardId
+    ? (await query('SELECT title FROM board_cards WHERE card_id = $1', [row.cardId])).rows.map(k => ` to ${q(k.title)}`)[0] || ''
+    : ' to the board';
+  const what = a.kind === 'link' ? 'added the link' : a.kind === 'text' ? 'added the note' : 'attached';
+  await record(row.boardId, row.userId, 'attach', `${what} ${q(a.filename)}${where}`,
+    { attachmentId: a.attachment_id, cardId: a.card_id || null, kind: a.kind });
+  return a;
 }
 
 /** One attachment the caller may read. `withData` pulls the bytes — only the file route asks. */
@@ -354,9 +530,105 @@ async function getAttachment(boardId, attachmentId, { withData = false } = {}) {
 
 async function deleteAttachment(boardId, userId, attachmentId) {
   await requireBoard(boardId, userId);
-  const r = await query('DELETE FROM board_attachments WHERE attachment_id = $1 AND board_id = $2', [attachmentId, boardId]);
+  const r = await query('DELETE FROM board_attachments WHERE attachment_id = $1 AND board_id = $2 RETURNING filename, card_id',
+    [attachmentId, boardId]);
   if (!r.rowCount) throw notFound('Attachment');
-  await touch(boardId);
+  await record(boardId, userId, 'detach', `removed ${q(r.rows[0].filename)}`, { attachmentId, cardId: r.rows[0].card_id || null });
+}
+
+// ── people ─────────────────────────────────────────────────────
+
+/**
+ * Everyone with access: the owner first, then editors. Emails only go to the
+ * owner (they typed them in); editors see names and usernames.
+ */
+async function listMembers(boardId, userId) {
+  const board = await requireBoard(boardId, userId, 'view');
+  const r = await query(`
+    SELECT u.user_id, u.name, u.username, u.email, 'owner' AS role, NULL::timestamptz AS added_at, 0 AS o
+      FROM boards b JOIN users u ON u.user_id = b.user_id WHERE b.board_id = $1
+    UNION ALL
+    SELECT u.user_id, u.name, u.username, u.email, m.role, m.created_at, 1
+      FROM board_members m JOIN users u ON u.user_id = m.user_id WHERE m.board_id = $1
+    ORDER BY o, added_at
+  `, [boardId]);
+  return {
+    access: board.access,
+    members: r.rows.map(m => ({
+      userId: m.user_id, name: m.name, username: m.username, role: m.role, addedAt: m.added_at,
+      email: board.access === 'owner' ? m.email : undefined, you: m.user_id === userId
+    }))
+  };
+}
+
+/** A person, by email or username — never an agent's or the system's own row. */
+async function findPerson(identifier) {
+  const id = clean(identifier, 200).replace(/^@/, '');
+  if (!id) throw bad('Type their email or FinChat username');
+  const r = await query(`
+    SELECT user_id, name, username FROM users
+     WHERE (lower(email) = lower($1) OR lower(username) = lower($1))
+       AND COALESCE(role, '') <> 'system' AND COALESCE(email, '') NOT LIKE '%@system.finchat.local'
+     LIMIT 1`, [id]);
+  if (!r.rows.length) {
+    throw new BoardError(404, `No FinChat account matches "${id}" — they need to sign up first, then you can invite them`);
+  }
+  return r.rows[0];
+}
+
+async function addMember(boardId, userId, { identifier } = {}) {
+  const board = await requireBoard(boardId, userId, 'owner');
+  const person = await findPerson(identifier);
+  if (person.user_id === board.user_id) throw bad('You own this board already');
+  const r = await query(`
+    INSERT INTO board_members (board_id, user_id, role, added_by) VALUES ($1, $2, 'editor', $3)
+    ON CONFLICT (board_id, user_id) DO NOTHING RETURNING user_id`, [boardId, person.user_id, userId]);
+  if (r.rowCount) {
+    await record(boardId, userId, 'add_member', `gave ${person.name || person.username} edit access`, { memberId: person.user_id });
+  }
+  return { userId: person.user_id, name: person.name, username: person.username, added: !!r.rowCount };
+}
+
+/** The owner removes anyone; an editor may remove only themselves ("leave"). */
+async function removeMember(boardId, userId, memberId) {
+  const board = await requireBoard(boardId, userId, 'view');
+  if (board.access !== 'owner' && memberId !== userId) throw new BoardError(403, 'Only the board owner can remove people');
+  const r = await query(`
+    DELETE FROM board_members m USING users u
+     WHERE m.board_id = $1 AND m.user_id = $2 AND u.user_id = m.user_id
+    RETURNING u.name, u.username`, [boardId, memberId]);
+  if (!r.rowCount) throw notFound('Member');
+  const who = r.rows[0].name || r.rows[0].username;
+  await record(boardId, userId, 'remove_member', memberId === userId ? 'left the board' : `removed ${who}'s edit access`,
+    { memberId });
+}
+
+/**
+ * Someone signed in opened an EDIT link: they join as an editor. Idempotent —
+ * opening the link again, or the owner opening it, just returns the board.
+ */
+async function joinByLink(boardId, userId) {
+  const b = (await query('SELECT user_id FROM boards WHERE board_id = $1', [boardId])).rows[0];
+  if (!b) throw notFound('Board');
+  if (b.user_id === userId) return { joined: false };
+  const r = await query(`
+    INSERT INTO board_members (board_id, user_id, role, added_by) VALUES ($1, $2, 'editor', 'link')
+    ON CONFLICT (board_id, user_id) DO NOTHING RETURNING user_id`, [boardId, userId]);
+  if (r.rowCount) await record(boardId, userId, 'join', 'joined as an editor from an edit link', {});
+  return { joined: !!r.rowCount };
+}
+
+/** Cheap "has anything changed?" for editors watching the same board. */
+async function boardStamp(boardId, userId) {
+  await requireBoard(boardId, userId, 'view');
+  const r = await query(`
+    SELECT b.updated_at, a.user_id AS by_id, u.name AS by_name
+      FROM boards b
+      LEFT JOIN LATERAL (SELECT user_id FROM board_activity WHERE board_id = b.board_id ORDER BY created_at DESC LIMIT 1) a ON true
+      LEFT JOIN users u ON u.user_id = a.user_id
+     WHERE b.board_id = $1`, [boardId]);
+  const row = r.rows[0] || {};
+  return { updatedAt: row.updated_at, byId: row.by_id || null, byName: row.by_name || null };
 }
 
 async function attachmentsWithData(boardId) {
@@ -398,7 +670,8 @@ async function fromMindMap(userId, mapId) {
 
   const boardId = await createBoard(userId, {
     title: map.title || root.label, description: root.summary || '',
-    columns: columnsSpec.map(c => c.title)
+    columns: columnsSpec.map(c => c.title),
+    origin: `made this board from the mind map ${q(map.title || root.label)}`, originDetails: { mapId }
   });
   await query('UPDATE boards SET source_map_id = $2 WHERE board_id = $1', [boardId, mapId]);
   const cols = (await query('SELECT column_id FROM board_columns WHERE board_id = $1 ORDER BY order_index', [boardId])).rows;
@@ -484,6 +757,10 @@ async function boardForMap(userId, mapId) {
  */
 async function toMindMap(userId, boardId) {
   const { board, columns, cards } = await getBoard(boardId, userId);
+  // The paired map is the OWNER's. An editor gets a map of their own and the
+  // pairing is left alone — otherwise one editor's click would repoint the
+  // owner's "Mind map" button at a map the owner cannot open.
+  const isOwner = board.access === 'owner';
   if (board.source_map_id) {
     const r = await query('SELECT map_id FROM mind_maps WHERE map_id = $1 AND user_id = $2', [board.source_map_id, userId]);
     if (r.rows.length) return { mapId: r.rows[0].map_id, existed: true };
@@ -514,7 +791,8 @@ async function toMindMap(userId, boardId) {
           atts.map(a => (a.card_id && nodeForCard.get(a.card_id)) || null),
           atts.map(() => 'mmd_' + uuidv4()), boardId]);
     }
-    await query('UPDATE boards SET source_map_id = $2 WHERE board_id = $1', [boardId, mapId]);
+    if (isOwner) await query('UPDATE boards SET source_map_id = $2 WHERE board_id = $1', [boardId, mapId]);
+    await record(boardId, userId, 'to_mind_map', 'made a mind map from this board', { mapId });
   } catch (err) {
     // Half a map is worse than an error; the cascade takes nodes and docs with it.
     await query('DELETE FROM mind_maps WHERE map_id = $1', [mapId]).catch(() => {});
@@ -690,26 +968,61 @@ async function readImageForPlan(userId, image) {
   return text;
 }
 
+const PLAN_FILES_MAX = 5;
+const PLAN_SOURCE_BUDGET = 14000;   // characters of source across every file, split evenly
+
+/**
+ * Every attached file as text. Images go through the vision transcription
+ * above; documents through the same extractor chat attachments use (PDF, DOCX,
+ * text, Markdown, CSV, JSON…). A file that yields nothing fails the request by
+ * name — a board silently built from four of five files would be wrong.
+ */
+async function readFilesForPlan(files) {
+  const list = (files || []).filter(f => f && f.buffer && f.buffer.length);
+  if (list.length > PLAN_FILES_MAX) throw bad(`Attach at most ${PLAN_FILES_MAX} files`);
+  const each = Math.floor(PLAN_SOURCE_BUDGET / Math.max(list.length, 1));
+  const { extractFromUpload } = require('./attachments');
+  // Sequential on purpose: two vision calls at once double the chance of
+  // meeting Gemini's 503 bursts, and a board request is not latency-critical.
+  const out = [];
+  for (const f of list) {
+    const name = clean(f.originalname || 'file', 120);
+    if (String(f.mimetype || '').startsWith('image/')) {
+      out.push({ name, kind: 'IMAGE', text: (await readImageForPlan(null, f)).slice(0, each) });
+      continue;
+    }
+    const x = await extractFromUpload(f);
+    const text = String(x.text || '');
+    if (x.kind !== 'document' || /^\[(Unsupported|Could not|File appears)/.test(text)) {
+      throw bad(`Could not read ${q(name)} — use a PDF, Word (.docx), text, Markdown or CSV file, or an image`);
+    }
+    out.push({ name, kind: 'DOCUMENT', text: text.slice(0, each) });
+  }
+  return out;
+}
+
 /**
  * Build a board from a plain-language instruction ("launch plan for the POS
- * app, 6 weeks, design / backend / marketing"), an image of a plan, or both.
- * One model call (two with an image), then the same batched inserts as fromMindMap.
+ * app, 6 weeks, design / backend / marketing"), from files (images, PDFs,
+ * Word documents, text), or both. One planning call — plus one vision call per
+ * image — then the same batched inserts as fromMindMap.
  */
-async function generateBoard(userId, instruction, { today = new Date(), image = null } = {}) {
+async function generateBoard(userId, instruction, { today = new Date(), image = null, files = [] } = {}) {
   const text = cleanLong(instruction, GEN_LIMITS.instruction);
-  const hasImage = !!(image && image.buffer && image.buffer.length);
-  if (text.length < 3 && !hasImage) throw bad('Describe what the board should plan, or add an image');
-  const fromImage = hasImage ? await readImageForPlan(userId, image) : '';
+  const all = [...(image ? [image] : []), ...(files || [])];
+  if (text.length < 3 && !all.length) throw bad('Describe what the board should plan, or add a file or image');
+  const sources = await readFilesForPlan(all);
   const { runInference } = require('./inference');
   const iso = isoDate(today);
   const ask = [
     `TODAY: ${iso}`,
-    `WHAT TO PLAN:\n${text || 'Turn the attached image into a board.'}`,
-    fromImage ? `FROM THE IMAGE THE USER ATTACHED (transcribed):\n${fromImage}\n\n` +
-      'Build the board from this image. Where it already has columns, lists or groups, those are the columns; ' +
-      'its items are the cards, in its own words. Do not drop items, and do not invent work the image does not imply ' +
-      'beyond what the user asked for above. A deadline or dates written in the image count as the user\'s timeframe. ' +
-      'Never put sticky-note or marker colours in card text.' : ''
+    `WHAT TO PLAN:\n${text || 'Turn the attached files into a board.'}`,
+    sources.length ? 'FROM THE FILES THE USER ATTACHED:\n\n' +
+      sources.map(s => `### ${s.kind}: ${s.name}${s.kind === 'IMAGE' ? ' (transcribed)' : ''}\n${s.text}`).join('\n\n') + '\n\n' +
+      'Build the board from these files. Where they already have columns, lists, phases or groups, those are the columns; ' +
+      'their items, tasks, requirements or action points are the cards, in their own words. Do not drop items, and do not ' +
+      'invent work they do not imply beyond what the user asked for above. A deadline or dates written in a file count as ' +
+      "the user's timeframe. Never put sticky-note or marker colours in card text." : ''
   ].filter(Boolean).join('\n\n');
   const res = await runInference({
     messages: [
@@ -729,7 +1042,11 @@ async function generateBoard(userId, instruction, { today = new Date(), image = 
     throw new BoardError(422, 'The AI could not turn that into a board — add a little more about what you are planning');
   }
 
-  const boardId = await createBoard(userId, { title: plan.title, description: plan.description, columns: plan.columns.map(c => c.title) });
+  const boardId = await createBoard(userId, {
+    title: plan.title, description: plan.description, columns: plan.columns.map(c => c.title),
+    origin: sources.length ? `built this board with AI from ${sources.map(s => q(s.name)).join(', ')}` : 'built this board with AI',
+    originDetails: { instruction: text.slice(0, 300), files: sources.map(s => s.name) }
+  });
   try {
     const cols = (await query('SELECT column_id FROM board_columns WHERE board_id = $1 ORDER BY order_index', [boardId])).rows;
     // One palette for the whole board, so a tag is the same colour on every card.
@@ -794,5 +1111,6 @@ module.exports = {
   addCard, updateCard, deleteCard, reorderCards,
   requireCard, insertAttachment, getAttachment, deleteAttachment, attachmentsWithData,
   fromMindMap, boardForMap, toMindMap, generateBoard,
-  normTags, isoDate, normalizePlan, planPalette, mapRowsFromBoard
+  listActivity, listMembers, addMember, removeMember, joinByLink, boardStamp, record,
+  normTags, isoDate, normalizePlan, planPalette, mapRowsFromBoard, describeCardChange
 };

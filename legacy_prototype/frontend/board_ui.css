@@ -210,9 +210,12 @@
 .bx-imgpick-zone .material-symbols-outlined { font-size: 26px; color: #e84fa7; flex: none; }
 .bx-imgpick-zone b { color: var(--bx-fg); }
 .bx-imgpick-zone small { display: block; color: var(--bx-muted); font-size: 12px; }
+.bx-imgpick-list { display: flex; flex-direction: column; gap: 6px; }
+.bx-imgpick-list:not(:empty) { margin-bottom: 6px; }
+.bx-imgpick-prev img, .bx-imgpick-prev .bx-att-ico { flex: none; }
 .bx-imgpick-prev { display: flex; align-items: center; gap: 12px; border: 1px solid var(--bx-line); border-radius: 11px; padding: 8px 8px 8px 8px;
   background: var(--bx-surface); }
-.bx-imgpick-prev img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bx-line); flex: none; }
+.bx-imgpick-prev img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bx-line); flex: none; }
 .bx-imgpick-meta { flex: 1; min-width: 0; }
 .bx-imgpick-meta b { display: block; font-size: 13.5px; color: var(--bx-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bx-imgpick-meta small { font-size: 12px; color: var(--bx-muted); }

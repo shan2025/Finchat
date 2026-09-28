@@ -53,9 +53,10 @@ body[data-theme="dark"] { background: #16181d; }
 <div class="bx-float topl">
   <span class="brand-dot"><span class="material-symbols-outlined" style="font-size:17px">view_kanban</span></span>
   <span class="title" id="title">Shared board</span>
-  <span class="view-only">View only</span>
+  <span class="view-only" id="modeTag">View only</span>
 </div>
 <div class="bx-float topr">
+  <button class="bx-btn primary" id="editBtn" hidden title="Sign in to FinChat and edit this board"><span class="material-symbols-outlined">edit</span>Open to edit</button>
   <div class="search-wrap"><span class="material-symbols-outlined">search</span><input class="search" id="search" placeholder="Search cards" autocomplete="off"></div>
   <button class="bx-btn ghost" id="filesBtn" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
   <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
@@ -127,8 +128,39 @@ body[data-theme="dark"] { background: #16181d; }
     const n = B.attachments.filter(a => !a.cardId).length;
     $('filesBtn').hidden = !n;
     $('filesCount').textContent = `Files (${n})`;
+    // An edit link: offer to join. The board shown here stays read-only; the
+    // editing happens on the real board, signed in, so History has a name.
+    $('editBtn').hidden = B.role !== 'edit';
+    if (B.role === 'edit') $('modeTag').textContent = 'You can edit';
     render();
   }
+
+  $('editBtn').addEventListener('click', async () => {
+    let session = null;
+    try { session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null'); } catch (e) {}
+    const auth = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (session && session.token) || '';
+    if (!auth) {
+      // Come back here after signing in (finchat_login.html honours only this shape).
+      try { sessionStorage.setItem('finchat_after_login', 'finchat_board_share.html#' + TOKEN); } catch (e) {}
+      location.href = 'finchat_login.html';
+      return;
+    }
+    $('editBtn').disabled = true;
+    try {
+      const r = await fetch(`${API}/join`, { method: 'POST', headers: { Authorization: 'Bearer ' + auth } });
+      const b = await r.json().catch(() => ({}));
+      if (r.status === 401) {
+        try { sessionStorage.setItem('finchat_after_login', 'finchat_board_share.html#' + TOKEN); } catch (e) {}
+        location.href = 'finchat_login.html';
+        return;
+      }
+      if (!r.ok) throw new Error(b.error || 'HTTP ' + r.status);
+      location.href = 'finchat_boards.html?board=' + encodeURIComponent(b.boardId);
+    } catch (e) {
+      U.toast(e.message);
+      $('editBtn').disabled = false;
+    }
+  });
 
   const attsOf = (id) => B.attachments.filter(a => a.cardId === id);
 

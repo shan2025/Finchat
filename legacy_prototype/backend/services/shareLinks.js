@@ -18,13 +18,16 @@ const TOKEN = /^[A-Za-z0-9_-]{43}$/;
  *   idCol   the column naming what is shared (e.g. board_id)
  *   page    the public page the link opens (token goes in the fragment)
  */
-function shareLinks({ table, idCol, prefix, page }) {
+function shareLinks({ table, idCol, prefix, page, roles = false }) {
+  // roles: the table has a `role` column ('view' | 'edit') — boards since 057.
+  const ROLES = ['view', 'edit'];
   const view = (row) => {
     const expired = row.expires_at && new Date(row.expires_at) <= new Date();
     return {
       shareId: row.share_id,
       // Fragment: never sent to a server, so it stays out of logs and Referers.
       path: `/${page}#${row.token}`,
+      ...(roles ? { role: row.role || 'view' } : {}),
       includeDocs: row.include_docs,
       expiresAt: row.expires_at,
       revokedAt: row.revoked_at,
@@ -45,19 +48,26 @@ function shareLinks({ table, idCol, prefix, page }) {
     },
 
     /** @throws {Error} with .status 400 on a bad expiry */
-    async create(targetId, userId, { includeDocs = true, expiresInDays = null } = {}) {
+    async create(targetId, userId, { includeDocs = true, expiresInDays = null, role = 'view' } = {}) {
       const days = expiresInDays == null ? null : Number(expiresInDays);
       if (days !== null && !EXPIRY_DAYS.includes(days)) {
         const e = new Error(`expiresInDays must be null or one of ${EXPIRY_DAYS.join(', ')}`);
         e.status = 400;
         throw e;
       }
+      if (roles && !ROLES.includes(role)) {
+        const e = new Error('role must be view or edit');
+        e.status = 400;
+        throw e;
+      }
+      const cols = roles ? ', role' : '';
+      const vals = roles ? ', $7' : '';
       const r = await query(`
-        INSERT INTO ${table} (share_id, token, ${idCol}, user_id, include_docs, expires_at)
-        VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + make_interval(days => $6::int) END)
+        INSERT INTO ${table} (share_id, token, ${idCol}, user_id, include_docs, expires_at${cols})
+        VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE now() + make_interval(days => $6::int) END${vals})
         RETURNING *
       `, [`${prefix}_${uuidv4()}`, crypto.randomBytes(32).toString('base64url'), targetId, userId,
-          includeDocs !== false, days]);
+          includeDocs !== false, days, ...(roles ? [role] : [])]);
       return view(r.rows[0]);
     },
 
@@ -74,7 +84,7 @@ function shareLinks({ table, idCol, prefix, page }) {
     async resolve(token) {
       if (!TOKEN.test(String(token || ''))) return null;
       const r = await query(`
-        SELECT share_id, ${idCol} AS target_id, user_id, include_docs, expires_at
+        SELECT share_id, ${idCol} AS target_id, user_id, include_docs, expires_at${roles ? ', role' : ''}
           FROM ${table}
          WHERE token = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
       `, [token]);

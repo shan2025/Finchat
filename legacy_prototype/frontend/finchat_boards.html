@@ -63,7 +63,31 @@ body[data-theme="dark"] { background: #16181d; }
 .swatches .sw { width: 24px; height: 24px; border-radius: 7px; border: 2px solid transparent; cursor: pointer; }
 .swatches .sw.on { border-color: var(--bx-fg); }
 .addrow { display: flex; flex-wrap: wrap; gap: 6px; }
+/* people + history */
+.people { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.person, .hrow { display: flex; align-items: center; gap: 10px; }
+.person { border: 1px solid var(--bx-line); border-radius: 11px; padding: 7px 8px 7px 10px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 12px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; }
+.person .who { flex: 1; min-width: 0; }
+.person .who b { display: block; font-size: 14px; }
+.person .who small { display: block; font-size: 12px; color: var(--bx-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person .role { font-size: 12px; font-weight: 700; color: var(--bx-fg-2); }
+.linkrole { flex: none; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--bx-surface-2);
+  color: var(--bx-fg-2); border: 1px solid var(--bx-line); }
+.linkrole.edit { background: #fff3a3; color: #6b5200; border-color: #f0d860; }
+.hday { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--bx-muted); margin: 14px 0 6px; }
+.hrow { align-items: flex-start; padding: 8px 6px; border-radius: 10px; }
+.hrow.link { cursor: pointer; }
+.hrow.link:hover { background: var(--bx-surface-2); }
+.hrow .avatar { width: 26px; height: 26px; font-size: 11px; margin-top: 1px; }
+.htext { font-size: 13.5px; line-height: 1.45; color: var(--bx-fg-2); word-break: break-word; }
+.htext b { color: var(--bx-fg); }
+.htext small { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--bx-muted); margin-top: 2px; }
+.htext small .material-symbols-outlined { font-size: 14px; }
+.tile .shared { font-size: 12px; font-weight: 700; color: #0ca789; }
 @media (max-width: 640px) {
+  #historyBtn span:last-child { display: none; }
   #stage { padding: 132px 12px 80px 12px; }
   .rail { top: auto; bottom: 14px; left: 14px; transform: none; flex-direction: row; }
   .search { width: 130px; }
@@ -91,6 +115,7 @@ body[data-theme="dark"] { background: #16181d; }
     <input class="search" id="search" placeholder="Search cards" autocomplete="off">
   </div>
   <button class="bx-btn ghost" id="filesBtn" title="Files and links on the whole board" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
+  <button class="bx-btn ghost" id="historyBtn" title="History — who changed what" hidden><span class="material-symbols-outlined">history</span><span>History</span></button>
   <button class="bx-btn ghost" id="mapBtn" title="See this board as a mind map" hidden><span class="material-symbols-outlined">account_tree</span><span id="mapBtnLabel">Mind map</span></button>
   <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
   <button class="bx-btn primary" id="shareBtn" hidden><span class="material-symbols-outlined">group_add</span>Share</button>
@@ -157,7 +182,7 @@ body[data-theme="dark"] { background: #16181d; }
 <div class="bx-modal" id="aiModal">
   <div class="bx-modal-box">
     <div class="bx-modal-title">Ask AI to build a board</div>
-    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved — or add an image of a plan. You get columns, cards, tags, priorities and dates you can edit.</div>
+    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved — and/or add files: a whiteboard photo, a PDF brief, a Word spec, notes. You get columns, cards, tags, priorities and dates you can edit.</div>
     <textarea class="bx-field" id="aiText" rows="4" maxlength="4000" style="margin-top:12px; resize:vertical;"
       placeholder="e.g. Launch plan for the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing"></textarea>
     <div id="aiImage"></div>
@@ -178,22 +203,41 @@ body[data-theme="dark"] { background: #16181d; }
 <div class="bx-modal" id="shareModal">
   <div class="bx-modal-box">
     <div class="bx-modal-title">Share this board</div>
-    <div class="bx-modal-sub">Anyone with the link can view the board and open its files and links — no FinChat account needed. It stays live: they see your changes.</div>
-    <label style="display:flex; align-items:center; gap:8px; margin-top:14px; font-size:14px; cursor:pointer;">
-      <input type="checkbox" id="shareDocs" checked style="width:16px; height:16px; accent-color:var(--bx-blue);"> Include attached files, notes and links
-    </label>
-    <div class="bx-label">Link expires</div>
-    <select class="bx-field" id="shareExpiry">
-      <option value="">Never — until I revoke it</option>
-      <option value="1">After 1 day</option><option value="7">After 7 days</option>
-      <option value="30">After 30 days</option><option value="90">After 90 days</option>
-    </select>
-    <div class="bx-modal-acts" style="margin-top:12px;">
-      <button class="bx-btn primary" id="shareCreate"><span class="material-symbols-outlined">add_link</span>Create link</button>
+
+    <div class="bx-label" style="margin-top:10px">People who can edit</div>
+    <div class="bx-row" id="inviteRow" style="align-items:center">
+      <input class="bx-field" id="inviteWho" placeholder="Their email or FinChat username" autocomplete="off">
+      <button class="bx-btn primary" id="inviteBtn" style="flex:none"><span class="material-symbols-outlined">person_add</span>Invite</button>
     </div>
-    <div class="bx-label">Links for this board</div>
-    <div id="shareList" style="display:flex; flex-direction:column; gap:8px;"></div>
-    <div class="bx-modal-acts"><button class="bx-btn" data-close="shareModal">Done</button></div>
+    <div class="bx-hint" id="inviteHint">They need a FinChat account. Editors change cards, columns and files; only you can delete the board or change who has access. Every change shows in History with their name.</div>
+    <div id="memberList" class="people"></div>
+
+    <div id="linkSection">
+      <div class="bx-label">Share with a link</div>
+      <div class="bx-row">
+        <select class="bx-field" id="shareRole">
+          <option value="view">Anyone with the link can view</option>
+          <option value="edit">Anyone with the link can edit (they sign in)</option>
+        </select>
+        <select class="bx-field" id="shareExpiry">
+          <option value="">Never expires</option>
+          <option value="1">Expires in 1 day</option><option value="7">Expires in 7 days</option>
+          <option value="30">Expires in 30 days</option><option value="90">Expires in 90 days</option>
+        </select>
+      </div>
+      <div class="bx-hint" id="shareRoleHint">No FinChat account needed. It stays live: they see your changes.</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; cursor:pointer;" id="shareDocsRow">
+        <input type="checkbox" id="shareDocs" checked style="width:16px; height:16px; accent-color:var(--bx-blue);"> Include attached files, notes and links
+      </label>
+      <div class="bx-modal-acts" style="margin-top:12px;">
+        <button class="bx-btn primary" id="shareCreate"><span class="material-symbols-outlined">add_link</span>Create link</button>
+      </div>
+      <div id="shareList" style="display:flex; flex-direction:column; gap:8px; margin-top:6px;"></div>
+    </div>
+    <div class="bx-modal-acts">
+      <button class="bx-btn ghost" id="leaveBtn" hidden style="margin-right:auto; color:var(--bx-danger)"><span class="material-symbols-outlined">logout</span>Leave board</button>
+      <button class="bx-btn" data-close="shareModal">Done</button>
+    </div>
   </div>
 </div>
 
@@ -290,11 +334,24 @@ body[data-theme="dark"] { background: #16181d; }
     closeDrawer();
     history.replaceState(null, '', 'finchat_boards.html');
     document.title = 'Boards | FinChat';
-    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn']) $(id).hidden = true;
+    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn']) $(id).hidden = true;
     setZoom(1);
     $('content').innerHTML = '<div class="bx-empty">Loading…</div>';
     try {
       const { boards } = await api('/api/boards');
+      const mine = boards.filter(b => b.access === 'owner');
+      const shared = boards.filter(b => b.access !== 'owner');
+      const edited = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+      const tile = (b, i) => `
+        <div class="tile" data-open="${esc(b.boardId)}">
+          ${b.access === 'owner' ? `<button class="bx-ibtn del" data-delboard="${esc(b.boardId)}" title="Delete board"><span class="material-symbols-outlined">delete</span></button>` : ''}
+          <div class="strip">${[0, 1, 2, 3].map(j => `<span style="background:${U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length]}"></span>`).join('')}</div>
+          <h3>${esc(b.title)}</h3>
+          <p>${b.columnCount} columns · ${b.cardCount} cards${b.sourceMapId ? ' · <span style="color:#6631d7; font-weight:700;">has a mind map</span>' : ''}</p>
+          ${b.access !== 'owner' ? `<p class="shared">Shared by ${esc(b.ownerName || 'someone')} · you can edit</p>`
+            : b.memberCount ? `<p class="shared">Shared with ${b.memberCount} ${b.memberCount === 1 ? 'person' : 'people'}</p>` : ''}
+          <p>Edited ${esc(edited(b.updatedAt))}</p>
+        </div>`;
       $('content').innerHTML = `
         <div style="max-width:1100px;">
           <h1 style="font-size:26px; margin:6px 0 4px;">Your boards</h1>
@@ -303,15 +360,12 @@ body[data-theme="dark"] { background: #16181d; }
             <div class="tile new" data-new="1"><span class="material-symbols-outlined" style="font-size:28px">add</span>New board</div>
             <div class="tile new" data-ai="1" style="color:#e84fa7"><span class="material-symbols-outlined" style="font-size:28px">auto_awesome</span>Ask AI to build one</div>
             <div class="tile new" data-frommap="1" style="color:#6631d7"><span class="material-symbols-outlined" style="font-size:28px">account_tree</span>From a mind map</div>
-            ${boards.map((b, i) => `
-              <div class="tile" data-open="${esc(b.boardId)}">
-                <button class="bx-ibtn del" data-delboard="${esc(b.boardId)}" title="Delete board"><span class="material-symbols-outlined">delete</span></button>
-                <div class="strip">${[0, 1, 2, 3].map(j => `<span style="background:${U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length]}"></span>`).join('')}</div>
-                <h3>${esc(b.title)}</h3>
-                <p>${b.columnCount} columns · ${b.cardCount} cards${b.sourceMapId ? ' · <span style="color:#6631d7; font-weight:700;">has a mind map</span>' : ''}</p>
-                <p>Edited ${esc(new Date(b.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }))}</p>
-              </div>`).join('')}
+            ${mine.map(tile).join('')}
           </div>
+          ${shared.length ? `
+            <h2 style="font-size:19px; margin:30px 0 4px;">Shared with you</h2>
+            <p style="margin:0 0 14px; color:var(--bx-muted);">Boards other people gave you edit access to.</p>
+            <div class="gallery">${shared.map(tile).join('')}</div>` : ''}
         </div>`;
     } catch (e) {
       $('content').innerHTML = `<div class="bx-empty"><h2>Could not load boards</h2>${esc(e.message)}</div>`;
@@ -348,15 +402,107 @@ body[data-theme="dark"] { background: #16181d; }
     history.replaceState(null, '', '?board=' + encodeURIComponent(id));
     document.title = `${B.board.title} | Boards`;
     $('boardTitle').value = B.board.title;
-    for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn']) $(x).hidden = false;
+    for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn']) $(x).hidden = false;
     $('mapBtnLabel').textContent = B.board.sourceMapId ? 'Mind map' : 'Make mind map';
     const n = B.attachments.filter(a => !a.cardId).length;
     $('filesCount').textContent = n ? `Files (${n})` : 'Files';
-    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; }
+    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; HISTORY_OPEN = false; }
+    LAST_STAMP = B.board.updatedAt;
+    // Editors do everything but delete the board — that and sharing stay the owner's.
+    document.querySelector('[data-bm="delete"]').hidden = B.board.access !== 'owner';
     render();
-    if (FILES_OPEN) openBoardFiles();
+    if (HISTORY_OPEN) openHistory();
+    else if (FILES_OPEN) openBoardFiles();
     else if (SELECTED && cardById(SELECTED)) openDrawer(SELECTED); else closeDrawer();
   }
+
+  // ── history: who changed what ──────────────────────────────
+  let HISTORY_OPEN = false, HISTORY = [], HISTORY_MORE = false;
+  const dayLabel = (d) => {
+    const t = new Date(d), today = new Date(), y = new Date(Date.now() - 864e5);
+    const same = (a, b) => a.toDateString() === b.toDateString();
+    return same(t, today) ? 'Today' : same(t, y) ? 'Yesterday'
+      : t.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: t.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+  };
+  const ACTION_ICON = {
+    create_board: 'add_box', add_card: 'note_add', update_card: 'edit', move_card: 'arrow_right_alt', delete_card: 'delete',
+    add_column: 'view_column', rename_column: 'edit', color_column: 'palette', delete_column: 'delete', order_columns: 'swap_horiz',
+    order_cards: 'swap_vert', attach: 'attach_file', detach: 'link_off', rename_board: 'edit', edit_board: 'edit',
+    add_member: 'person_add', remove_member: 'person_remove', join: 'person_add', share_link: 'add_link', revoke_link: 'link_off',
+    to_mind_map: 'account_tree'
+  };
+
+  async function openHistory({ more = false } = {}) {
+    // Already showing History (a live refresh): keep it on screen while the new
+    // rows load. Coming from a card or the files panel: clear that first.
+    const refreshing = HISTORY_OPEN && $('drawer').classList.contains('open');
+    HISTORY_OPEN = true; FILES_OPEN = false; SELECTED = null;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    $('dWhere').textContent = `${B.board.title} › History`;
+    $('dDelete').hidden = true;
+    if (!more && !refreshing) {
+      $('dBody').innerHTML = '<div style="font-size:20px; font-weight:800;">History</div><div class="bx-hint">Loading…</div>';
+    }
+    $('drawer').classList.add('open');
+    try {
+      const before = more && HISTORY.length ? HISTORY[HISTORY.length - 1].at : '';
+      const { activity } = await api(`/api/boards/${boardId()}/activity${before ? '?before=' + encodeURIComponent(before) : ''}`);
+      HISTORY = more ? HISTORY.concat(activity) : activity;
+      HISTORY_MORE = activity.length === 50;
+      if (HISTORY_OPEN) paintHistory();
+    } catch (e) { $('dBody').innerHTML = `<div class="bx-hint">${esc(e.message)}</div>`; }
+  }
+
+  function paintHistory() {
+    const keep = $('dBody').scrollTop;
+    let day = '';
+    const rows = HISTORY.map(a => {
+      const d = dayLabel(a.at);
+      const head = d !== day ? `<div class="hday">${esc((day = d))}</div>` : '';
+      const cardId = a.details && a.details.cardId;
+      const live = cardId && cardById(cardId);
+      return `${head}<div class="hrow${live ? ' link' : ''}" ${live ? `data-hcard="${esc(cardId)}" title="Open this card"` : ''}>
+        <span class="avatar" style="background:${personColor(a.userId)}">${esc(initials(a.userName))}</span>
+        <div class="htext"><b>${esc(a.you ? 'You' : a.userName)}</b> ${esc(a.summary)}
+          <small><span class="material-symbols-outlined">${ACTION_ICON[a.action] || 'history'}</span>
+          ${esc(new Date(a.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}</small></div>
+      </div>`;
+    }).join('');
+    $('dBody').innerHTML = `
+      <div style="font-size:20px; font-weight:800;">History</div>
+      <div class="bx-hint" style="margin-bottom:12px">Every change to this board — who made it and when. Click a change to open its card.</div>
+      ${rows || '<div class="bx-hint">No changes recorded yet. Changes made from now on show here.</div>'}
+      ${HISTORY_MORE ? '<button class="bx-btn sm" id="hMore" style="margin-top:10px">Show older changes</button>' : ''}`;
+    $('dBody').scrollTop = keep;
+  }
+  $('dBody').addEventListener('click', (e) => {
+    if (!HISTORY_OPEN) return;
+    if (e.target.closest('#hMore')) return openHistory({ more: true });
+    const r = e.target.closest('[data-hcard]');
+    if (r) { HISTORY_OPEN = false; openDrawer(r.dataset.hcard); }
+  });
+  $('historyBtn').addEventListener('click', () => (HISTORY_OPEN ? closeDrawer() : openHistory()));
+
+  // ── other editors' changes ─────────────────────────────────
+  // No sockets for boards: a cheap stamp every 20s while the tab is visible.
+  // Someone else changed it → reload quietly, unless you are mid-edit (typing
+  // in the drawer, dragging, a dialog open) — then wait for the next tick.
+  let LAST_STAMP = null;
+  async function checkForChanges() {
+    if (!B || document.hidden || drag || document.querySelector('.bx-modal.open')) return;
+    const a = document.activeElement;
+    if (a && $('drawer').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
+    try {
+      const s = await api(`/api/boards/${boardId()}/stamp`);
+      if (!s.updatedAt || !LAST_STAMP || new Date(s.updatedAt).getTime() === new Date(LAST_STAMP).getTime()) return;
+      LAST_STAMP = s.updatedAt;
+      if (s.byYou) return;
+      await openBoard(boardId(), { keepSelection: true });
+      U.toast(`${s.byName || 'Someone'} updated the board`);
+    } catch (e) { /* a missed tick is harmless */ }
+  }
+  setInterval(checkForChanges, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForChanges(); });
 
   // Files and links on the board itself — what a map's root carried, or
   // anything that belongs to the whole plan rather than one card.
@@ -364,6 +510,7 @@ body[data-theme="dark"] { background: #16181d; }
   function openBoardFiles() {
     const keepScroll = FILES_OPEN && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
     FILES_OPEN = true;
+    HISTORY_OPEN = false;
     SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const atts = B.attachments.filter(a => !a.cardId);
@@ -675,6 +822,7 @@ body[data-theme="dark"] { background: #16181d; }
     const keepScroll = SELECTED === cardId && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
     SELECTED = cardId;
     FILES_OPEN = false;
+    HISTORY_OPEN = false;
     $('dDelete').hidden = false;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const el = document.querySelector(`[data-card="${cardId}"]`);
@@ -732,6 +880,7 @@ body[data-theme="dark"] { background: #16181d; }
     $('drawer').classList.remove('open');
     SELECTED = null;
     FILES_OPEN = false;
+    HISTORY_OPEN = false;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
   }
   $('dClose').addEventListener('click', closeDrawer);
@@ -977,10 +1126,10 @@ body[data-theme="dark"] { background: #16181d; }
 
   // ── built by AI ────────────────────────────────────────────
   // Multipart, so no JSON Content-Type — the browser sets the boundary.
-  async function generateFromImage(instruction, image) {
+  async function generateFromFiles(instruction, files) {
     const fd = new FormData();
     fd.append('instruction', instruction);
-    fd.append('image', image, image.name || 'image');
+    for (const f of files) fd.append('files', f, f.name || 'image');
     const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
     if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
     const body = await res.json().catch(() => ({}));
@@ -991,20 +1140,20 @@ body[data-theme="dark"] { background: #16181d; }
     const b = e.target.closest('[data-idea]');
     if (b) { $('aiText').value = b.dataset.idea; $('aiText').focus(); }
   });
-  const aiImage = U.planImagePicker($('aiImage'), { pasteRoot: $('aiModal') });
+  const aiFiles = U.planFilesPicker($('aiImage'), { pasteRoot: $('aiModal') });
   $('aiBuild').addEventListener('click', async () => {
     const instruction = $('aiText').value.trim();
-    const image = aiImage.file;
-    if (instruction.length < 3 && !image) { $('aiText').focus(); return U.toast('Describe what the board should plan, or add an image'); }
+    const files = aiFiles.files;
+    if (instruction.length < 3 && !files.length) { $('aiText').focus(); return U.toast('Describe what the board should plan, or add a file'); }
     $('aiBuild').disabled = true;
-    $('aiStatus').textContent = image
-      ? 'Reading the image and planning your board — this usually takes 20 to 45 seconds…'
+    $('aiStatus').textContent = files.length
+      ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and planning your board — this usually takes 20 to 60 seconds…`
       : 'Planning your board — this usually takes 10 to 30 seconds…';
     try {
-      const { boardId: id } = image ? await generateFromImage(instruction, image) : await post('/api/boards/generate', { instruction });
+      const { boardId: id } = files.length ? await generateFromFiles(instruction, files) : await post('/api/boards/generate', { instruction });
       closeModal('aiModal');
       $('aiText').value = '';
-      aiImage.clear();
+      aiFiles.clear();
       openBoard(id);
       U.toast('Board built — edit anything that is not right');
     } catch (err) {
@@ -1015,15 +1164,79 @@ body[data-theme="dark"] { background: #16181d; }
     }
   });
 
-  // ── share ──────────────────────────────────────────────────
+  // ── share: people + links ──────────────────────────────────
   let SHARES = [];
+  const isOwner = () => B && B.board.access === 'owner';
   const shareUrl = (s) => location.origin + s.path;
   $('shareBtn').addEventListener('click', async () => {
     openModal('shareModal');
+    const owner = isOwner();
+    // Editors see who has access and can leave; links and invites are the owner's.
+    $('inviteRow').hidden = !owner;
+    $('inviteHint').hidden = !owner;
+    $('linkSection').hidden = !owner;
+    $('leaveBtn').hidden = owner;
+    loadMembers();
+    if (!owner) return;
     $('shareList').innerHTML = '<div class="bx-hint">Loading…</div>';
     try { SHARES = (await api(`/api/boards/${boardId()}/shares`)).shares; renderShares(); }
     catch (e) { $('shareList').innerHTML = `<div class="bx-hint">${esc(e.message)}</div>`; }
   });
+
+  const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const personColor = (id) => U.TAG_COLORS[[...String(id || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % U.TAG_COLORS.length];
+
+  async function loadMembers() {
+    $('memberList').innerHTML = '<div class="bx-hint">Loading…</div>';
+    try {
+      const { members } = await api(`/api/boards/${boardId()}/members`);
+      $('memberList').innerHTML = members.map(m => `
+        <div class="person">
+          <span class="avatar" style="background:${personColor(m.userId)}">${esc(initials(m.name || m.username))}</span>
+          <div class="who"><b>${esc(m.name || m.username)}${m.you ? ' (you)' : ''}</b>
+            <small>${esc([m.username ? '@' + m.username : '', m.email || ''].filter(Boolean).join(' · '))}</small></div>
+          <span class="role">${m.role === 'owner' ? 'Owner' : 'Can edit'}</span>
+          ${isOwner() && m.role !== 'owner'
+            ? `<button class="bx-ibtn" data-unshare="${esc(m.userId)}" data-name="${esc(m.name || m.username)}" title="Remove access"><span class="material-symbols-outlined">person_remove</span></button>` : ''}
+        </div>`).join('');
+    } catch (e) { $('memberList').innerHTML = `<div class="bx-hint">${esc(e.message)}</div>`; }
+  }
+  async function invite() {
+    const identifier = $('inviteWho').value.trim();
+    if (!identifier) return $('inviteWho').focus();
+    $('inviteBtn').disabled = true;
+    try {
+      const { member } = await post(`/api/boards/${boardId()}/members`, { identifier });
+      $('inviteWho').value = '';
+      U.toast(member.added ? `${member.name || member.username} can now edit this board` : `${member.name || member.username} already has access`);
+      loadMembers();
+    } catch (e) { U.toast(e.message); } finally { $('inviteBtn').disabled = false; }
+  }
+  $('inviteBtn').addEventListener('click', invite);
+  $('inviteWho').addEventListener('keydown', (e) => { if (e.key === 'Enter') invite(); });
+  $('memberList').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-unshare]');
+    if (!b) return;
+    if (!(await confirmBox(`Remove ${b.dataset.name}?`, 'They lose edit access straight away. Their past changes stay in History.', 'Remove'))) return;
+    try { await del(`/api/boards/${boardId()}/members/${encodeURIComponent(b.dataset.unshare)}`); loadMembers(); }
+    catch (err) { U.toast(err.message); }
+  });
+  $('leaveBtn').addEventListener('click', async () => {
+    if (!(await confirmBox('Leave this board?', 'You lose edit access. The owner can invite you again.', 'Leave'))) return;
+    try {
+      const me = (await api(`/api/boards/${boardId()}/members`)).members.find(m => m.you);
+      await del(`/api/boards/${boardId()}/members/${encodeURIComponent(me.userId)}`);
+      closeModal('shareModal');
+      U.toast('You left the board');
+      showGallery();
+    } catch (err) { U.toast(err.message); }
+  });
+  $('shareRole').addEventListener('change', () => {
+    $('shareRoleHint').textContent = $('shareRole').value === 'edit'
+      ? 'Whoever opens it signs in to FinChat and joins as an editor — their changes show in History under their name. Share it only with people you trust to edit.'
+      : 'No FinChat account needed. It stays live: they see your changes.';
+  });
+
   function renderShares() {
     if (!SHARES.length) { $('shareList').innerHTML = '<div class="bx-hint">No links yet.</div>'; return; }
     const when = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1032,6 +1245,7 @@ body[data-theme="dark"] { background: #16181d; }
         : s.expiresAt ? 'Expires ' + when(s.expiresAt) : 'No expiry';
       return `<div style="border:1px solid var(--bx-line); border-radius:11px; padding:9px 10px; ${s.active ? '' : 'opacity:.55'}">
         <div style="display:flex; gap:6px; align-items:center;">
+          <span class="linkrole ${s.role === 'edit' ? 'edit' : ''}">${s.role === 'edit' ? 'Can edit' : 'View only'}</span>
           <input class="bx-field" readonly value="${esc(shareUrl(s))}" style="flex:1; min-width:0; font-size:12px; padding:6px 9px;">
           ${s.active ? `<button class="bx-ibtn" data-copy="${esc(s.shareId)}" title="Copy link"><span class="material-symbols-outlined">content_copy</span></button>
           <button class="bx-ibtn" data-revoke="${esc(s.shareId)}" title="Revoke"><span class="material-symbols-outlined">link_off</span></button>` : ''}
@@ -1053,7 +1267,8 @@ body[data-theme="dark"] { background: #16181d; }
   $('shareCreate').addEventListener('click', async () => {
     try {
       const v = $('shareExpiry').value;
-      const { share } = await post(`/api/boards/${boardId()}/shares`, { includeDocs: $('shareDocs').checked, expiresInDays: v ? Number(v) : null });
+      const { share } = await post(`/api/boards/${boardId()}/shares`,
+        { includeDocs: $('shareDocs').checked, expiresInDays: v ? Number(v) : null, role: $('shareRole').value });
       SHARES.unshift(share);
       renderShares();
       copyShare(share.shareId);
