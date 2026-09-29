@@ -1,9 +1,14 @@
-// sidebar_nav.js — shared sidebar for every FinChat page, matching the chat
-// page's design (dark warm rail: brand, New chat, Recent, Navigation, System,
-// profile card). The chat page keeps its own inline copy (it wires Recents into
-// the live conversation); every OTHER page includes this file and gets its
-// #sideNav rebuilt in place. Shared-JS pattern: survives design-tool regens —
+// sidebar_nav.js — shared sidebar for every FinChat page (dark warm rail:
+// brand, New chat, Recent, Navigation, System, profile card). Every page,
+// Chat included, includes this file and gets its #sideNav rebuilt in place.
+// Shared-JS pattern: survives design-tool regens —
 // if a regen wipes the include, re-add <script src="sidebar_nav.js"></script>.
+//
+// Page hooks (optional), read at build time from window.fcRail:
+//   newChat()       — the New chat button calls this instead of navigating.
+//   renderRecents() — the page paints #sbnRecent itself (Chat does, so a
+//                     conversation opens in place and rows carry its extra
+//                     actions); the rail then skips its own fetch.
 // file:// fallback — route root-relative "/api/…" fetches to the local backend
 // when a page is opened directly from disk. Global + idempotent; no-op over http.
 (function(){ if(location.protocol==='file:'&&!window.__apiFileFix){ window.__apiFileFix=true; var _f=window.fetch.bind(window);
@@ -157,6 +162,8 @@
     '.sbn-soonbadge { margin-left:auto; font-size:9px; letter-spacing:.1em; padding:3px 7px; border-radius:999px; background:var(--sbn-badge); color:var(--sbn-muted); }',
     '.sbn-recent { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; color:var(--sbn-item); font-size:13px; font-weight:500; text-decoration:none; cursor:pointer; transition:background .14s ease; }',
     '.sbn-recent:hover { background:var(--sbn-hover); }',
+    // The conversation open right now (only Chat marks one).
+    '.sbn-recent.sbn-rcur { color:var(--sbn-fg); background:var(--sbn-hover); font-weight:600; }',
     '.sbn-ract { display:none; align-items:center; gap:2px; flex-shrink:0; margin-left:auto; }',
     '.sbn-ract button, .sbn-rmore { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:var(--sbn-muted); cursor:pointer; padding:0; }',
     '.sbn-ract button:hover { background:var(--sbn-hover); color:var(--sbn-fg); }',
@@ -302,6 +309,7 @@
     try { navTheme = localStorage.getItem('finchat_nav_theme') || 'espresso'; } catch (e) {}
     nav.classList.toggle('sbn-cream', navTheme === 'cream');
 
+    var hooks = window.fcRail || null;
     var sess = getSession() || {};
     var name = sess.name || 'User';
     var role = sess.role || 'user';
@@ -321,7 +329,7 @@
         '</button>' +
       '</div>' +
       '<div class="sbn-newwrap">' +
-        '<button class="sbn-newchat" onclick="location.href=\'finchat_chat.html\'">' +
+        '<button class="sbn-newchat" id="sbnNewChat">' +
           '<span class="material-symbols-outlined" style="font-size:18px;">add</span> New chat' +
         '</button>' +
       '</div>' +
@@ -430,8 +438,26 @@
           }
         }).catch(function () {});
 
-      refreshRecents(tok);
+      if (!(hooks && typeof hooks.renderRecents === 'function')) refreshRecents(tok);
     }
+    // The page's own Recent painter runs even without a token here: Chat
+    // resolves its token its own way and knows when it has none.
+    if (hooks && typeof hooks.renderRecents === 'function') {
+      try { hooks.renderRecents(); } catch (e) {}
+    }
+
+    var newBtn = document.getElementById('sbnNewChat');
+    if (newBtn) newBtn.onclick = function () {
+      if (hooks && typeof hooks.newChat === 'function') {
+        nav.classList.remove('open');
+        var bd = document.getElementById('navBackdrop');
+        if (bd) bd.classList.add('hidden');
+        setMobileDrawer(false);
+        hooks.newChat();
+      } else {
+        location.href = 'finchat_chat.html';
+      }
+    };
 
     // Theme toggle — persists and rebuilds so every themed element updates.
     var themeBtn = document.getElementById('sbnThemeBtn');
@@ -737,7 +763,15 @@
 
   // The rail owns its own active-state contract; spa_router.js calls syncActive()
   // after a view swap rather than guessing at the class names.
-  window.fcSidebarNav = { rebuild: build, syncActive: syncActive };
+  // recentsPainted(): a page that paints Recent itself calls this afterwards,
+  // since Recent settling resizes the nav list under it.
+  window.fcSidebarNav = {
+    rebuild: build, syncActive: syncActive,
+    recentsPainted: function () {
+      var nav = document.getElementById('sideNav');
+      if (nav) revealActive(nav);
+    }
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
   else build();

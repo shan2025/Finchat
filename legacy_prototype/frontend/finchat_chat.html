@@ -117,23 +117,11 @@
   .msg-copy { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; border-radius:6px; background:transparent; color:var(--text3); cursor:pointer; opacity:0; transition:opacity .12s, background .12s; padding:0; }
   .msg-group:hover .msg-copy { opacity:1; }
   .msg-copy:hover { background:var(--surface2); color:var(--text2); }
-  .rc-actions { display:none; align-items:center; gap:2px; flex-shrink:0; }
-  .rc-actions button, .rc-more { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:none; border-radius:6px; background:transparent; color:#a99e88; cursor:pointer; padding:0; }
-  .rc-actions button:hover { background:rgba(255,255,255,.12); color:#fff; }
-  /* Touch screens have no hover, so neither the per-message copy/edit buttons
-     (opacity 0 until hovered) nor a recent chat's actions could be found —
-     and tapping the recent row opens the chat. Messages keep their buttons
-     visible, dimmed; each recent row gets a "⋯" that swaps in its actions.
-     The hover rule is scoped to (hover:hover) so a tap's sticky :hover cannot
-     open the actions as well. */
-  .rc-more { display:none; flex-shrink:0; }
-  @media (hover: hover) { .fc-recent:hover .rc-actions { display:inline-flex; } }
+  /* Touch screens have no hover, so the per-message copy/edit buttons
+     (opacity 0 until hovered) could not be found; keep them visible, dimmed.
+     Recent rows' actions are handled by sidebar_nav.js. */
   @media (hover: none) {
     .msg-copy { opacity:.6; width:32px; height:32px; }
-    .rc-more { display:inline-flex; width:34px; height:34px; margin-right:-6px; }
-    .fc-recent.rc-open .rc-more { display:none; }
-    .fc-recent.rc-open .rc-actions { display:inline-flex; }
-    .rc-actions button { width:34px; height:34px; }
   }
   .msg-time { font-size:10px; color:var(--text3); font-family:var(--mono); }
   .read-receipt { font-size:11px; color:var(--text3); }
@@ -391,13 +379,6 @@
 
   #fileInput { display:none; }
 
-  /* Sidebar nav item hover (dark espresso rail) */
-  .fc-nav { transition: background .14s ease, color .14s ease; }
-  .fc-nav:hover { background: rgba(255,255,255,.07); }
-  .fc-newchat:hover { background: var(--accent-hover) !important; }
-  .side-label { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--side-muted); padding:8px 12px 6px; font-weight:700; }
-  .side-soon { margin-left:auto; font-size:9px; letter-spacing:.1em; padding:3px 7px; border-radius:999px; background:rgba(239,230,214,.1); color:var(--side-muted); }
-
   /* Composer */
   .fc-tool:hover { background:#f0e4cd !important; color:#201e1d !important; }
   .fc-send:hover { background:var(--accent-hover) !important; }
@@ -467,108 +448,13 @@
   .fc-card { transition:transform .14s ease, box-shadow .16s ease, border-color .14s ease; }
   .fc-card:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(46,43,37,.14); border-color:var(--accent) !important; }
 
-  /* Sidebar Recent + agent menu */
-  .fc-recent .fc-hdel { opacity:0; transition:opacity .12s; }
-  .fc-recent:hover .fc-hdel { opacity:1; }
+  /* Agent menu */
   .fc-agentmenu-item:hover { background:#f0e4cd !important; }
   @keyframes fcPop { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
   .fc-pop { animation:fcPop .2s cubic-bezier(.2,.8,.2,1); }
 
-  /* Sidebar: static rail at lg+, slide-in drawer below so nav is reachable on
-     phones and portrait tablets (was `hidden md:flex` — no nav at all under
-     768px). */
-  /* ── Cream nav theme (toggle in the sidebar header; shared key
-        localStorage['finchat_nav_theme'] with every other page) ── */
-  body.nav-cream { --side-bg:#f3eee3; --side-fg:#3a2e23; --side-muted:#8c7a6b; }
-  body.nav-cream #sideNav { border-right:1px solid #d6ccbc; }
-  body.nav-cream #sideNav [style*="#cfc3ad"] { color:#5c4a38 !important; }
-  body.nav-cream #sideNav [style*="#867a63"] { color:#b3a693 !important; }
-  body.nav-cream #sideNav [style*="#f3ead9"] { color:#3a2e23 !important; }
-  #sideNav .fc-recent { color:#cfc3ad; }
-  #sideNav .fc-recent.rc-active { color:#fff; background:rgba(255,255,255,.09); }
-  body.nav-cream #sideNav .fc-recent { color:#5c4a38; }
-  body.nav-cream #sideNav .fc-recent.rc-active { color:#3a2e23; background:rgba(58,46,35,.1); font-weight:600; }
-  body.nav-cream #sideNav .side-soon { background:rgba(58,46,35,.08); }
-  body.nav-cream #sideNav [style*="border-top"] { border-top-color:rgba(58,46,35,.12) !important; }
-  /* The rail's accent is the burnt orange sidebar_nav.js uses on every other
-     page, not the page's brown --accent — otherwise Chat looked like a
-     different app from Group Chat. */
-  #sideNav { --rail-accent:#c67139; }
-  #sideNav .fc-newchat:hover { background:#b2622d !important; }
-  .fcs-logo { flex:0 0 auto; line-height:0; margin-top:1px; color:#f3ead9; }
-  .fcs-logo svg { display:block; width:37px; height:auto; }
-  body.nav-cream #sideNav .fcs-logo { color:#3a2e23; }
-  @media (max-height: 860px) { .fcs-logo svg { width:31px; } }
-  body.nav-cream #sideNav .fc-nav:not([style*="background:var(--rail-accent)"]):hover { background:rgba(58,46,35,.07); }
-  body.nav-cream #sideNav .rc-actions button { color:#8c7a6b; }
-  body.nav-cream #sideNav .rc-actions button:hover { background:rgba(58,46,35,.1); color:#3a2e23; }
-  .nav-theme-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:999px; background:rgba(239,230,214,.1); color:var(--side-muted); cursor:pointer; padding:0; }
-  .nav-theme-btn:hover { color:var(--side-fg); }
-  @media (pointer: coarse) { .nav-theme-btn { width:40px; height:40px; } }
-  body.nav-cream .nav-theme-btn { background:rgba(58,46,35,.08); }
-  /* Rail from 1024px, drawer below — phones AND portrait tablets. Pinned at
-     768px the rail left the conversation 512px, and the composer's toolbar
-     pushed Send past the right edge of an iPad. The shadow belongs to the
-     open drawer only; on the closed one it bled down the left edge. */
-  #sideNav { transition: transform .25s ease; }
-  @media (max-width: 1023px) {
-    #sideNav { transform: translateX(-100%); z-index: 60; }
-    #sideNav.open { transform: translateX(0); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-  }
-  @media (min-width: 1024px) { #sideNav { transform: none !important; } }
-
-  /* ── Short-viewport rail ──────────────────────────────────────────────
-     This page builds its own sidebar rather than loading sidebar_nav.js, so
-     it needs the same treatment: the rail wants ~970px of height and a
-     laptop viewport is ~720px, which pushed the profile footer and the lower
-     nav links below the fold with nothing to say they were there.
-     Only the nav list flexes; header, Recent and the footer keep their
-     natural height so nothing collapses into anything else. */
-  #sideNav > * { flex:0 0 auto; }
-  /* On the rail the sidebar is exactly viewport-height and the nav list is the
-     part that scrolls; letting the rail itself scroll too only ever produced a
-     1-2px hairline from fractional child heights. The drawer keeps its own
-     scrolling as a fallback for very short screens. */
-  #sideNav { overflow-y:auto; }
-  @media (min-width: 1024px) { #sideNav { overflow-y:hidden; } }
-  .fcs-head { padding:22px 22px 14px; display:flex; align-items:flex-start; gap:8px; }
-  .fcs-brand { font-family:var(--serif); font-size:27px; line-height:1; letter-spacing:-.01em; color:#f3ead9; }
-  .fcs-brandsub { font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--side-muted); margin-top:7px; }
-  .fcs-newwrap { padding:4px 14px 12px; }
-  .fcs-recentwrap { padding:0 14px 12px; }
-  #recentList { max-height:150px; overflow-y:auto; }
-  .fcs-scroll { flex:1 1 0% !important; min-height:132px; overflow-y:auto; padding:8px 14px; }
-  .fcs-foot { padding:12px 14px 16px; border-top:1px solid rgba(239,230,214,.14); }
-  body.nav-cream #sideNav .fcs-foot { border-top-color:rgba(58,46,35,.12); }
-  /* The cream overrides match on inline colours ([style*="#f3ead9"]); the
-     brand's colour now lives in a class, so it needs its own rule. */
-  body.nav-cream #sideNav .fcs-brand { color:#3a2e23; }
-  .fcs-syslabel { padding-top:20px; }
-  .fcs-avatar { width:38px; height:38px; background:linear-gradient(135deg,#d67f48,#8c491a); color:#fff; font-family:var(--serif); font-size:15px; }
-  /* Persistent cue that a region has content past its edge; the custom
-     properties are driven from JS (0px = no fade on that edge). */
-  .fcs-faded { -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fcs-ft,0px), #000 calc(100% - var(--fcs-fb,0px)), transparent 100%);
-                       mask-image:linear-gradient(to bottom, transparent 0, #000 var(--fcs-ft,0px), #000 calc(100% - var(--fcs-fb,0px)), transparent 100%); }
-  @media (max-height: 860px) {
-    .fcs-head { padding:14px 18px 8px; }
-    .fcs-brand { font-size:22px; }
-    .fcs-brandsub { font-size:9.5px; letter-spacing:.18em; margin-top:5px; }
-    .fcs-newwrap { padding:2px 12px 8px; }
-    .fcs-newwrap .fc-newchat { padding:9px !important; font-size:13px !important; }
-    .fcs-recentwrap { padding:0 12px 8px; }
-    #recentList { max-height:108px; }
-    .fcs-scroll { padding:4px 12px; }
-    .side-label { padding:5px 0 3px; }
-    .fcs-syslabel { padding-top:12px !important; }
-    #sideNav .fc-nav { padding:7px 12px !important; }
-    .fcs-foot { padding:8px 12px 10px; }
-    .fcs-avatar { width:32px !important; height:32px !important; font-size:13px !important; }
-  }
-  @media (max-height: 640px) {
-    .fcs-brandsub { display:none; }
-    #recentList { max-height:74px; }
-    #sideNav .fc-nav { padding:6px 12px !important; font-size:13.5px !important; }
-  }
+  /* The rail (#sideNav) is built and styled by sidebar_nav.js, as on every
+     other page. */
 
   /* ── Print / export ──────────────────────────────────────────────────
      On screen the page is locked to the viewport (body h-screen + overflow
@@ -606,96 +492,9 @@
 <div id="navBackdrop" class="hidden lg:hidden fixed inset-0 z-[55]" style="background: rgba(0,0,0,.45);"></div>
 
 <!-- ═══════════════════════════════════ -->
-<!-- LEFT SIDEBAR NAV (rail at lg+, drawer below) -->
+<!-- LEFT SIDEBAR NAV — built by sidebar_nav.js (rail at lg+, drawer below) -->
 <!-- ═══════════════════════════════════ -->
-    <!-- overflow-y is set in CSS, not inline: the rail must not scroll (the nav
-         list inside it does), and an inline value would outrank the rule. -->
-    <nav id="sideNav" class="fc-sidescroll flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden;">
-        <!-- Brand -->
-        <div class="fcs-head">
-            <!-- Mascot head, same mark as sidebar_nav.js -->
-            <div class="fcs-logo" aria-hidden="true"><svg viewBox="13.25 2.6 83.5 74.8" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-7 55 40)"><circle cx="55" cy="12" r="5" fill="currentColor"/><rect x="53.5" y="14" width="3" height="15" rx="1.5" fill="currentColor"/><path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="currentColor"/><path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="currentColor"/><rect x="25" y="27" width="60" height="46" rx="22" fill="currentColor"/><rect x="35" y="37" width="40" height="26" rx="12" fill="var(--side-bg, #2a241d)"/><circle cx="46" cy="48" r="4.5" fill="currentColor"/><circle cx="64" cy="48" r="4.5" fill="currentColor"/></g></svg></div>
-            <div style="flex:1; min-width:0;">
-                <div class="fcs-brand">FinChat</div>            </div>
-            <button class="nav-theme-btn" id="navThemeBtn" title="Switch nav theme (espresso / cream)">
-                <span class="material-symbols-outlined" style="font-size:16px;" id="navThemeIcon">light_mode</span>
-            </button>
-        </div>
-        <!-- New chat -->
-        <div class="fcs-newwrap">
-            <button onclick="newChat()" class="fc-newchat" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--rail-accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;">
-                <span class="material-symbols-outlined text-[18px]">add</span> New chat
-            </button>
-        </div>
-        <!-- Recent Chats — real sessions from /api/ai-chat/sessions (rendered by loadRecentSessions) -->
-        <div class="fcs-recentwrap">
-            <div class="side-label" style="margin-bottom:6px; font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--side-muted);">Recent</div>
-            <div id="recentList" class="flex flex-col gap-0.5" data-fcs-scroll>
-                <div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">Loading…</div>
-            </div>
-        </div>
-        <!-- Nav -->
-        <div class="fcs-scroll" data-fcs-scroll>
-            <div class="side-label">Navigation</div>
-            <div class="flex flex-col gap-0.5">
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_dashboard.html">
-                    <span class="material-symbols-outlined text-[20px]">dashboard</span> Operations
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_agents.html">
-                    <span class="material-symbols-outlined text-[20px]">smart_toy</span> Agents
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; background:var(--rail-accent); color:#fff; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; box-shadow:0 6px 16px rgba(140,73,26,.32);" href="finchat_chat.html">
-                    <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">chat</span> Chat
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_groupchat.html">
-                    <span class="material-symbols-outlined text-[20px]">forum</span> Group Chat
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralspace.html">
-                    <span class="material-symbols-outlined text-[20px]">scatter_plot</span> Neural Space
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralmap.html">
-                    <span class="material-symbols-outlined text-[20px]">hub</span> Neural Map
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_brainmodel.html">
-                    <span class="material-symbols-outlined text-[20px]">travel_explore</span> Agent Map
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_planning.html">
-                    <span class="material-symbols-outlined text-[20px]">schema</span> Planning
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_reports.html">
-                    <span class="material-symbols-outlined text-[20px]">assessment</span> Reports
-                </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_knowledge.html">
-                    <span class="material-symbols-outlined text-[20px]">menu_book</span> Knowledge
-                </a>
-                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
-                    <span class="material-symbols-outlined text-[20px]">account_balance</span> <span style="flex:1;">Governance</span> <span class="side-soon">SOON</span>
-                </div>
-            </div>
-            <div class="side-label fcs-syslabel">System</div>
-            <div class="flex flex-col gap-0.5">
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_settings.html">
-                    <span class="material-symbols-outlined text-[20px]">settings</span> Settings
-                </a>
-                <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#867a63; font-size:14px; font-weight:600; cursor:default;">
-                    <span class="material-symbols-outlined text-[20px]">help</span> <span style="flex:1;">Support</span> <span class="side-soon">SOON</span>
-                </div>
-            </div>
-        </div>
-        <!-- User profile -->
-        <div class="fcs-foot">
-            <div class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:14px; cursor:pointer;" onclick="openSettings()">
-                <div id="sidebarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0 fcs-avatar">
-                    BT
-                </div>
-                <div class="flex-1 overflow-hidden">
-                    <div id="sidebarName" style="font-size:14px; font-weight:700; color:#f3ead9;" class="truncate">Bro Test</div>
-                    <div id="sidebarRole" style="font-size:11px; color:var(--side-muted); margin-top:1px;" class="truncate">Staff • Internal</div>
-                </div>
-                <span class="material-symbols-outlined text-[18px]" style="color:var(--side-muted);">more_vert</span>
-            </div>
-        </div>
-    </nav>
+    <nav id="sideNav" class="flex flex-col h-full fixed left-0 top-0 w-64 z-40"></nav>
 
 <!-- ═══════════════════════════════════ -->
 <!-- MAIN CONTENT WRAPPER                -->
@@ -1845,11 +1644,15 @@
     // ─────────────────────────────────
     // Build the Recent list markup + wire its clicks. Shared by the instant
     // cache paint and the post-fetch repaint so both render identically.
+    // The list lives in the shared rail (sidebar_nav.js builds #sbnRecent and
+    // calls window.fcRail.renderRecents), so rows use its sbn-* classes; the
+    // behaviour — open in place, mind map, in-app dialogs — stays this page's.
     function renderRecentList(sessions) {
-      const list = document.getElementById('recentList');
+      const list = document.getElementById('sbnRecent');
       if (!list) return;
       if (!sessions.length) {
-        list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--side-muted);">No conversations yet</div>';
+        list.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--sbn-muted);">No conversations yet</div>';
+        if (window.fcSidebarNav?.recentsPainted) window.fcSidebarNav.recentsPainted();
         return;
       }
       list.innerHTML = sessions.map(s => {
@@ -1858,10 +1661,10 @@
           ? `<span class="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0" style="background:#efe8de;">${p.avatar}</span>`
           : `<span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style="background:#efe8de; font-size:13px;">${s.personaAvatar || '🤖'}</span>`;
         const active = s.session_id === personaSessions[activePersona];
-        return `<a class="fc-nav fc-recent${active ? ' rc-active' : ''}" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:12px; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer;">
-            ${av}<span class="truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
-            <button type="button" class="rc-more" data-act="more" title="Conversation actions" aria-label="Conversation actions"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>
-            <span class="rc-actions">
+        return `<a class="sbn-recent${active ? ' sbn-rcur' : ''}" href="finchat_chat.html?session=${encodeURIComponent(s.session_id)}" data-session="${s.session_id}" data-persona="${s.persona}" data-title="${escHtml(s.title)}" title="${escHtml(s.title)} — ${escHtml(s.personaName || s.persona)}">
+            ${av}<span class="sbn-truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
+            <button type="button" class="sbn-rmore" data-act="more" title="Conversation actions" aria-label="Conversation actions"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>
+            <span class="sbn-ract">
               <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
               <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
               <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
@@ -1872,6 +1675,11 @@
       list.querySelectorAll('[data-session]').forEach(a => {
         a.onclick = (ev) => {
           if (ev.target.closest('[data-act]')) return; // action buttons handle themselves
+          // Plain click opens in place; ctrl/middle-click keeps the href.
+          if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+          ev.preventDefault();
+          document.getElementById('sideNav')?.classList.remove('open');
+          document.getElementById('navBackdrop')?.classList.add('hidden');
           openSession(a.dataset.session, a.dataset.persona);
         };
       });
@@ -1881,8 +1689,8 @@
           const a = b.closest('[data-session]');
           if (b.dataset.act === 'more') {
             // Touch: one row's actions at a time; any other tap closes them.
-            list.querySelectorAll('.rc-open').forEach(r => { if (r !== a) r.classList.remove('rc-open'); });
-            a.classList.toggle('rc-open');
+            list.querySelectorAll('.sbn-ract-open').forEach(r => { if (r !== a) r.classList.remove('sbn-ract-open'); });
+            a.classList.toggle('sbn-ract-open');
             return;
           }
           if (b.dataset.act === 'rename') renameSession(a.dataset.session, a.dataset.title);
@@ -1896,14 +1704,15 @@
       if (!renderRecentList.closeBound) {
         renderRecentList.closeBound = true;
         document.addEventListener('click', (ev) => {
-          if (ev.target.closest('.rc-actions, .rc-more')) return;
-          document.querySelectorAll('#recentList .rc-open').forEach(r => r.classList.remove('rc-open'));
+          if (ev.target.closest('.sbn-ract, .sbn-rmore')) return;
+          document.querySelectorAll('#sbnRecent .sbn-ract-open').forEach(r => r.classList.remove('sbn-ract-open'));
         });
       }
+      if (window.fcSidebarNav?.recentsPainted) window.fcSidebarNav.recentsPainted();
     }
 
     async function loadRecentSessions() {
-      const list = document.getElementById('recentList');
+      const list = document.getElementById('sbnRecent');
       const token = _session?.token;
       if (!list || !token) return;
       // Instant paint from the shared cache (first 6) so returning to Chat never
@@ -1918,7 +1727,7 @@
         if (!res.ok) return;
         const data = await res.json();
         // Seed the shared sidebar's Recent cache so the first hop OFF the chat
-        // page (which uses this inline rail, not sidebar_nav.js) paints Recents
+        // page (where the rail fetches Recent itself) paints Recents
         // instantly instead of flashing "Loading…". Same key/shape the rail
         // reads: { token, sessions }. Cache is canonical at 10 (this list's
         // length); the shared rail slices to its own 6 on read. This runs on
@@ -2110,24 +1919,12 @@
       showToast(ok ? 'Message copied' : 'Copy failed', ok ? 'info' : 'warn');
     });
 
-    // Nav theme (espresso / cream) — same localStorage key as sidebar_nav.js
-    // so the choice follows the user across every page.
-    (function () {
-      function applyNavTheme() {
-        let t = 'espresso';
-        try { t = localStorage.getItem('finchat_nav_theme') || 'espresso'; } catch (e) {}
-        document.body.classList.toggle('nav-cream', t === 'cream');
-        const icon = document.getElementById('navThemeIcon');
-        if (icon) icon.textContent = t === 'cream' ? 'dark_mode' : 'light_mode';
-      }
-      const btn = document.getElementById('navThemeBtn');
-      if (btn) btn.onclick = function () {
-        const next = document.body.classList.contains('nav-cream') ? 'espresso' : 'cream';
-        try { localStorage.setItem('finchat_nav_theme', next); } catch (e) {}
-        applyNavTheme();
-      };
-      applyNavTheme();
-    })();
+    // Hooks for the shared rail (sidebar_nav.js, loaded at the end of the
+    // page): New chat starts one in place, and Recent is painted by this page.
+    window.fcRail = {
+      newChat: () => newChat(),
+      renderRecents: () => loadRecentSessions()
+    };
 
     // Open a specific past conversation (from the Recent list or a ?session= deep link).
     async function openSession(sessionId, personaId) {
@@ -2143,8 +1940,8 @@
         personaSessions[pid] = sessionId;   // future sends continue THIS session
         renderHistoryMessages(data.messages, pid);
         // Update active highlight in-DOM instead of re-fetching all sessions
-        document.querySelectorAll('#recentList [data-session]').forEach(a => {
-          a.classList.toggle('rc-active', a.dataset.session === sessionId);
+        document.querySelectorAll('#sbnRecent [data-session]').forEach(a => {
+          a.classList.toggle('sbn-rcur', a.dataset.session === sessionId);
         });
       } catch (e) { console.log('Could not open session:', e); }
     }
@@ -3541,8 +3338,7 @@
         const img = `<img src="${avatarSrc()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         const settingsAvatar = document.getElementById('settingsAvatar');
         if (settingsAvatar) settingsAvatar.innerHTML = img;
-        const sidebarAvatar = document.getElementById('sidebarAvatar');
-        if (sidebarAvatar) sidebarAvatar.innerHTML = `${img}<div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#16a34a] border-2 border-[#2a1f18]"></div>`;
+        if (typeof window.fcSetRailAvatar === 'function') window.fcSetRailAvatar(SESSION_USER.avatar_url);
         const topbarUserIcon = document.getElementById('topbarUserIcon');
         if (topbarUserIcon) topbarUserIcon.innerHTML = img;
         refreshUserAvatars();
@@ -4080,80 +3876,15 @@
       nav.querySelectorAll('a[href]').forEach(a => a.addEventListener('click', () => toggle(false)));
     })();
 
-    // ── Short-viewport scroll cues in the rail ──────────────────────────
-    // Mirrors sidebar_nav.js, which this page does not load. Where a region
-    // has content past its edge, fade that edge so it is obvious at rest, and
-    // keep it in sync as the rail's boxes resize (Recent loading in, the
-    // window resizing, the drawer opening).
+    // ?settings=1 opens the settings modal (older links still use it).
     (function () {
-      const nav = document.getElementById('sideNav');
-      if (!nav) return;
-      [nav.querySelector('.fcs-scroll'), document.getElementById('recentList')].forEach(el => {
-        if (!el) return;
-        const sync = () => {
-          // Ignore a few px of trailing padding — only fade when a row is cut.
-          const over = el.scrollHeight - el.clientHeight;
-          if (over <= 10) { el.classList.remove('fcs-faded'); return; }
-          el.classList.add('fcs-faded');
-          el.style.setProperty('--fcs-ft', el.scrollTop > 4 ? '16px' : '0px');
-          el.style.setProperty('--fcs-fb', el.scrollTop < over - 4 ? '18px' : '0px');
-        };
-        el.addEventListener('scroll', sync, { passive: true });
-        window.addEventListener('resize', sync);
-        if (window.ResizeObserver) new ResizeObserver(sync).observe(el);
-        sync();
-      });
-
-      // At short heights the current page's own link (Chat) can start below
-      // the fold of the nav list.
-      const sc = nav.querySelector('.fcs-scroll');
-      const act = sc && sc.querySelector('a[href="finchat_chat.html"]');
-      if (sc && act) {
-        const a = act.getBoundingClientRect(), s = sc.getBoundingClientRect();
-        if (a.bottom > s.bottom) sc.scrollTop += (a.bottom - s.bottom) + 8;
-        else if (a.top < s.top) sc.scrollTop -= (s.top - a.top) + 8;
-      }
-    })();
-
-    // Mark not-yet-built nav destinations as "Coming soon" instead of silently
-    // opening the chat page.
-    (function () {
-      const SOON = ['Governance', 'Support'];
-      function toast(msg) {
-        let t = document.getElementById('nmSoonToast');
-        if (!t) {
-          t = document.createElement('div');
-          t.id = 'nmSoonToast';
-          t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#3a2e23;color:#efe8de;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 10px 25px rgba(0,0,0,.25);opacity:0;transition:all .25s ease;pointer-events:none;';
-          document.body.appendChild(t);
-        }
-        t.textContent = msg;
-        requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
-        clearTimeout(t._h);
-        t._h = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400);
-      }
-      document.querySelectorAll('#sideNav a').forEach(a => {
-        const labelEl = a.querySelector('.font-body-sm');
-        const label = labelEl ? labelEl.textContent.trim() : '';
-        if (!SOON.includes(label)) return;
-        a.setAttribute('href', 'javascript:void(0)');
-        a.style.opacity = '0.55';
-        a.style.cursor = 'not-allowed';
-        if (!a.querySelector('.soon-badge')) {
-          const b = document.createElement('span');
-          b.className = 'soon-badge';
-          b.textContent = 'Soon';
-          b.style.cssText = 'margin-left:auto;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 6px;border-radius:999px;background:rgba(239,232,222,.18);';
-          a.appendChild(b);
-        }
-        a.addEventListener('click', (e) => { e.preventDefault(); toast(label + ' is coming soon.'); });
-      });
       if (window.location.search.includes('settings=1') && typeof openSettings === 'function') {
         setTimeout(openSettings, 300);
       }
     })();
   </script>
-  <!-- Shared sidebar retract/expand control (this page keeps its own inline nav) -->
+  <!-- Shared rail (reads window.fcRail, set above) + retract/expand control -->
+  <script src="sidebar_nav.js"></script>
   <script src="sidebar_collapse.js"></script>
 </body>
 </html>
