@@ -490,7 +490,16 @@
   body.nav-cream #sideNav .fc-recent.rc-active { color:#3a2e23; background:rgba(58,46,35,.1); font-weight:600; }
   body.nav-cream #sideNav .side-soon { background:rgba(58,46,35,.08); }
   body.nav-cream #sideNav [style*="border-top"] { border-top-color:rgba(58,46,35,.12) !important; }
-  body.nav-cream #sideNav .fc-nav:not([style*="background:var(--accent)"]):hover { background:rgba(58,46,35,.07); }
+  /* The rail's accent is the burnt orange sidebar_nav.js uses on every other
+     page, not the page's brown --accent — otherwise Chat looked like a
+     different app from Group Chat. */
+  #sideNav { --rail-accent:#c67139; }
+  #sideNav .fc-newchat:hover { background:#b2622d !important; }
+  .fcs-logo { flex:0 0 auto; line-height:0; margin-top:1px; color:#f3ead9; }
+  .fcs-logo svg { display:block; width:37px; height:auto; }
+  body.nav-cream #sideNav .fcs-logo { color:#3a2e23; }
+  @media (max-height: 860px) { .fcs-logo svg { width:31px; } }
+  body.nav-cream #sideNav .fc-nav:not([style*="background:var(--rail-accent)"]):hover { background:rgba(58,46,35,.07); }
   body.nav-cream #sideNav .rc-actions button { color:#8c7a6b; }
   body.nav-cream #sideNav .rc-actions button:hover { background:rgba(58,46,35,.1); color:#3a2e23; }
   .nav-theme-btn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:999px; background:rgba(239,230,214,.1); color:var(--side-muted); cursor:pointer; padding:0; }
@@ -604,6 +613,8 @@
     <nav id="sideNav" class="fc-sidescroll flex flex-col h-full fixed left-0 top-0 w-64 z-40" style="background:var(--side-bg); color:var(--side-fg); overflow-x:hidden;">
         <!-- Brand -->
         <div class="fcs-head">
+            <!-- Mascot head, same mark as sidebar_nav.js -->
+            <div class="fcs-logo" aria-hidden="true"><svg viewBox="13.25 2.6 83.5 74.8" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-7 55 40)"><circle cx="55" cy="12" r="5" fill="currentColor"/><rect x="53.5" y="14" width="3" height="15" rx="1.5" fill="currentColor"/><path d="M 23 48 Q 17 48 17 41 Q 17 34 23 34 Z" fill="currentColor"/><path d="M 87 48 Q 93 48 93 41 Q 93 34 87 34 Z" fill="currentColor"/><rect x="25" y="27" width="60" height="46" rx="22" fill="currentColor"/><rect x="35" y="37" width="40" height="26" rx="12" fill="var(--side-bg, #2a241d)"/><circle cx="46" cy="48" r="4.5" fill="currentColor"/><circle cx="64" cy="48" r="4.5" fill="currentColor"/></g></svg></div>
             <div style="flex:1; min-width:0;">
                 <div class="fcs-brand">FinChat</div>            </div>
             <button class="nav-theme-btn" id="navThemeBtn" title="Switch nav theme (espresso / cream)">
@@ -612,7 +623,7 @@
         </div>
         <!-- New chat -->
         <div class="fcs-newwrap">
-            <button onclick="newChat()" class="fc-newchat" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;">
+            <button onclick="newChat()" class="fc-newchat" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:999px; border:none; background:var(--rail-accent); color:#fff; font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;">
                 <span class="material-symbols-outlined text-[18px]">add</span> New chat
             </button>
         </div>
@@ -633,17 +644,23 @@
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_agents.html">
                     <span class="material-symbols-outlined text-[20px]">smart_toy</span> Agents
                 </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; background:var(--accent); color:#fff; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; box-shadow:0 6px 16px rgba(140,73,26,.32);" href="finchat_chat.html">
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; background:var(--rail-accent); color:#fff; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; box-shadow:0 6px 16px rgba(140,73,26,.32);" href="finchat_chat.html">
                     <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">chat</span> Chat
                 </a>
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_groupchat.html">
                     <span class="material-symbols-outlined text-[20px]">forum</span> Group Chat
                 </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralspace.html">
+                    <span class="material-symbols-outlined text-[20px]">scatter_plot</span> Neural Space
+                </a>
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_neuralmap.html">
                     <span class="material-symbols-outlined text-[20px]">hub</span> Neural Map
                 </a>
-                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_mindmap.html">
-                    <span class="material-symbols-outlined text-[20px]">schema</span> Mind Maps
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_brainmodel.html">
+                    <span class="material-symbols-outlined text-[20px]">travel_explore</span> Agent Map
+                </a>
+                <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_planning.html">
+                    <span class="material-symbols-outlined text-[20px]">schema</span> Planning
                 </a>
                 <a class="fc-nav" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:#cfc3ad; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer;" href="finchat_reports.html">
                     <span class="material-symbols-outlined text-[20px]">assessment</span> Reports
