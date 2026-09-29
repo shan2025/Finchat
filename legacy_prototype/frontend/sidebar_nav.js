@@ -51,7 +51,8 @@
     ['finchat_universe', 'neuralspace'], // old name — the page now redirects
     ['finchat_neuralmap', 'neuralmap'],
     ['finchat_neuralnetwork', 'neuralmap'], // Model Lab lives under Neural Map
-    ['finchat_brainmodel', 'brainmodel'],
+    ['finchat_agentmap', 'brainmodel'],
+    ['finchat_brainmodel', 'brainmodel'], // old name — the page now redirects
     // Planning is one rail item over three pages: the chooser, mind maps, boards.
     ['finchat_planning', 'mindmap'],
     ['finchat_mindmap', 'mindmap'],
@@ -348,7 +349,7 @@
           navItem('groupchat', 'finchat_groupchat.html', 'forum', 'Group Chat') +
           navItem('neuralspace', 'finchat_neuralspace.html', 'scatter_plot', 'Neural Space') +
           navItem('neuralmap', 'finchat_neuralmap.html', 'hub', 'Neural Map') +
-          navItem('brainmodel', 'finchat_brainmodel.html', 'travel_explore', 'Agent Map') +
+          navItem('brainmodel', 'finchat_agentmap.html', 'travel_explore', 'Agent Map') +
           navItem('mindmap', 'finchat_planning.html', 'schema', 'Planning') +
           navItem('reports', 'finchat_reports.html', 'assessment', 'Reports') +
           navItem('knowledge', 'finchat_knowledge.html', 'menu_book', 'Knowledge') +

@@ -64,18 +64,21 @@ router.get('/:id', requireAuth, async (req, res) => {
 // Recent executions for the signed-in user, newest first — feeds the Brain
 // Model's "load a real run" picker. Two path segments so it never collides
 // with GET /:id.
+// ?race=<raceId> returns just that race's lanes: scheduled missions push a
+// race out of the newest 50 within days, which broke ?race= deep links.
 router.get('/list/recent', requireAuth, async (req, res) => {
   try {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const race = typeof req.query.race === 'string' && req.query.race ? req.query.race.slice(0, 80) : null;
     const rows = await query(`
       SELECT execution_id, assigned_agent, current_state, completion_reason, goal,
              tokens_used, tool_calls_used, created_at, updated_at,
              metrics->>'raceId' AS race_id
       FROM executions
-      WHERE user_id = $1
+      WHERE user_id = $1 ${race ? "AND metrics->>'raceId' = $3" : ''}
       ORDER BY created_at DESC
       LIMIT $2
-    `, [req.user.id, limit]);
+    `, race ? [req.user.id, limit, race] : [req.user.id, limit]);
     res.json({ executions: rows.rows });
   } catch (err) {
     console.error('Recent executions error:', err);

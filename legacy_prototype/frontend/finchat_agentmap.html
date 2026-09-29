@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>FinChat | Agent Map</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/assets/favicon.svg">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Socket.io client (served by the backend) — powers live execution streaming -->
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  /* ── Agent Map — a daylight isometric town. Plato sits in the Question Hub at
+     the centre; every landmark is a tool district (Web & Search, News, Markets,
+     Research, Operations, Portfolio, System). Agents are cars: the one on the
+     current question drives its real route, the rest circle their home blocks.
+     Ported from the Claude Design "Agent Map" handoff. ─────────────────────── */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { font-family: 'Figtree', system-ui, sans-serif; background: #fbf4ea; color: #1f1b16; overflow: hidden; }
+
+  .am-app { position: fixed; inset: 0; background: #9fbd72; overflow: hidden; }
+  /* The rail is pinned only from 1024px (sidebar_nav.js); below that it is a
+     drawer and the shared app bar takes the top 52px instead. */
+  @media (min-width: 1024px) { .am-app { left: 256px; } }
+  @media (max-width: 1023px) { html.sbn-mbar-on .am-app { top: calc(52px + env(safe-area-inset-top, 0px)); } }
+
+  .am-app a { color: #2f6fd6; text-decoration: none; }
+  .am-app a:hover { color: #2259b3; text-decoration: underline; }
+  .am-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .am-canvas:active { cursor: grabbing; }
+  .am-btn { cursor: pointer; border: none; font-family: inherit; transition: background .15s ease, transform .15s ease; }
+  .am-btn:hover { background: #fff; }
+  .am-btn:active { transform: scale(.98); }
+  .am-row { cursor: pointer; transition: background .15s ease; }
+  .am-row:hover { background: #f4eee4; }
+  .am-scroll { overflow-y: auto; scrollbar-width: thin; }
+  .am-scroll::-webkit-scrollbar { width: 6px; }
+  .am-scroll::-webkit-scrollbar-thumb { background: #e2d8c8; border-radius: 999px; }
+  .am-app input::placeholder { color: #3a332b; opacity: 1; }
+  .am-app :focus-visible, .am-ov :focus-visible { outline: 2px solid #e7824b; outline-offset: 2px; }
+  .am-seg { cursor: pointer; user-select: none; }
+  .am-dark span { cursor: pointer; user-select: none; }
+  @keyframes ampulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+  .am-pulse { animation: ampulse 1.4s ease-in-out infinite; }
+  @keyframes ampop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .am-pop { animation: ampop .18s cubic-bezier(.2,.8,.2,1); }
+  @media (max-width: 1180px) { .am-lbl { display: none; } }
+
+  /* Layout: map fills the frame, chrome floats over it. */
+  #amTop { position: absolute; top: 20px; left: 24px; right: 18px; display: flex; align-items: center; gap: 14px; pointer-events: none; z-index: 6; }
+  #amAskBox { flex: 1 1 0; min-width: 0; max-width: 770px; display: flex; align-items: center; height: 56px; padding: 0 6px 0 26px; border-radius: 16px; background: #fbf4ea; box-shadow: 0 2px 10px rgba(40,50,20,.12); pointer-events: auto; }
+  #amCluster { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 14px; pointer-events: auto; }
+  .am-chip { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; border-radius: 14px; background: #fbf4ea; box-shadow: 0 2px 10px rgba(40,50,20,.12); font-size: 15px; font-weight: 600; color: #1f1b16; white-space: nowrap; }
+  #amViews { position: absolute; right: 432px; bottom: 76px; display: flex; gap: 2px; padding: 4px; border-radius: 12px; background: #232323; box-shadow: 0 4px 14px rgba(0,0,0,.2); z-index: 5; }
+  #amZoom { position: absolute; right: 370px; bottom: 76px; display: flex; flex-direction: column; border-radius: 12px; background: #232323; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.2); z-index: 5; }
+  #amZoom span { display: flex; align-items: center; justify-content: center; width: 50px; height: 44px; cursor: pointer; color: #fff; }
+  #amPanel { position: absolute; top: 92px; right: 6px; bottom: 30px; width: 334px; border-radius: 18px; background: #fffaf3; box-shadow: 0 6px 24px rgba(40,50,20,.16); z-index: 5; }
+  #amToast { position: absolute; top: 86px; left: 24px; max-width: min(560px, calc(100% - 420px)); padding: 10px 16px; border-radius: 12px; background: #fffaf3; box-shadow: 0 4px 16px rgba(40,50,20,.16); font-size: 14px; color: #3a332b; z-index: 7; display: none; }
+  #amPast { position: absolute; top: 84px; right: 18px; width: 380px; max-height: min(520px, calc(100% - 120px)); border-radius: 16px; background: #fffaf3; box-shadow: 0 10px 34px rgba(40,50,20,.22); z-index: 8; display: none; flex-direction: column; overflow: hidden; }
+
+  /* Phones: the run panel becomes a bottom sheet under the map. */
+  @media (max-width: 767px) {
+    #amTop { top: 10px; left: 10px; right: 10px; flex-wrap: wrap; gap: 8px; }
+    #amAskBox { flex: 1 1 100%; max-width: none; height: 48px; padding-left: 16px; }
+    #amRaceTog { height: 34px; padding: 0 10px; margin-right: 6px; }
+    #amCluster { margin-left: 0; gap: 8px; }
+    .am-chip { height: 42px; padding: 0 12px; font-size: 14px; gap: 8px; }
+    #amPanel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 42%; }
+    #amViews { right: 70px; bottom: calc(42% + 20px); }
+    #amZoom { right: 12px; bottom: calc(42% + 20px); }
+    #amToast { top: 118px; left: 10px; max-width: calc(100% - 20px); }
+    #amPast { top: 118px; left: 10px; right: 10px; width: auto; }
+  }
+
+  /* Overlays (Ranks, Profiles) */
+  .am-ov { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(31,27,22,.38); align-items: flex-start; justify-content: center; padding: 64px 16px; font-family: 'Figtree', system-ui, sans-serif; color: #1f1b16; }
+  .am-ov-card { width: min(740px, 100%); max-height: 82vh; background: #fffaf3; border-radius: 18px; box-shadow: 0 24px 70px rgba(40,30,20,.3); display: flex; flex-direction: column; overflow: hidden; }
+  .am-ov-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid #efe6d8; }
+  .am-ov-foot { padding: 11px 18px 14px; border-top: 1px solid #efe6d8; font-size: 12px; color: #7a7064; line-height: 1.6; }
+  .am-tog { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: #f1e9dc; margin-left: auto; }
+  .am-tog span { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .am-x { width: 30px; height: 30px; border-radius: 999px; background: #f1e9dc; color: #3a332b; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+  @media (pointer: coarse) {
+    .am-x { width: 40px; height: 40px; }
+    .am-tog span { padding: 9px 14px; }
+  }
+</style>
+<script>
+/* file:// fallback — route root-relative "/api/…" fetches to the local backend
+   when this page is opened directly from disk. No-op when served over http. */
+(function(){ if(location.protocol==='file:'){ var _f=window.fetch.bind(window);
+ window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
+</script>
+</head>
+
+<body>
+
+<!-- Shared FinChat rail — sidebar_nav.js rebuilds this in place (and adds its own
+     mobile app bar, since this page ships no #navToggle). -->
+<nav id="sideNav" style="position:fixed; left:0; top:0; height:100%; width:256px; z-index:40;"></nav>
+
+<div class="am-app" id="amApp">
+  <canvas id="amCanvas" class="am-canvas"></canvas>
+
+  <!-- ── Top: ask Plato, run mode, replay, ranks/profiles ─────────────────── -->
+  <div id="amTop">
+    <div id="amAskBox">
+      <input id="amDraft" aria-label="Ask the agents a question" style="flex:1; min-width:0; border:none; background:transparent; font-family:inherit; font-size:17px; color:#1f1b16; outline:none;">
+      <button id="amRaceTog" class="am-btn" aria-pressed="false" title="Race: Plato sends 2–3 agents at the same question and ranks them" style="display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 14px; margin-right:8px; flex-shrink:0; border-radius:999px; border:1px solid #e2d8c8; background:transparent; font-size:14px; font-weight:600; color:#6f665a;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><path d="M4 22v-7"></path></svg>Race
+      </button>
+      <button id="amSend" class="am-btn" title="Ask Plato — watch the route form live" style="width:46px; height:46px; flex-shrink:0; border-radius:999px; background:#e7824b; display:flex; align-items:center; justify-content:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21.7a.5.5 0 0 0 .9 0L22 2.6a.5.5 0 0 0-.6-.6L2.3 8.6a.5.5 0 0 0 0 .9l8 3.2a2 2 0 0 1 1.1 1.1z"></path><path d="m21.9 2.1-10.9 10.9"></path></svg>
+      </button>
+    </div>
+    <div id="amCluster">
+      <div class="am-chip" id="amModes" style="gap:6px; padding:0 14px; font-weight:400;"></div>
+      <button id="amReplay" class="am-btn am-chip" title="Replay this run from the start">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg><span class="am-lbl">Replay</span>
+      </button>
+      <button id="amRanks" class="am-btn am-chip" title="Leaderboard — who's actually the better agent">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg><span class="am-lbl">Ranks</span>
+      </button>
+      <button id="amProfiles" class="am-btn am-chip" title="Profiles — who's best at what">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg><span class="am-lbl">Profiles</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="amToast" class="am-pop"></div>
+  <div id="amTip" role="tooltip" style="display:none; position:absolute; z-index:6; width:300px; max-width:calc(100% - 32px); padding:14px 16px; border-radius:14px; background:#fffaf2; box-shadow:0 10px 30px rgba(40,30,15,.22); font-size:13px; line-height:1.5; color:#3a3024; pointer-events:none;"></div>
+
+  <!-- Past runs picker -->
+  <div id="amPast" class="am-pop">
+    <div style="display:flex; align-items:center; gap:10px; padding:16px 18px 12px; border-bottom:1px solid #efe6d8;">
+      <span style="font-size:17px; font-weight:600;">Past Runs</span>
+      <span style="font-size:13px; color:#7a7064;">replay any question</span>
+      <button id="amPastClose" class="am-btn am-x" style="margin-left:auto;" aria-label="Close">✕</button>
+    </div>
+    <div id="amPastBody" class="am-scroll" style="padding:8px 10px 12px; overflow-y:auto;"></div>
+  </div>
+
+  <!-- ── Map controls ──────────────────────────────────────────────────────── -->
+  <div id="amViews" class="am-dark"></div>
+  <div id="amZoom">
+    <span id="amZoomIn" title="Zoom in"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M12 5v14"></path></svg></span>
+    <span style="height:1px; width:auto; background:#3a3a3a; cursor:default;"></span>
+    <span id="amZoomOut" title="Zoom out"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"></path></svg></span>
+  </div>
+
+  <!-- ── Current run panel ─────────────────────────────────────────────────── -->
+  <div id="amPanel" class="am-scroll">
+    <div style="padding:20px 20px 18px; border-bottom:1px solid #efe6d8;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-size:17px; font-weight:600;">Current Run</span>
+        <span id="amLive" style="display:inline-flex; align-items:center; gap:9px; font-size:15px; font-weight:500;">
+          <span id="amLiveDot" style="width:12px; height:12px; border-radius:999px;"></span><span id="amLiveLabel"></span>
+        </span>
+      </div>
+      <div id="amQ" style="font-size:17px; line-height:1.35; color:#3a332b; margin-top:16px; text-wrap:pretty;"></div>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
+        <div style="flex:1; height:8px; border-radius:999px; background:#ece5da; overflow:hidden;">
+          <div id="amRunBar" style="height:100%; width:0%; border-radius:999px; background:#f2ab76;"></div>
+        </div>
+        <span id="amStepLabel" style="font-size:13px; color:#6f665a; white-space:nowrap;"></span>
+      </div>
+      <div id="amRunMeta" style="font-size:12px; color:#8a8174; margin-top:10px;"></div>
+    </div>
+
+    <!-- Race only: the field, ranked like the leaderboard credits wins. -->
+    <div id="amStandWrap" style="display:none; padding:20px 16px 4px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; padding:0 6px 10px;">
+        <span style="font-size:17px; font-weight:600;">Standings</span>
+        <span style="font-size:12px; color:#8a8174;" title="Clean finish first, then fewest tokens, then fastest. The same order the leaderboard uses to credit a win.">clean finish · tokens · time</span>
+      </div>
+      <div id="amStand" style="display:flex; flex-direction:column; gap:2px;"></div>
+    </div>
+
+    <div style="padding:20px 16px 6px;">
+      <div style="display:flex; align-items:center; gap:8px; padding:0 6px 12px;">
+        <span style="font-size:17px; font-weight:600;">Routing Decision</span>
+        <span id="amRouteInfo" title="" style="display:inline-flex;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8174" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg></span>
+      </div>
+      <div id="amRouting" style="display:flex; flex-direction:column; gap:2px;"></div>
+      <div id="amWhyLink" style="display:inline-flex; align-items:center; gap:8px; margin:12px 6px 0; cursor:pointer; font-size:15px; font-weight:600; color:#2f6fd6;"></div>
+      <div id="amWhy" style="display:none; margin:10px 6px 0; padding:12px 14px; border-radius:12px; background:#f4eee4; font-size:13px; line-height:1.55; color:#4a4238;"></div>
+    </div>
+
+    <div style="padding:18px 22px 10px;">
+      <div id="amRouteTitle" style="font-size:17px; font-weight:600; margin-bottom:12px;">Live Route</div>
+      <div style="position:relative; display:flex; flex-direction:column; gap:4px;">
+        <div style="position:absolute; left:8px; top:10px; bottom:12px; width:2px; background:#e4ddd1;"></div>
+        <div id="amSteps" style="display:flex; flex-direction:column; gap:4px;"></div>
+      </div>
+    </div>
+
+    <div style="margin:8px 20px 0; padding:16px 0; border-top:1px solid #efe6d8; display:flex; align-items:center; gap:16px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2b251e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"></path><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path></svg>
+      <div style="flex:1;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between;">
+          <span style="font-size:15px; font-weight:600;">Fuel / Tokens</span>
+          <span id="amFuelLabel" style="font-size:15px; font-variant-numeric:tabular-nums;"></span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:8px;">
+          <div style="flex:1; height:8px; border-radius:999px; background:#ece5da; overflow:hidden;">
+            <div id="amFuelBar" style="height:100%; width:0%; border-radius:999px; background:#4dbf74;"></div>
+          </div>
+          <span id="amFuelPct" style="font-size:14px; font-variant-numeric:tabular-nums;"></span>
+        </div>
+      </div>
+    </div>
+    <div id="amFuelWhy" style="margin:0 20px 12px; font-size:13px; line-height:1.55; color:#4a4238;"></div>
+
+    <div id="amVerify" style="margin:4px 16px 18px; padding:18px; border-radius:14px; display:flex; align-items:center; gap:16px;"></div>
+  </div>
+</div>
+
+<!-- Leaderboard overlay — long-term agent performance -->
+<div id="amLb" class="am-ov">
+  <div class="am-ov-card">
+    <div class="am-ov-head">
+      <span style="font-size:18px; font-weight:700;">Agent Leaderboard</span>
+      <span style="font-size:13px; color:#7a7064;">who's actually the better agent</span>
+      <div class="am-tog"><span id="amLbGlobal">Global</span><span id="amLbMine">Mine</span></div>
+      <button id="amLbClose" class="am-btn am-x" aria-label="Close">✕</button>
+    </div>
+    <div id="amLbBody" class="am-scroll" style="padding:14px 16px; overflow-y:auto;"></div>
+    <div class="am-ov-foot">Cognitive Score = 60% accuracy + 30% route efficiency + 10% win rate. Quality is weighted over wins by design.</div>
+  </div>
+</div>
+
+<!-- Profiles overlay — agent performance by task type -->
+<div id="amPf" class="am-ov">
+  <div class="am-ov-card" style="width:min(780px,100%);">
+    <div class="am-ov-head">
+      <span style="font-size:18px; font-weight:700;">Performance Profiles</span>
+      <span style="font-size:13px; color:#7a7064;">who's best at what</span>
+      <div class="am-tog"><span id="amPfGlobal">Global</span><span id="amPfMine">Mine</span></div>
+      <button id="amPfClose" class="am-btn am-x" aria-label="Close">✕</button>
+    </div>
+    <div id="amPfBody" class="am-scroll" style="padding:14px 16px; overflow-y:auto;"></div>
+    <div class="am-ov-foot">Accuracy = share of runs that finished cleanly, by task type. Plato blends this history (30%) with capability match (70%) when it routes a question.</div>
+  </div>
+</div>
+
+<script src="sidebar_nav.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ── The town ────────────────────────────────────────────────────────────
+  // World units: lots sit on an 8-unit grid (-24…24), roads run in the gaps at
+  // x,y ≡ 4 (mod 8). TW is the tile half-width in screen px; the view picks the
+  // half-height (Top is steeper, Side is flatter and lifts buildings more).
+  var TW = 9.4;
+  var VIEWS = { top: { th: 7.8, lh: 1 }, side: { th: 4.9, lh: 1.45 } };
+  var ICONS = {
+    search: ['M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0', 'm21 21-4.3-4.3'],
+    news: ['M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2', 'M18 14h-8', 'M15 18h-5', 'M10 6h8v4h-8V6Z'],
+    book: ['M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z', 'M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z'],
+    chart: ['M3 3v18h18', 'M18 17V9', 'M13 17V5', 'M8 17v-3'],
+    gear: ['M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0'],
+    pie: ['M21.21 15.89A10 10 0 1 1 8 2.83', 'M22 12A10 10 0 0 0 12 2v10z'],
+    db: ['M21 5c0 1.66-4.03 3-9 3S3 6.66 3 5s4.03-3 9-3 9 1.34 9 3', 'M3 5v14a9 3 0 0 0 18 0V5', 'M3 12a9 3 0 0 0 18 0'],
+    bot: ['M12 8V4H8', 'M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z', 'M2 14h2', 'M20 14h2', 'M15 13v2', 'M9 13v2']
+  };
+  // Landmarks ARE the backend's tool districts (services/cognitive/toolDistricts.js),
+  // so a real tool call lands on the building its district names.
+  var LM = [
+    { id: 'web', label: 'WEB & SEARCH', x: -24, y: 0, roof: '#5b98dc', icon: 'search' },
+    { id: 'news', label: 'NEWS & SENTIMENT', x: -8, y: -16, roof: '#cf6a3c', icon: 'news' },
+    { id: 'markets', label: 'MARKETS', x: 16, y: -24, roof: '#4d6a72', icon: 'chart' },
+    { id: 'research', label: 'RESEARCH', x: -16, y: 16, roof: '#cf6a3c', icon: 'book' },
+    { id: 'ops', label: 'OPERATIONS', x: 0, y: 24, roof: '#cf6a3c', icon: 'gear' },
+    { id: 'portfolio', label: 'PORTFOLIO', x: 24, y: 0, roof: '#cf6a3c', icon: 'pie' },
+    { id: 'system', label: 'SYSTEM', x: 24, y: 16, roof: '#4d6a72', icon: 'db' }
+  ];
+  // Districts without a landmark of their own park at the nearest relative:
+  // the knowledge graph and entity districts read as Research, catch-all tools as System.
+  var DISTRICT_LM = { web: 'web', news: 'news', markets: 'markets', research: 'research', knowledge: 'research', ops: 'ops', portfolio: 'portfolio', system: 'system', tools: 'system' };
+  function lmFor(did) { did = String(did || ''); if (DISTRICT_LM[did]) return DISTRICT_LM[did]; return did.indexOf('kd:') === 0 ? 'research' : 'web'; }
+  function lmById(id) { for (var i = 0; i < LM.length; i++) if (LM[i].id === id) return LM[i]; return LM[0]; }
+  function sgn(v) { return v < 0 ? -1 : 1; }
+  // The road corner of a landmark's lot that faces the hub — where a car parks.
+  function doorOf(id) { var l = lmById(id); return [l.x - 4 * sgn(l.x), l.y - 4 * sgn(l.y)]; }
+  var HUB_DOOR = [-4, -4];
+  // What each building holds, for the hover card. Tools mirror
+  // services/cognitive/toolDistricts.js; keep them in step when a tool moves.
+  var LM_INFO = {
+    hub: { title: 'Question Hub', what: 'Plato’s tower. Every question arrives here, Plato picks the agent (or the field, in a race), and each answer comes back here to be checked before you see it.', tools: [] },
+    web: { title: 'Web & Search', what: 'The open web: search results, reading a single page, crawling a site. Every agent carries these tools, so this is where a question with no specialist data usually goes first.', tools: ['search', 'fetch', 'crawl'] },
+    news: { title: 'News & Sentiment', what: 'Headlines and what people are saying about them. News articles are sources; Reddit and Quora threads are treated as opinion until something else backs them up.', tools: ['news', 'reddit', 'quora'] },
+    markets: { title: 'Markets', what: 'Prices and market data: stocks, crypto, forex and commodities, plus trading signals and which market sessions are open.', tools: ['stocks', 'crypto', 'forex', 'commodities', 'signal', 'session'] },
+    research: { title: 'Research', what: 'Deeper reading: academic papers, Wikipedia, and the knowledge graph of companies, people and ideas that earlier runs have linked together.', tools: ['paper', 'wikipedia', 'neural_map'] },
+    ops: { title: 'Operations', what: 'Doing things for you rather than looking things up: notifications, Gmail, drafting job applications and scheduled missions. Some of these ask for your approval first.', tools: ['notifications', 'gmail', 'apply_draft', 'mission'] },
+    portfolio: { title: 'Portfolio', what: 'Your own data: holdings from connected brokers, your watchlist, your résumé, job search and applications.', tools: ['portfolio', 'watchlist', 'resume', 'jobs', 'applications'] },
+    system: { title: 'System', what: 'FinChat’s own machinery: reading and editing its files and running diagnostics. Any tool without a district of its own also parks here.', tools: ['file_read', 'file_edit', 'file_write', 'glob', 'bash'] }
+  };
+  var FOG = { x0: -14, x1: 6, y0: 29.5, y1: 41 };
+
+  // Mirror of AGENT_SKIN in backend/services/cognitive/ExecutionTrace.js — keep
+  // the two in step, or an agent plates in the wrong colour on the map.
+  var AGENT_COLORS = { plato: '#9a5c8a', nova: '#e08a44', aurelius: '#93a56e', atlas: '#2f6f5e', rasha: '#c76b6b', feynman: '#c9a24a', hopper: '#6f7fa8' };
+  var AGENT_ROLES = { plato: 'Supervisor', nova: 'Research', aurelius: 'Finance', atlas: 'Portfolio', rasha: 'Careers', feynman: 'Tutor', hopper: 'Diagnostics' };
+  function colorOf(id) { return AGENT_COLORS[id] || '#c67139'; }
+  function avatarOf(id) { return AGENT_COLORS[id] ? id + '_avatar.png' : ''; }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function cap2(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }).trim(); }
+  // Mission runs carry their whole prompt as the goal. Show the opening of it,
+  // without markdown; the full text stays on the element's title.
+  function tidyQ(s) {
+    s = String(s || '').replace(/[*#`>|]+/g, '').replace(/\s+/g, ' ').trim();
+    if (s.length <= 180) return s;
+    var cut = s.slice(0, 180), sp = cut.lastIndexOf(' ');
+    return (sp > 120 ? cut.slice(0, sp) : cut) + '…';
+  }
+  function fmtN(n) { return Math.round(n).toLocaleString('en-US'); }
+  function fmtTok(n) { n = Math.round(n || 0); return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n); }
+  function fmtAgo(ms) {
+    var m = Math.round((ms || 0) / 60000);
+    return m < 1 ? 'under a minute' : m < 60 ? m + ' min' : m < 2880 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + ' days';
+  }
+  function fmtSecs(ms) { var s = (ms || 0) / 1000; return s < 10 ? s.toFixed(1).replace(/\.0$/, '') + 's' : Math.round(s) + 's'; }
+  function shade(hex, f) {
+    var n = parseInt(String(hex).slice(1), 16);
+    var r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;
+    if (f < 1) { r *= f; gg *= f; b *= f; } else { var k = f - 1; r += (255 - r) * k; gg += (255 - gg) * k; b += (255 - b) * k; }
+    return 'rgb(' + (r | 0) + ',' + (gg | 0) + ',' + (b | 0) + ')';
+  }
+  function alpha(hex, a) { var n = parseInt(String(hex).slice(1), 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+
+  // ── Scenarios ───────────────────────────────────────────────────────────
+  // A scenario is what the panel and the cars read: the question, routing, and
+  // one LANE per agent on the question — its legs (one per landmark visited, in
+  // order), fuel and verification. A normal run has one lane; a race has 2–3
+  // on a shared clock. compile() turns each lane's legs into a timed road path.
+  var DEMO_ROUTING = [
+    { id: 'nova', pct: 92, why: 'Nova scored highest on source freshness and topic match. The question asks for the latest trends, so Plato sent it to Web & Search first, then News & Sentiment.' },
+    { id: 'aurelius', pct: 68, why: 'Aurelius is strongest on financial statements. Useful for a follow-up on specific companies, but this question is about recent news.' },
+    { id: 'atlas', pct: 54, why: 'Atlas knows portfolio exposure. It would be routed first if the question were about your own holdings.' },
+    { id: 'rasha', pct: 41, why: 'Rasha covers careers and hiring. Low match for a market-trends question.' }
+  ];
+  // Demo idle loops, straight from the design.
+  var DEMO_LOOPS = [
+    { id: 'aurelius', pts: [[4, -4], [20, -4], [20, -20], [4, -20]], period: 18, off: 2 },
+    { id: 'rasha', pts: [[-4, 12], [-4, 20], [-20, 20], [-20, 12]], period: 15, off: 5 },
+    { id: 'atlas', pts: [[12, 4], [28, 4], [28, 12], [12, 12]], period: 16, off: 11 }
+  ];
+
+  function demoScenario() {
+    var lane = {
+      agent: { id: 'nova', name: 'Nova', role: 'Research' },
+      legs: [
+        { lm: 'web', name: 'Web & Search', reasons: ['Searching latest FinTech news…'], real: '', tokens: 3100, calls: 2 },
+        { lm: 'news', name: 'News & Sentiment', reasons: ['Fetching articles and trends…'], real: '', tokens: 2300, calls: 1 }
+      ],
+      fuel: 8420, fuelCap: 14000, verified: true, reason: 'natural', confidence: 87, sources: 6,
+      fog: [{ name: 'we don’t know enough here' }], validate: true, durationMs: null, live: false, execId: null,
+      hubTokens: 900, answerTokens: 2120, stepTokens: true, promptTokens: 6900, completionTokens: 1520, turns: 4, toolCalls: 3,
+      before: { home: { id: 'research', name: 'Research' }, status: 'idle', idleMs: 7200000, previous: { goal: 'Summarise the new RBI digital lending rules' } },
+      comparison: { taskType: 'news', agents: [
+        { id: 'aurelius', name: 'Aurelius', runs: 12, avgTokens: 4200, avgTurns: 2.5, avgTools: 1.8 },
+        { id: 'nova', name: 'Nova', runs: 31, avgTokens: 6100, avgTurns: 2.8, avgTools: 2.2 },
+        { id: 'atlas', name: 'Atlas', runs: 7, avgTokens: 7300, avgTurns: 3.1, avgTools: 2.6 }
+      ] }
+    };
+    return {
+      demo: true, race: false, question: 'What are the latest trends in FinTech in India?', lanes: [lane],
+      routing: DEMO_ROUTING.map(function (r) { return { id: r.id, name: cap2(r.id), role: AGENT_ROLES[r.id], pct: r.pct, why: r.why }; }),
+      chosen: 'nova', live: false, execId: null
+    };
+  }
+
+  // /trace payload (or the live accumulator, same shape) → one lane.
+  function laneFromTrace(tr) {
+    var bmap = {}, dname = {};
+    (tr.buildings || []).forEach(function (b) { bmap[b.id] = b; });
+    (tr.districts || []).forEach(function (d) { dname[d.id] = d.name; });
+    var legs = [], hubTokens = 0, answerTokens = 0, stepTokens = false;
+    (tr.waypoints || []).forEach(function (w) {
+      // Reasoning turns carry what they cost. Charge each to where the agent
+      // stood while thinking: the hub before its first stop, the stop it had
+      // just reached after one, or the answer for the turn that wrote it.
+      if (w.phase === 'think' && w.tokens != null) {
+        stepTokens = true;
+        if (w.action === 'respond') answerTokens += w.tokens;
+        else if (legs.length) legs[legs.length - 1].tokens += w.tokens;
+        else hubTokens += w.tokens;
+      }
+      // Only tool calls are stops. Thoughts and the answer stand where the car
+      // already is — letting them into the merge below overwrote a failed
+      // stop's error with whatever the agent thought next.
+      if (w.phase && w.phase !== 'tool') return;
+      var b = w.buildingId && bmap[w.buildingId]; if (!b) return;
+      var lm = lmFor(b.district), reason = w.reason || ('Used ' + b.label);
+      var last = legs[legs.length - 1];
+      // Consecutive stops in the same district are one visit to its landmark,
+      // but every call there keeps its own reason.
+      if (last && last.lm === lm) {
+        last.calls++;
+        if (last.reasons.indexOf(reason) < 0) last.reasons.push(reason);
+        if (last.err && !w.offRoad) last.err = false;
+        return;
+      }
+      legs.push({ lm: lm, name: dname[b.district] || b.districtName || cap2(b.district), reasons: [reason], err: !!w.offRoad, calls: 1, tokens: 0, atMs: w.atMs || 0, real: w.atMs != null ? fmtSecs(w.atMs) : '' });
+    });
+    var a = tr.agent || {};
+    var id = a.id || 'plato';
+    var ver = tr.verification || {};
+    return {
+      hubTokens: hubTokens, answerTokens: answerTokens, stepTokens: stepTokens,
+      promptTokens: a.promptTokens || 0, completionTokens: a.completionTokens || 0,
+      turns: a.iterations || 0, toolCalls: a.toolCalls || 0,
+      before: tr.before || null, comparison: tr.comparison || null,
+      agent: { id: id, name: a.name || cap2(id), role: a.role || AGENT_ROLES[id] || '' },
+      legs: legs,
+      fuel: Math.round((a.fuel || 0) * 1000), fuelCap: Math.round((a.fuelCap || 15) * 1000),
+      verified: !!ver.verified, reason: ver.reason || null, confidence: a.confidence || null,
+      sources: Array.isArray(tr.sources) ? tr.sources.length : 0,
+      fog: (tr.fog || []).filter(function (f) { return f.state !== 'lifted'; }),
+      validate: !!ver.verified, durationMs: tr.durationMs || null, live: !!tr.live, execId: tr.executionId || null
+    };
+  }
+
+  // Plato's capability-vs-history breakdown → panel rows. In a race `field`
+  // lists the agents it sent, and every one of them is "picked".
+  function routingRows(rt, chosen, field) {
+    if (!rt || !rt.candidates || !rt.candidates.length) return null;
+    var tt = rt.taskType || '';
+    var best = rt.candidates[0];
+    var cands = rt.candidates.slice();
+    if (field) {
+      var inField = cands.filter(function (c) { return field.indexOf(c.agentId) >= 0; });
+      var rest = cands.filter(function (c) { return field.indexOf(c.agentId) < 0; });
+      cands = inField.concat(rest).slice(0, Math.max(4, inField.length));
+    } else cands = cands.slice(0, 4);
+    return cands.map(function (c) {
+      var nm = cap2(c.agentId), pct = Math.round((Number(c.finalScore) || 0) * 100);
+      var racing = !!(field && field.indexOf(c.agentId) >= 0);
+      var hist = c.hasHistory && c.history
+        ? ' Its track record on ' + (tt || 'this kind of') + ' questions: ' + c.history.accuracy + '% accuracy over ' + c.history.runs + ' runs.'
+        : ' It has no ' + tt + ' track record yet, so this is capability alone.';
+      var head;
+      if (field) head = racing ? nm + ' made the field for this ' + tt + ' race at ' + pct + '% (70% capability match, 30% past results).'
+        : nm + ' scored ' + pct + '%, not enough to make the field.';
+      else head = c.agentId === chosen
+        ? 'Plato picked ' + nm + ' for this ' + tt + ' question: ' + pct + '% after blending capability match (70%) with past results (30%).'
+        : nm + ' scored ' + pct + '%, behind ' + cap2(best.agentId) + ' at ' + Math.round((Number(best.finalScore) || 0) * 100) + '%.';
+      return { id: c.agentId, name: nm, role: AGENT_ROLES[c.agentId] || '', pct: pct, racing: racing, why: head + ' Capability match: ' + c.cap + '.' + hist };
+    });
+  }
+
+  function scenarioFromTrace(tr) {
+    var L = laneFromTrace(tr);
+    var chosen = (tr.routing && (tr.routing.chosen || (tr.routing.candidates && tr.routing.candidates[0] && tr.routing.candidates[0].agentId))) || L.agent.id;
+    return { demo: false, race: false, question: tr.question || '', lanes: [L], routing: routingRows(tr.routing, chosen, null), chosen: chosen, live: L.live, execId: L.execId };
+  }
+
+  // A race: { raceId, question, routing, order: [executionId], traces: {id: trace} }.
+  function scenarioFromRace(r) {
+    var lanes = r.order.map(function (id) { return laneFromTrace(r.traces[id]); });
+    var field = lanes.map(function (L) { return L.agent.id; });
+    var rt = r.routing;
+    if (!rt) r.order.some(function (id) { var t = r.traces[id]; if (t && t.routing) { rt = t.routing; return true; } return false; });
+    return {
+      demo: false, race: true, raceId: r.raceId, question: r.question || '', lanes: lanes,
+      routing: routingRows(rt, null, field), chosen: field[0], live: lanes.some(function (L) { return L.live; }), execId: null
+    };
+  }
+
+  // Race order at clock t — the same order AgentLeaderboard credits a win:
+  // clean finish first, then fewest tokens, then fastest. Lanes still running
+  // follow, by how many districts they've reached.
+  function standings(S, t) {
+    return S.lanes.map(function (L) {
+      var fin = !L.live && t >= L.end;
+      var ok = fin && (!L.reason || L.reason === 'natural');
+      var visited = L.legs.filter(function (l) { return Math.min(t, laneHorizon(L)) >= l.at; }).length;
+      return { L: L, fin: fin, ok: ok, visited: visited };
+    }).sort(function (a, b) {
+      if (a.ok !== b.ok) return a.ok ? -1 : 1;
+      if (a.ok) return (a.L.fuel - b.L.fuel) || ((a.L.durationMs || 0) - (b.L.durationMs || 0));
+      if (a.fin !== b.fin) return a.fin ? -1 : 1;
+      return b.visited - a.visited;
+    });
+  }
+
+  // Legs → virtual timeline + road path + panel steps.
+  // One run: the car leaves the hub, visits each landmark 5s apart (3.5s when
+  // the route is long), drives back, then the answer is written and checked.
+  // A race: every lane runs on ONE clock in real elapsed seconds (live), or
+  // squeezed so the whole race replays in ~30s — so who finishes first on the
+  // map is who finished first for real.
+  function compile(S) {
+    var k = 1;
+    if (S.race && !S.live) {
+      var span = 1;
+      S.lanes.forEach(function (L) { span = Math.max(span, L.durationMs || 0, L.legs.length ? L.legs[L.legs.length - 1].atMs : 0); });
+      k = Math.min(1, 30000 / span);
+    }
+    S.lanes.forEach(function (L) { compileLane(S, L, k); });
+    S.RUN = Math.max.apply(null, S.lanes.map(function (L) { return L.end; }));
+    S.fog = [].concat.apply([], S.lanes.map(function (L) { return L.fog || []; }));
+    return S;
+  }
+  function compileLane(S, L, k) {
+    var name = L.agent.name, prev = 0;
+    if (S.race) {
+      L.legs.forEach(function (l) { l.at = Math.max(3, 2 + (l.atMs || 0) / 1000 * k, prev + 2.5); prev = l.at; });
+      L.backAt = Math.max(L.legs.length ? prev + 3 : 3, L.durationMs && !L.live ? 2 + L.durationMs / 1000 * k - 2 : 0);
+    } else {
+      var sp = L.legs.length > 6 ? 3.5 : 5;
+      L.legs.forEach(function (l, i) { l.at = 4 + sp * i; });
+      L.backAt = L.legs.length ? L.legs[L.legs.length - 1].at + 5 : 3;
+    }
+    var real = function (t) { return S.demo ? t + 's' : ''; };
+    var tok = function (n) { return L.stepTokens ? n : null; };
+    var steps = [];
+    var home = L.before && L.before.home ? lmById(lmFor(L.before.home.id)) : null;
+    if (L.before) {
+      var bf = L.before;
+      steps.push({
+        at: 0, kind: 'before',
+        a: name + ' was ' + (bf.status === 'busy' ? 'busy' : 'idle') + ' at ' + (home ? cap2(home.label.toLowerCase()) : 'the hub'),
+        sub: bf.previous
+          ? (bf.status === 'busy' ? 'Still on: “' : 'Last job: “') + tidyQ(bf.previous.goal) + '”' + (bf.idleMs != null ? ' · idle for ' + fmtAgo(bf.idleMs) : '')
+          : 'No earlier runs for you, so this was its first job.'
+      });
+    }
+    // Plato answering itself is a routing decision too, but "Plato selected Plato" reads as a glitch.
+    steps.push({ at: 0, a: S.race ? 'Plato sent ' + name : name === 'Plato' ? 'Plato took it on directly' : 'Plato selected ' + name, kind: 'start', real: real(0), sub: L.stepTokens && L.hubTokens ? 'Planned the route at the hub' : '', tok: tok(L.hubTokens) });
+    L.legs.forEach(function (l) { steps.push({ at: l.at, a: name, b: l.name, subs: l.reasons, calls: l.calls, kind: l.err ? 'err' : 'leg', real: S.demo ? l.at + 's' : l.real, tok: tok(l.tokens) }); });
+    var t = L.backAt;
+    if (S.race) {
+      steps.push({ at: t, a: 'Writing the answer', kind: 'mid', real: '', tok: tok(L.answerTokens) });
+      t += 2;
+    } else {
+      steps.push({ at: t, a: 'Analyzing findings', kind: 'mid', real: real(t) });
+      t += 5; steps.push({ at: t, a: 'Generating answer', kind: 'mid', real: real(t), tok: tok(L.answerTokens) });
+      if (L.validate) { t += 3; steps.push({ at: t, a: 'Plato validating', kind: 'mid', real: real(t) }); }
+      t += 4;
+    }
+    var ok = S.demo || L.live || L.reason === 'natural' || !L.reason;
+    steps.push({ at: t, a: ok ? (S.race ? 'Finished' : 'Complete') : 'Stopped: ' + cap2(L.reason), kind: ok ? 'end' : 'err', real: S.demo ? t + 's' : (L.durationMs ? fmtSecs(L.durationMs) : '') });
+    L.steps = steps; L.end = t;
+    // Road path keyframes.
+    // The agent sets off from where it was when the task came in — its home
+    // block — and drives to the hub to pick the task up before its first stop.
+    var start = home ? doorOf(home.id) : HUB_DOOR;
+    var keys = [{ x: start[0], y: start[1], t: 0 }];
+    var cur = start, tPrev = 0;
+    function drive(a, b, t0, t1) {
+      if (t0 > keys[keys.length - 1].t) keys.push({ x: a[0], y: a[1], t: t0 });
+      var pts = [a];
+      if (a[0] !== b[0] && a[1] !== b[1]) pts.push([a[0], b[1]]);
+      pts.push(b);
+      var lens = [], tot = 0;
+      for (var i = 1; i < pts.length; i++) { var d = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]); lens.push(d); tot += d; }
+      var acc = 0;
+      for (var j = 1; j < pts.length; j++) { acc += lens[j - 1]; keys.push({ x: pts[j][0], y: pts[j][1], t: t0 + (t1 - t0) * (tot ? acc / tot : 1) }); }
+    }
+    if (start !== HUB_DOOR) { drive(start, HUB_DOOR, 0, 2.5); cur = HUB_DOOR; tPrev = 2.5; }
+    L.legs.forEach(function (l) {
+      var d = doorOf(l.lm);
+      var dep = tPrev + (tPrev ? Math.min(1, (l.at - tPrev) * 0.2) : 0);
+      drive(cur, d, dep, l.at); cur = d; tPrev = l.at;
+    });
+    if (L.legs.length) drive(cur, HUB_DOOR, tPrev + 0.6, L.backAt);
+    L.keys = keys;
+  }
+
+  // ── Map engine ──────────────────────────────────────────────────────────
+  function AgentMap(canvas) {
+    this.c = canvas; this.view = 'top'; this.t = 0; this.z = 1; this.px = 0; this.py = 0;
+    this.w = 1000; this.h = 800; this.dpr = 1; this.userView = false; this.playing = true; this.frame = 0;
+    this.S = null; this.loops = [];
+    var self = this;
+    this.paths = {};
+    Object.keys(ICONS).forEach(function (k) { self.paths[k] = ICONS[k].map(function (d) { return new Path2D(d); }); });
+    this.build();
+    this.ro = new ResizeObserver(function () { self.resize(); if (!self.userView) self.fit(); });
+    this.ro.observe(canvas.parentElement);
+    this.resize(); this.fit();
+    canvas.addEventListener('wheel', function (e) { self.onWheel(e); }, { passive: false });
+    // One finger (or the mouse) pans; two fingers pinch-zoom about their
+    // midpoint and pan as they travel — a tablet has no wheel. Once a pinch
+    // starts, nothing else happens until every finger has lifted, so the one
+    // left behind neither jumps the map nor lands as a tap.
+    var pts = {}, pinch = null;
+    var pair = function () { var k = Object.keys(pts); return k.length === 2 ? [pts[k[0]], pts[k[1]]] : null; };
+    canvas.addEventListener('pointerdown', function (e) {
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var p = pair();
+      if (p) {
+        var r = canvas.getBoundingClientRect();
+        pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: self.z, px: self.px, py: self.py,
+                  mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top };
+        self.drag = null;
+        if (self.onHover) self.onHover(null, 0, 0, false);
+        return;
+      }
+      if (pinch) return;
+      self.drag = { x: e.clientX, y: e.clientY, px: self.px, py: self.py };
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (pts[e.pointerId]) pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (pinch) {
+        var p = pair(); if (!p) return;
+        var r = canvas.getBoundingClientRect();
+        var mx = (p[0].x + p[1].x) / 2 - r.left, my = (p[0].y + p[1].y) / 2 - r.top;
+        var nz = Math.min(3, Math.max(0.3, pinch.z * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / pinch.d)), k = nz / pinch.z;
+        // The ground point that started under the fingers stays under them.
+        self.px = mx - (pinch.mx - pinch.px) * k; self.py = my - (pinch.my - pinch.py) * k; self.z = nz;
+        self.userView = true;
+        return;
+      }
+      if (!self.drag) return;
+      if (Math.abs(e.clientX - self.drag.x) + Math.abs(e.clientY - self.drag.y) > 4) self.drag.moved = true;
+      self.userView = true;
+      self.px = self.drag.px + e.clientX - self.drag.x; self.py = self.drag.py + e.clientY - self.drag.y;
+    });
+    // Hovering a building (or tapping one, on touch) asks the app to explain it.
+    canvas.addEventListener('pointermove', function (e) {
+      if (self.drag || e.pointerType === 'touch') return;
+      var r = canvas.getBoundingClientRect(), id = self.hitLandmark(e.clientX - r.left, e.clientY - r.top);
+      canvas.style.cursor = id ? 'pointer' : '';
+      if (self.onHover) self.onHover(id, e.clientX - r.left, e.clientY - r.top, false);
+    });
+    canvas.addEventListener('pointerleave', function () { if (self.onHover) self.onHover(null, 0, 0, false); });
+    window.addEventListener('pointercancel', function (e) {
+      delete pts[e.pointerId];
+      if (!Object.keys(pts).length) pinch = null;
+      self.drag = null; // the system took the touch: no pan, no tap
+    });
+    window.addEventListener('pointerup', function (e) {
+      delete pts[e.pointerId];
+      if (pinch) { if (!Object.keys(pts).length) pinch = null; self.drag = null; return; }
+      var d = self.drag; self.drag = null;
+      if (!d || d.moved || e.target !== canvas || !self.onHover) return;
+      var r = canvas.getBoundingClientRect(), id = self.hitLandmark(e.clientX - r.left, e.clientY - r.top);
+      self.onHover(id, e.clientX - r.left, e.clientY - r.top, true);
+    });
+    this.last = performance.now();
+    this.loop = this.loop.bind(this);
+    requestAnimationFrame(this.loop);
+  }
+  var P = AgentMap.prototype;
+
+  P.build = function () {
+    var s = 20260925;
+    var rnd = function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    var self = this;
+    this.lots = []; this.houses = []; this.trees = []; this.fogTrees = []; this.blotches = []; this.clouds = [];
+    var C = [-24, -16, -8, 0, 8, 16, 24];
+    C.forEach(function (bx) {
+      C.forEach(function (by) {
+        if (bx === 0 && by === 0) return;
+        var lm = LM.filter(function (l) { return l.x === bx && l.y === by; })[0];
+        var r = rnd();
+        var lot = { x: bx, y: by, field: !lm && r < 0.22 };
+        self.lots.push(lot);
+        if (lm) return;
+        if (!lot.field && r < 0.7) self.houses.push({ x: bx + (rnd() - 0.5) * 1.4, y: by + (rnd() - 0.5) * 1.4, green: rnd() < 0.4 });
+        var nt = lot.field ? 0 : 1 + Math.floor(rnd() * 3);
+        for (var i = 0; i < nt; i++) {
+          var cx = [-1.9, 1.9][Math.floor(rnd() * 2)], cy = [-1.9, 1.9][Math.floor(rnd() * 2)];
+          self.trees.push({ x: bx + cx + (rnd() - 0.5) * 0.4, y: by + cy + (rnd() - 0.5) * 0.4, s: 0.75 + rnd() * 0.3 });
+        }
+      });
+    });
+    // Countryside. Trees inside the fog zone are kept aside — they only grow
+    // when there is nothing unknown to cover.
+    var inFog = function (x, y) { return x > FOG.x0 - 8 && x < FOG.x1 + 2 && y > FOG.y0 - 2 && y < FOG.y1 + 6; };
+    for (var i = 0; i < 460 && this.trees.length < 330; i++) {
+      var x = -62 + rnd() * 124, y = -62 + rnd() * 124;
+      if (Math.abs(x) < 31.5 && Math.abs(y) < 31.5) continue;
+      if (Math.abs(x - y) > 64 || x + y < -66 || x + y > 70) continue;
+      if (inFog(x, y)) { this.fogTrees.push({ x: x, y: y, s: 0.8 + rnd() * 0.45 }); continue; }
+      this.trees.push({ x: x, y: y, s: 0.8 + rnd() * 0.45 });
+    }
+    for (i = 0; i < 70; i++) this.blotches.push({ x: -60 + rnd() * 120, y: -60 + rnd() * 120, r: 2 + rnd() * 5, light: rnd() > 0.45 });
+    for (i = 0; i < 34; i++) {
+      var u = rnd();
+      this.clouds.push({ x: FOG.x0 - 10 + u * 22 + (rnd() - 0.5) * 4, y: FOG.y0 - 1 + rnd() * 15, r: 16 + rnd() * 30 });
+    }
+  };
+
+  P.panelW = function () { return this.w >= 768 ? 350 : 0; };
+  P.topH = function () { return this.w >= 768 ? 90 : 116; };
+  P.sheetH = function () { return this.w >= 768 ? 0 : Math.round(this.h * 0.42) + 16; };
+  P.resize = function () {
+    var r = this.c.parentElement.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+    this.c.width = Math.max(1, r.width * d); this.c.height = Math.max(1, r.height * d);
+    this.w = r.width; this.h = r.height; this.dpr = d;
+  };
+  P.fit = function () {
+    var top = this.topH();
+    var availW = Math.max(240, this.w - this.panelW()), availH = Math.max(200, this.h - top - this.sheetH());
+    this.z = Math.max(0.25, Math.min((availW - 24) / (129 * TW), (availH - 16) / (122 * this.TH() + 40)));
+    this.px = availW / 2 + 3.5 * TW * this.z; this.py = top + availH / 2 + 12 * this.z;
+  };
+  P.TH = function () { return VIEWS[this.view].th; };
+  P.proj = function (x, y, l) { return [(x - y) * TW * this.z + this.px, (x + y) * this.TH() * this.z + this.py - (l || 0) * this.z * VIEWS[this.view].lh]; };
+  P.setView = function (k) { this.view = k; this.userView = false; this.fit(); };
+
+  P.onWheel = function (e) {
+    e.preventDefault(); this.userView = true;
+    var r = this.c.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    var nz = Math.min(3, Math.max(0.3, this.z * (e.deltaY < 0 ? 1.1 : 0.91))), k = nz / this.z;
+    this.px = mx - (mx - this.px) * k; this.py = my - (my - this.py) * k; this.z = nz;
+  };
+  P.zoomBy = function (k) {
+    this.userView = true;
+    var cx = (this.w - this.panelW()) / 2, cy = (this.h - this.sheetH()) / 2;
+    var nz = Math.min(3, Math.max(0.3, this.z * k)); k = nz / this.z;
+    this.px = cx - (cx - this.px) * k; this.py = cy - (cy - this.py) * k; this.z = nz;
+  };
+
+  // The clock. A live lane can't drive past its newest stop — the car waits
+  // there until the next pulse lands. The shared clock runs to the furthest lane.
+  function laneHorizon(L) { return L.live ? (L.legs.length ? L.legs[L.legs.length - 1].at : 0) : L.end; }
+  P.horizon = function () {
+    var S = this.S; if (!S) return 0;
+    if (!S.live) return S.RUN;
+    return Math.max.apply(null, S.lanes.map(laneHorizon));
+  };
+  P.loop = function () {
+    var now = performance.now(), dt = Math.min(70, now - this.last); this.last = now;
+    if (this.playing && this.S) {
+      this.t = Math.min(this.horizon(), this.t + dt / 1000);
+      if (!this.S.live && this.t >= this.S.RUN) { this.t = this.S.RUN; this.playing = false; }
+    }
+    try { this.draw(now / 1000); } catch (err) { if (!this._err) { this._err = 1; console.error(err); } }
+    if (++this.frame % 6 === 0 && this.onTick) this.onTick();
+    requestAnimationFrame(this.loop);
+  };
+
+  P.posAt = function (L, t) {
+    var K = (L && L.keys) || [{ x: HUB_DOOR[0], y: HUB_DOOR[1], t: 0 }];
+    t = Math.min(t, L ? laneHorizon(L) : 0);
+    var dir = [1, 0];
+    for (var i = 1; i < K.length; i++) {
+      var a = K[i - 1], b = K[i];
+      if (b.x !== a.x || b.y !== a.y) dir = [b.x - a.x, b.y - a.y];
+      if (t <= b.t) {
+        var f = b.t > a.t ? Math.max(0, (t - a.t) / (b.t - a.t)) : 1;
+        return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, dx: dir[0], dy: dir[1], i: i };
+      }
+    }
+    var L = K[K.length - 1];
+    return { x: L.x, y: L.y, dx: dir[0], dy: dir[1], i: K.length };
+  };
+  P.loopAt = function (l, sec) {
+    var pts = l.pts, segs = [], total = 0, i;
+    for (i = 0; i < pts.length; i++) { var a = pts[i], b = pts[(i + 1) % pts.length]; var d = Math.hypot(b[0] - a[0], b[1] - a[1]); segs.push(d); total += d; }
+    var want = (((sec + l.off) % l.period) / l.period) * total;
+    for (i = 0; i < pts.length; i++) {
+      if (want <= segs[i]) {
+        var p = pts[i], q = pts[(i + 1) % pts.length], f = want / segs[i];
+        return { x: p[0] + (q[0] - p[0]) * f, y: p[1] + (q[1] - p[1]) * f, dx: q[0] - p[0], dy: q[1] - p[1] };
+      }
+      want -= segs[i];
+    }
+    return { x: pts[0][0], y: pts[0][1], dx: 1, dy: 0 };
+  };
+
+  P.poly = function (g, pts, fill, stroke, lw) {
+    g.beginPath(); pts.forEach(function (p, i) { if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }); g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+  };
+  P.wquad = function (g, x0, y0, x1, y1, fill, stroke, lw) {
+    this.poly(g, [this.proj(x0, y0), this.proj(x1, y0), this.proj(x1, y1), this.proj(x0, y1)], fill, stroke, lw);
+  };
+  P.wcircle = function (g, cx, cy, r, fill, stroke, lw) {
+    var pts = [];
+    for (var i = 0; i < 48; i++) { var a = i / 48 * 6.283; pts.push(this.proj(cx + Math.cos(a) * r, cy + Math.sin(a) * r)); }
+    this.poly(g, pts, fill, stroke, lw);
+  };
+  P.icon = function (g, name, cx, cy, size, color, lw) {
+    g.save(); g.translate(cx - size / 2, cy - size / 2); g.scale(size / 24, size / 24);
+    g.strokeStyle = color; g.lineWidth = lw; g.lineCap = 'round'; g.lineJoin = 'round';
+    this.paths[name].forEach(function (p) { g.stroke(p); });
+    g.restore();
+  };
+
+  P.tree = function (g, t) {
+    var z = this.z, sp = this.proj(t.x, t.y), sx = sp[0], sy = sp[1], k = t.s * z;
+    g.fillStyle = 'rgba(60,80,30,.22)';
+    g.beginPath(); g.ellipse(sx + 2 * k, sy + 1, 7 * k, 3.4 * k, 0, 0, 6.283); g.fill();
+    g.strokeStyle = '#7b5a3a'; g.lineWidth = Math.max(1.2, 2.2 * k); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, sy - 8 * k); g.stroke();
+    g.fillStyle = '#4f7f3c'; g.beginPath(); g.ellipse(sx, sy - 14 * k, 6.6 * k, 8 * k, 0, 0, 6.283); g.fill();
+    g.fillStyle = '#6a9a4a'; g.beginPath(); g.ellipse(sx - 1.6 * k, sy - 16 * k, 4.6 * k, 5.6 * k, 0, 0, 6.283); g.fill();
+    g.fillStyle = '#86b25d'; g.beginPath(); g.ellipse(sx - 2.4 * k, sy - 18 * k, 2.2 * k, 2.8 * k, 0, 0, 6.283); g.fill();
+  };
+
+  P.building = function (g, x, y, hw, H, R, roof, opts) {
+    var self = this, z = this.z, Pj = function (a, b, l) { return self.proj(a, b, l); };
+    this.poly(g, [Pj(x - hw + 0.3, y + hw + 0.9), Pj(x + hw + 1.1, y + hw + 0.9), Pj(x + hw + 1.1, y - hw + 0.3), Pj(x - hw + 0.3, y - hw + 0.3)], 'rgba(60,80,30,.2)');
+    var A = Pj(x - hw, y + hw), B = Pj(x + hw, y + hw), Cc = Pj(x + hw, y - hw);
+    var A2 = Pj(x - hw, y + hw, H), B2 = Pj(x + hw, y + hw, H), C2 = Pj(x + hw, y - hw, H);
+    this.poly(g, [A, B, B2, A2], '#f4e8d2');
+    this.poly(g, [B, Cc, C2, B2], '#dcc8a6');
+    var win = function (L, Rr, u0, u1, v0, v1, col) {
+      var lp = function (u, v) { return [L[0] + (Rr[0] - L[0]) * u, L[1] + (Rr[1] - L[1]) * u - v * H * z * VIEWS[self.view].lh]; };
+      self.poly(g, [lp(u0, v0), lp(u1, v0), lp(u1, v1), lp(u0, v1)], col);
+    };
+    var rows = opts.big ? 2 : 1;
+    for (var r = 0; r < rows; r++) {
+      var v0 = 0.18 + r * 0.36, v1 = v0 + 0.22;
+      [0.2, 0.62].forEach(function (u) { win(A, B, u, u + 0.16, v0, v1, '#6f8f9e'); win(B, Cc, u, u + 0.16, v0, v1, '#5b7a88'); });
+    }
+    if (opts.big) win(A, B, 0.42, 0.58, 0, 0.3, '#8a6a4a');
+    var e = hw * 1.16;
+    var nw = Pj(x - e, y - e, H), ne = Pj(x + e, y - e, H), se = Pj(x + e, y + e, H), sw = Pj(x - e, y + e, H), ap = Pj(x, y, H + R);
+    this.poly(g, [nw, ne, ap], shade(roof, 1.12));
+    this.poly(g, [nw, sw, ap], shade(roof, 1.05));
+    this.poly(g, [sw, se, ap], roof);
+    this.poly(g, [se, ne, ap], shade(roof, 0.78));
+    g.strokeStyle = shade(roof, 0.7); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(sw[0], sw[1]); g.lineTo(se[0], se[1]); g.lineTo(ne[0], ne[1]); g.moveTo(se[0], se[1]); g.lineTo(ap[0], ap[1]); g.stroke();
+    return { ap: ap, se: se, sw: sw, base: B };
+  };
+
+  // Plato's tower at the Question Hub, with the robot mascot on the roof.
+  P.hub = function (g) {
+    var self = this, z = this.z, r = 2.8, H = 22;
+    var ring = function (rad, lift) { var pts = []; for (var i = 0; i <= 40; i++) { var a = -Math.PI / 4 + i / 40 * Math.PI; pts.push(self.proj(Math.cos(a) * rad, Math.sin(a) * rad, lift)); } return pts; };
+    var base = ring(r, 0), top = ring(r, H);
+    this.poly(g, base.concat(top.slice().reverse()), '#ecdfc6');
+    var top2 = []; for (var i = 0; i < 48; i++) { var a = i / 48 * 6.283; top2.push(this.proj(Math.cos(a) * r, Math.sin(a) * r, H)); }
+    this.poly(g, top2, '#f8f0e1', '#e0d1b3', 1.2);
+    for (i = 0; i < 5; i++) {
+      var an = -Math.PI / 4 + (i + 0.5) / 5 * Math.PI;
+      var p1 = this.proj(Math.cos(an) * r, Math.sin(an) * r, H * 0.25), p2 = this.proj(Math.cos(an) * r, Math.sin(an) * r, H * 0.7);
+      g.strokeStyle = '#8fa8b2'; g.lineWidth = 3.4 * z; g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke();
+    }
+    var c = this.proj(0, 0, H), cx = c[0], cy = c[1];
+    g.fillStyle = '#fbf7ee'; g.strokeStyle = '#e3d6bd'; g.lineWidth = 1.2;
+    g.beginPath(); g.ellipse(cx, cy, 15 * z, 12 * z, 0, Math.PI, 0); g.closePath(); g.fill(); g.stroke();
+    var s = 30 * z, bx = cx - s / 2, by = cy - 14 * z - s / 2;
+    g.fillStyle = '#2d2d31';
+    g.beginPath(); g.roundRect(bx + 4 * s / 24, by + 8 * s / 24, 16 * s / 24, 12 * s / 24, 2.5 * s / 24); g.fill();
+    this.icon(g, 'bot', cx, cy - 14 * z, s, '#2d2d31', 2.4);
+    g.fillStyle = '#fff';
+    g.beginPath(); g.arc(cx - 3 * s / 24, cy - 14 * z + 2 * s / 24, 1.4 * s / 24, 0, 6.283); g.arc(cx + 3 * s / 24, cy - 14 * z + 2 * s / 24, 1.4 * s / 24, 0, 6.283); g.fill();
+  };
+
+  P.car = function (g, x, y, color, dx, dy) {
+    var self = this, z = this.z, dl = Math.hypot(dx, dy) || 1;
+    var h = { x: dx / dl, y: dy / dl }, p = { x: -h.y, y: h.x };
+    var Pc = function (l, w, lift) { return self.proj(x + h.x * l + p.x * w, y + h.y * l + p.y * w, lift); };
+    var LL = 1.05, WW = 0.52, BOT = 1.6, MID = 5.4, ROOF = 9.2;
+    this.poly(g, [Pc(-LL - 0.15, -WW - 0.15), Pc(LL + 0.15, -WW - 0.15), Pc(LL + 0.15, WW + 0.15), Pc(-LL - 0.15, WW + 0.15)], 'rgba(40,50,20,.25)');
+    [[-0.62, -0.5], [0.62, -0.5], [-0.62, 0.5], [0.62, 0.5]].forEach(function (o) {
+      var w = Pc(o[0], o[1], 1.4); g.fillStyle = '#26221e';
+      g.beginPath(); g.ellipse(w[0], w[1], 2.8 * z, 2 * z, 0, 0, 6.283); g.fill();
+    });
+    var sides = function (fp, lo, hi, fill) {
+      [[0, 1], [1, 2], [2, 3], [3, 0]].map(function (ij) {
+        var a = fp[ij[0]], b = fp[ij[1]];
+        var d = (x + h.x * a[0] + p.x * a[1] + y + h.y * a[0] + p.y * a[1] + x + h.x * b[0] + p.x * b[1] + y + h.y * b[0] + p.y * b[1]) / 2;
+        return { a: a, b: b, d: d };
+      }).sort(function (m, n) { return m.d - n.d; }).forEach(function (e) {
+        self.poly(g, [Pc(e.a[0], e.a[1], lo), Pc(e.b[0], e.b[1], lo), Pc(e.b[0], e.b[1], hi), Pc(e.a[0], e.a[1], hi)], fill);
+      });
+    };
+    var fp = [[-LL, -WW], [LL, -WW], [LL, WW], [-LL, WW]];
+    sides(fp, BOT, MID, shade(color, 0.82));
+    this.poly(g, fp.map(function (q) { return Pc(q[0], q[1], MID); }), shade(color, 1.1));
+    var cf = [[-0.5, -0.44], [0.4, -0.44], [0.4, 0.44], [-0.5, 0.44]];
+    sides(cf, MID, ROOF, '#a9d3ee');
+    this.poly(g, cf.map(function (q) { return Pc(q[0], q[1], ROOF); }), shade(color, 1.18));
+    var hl = Pc(LL, -0.3, 3.6), hr = Pc(LL, 0.3, 3.6);
+    g.fillStyle = '#fff6d8';
+    [hl, hr].forEach(function (q) { g.beginPath(); g.ellipse(q[0], q[1], 1.3 * z, 1 * z, 0, 0, 6.283); g.fill(); });
+    return Pc(0, 0, ROOF);
+  };
+
+  P.pill = function (g, text, x, y, bg, fg, size, weight, padX) {
+    var z = Math.min(1.25, Math.max(0.42, this.z));
+    g.font = (weight || 700) + ' ' + ((size || 13) * z).toFixed(1) + 'px Figtree, sans-serif';
+    var w = g.measureText(text).width + (padX || 10) * 2 * z, h = (size || 13) * z + 9 * z;
+    g.fillStyle = bg; g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, 5 * z); g.fill();
+    if (bg === '#f7eedc') { g.strokeStyle = '#e1d0af'; g.lineWidth = 1; g.stroke(); }
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, x, y + 0.5); g.textBaseline = 'alphabetic';
+  };
+
+  // Which landmark (or 'hub') is under a canvas-space point: the screen box of
+  // its walls, roof and name tag, front-most first since nearer lots overlap.
+  P.hitLandmark = function (sx, sy) {
+    var self = this, z = this.z, hit = null, best = -Infinity;
+    LM.forEach(function (l) {
+      var e = 2.55 * 1.16, pts = [
+        self.proj(l.x - e, l.y + e), self.proj(l.x + e, l.y + e), self.proj(l.x + e, l.y - e),
+        self.proj(l.x - e, l.y + e, 24), self.proj(l.x + e, l.y - e, 24), self.proj(l.x, l.y, 40)
+      ];
+      var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+      var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys) + 26 * Math.max(0.6, z);
+      if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && l.x + l.y > best) { best = l.x + l.y; hit = l.id; }
+    });
+    if (hit) return hit;
+    var c = this.proj(0, 0), top = this.proj(0, 0, 36), rx = 3.2 * TW * z * 1.4;
+    if (Math.abs(sx - c[0]) <= rx && sy >= top[1] - 20 * z && sy <= c[1] + 50 * z) return 'hub';
+    return null;
+  };
+
+  P.showFog = function () { return !!(this.S && this.S.fog && this.S.fog.length); };
+  P.fogLabel = function () {
+    var f = this.S && this.S.fog && this.S.fog[0];
+    var s = f ? String(f.name || '') : '';
+    return s.length > 42 ? s.slice(0, 41) + '…' : s;
+  };
+
+  // The town is drawn once per zoom/view/fog state into an offscreen canvas;
+  // each frame just blits it and draws the cars on top.
+  P.draw = function (sec) {
+    var g = this.c.getContext('2d'), z = this.z;
+    var key = z.toFixed(4) + '|' + this.dpr + '|' + this.showFog() + '|' + this.fogLabel() + '|' + this.view;
+    var W = Math.ceil(130 * TW * z + 80), H = Math.ceil(140 * this.TH() * z + 180 * z + 60);
+    var ox = W / 2, oy = 66 * this.TH() * z + 130 * z + 20;
+    if (key !== this.sKey) {
+      this.sKey = key;
+      var d = Math.min(this.dpr || 1, Math.sqrt(14e6 / (W * H)));
+      if (!this.sc) this.sc = document.createElement('canvas');
+      this.sc.width = Math.max(1, Math.floor(W * d)); this.sc.height = Math.max(1, Math.floor(H * d));
+      var sg = this.sc.getContext('2d');
+      sg.setTransform(d, 0, 0, d, 0, 0);
+      var spx = this.px, spy = this.py;
+      this.px = ox; this.py = oy;
+      try { this.drawStatic(sg); } finally { this.px = spx; this.py = spy; }
+    }
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.fillStyle = '#9fbd72'; g.fillRect(0, 0, this.w, this.h);
+    g.drawImage(this.sc, this.px - ox, this.py - oy, W, H);
+    this.drawDynamic(g, sec);
+  };
+
+  P.drawStatic = function (g) {
+    var self = this, z = this.z, fog = this.showFog();
+    this.blotches.forEach(function (b) {
+      var sp = self.proj(b.x, b.y);
+      g.fillStyle = b.light ? 'rgba(186,208,142,.45)' : 'rgba(140,172,96,.35)';
+      g.beginPath(); g.ellipse(sp[0], sp[1], b.r * TW * z, b.r * self.TH() * z * 0.8, 0, 0, 6.283); g.fill();
+    });
+    var E = 30.4;
+    this.poly(g, [this.proj(-E, E), this.proj(E, E), this.proj(E, E, -6), this.proj(-E, E, -6)], '#d4bf97');
+    this.poly(g, [this.proj(E, E), this.proj(E, -E), this.proj(E, -E, -6), this.proj(E, E, -6)], '#c7b186');
+    this.wquad(g, -E, -E, E, E, '#eddcbd', '#dbc69f', 1.2);
+    this.lots.forEach(function (l) {
+      var hw = 2.85;
+      self.wquad(g, l.x - hw, l.y - hw, l.x + hw, l.y + hw, l.field ? '#b3c985' : '#a7c47a', '#93b168', 1);
+      if (l.field) {
+        g.strokeStyle = 'rgba(120,150,80,.55)'; g.lineWidth = 1;
+        for (var i = -2.2; i <= 2.2; i += 0.75) { var a = self.proj(l.x - 2.4, l.y + i), b = self.proj(l.x + 2.4, l.y + i); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+      } else {
+        self.wquad(g, l.x - hw + 0.55, l.y - hw + 0.55, l.x + hw - 0.55, l.y + hw - 0.55, null, 'rgba(147,177,104,.7)', 1);
+      }
+    });
+    if (fog) {
+      this.wquad(g, FOG.x0, FOG.y0, FOG.x1, FOG.y1, '#d6d4c6');
+      g.save(); g.setLineDash([6, 5]); this.wquad(g, FOG.x0, FOG.y0, FOG.x1, FOG.y1, null, '#a4a497', 1.4); g.restore();
+    }
+    this.wcircle(g, 0, 0, 5.4, '#f3e8d2', '#dcc8a2', 2);
+    this.wcircle(g, 0, 0, 4.1, null, '#e4d4b3', 1.2);
+    var sprites = [];
+    this.trees.forEach(function (tr) { sprites.push({ d: tr.x + tr.y, f: function () { self.tree(g, tr); } }); });
+    if (!fog) this.fogTrees.forEach(function (tr) { sprites.push({ d: tr.x + tr.y, f: function () { self.tree(g, tr); } }); });
+    this.houses.forEach(function (hs) { sprites.push({ d: hs.x + hs.y, f: function () { self.building(g, hs.x, hs.y, 1.35, 12, 9, hs.green ? '#5e8a4e' : '#cf6a3c', {}); } }); });
+    var lmTops = {};
+    LM.forEach(function (l) { sprites.push({ d: l.x + l.y, f: function () { lmTops[l.id] = self.building(g, l.x, l.y, 2.55, 24, 16, l.roof, { big: true }); } }); });
+    sprites.push({ d: 0, f: function () { self.hub(g); } });
+    sprites.sort(function (m, n) { return m.d - n.d; }).forEach(function (sp) { sp.f(); });
+
+    if (fog) {
+      this.clouds.forEach(function (cl) {
+        var sp = self.proj(cl.x, cl.y), r = cl.r * z;
+        var grd = g.createRadialGradient(sp[0], sp[1], r * 0.2, sp[0], sp[1], r);
+        grd.addColorStop(0, 'rgba(250,250,247,.95)'); grd.addColorStop(0.7, 'rgba(236,236,230,.75)'); grd.addColorStop(1, 'rgba(225,226,218,0)');
+        g.fillStyle = grd; g.beginPath(); g.arc(sp[0], sp[1], r, 0, 6.283); g.fill();
+      });
+      var fp = this.proj(FOG.x0 + 4, FOG.y1 - 3), k = Math.min(1.25, Math.max(0.5, z));
+      g.textAlign = 'center';
+      g.font = '700 ' + Math.max(9, 15 * k).toFixed(1) + 'px Figtree, sans-serif'; g.fillStyle = '#6f6f66'; g.fillText('UNKNOWN AREA', fp[0], fp[1]);
+      if (z >= 0.5) { g.font = '500 ' + (11 * k).toFixed(1) + 'px Figtree, sans-serif'; g.fillStyle = '#7d7d73'; g.fillText(this.fogLabel() || 'we don’t know enough here', fp[0], fp[1] + 18 * k); }
+    }
+
+    LM.forEach(function (l) {
+      var tp = lmTops[l.id]; if (!tp) return;
+      var ic = [tp.ap[0] + (tp.se[0] - tp.ap[0]) * 0.2 - 6 * z, tp.ap[1] + (tp.se[1] - tp.ap[1]) * 0.55];
+      self.icon(g, l.icon, ic[0], ic[1], 24 * z, '#ffffff', 2.4);
+      self.pill(g, l.label, tp.base[0], tp.base[1] + 12 * z, '#f7eedc', '#3a3024', z < 0.5 ? 11 : 13, 700, z < 0.5 ? 6 : 9);
+    });
+    var hp = this.proj(0, 0);
+    if (z >= 0.5) {
+      this.pill(g, 'PLATO', hp[0], hp[1] + 22 * z, 'rgba(0,0,0,0)', '#2e2820', 15, 700, 6);
+      this.pill(g, 'QUESTION HUB', hp[0], hp[1] + 44 * z, '#f7eedc', '#3a3024', 11, 700, 9);
+    } else {
+      this.pill(g, 'PLATO', hp[0], hp[1] + 26 * z, '#f7eedc', '#3a3024', 11, 700, 7);
+    }
+  };
+
+  P.drawDynamic = function (g, sec) {
+    var self = this, z = this.z, S = this.S;
+    if (!S) return;
+    var t = this.t, n = S.lanes.length, selId = this.selId;
+    var place = {};
+    if (S.race) standings(S, t).forEach(function (r, i) { if (r.fin) place[r.L.agent.id] = i + 1; });
+    var lanes = S.lanes.map(function (L, i) {
+      var p = self.posAt(L, t);
+      // Racers share roads: nudge each car sideways so they never stack.
+      if (n > 1) {
+        var dl = Math.hypot(p.dx, p.dy) || 1, off = (i - (n - 1) / 2) * 0.55;
+        p = { x: p.x - p.dy / dl * off, y: p.y + p.dx / dl * off, dx: p.dx, dy: p.dy, i: p.i };
+      }
+      return { L: L, p: p, on: n === 1 || L.agent.id === selId };
+    });
+    // Unselected trails first, the selected one on top.
+    lanes.slice().sort(function (a, b) { return a.on - b.on; }).forEach(function (ln) {
+      var K = ln.L.keys || [], col = colorOf(ln.L.agent.id);
+      if (K.length < 2) return;
+      var pts = K.slice(0, ln.p.i).map(function (k) { return self.proj(k.x, k.y); }).concat([self.proj(ln.p.x, ln.p.y)]);
+      g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+      // Muted agent colours (sage, gold) vanish on the beige road at the
+      // design's weights, so the glow is heavier and the core darker.
+      g.strokeStyle = alpha(col, ln.on ? 0.55 : 0.3); g.lineWidth = (ln.on ? 12 : 8) * z;
+      g.beginPath(); pts.forEach(function (p, i) { if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }); g.stroke();
+      g.strokeStyle = ln.on ? shade(col, 0.68) : alpha(col, 0.8); g.lineWidth = (ln.on ? 3.4 : 2.2) * z; g.stroke();
+      g.restore();
+    });
+    var busy = {};
+    var cars = lanes.map(function (ln) { busy[ln.L.agent.id] = 1; return { id: ln.L.agent.id, name: (place[ln.L.agent.id] ? place[ln.L.agent.id] + '. ' : '') + ln.L.agent.name, p: ln.p }; });
+    this.loops.forEach(function (l) { if (!busy[l.id]) cars.push({ id: l.id, name: l.name, p: self.loopAt(l, sec) }); });
+    cars.sort(function (m, n) { return (m.p.x + m.p.y) - (n.p.x + n.p.y); });
+    var tops = cars.map(function (cc) { return { cc: cc, top: self.car(g, cc.p.x, cc.p.y, colorOf(cc.id), cc.p.dx, cc.p.dy) }; });
+    // Cars parked at the same stop would stack their name tags — lift each tag
+    // clear of any already placed nearby.
+    var placed = [], ph = (z < 0.5 ? 10 : 12) * Math.min(1.25, Math.max(0.42, z)) + 13 * Math.min(1.25, Math.max(0.42, z));
+    tops.slice().sort(function (a, b) { return b.top[1] - a.top[1]; }).forEach(function (ct) {
+      var x = ct.top[0], y = ct.top[1] - 10 * Math.max(0.6, Math.min(1.2, z));
+      for (var guard = 0; guard < 6; guard++) {
+        var hit = placed.some(function (q) { return Math.abs(q[0] - x) < 60 && Math.abs(q[1] - y) < ph; });
+        if (!hit) break;
+        y -= ph;
+      }
+      placed.push([x, y]);
+      self.pill(g, ct.cc.name, x, y, shade(colorOf(ct.cc.id), 0.8), '#ffffff', z < 0.5 ? 10 : 12, 600, z < 0.5 ? 6 : 9);
+    });
+  };
+
+  // Idle agents circle their home block. Homes come from GET /api/agents/locations
+  // (the district their own tools point at); the demo uses the design's loops.
+  P.setRoster = function (roster, demo) {
+    if (demo) {
+      this.loops = DEMO_LOOPS.map(function (l) { return { id: l.id, name: cap2(l.id), pts: l.pts, period: l.period, off: l.off }; });
+      return;
+    }
+    var perHome = {};
+    this.loops = (roster || []).filter(function (a) { return a.id !== 'plato'; }).map(function (a) {
+      var lm = a.home ? lmById(lmFor(a.home.id)) : null;
+      var cx = lm ? lm.x : 0, cy = lm ? lm.y : 0, key = lm ? lm.id : 'hub';
+      var n = perHome[key] = (perHome[key] || 0) + 1;
+      var pts = [[cx - 4, cy - 4], [cx + 4, cy - 4], [cx + 4, cy + 4], [cx - 4, cy + 4]];
+      // An agent still on another of your runs says so on its tag.
+      var nm = (a.name || cap2(a.id)) + (a.status === 'running' ? ' · busy' : '');
+      return { id: a.id, name: nm, pts: pts, period: 13 + (n - 1) * 2, off: (n - 1) * 6.5 };
+    });
+  };
+
+  // ── App: panel, controls, data ──────────────────────────────────────────
+  var map = null, SCN = null, ROSTER = [], sel = null, whyOpen = false, mode = 'live';
+  var RUN_ACTIVE = false, pendingAsk = false;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setScenario(S, opts) {
+    opts = opts || {};
+    compile(S);
+    SCN = S;
+    if (!opts.keepSel || !sel) sel = S.chosen || S.lanes[0].agent.id;
+    map.S = S; map.selId = sel;
+    map.setRoster(ROSTER, S.demo || !ROSTER.length);
+    if (opts.keepT) map.t = Math.min(map.t, S.live ? map.horizon() : S.RUN);
+    else map.t = 0;
+    map.playing = opts.paused ? false : true;
+    if (opts.paused) map.t = S.RUN;
+    var q = tidyQ(S.question);
+    $('amDraft').placeholder = q || 'Ask the agents anything…';
+    $('amQ').textContent = q || '—';
+    $('amQ').title = S.question && S.question.length > q.length ? S.question : '';
+    if (raceMode) setRaceMode(true); // keep the race prompt in the bar
+    cache = {};
+    renderPanel();
+  }
+
+  var cache = {};
+  function setHtml(id, html) { if (cache[id] !== html) { cache[id] = html; $(id).innerHTML = html; } }
+  // The lane the panel describes: the selected agent's, else the first.
+  function selLane(S) { return S.lanes.filter(function (L) { return L.agent.id === sel; })[0] || S.lanes[0]; }
+  function avatarHtml(id, name, size) {
+    var c = colorOf(id), av = avatarOf(id);
+    return '<div style="width:' + size + 'px; height:' + size + 'px; border-radius:999px; flex-shrink:0; border:2px solid ' + c + '; background-color:#fff;' + (av ? " background-image:url('" + av + "');" : '') + ' background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color:' + c + '; font-size:' + Math.round(size * 0.38) + 'px; font-weight:700;">' + (av ? '' : esc((name || '?')[0])) + '</div>';
+  }
+
+  function renderModes() {
+    setHtml('amModes', [['live', 'Live Run'], ['past', 'Past Runs']].map(function (m) {
+      var on = mode === m[0];
+      return '<span class="am-seg" data-mode="' + m[0] + '" role="button" tabindex="0" title="' + m[1] + '" aria-label="' + m[1] + '" aria-pressed="' + on + '" style="display:inline-flex; align-items:center; gap:10px; padding:8px 10px; font-size:15px; font-weight:' + (on ? 500 : 400) + '; color:' + (on ? '#1f1b16' : '#6f665a') + '; white-space:nowrap;">' +
+        '<span style="width:16px; height:16px; border-radius:999px; background:' + (on ? '#e7824b' : '#d9d3c9') + ';"></span><span class="am-lbl">' + m[1] + '</span></span>';
+    }).join(''));
+    setHtml('amViews', [['top', 'Top'], ['side', 'Side']].map(function (v) {
+      var on = map && map.view === v[0];
+      return '<span data-view="' + v[0] + '" style="padding:8px 14px; border-radius:9px; font-size:13px; font-weight:600; background:' + (on ? '#fbf4ea' : 'transparent') + '; color:' + (on ? '#1f1b16' : '#e9e2d6') + ';">' + v[1] + '</span>';
+    }).join(''));
+  }
+
+  function renderPanel() {
+    var S = SCN; if (!S || !map) return;
+    var L = selLane(S);
+    var t = map.t, done = !L.live && t >= L.end;
+    // Status
+    var lbl, lc;
+    if (pendingAsk) { lbl = 'Starting'; lc = '#e7824b'; }
+    else if (S.live) { lbl = 'Live'; lc = '#3aa865'; }
+    else if (t >= S.RUN) { lbl = 'Done'; lc = '#6f665a'; }
+    else if (map.playing) { lbl = S.demo ? 'Demo' : 'Replaying'; lc = '#3aa865'; }
+    else { lbl = 'Paused'; lc = '#6f665a'; }
+    $('amLiveLabel').textContent = lbl;
+    $('amLive').style.color = lc; $('amLiveDot').style.background = lc;
+    $('amLiveDot').classList.toggle('am-pulse', !!(S.live || pendingAsk));
+    var runPct;
+    if (S.race) {
+      var finished = S.lanes.filter(function (x) { return !x.live && t >= x.end; }).length;
+      runPct = S.live ? Math.max(4, finished / S.lanes.length * 100) : Math.min(1, t / S.RUN) * 100;
+    } else {
+      runPct = L.live ? Math.min(92, (L.legs.length / (L.legs.length + 2)) * 100) : Math.min(1, t / S.RUN) * 100;
+    }
+    $('amRunBar').style.width = runPct.toFixed(1) + '%';
+    var main = L.steps.slice(L.steps[0].kind === 'before' ? 2 : 1, L.steps.length - 1);
+    var stepN = Math.max(1, Math.min(main.length, main.filter(function (s) { return t >= s.at; }).length));
+    $('amStepLabel').textContent = S.race ? (S.lanes.filter(function (x) { return !x.live && t >= x.end; }).length + ' of ' + S.lanes.length + ' finished') : 'Step ' + stepN + ' of ' + main.length;
+    var slowest = Math.max.apply(null, S.lanes.map(function (x) { return x.durationMs || 0; }));
+    $('amRunMeta').textContent = S.demo ? 'Demo scenario. Sign in and ask a question to see your own runs.'
+      : S.race ? 'Race · ' + S.lanes.map(function (x) { return x.agent.name; }).join(' vs ') + (S.live ? ' · streaming' : slowest ? ' · took ' + fmtSecs(slowest) : '')
+      : (S.execId ? (S.live ? 'Streaming ' : 'Run ') + S.execId.slice(0, 10) + '…' + (L.durationMs && !L.live ? ' · took ' + fmtSecs(L.durationMs) : '') : '');
+
+    // Standings (race only)
+    $('amStandWrap').style.display = S.race ? 'block' : 'none';
+    if (S.race) {
+      setHtml('amStand', standings(S, t).map(function (r, i) {
+        var x = r.L, c = colorOf(x.agent.id), on = x.agent.id === sel;
+        // A live lane's car waits at its newest stop, so read it on its own clock.
+        var tl = Math.min(t, laneHorizon(x));
+        var at = x.legs.filter(function (l) { return tl >= l.at; }).pop();
+        var next = x.legs.filter(function (l) { return tl < l.at; })[0];
+        var status = r.fin
+          ? (r.ok ? 'Finished' : 'Stopped: ' + cap2(x.reason)) + (x.durationMs ? ' in ' + fmtSecs(x.durationMs) : '')
+          : x.live ? (next ? 'Driving to ' + next.name : at ? 'At ' + at.name : 'Planning at the hub')
+          : t >= x.backAt ? 'Writing the answer'
+          : next ? 'Driving to ' + next.name
+          : at ? (x.live ? 'At ' + at.name : 'Heading back to the hub')
+          : 'Planning at the hub';
+        var tok = x.live ? x.fuel : Math.round(x.fuel * Math.min(1, t / x.end));
+        return '<div class="am-row" data-sel="' + esc(x.agent.id) + '" style="display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:12px; background:' + (on ? alpha(c, 0.12) : 'transparent') + ';">' +
+          '<span style="width:18px; font-size:15px; font-weight:700; color:' + (r.fin ? '#1f1b16' : '#b0a79a') + '; text-align:center; font-variant-numeric:tabular-nums;">' + (i + 1) + '</span>' +
+          avatarHtml(x.agent.id, x.agent.name, 34) +
+          '<div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:600;">' + esc(x.agent.name) + ' <span style="font-weight:400; color:' + shade(c, 0.85) + ';">' + esc(x.agent.role || '') + '</span></div>' +
+          '<div style="font-size:12px; color:' + (r.fin && !r.ok ? '#a8642a' : '#6f665a') + '; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(status) + '</div></div>' +
+          '<span style="font-size:13px; color:#6f665a; font-variant-numeric:tabular-nums; white-space:nowrap;">' + (tok / 1000).toFixed(1) + 'k</span>' +
+          '</div>';
+      }).join(''));
+    }
+
+    // Routing
+    var rows = S.routing || (S.race
+      ? S.lanes.map(function (x) { return { id: x.agent.id, name: x.agent.name, role: x.agent.role, pct: null, racing: true, why: x.agent.name + ' was sent into this race. No routing breakdown was recorded for it.' }; })
+      : [{ id: L.agent.id, name: L.agent.name, role: L.agent.role, pct: null, why: 'This question went straight to ' + L.agent.name + ', so Plato didn’t weigh other agents for it.' }]);
+    setHtml('amRouting', rows.map(function (r) {
+      var on = r.id === sel, c = colorOf(r.id), av = avatarOf(r.id);
+      return '<div class="am-row" data-sel="' + esc(r.id) + '" style="display:flex; align-items:center; gap:14px; padding:10px 12px; border-radius:12px; background:' + (on ? alpha(c, 0.12) : 'transparent') + ';">' +
+        '<div style="width:40px; height:40px; border-radius:999px; flex-shrink:0; border:2px solid ' + c + '; background-color:#fff;' + (av ? " background-image:url('" + av + "');" : '') + ' background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; color:' + c + '; font-size:15px; font-weight:700;">' + (av ? '' : esc((r.name || '?')[0])) + '</div>' +
+        '<div style="flex:1; min-width:0;">' +
+          '<div style="display:flex; align-items:baseline; gap:8px;">' +
+            '<span style="font-size:14px; font-weight:600;">' + esc(r.name) + '</span>' +
+            '<span style="font-size:14px; color:' + shade(c, 0.85) + ';">' + esc(r.role || '') + '</span>' +
+            (r.racing ? '<span style="font-size:10px; font-weight:700; letter-spacing:.06em; padding:2px 7px; border-radius:999px; background:#fbe4d3; color:#b4531c;">RACING</span>' : '') +
+            '<span style="margin-left:auto; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">' + (r.pct == null ? (r.racing ? '—' : 'direct') : r.pct + '%') + '</span>' +
+          '</div>' +
+          '<div style="height:6px; border-radius:999px; background:#ece5da; margin-top:8px; overflow:hidden;"><div style="height:100%; width:' + (r.pct == null ? 100 : r.pct) + '%; border-radius:999px; background:' + c + ';"></div></div>' +
+        '</div>' +
+        '<div style="width:24px; height:24px; flex-shrink:0; border-radius:999px; background:' + (on ? c : 'transparent') + '; display:flex; align-items:center; justify-content:center;">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + (on ? '#fff' : 'transparent') + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>' +
+        '</div></div>';
+    }).join(''));
+    var selRow = rows.filter(function (r) { return r.id === sel; })[0] || rows[0];
+    setHtml('amWhyLink', 'Why ' + esc(selRow.name) + '? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s ease; transform:rotate(' + (whyOpen ? 90 : 0) + 'deg);"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>');
+    $('amWhy').style.display = whyOpen ? 'block' : 'none';
+    setHtml('amWhy', esc(selRow.why || ''));
+    $('amRouteInfo').title = S.routing ? 'Plato scores each agent: 70% capability match, 30% past results on this kind of question.' : 'No routing breakdown was recorded for this run.';
+
+    // Live route (the selected lane's)
+    $('amRouteTitle').textContent = S.race ? 'Live Route · ' + L.agent.name : 'Live Route';
+    var acol = colorOf(L.agent.id);
+    setHtml('amSteps', L.steps.map(function (s) {
+      var reached = L.live ? (s.kind === 'before' || s.kind === 'start' || s.kind === 'leg' || s.kind === 'err') && t >= s.at - 0.01 : t >= s.at;
+      var green = s.kind === 'start' || s.kind === 'end';
+      var dc = s.kind === 'err' ? '#d0833a' : s.kind === 'before' ? '#a39a8c' : green ? '#3aa865' : acol;
+      var subs = s.subs || (s.sub ? [s.sub] : []);
+      if (s.calls > 1) subs = subs.concat(s.calls + ' calls here');
+      var right = [s.tok != null && s.tok > 0 ? fmtTok(s.tok) + ' tok' : '', s.real || ''].filter(Boolean).join(' · ');
+      var dot = reached ? dc : '#cfc8bc', ring = reached ? alpha(dc, 0.2) : 'transparent';
+      var bold = s.b && reached;
+      return '<div style="position:relative; display:flex; gap:22px; padding:4px 0;">' +
+        '<span style="width:18px; height:18px; flex-shrink:0; border-radius:999px; background:' + dot + '; box-shadow:0 0 0 3px ' + ring + '; margin-top:1px;"></span>' +
+        '<div style="flex:1; min-width:0;">' +
+          '<div style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:' + (bold ? 600 : 400) + '; color:' + (reached ? '#1f1b16' : '#4a4238') + ';">' +
+            '<span style="white-space:nowrap;">' + esc(s.a) + '</span>' +
+            (s.b ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M5 12h14M12 5l7 7-7 7"></path></svg><span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(s.b) + '</span>' : '') +
+            '<span style="margin-left:auto; font-size:14px; font-weight:400; color:#6f665a; font-variant-numeric:tabular-nums; white-space:nowrap;">' + esc(right) + '</span>' +
+          '</div>' +
+          subs.map(function (x) { return '<div title="' + esc(x) + '" style="font-size:13px; color:' + (s.kind === 'err' && /fail/i.test(x) ? '#a8642a' : '#6f665a') + '; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(x) + '</div>'; }).join('') +
+        '</div></div>';
+    }).join('') + (L.live ? '<div style="font-size:13px; color:#8a8174; padding:4px 0 0 40px;" class="am-pulse">' + esc(L.agent.name) + ' is working…</div>' : ''));
+
+    // Fuel: a replay spends it as the clock runs; a live run shows the real burn.
+    var tokens = L.live ? L.fuel : Math.round(L.fuel * Math.min(1, t / L.end));
+    var fpct = L.fuelCap ? Math.round(tokens / L.fuelCap * 100) : 0;
+    $('amFuelLabel').textContent = fmtN(tokens) + ' / ' + fmtN(L.fuelCap);
+    $('amFuelBar').style.width = Math.min(100, fpct) + '%';
+    $('amFuelBar').style.background = fpct > 100 ? '#d0833a' : '#4dbf74';
+    $('amFuelPct').textContent = fpct + '%';
+    setHtml('amFuelWhy', fuelWhyHtml(L, S));
+
+    // Verification
+    var v;
+    var awaiting = !L.verified && L.execId && verifyWait[L.execId] > Date.now();
+    if (!done || awaiting) v = { bg: '#f3eee6', fg: '#6f665a', icon: '#b8b0a3', title: 'Verifying answer', sub: 'Plato checks every source before release' };
+    else if (L.verified) v = { bg: '#e7f4e8', fg: '#2e8f53', icon: '#2e9e57', title: 'Answer verified', sub: 'Confidence: ' + (L.confidence || '—') + '%   |   ' + L.sources + ' source' + (L.sources === 1 ? '' : 's') };
+    else v = { bg: '#fbeedd', fg: '#9a5a1e', icon: '#d98a3d', title: 'Not verified', sub: L.reason === 'budget_exceeded' ? 'Stopped at the fuel limit before checking' : L.reason === 'error' ? 'The run hit an error' : (L.sources ? L.sources + ' source' + (L.sources === 1 ? '' : 's') + ', not all of them checked' : 'No sources to check against') };
+    if (S.race && done) v.title = L.agent.name + ': ' + v.title.charAt(0).toLowerCase() + v.title.slice(1);
+    $('amVerify').style.background = v.bg;
+    setHtml('amVerify',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="' + v.icon + '" stroke="none" style="flex-shrink:0;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>' +
+      '<div style="flex:1; min-width:0;"><div style="font-size:17px; font-weight:600; color:' + v.fg + ';">' + esc(v.title) + '</div>' +
+      '<div style="font-size:13px; color:' + v.fg + '; margin-top:4px; white-space:pre;">' + esc(v.sub) + '</div></div>');
+    renderModes();
+  }
+
+  // Why the run cost what it did: where the tokens went (per stop), what kind
+  // of tokens they were, and how that compares with this agent's usual spend
+  // and with the other agents on the same kind of question.
+  function fuelWhyHtml(L, S) {
+    var out = [], muted = 'color:#7a7064;';
+    var bar = function (label, n, max, hot, c) {
+      return '<div style="display:flex; align-items:center; gap:10px; margin-top:5px;">' +
+        '<span style="width:128px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' + (hot ? ' font-weight:600;' : '') + '" title="' + esc(label) + '">' + esc(label) + '</span>' +
+        '<div style="flex:1; height:6px; border-radius:999px; background:#ece5da; overflow:hidden;"><div style="height:100%; width:' + Math.max(2, Math.round(n / max * 100)) + '%; background:' + c + '; border-radius:999px;"></div></div>' +
+        '<span style="width:44px; text-align:right; font-variant-numeric:tabular-nums;">' + fmtTok(n) + '</span></div>';
+    };
+    var acol = colorOf(L.agent.id);
+
+    // 1. Where it went.
+    if (L.stepTokens) {
+      var parts = [{ label: 'Planning at the hub', n: L.hubTokens }]
+        .concat(L.legs.map(function (l) { return { label: l.name + (l.calls > 1 ? ' ×' + l.calls : ''), n: l.tokens }; }))
+        .concat([{ label: 'Writing the answer', n: L.answerTokens }])
+        .filter(function (p) { return p.n > 0; });
+      if (parts.length) {
+        var max = Math.max.apply(null, parts.map(function (p) { return p.n; }));
+        var top = parts.filter(function (p) { return p.n === max; })[0];
+        out.push('<div style="font-weight:600; margin-top:2px;">Where the tokens went' + (L.live ? ' so far' : '') + '</div>' +
+          parts.map(function (p) { return bar(p.label, p.n, max, p === top, p === top ? acol : alpha(acol, 0.45)); }).join(''));
+      }
+    } else if (!L.live && L.fuel) {
+      out.push('<div style="' + muted + '">This run was recorded before per-stop costs were saved, so only its total is known.</div>');
+    }
+
+    // 2. What kind of tokens, and why that adds up.
+    if (L.promptTokens || L.completionTokens) {
+      var tot = L.promptTokens + L.completionTokens, share = tot ? L.promptTokens / tot : 0;
+      var line = 'Reading ' + fmtTok(L.promptTokens) + ' · writing ' + fmtTok(L.completionTokens) +
+        (L.turns ? ' · ' + L.turns + ' turn' + (L.turns === 1 ? '' : 's') : '') +
+        (L.toolCalls ? ' · ' + L.toolCalls + ' tool call' + (L.toolCalls === 1 ? '' : 's') : '');
+      var why = share >= 0.7 && L.turns > 1
+        ? ' Most of it was reading: every turn re-reads the question plus everything gathered so far, so each extra turn costs more than the one before.'
+        : '';
+      out.push('<div style="margin-top:10px;">' + esc(line) + '<span style="' + muted + '">' + esc(why) + '</span></div>');
+    }
+
+    // 3. Against its own habit and against the others.
+    var cmp = L.comparison;
+    if (!L.live && cmp && cmp.agents && cmp.agents.length && L.fuel) {
+      var mine = cmp.agents.filter(function (a) { return a.id === L.agent.id; })[0];
+      var others = cmp.agents.filter(function (a) { return a.id !== L.agent.id; });
+      var scope = cmp.taskType ? cap2(cmp.taskType) + ' questions' : 'all questions';
+      var said = [];
+      if (mine && mine.avgTokens) {
+        var d = Math.round((L.fuel - mine.avgTokens) / mine.avgTokens * 100);
+        var s = Math.abs(d) < 10 ? 'About ' + L.agent.name + '’s usual ' + fmtTok(mine.avgTokens) + ' on ' + scope + '.'
+          : (Math.abs(d) + '% ' + (d > 0 ? 'more' : 'less') + ' than ' + L.agent.name + '’s usual ' + fmtTok(mine.avgTokens) + ' on ' + scope + '.');
+        var drivers = [];
+        if (L.turns && mine.avgTurns && Math.abs(L.turns - mine.avgTurns) >= 1) drivers.push(L.turns + ' turns vs ' + mine.avgTurns + ' usually');
+        if (L.toolCalls && mine.avgTools && Math.abs(L.toolCalls - mine.avgTools) >= 1) drivers.push(L.toolCalls + ' tool calls vs ' + mine.avgTools);
+        if (drivers.length && Math.abs(d) >= 10) s += ' It took ' + drivers.join(' and ') + '.';
+        said.push(s);
+      }
+      var cheaper = others.filter(function (a) { return a.avgTokens && a.avgTokens < L.fuel; });
+      if (cheaper.length) said.push(cheaper.map(function (a) { return a.name; }).join(', ') + ' usually spend' + (cheaper.length === 1 ? 's' : '') + ' less here. Tokens aren’t the whole story, so check accuracy on Ranks too.');
+      var rows = cmp.agents.map(function (a) { return { label: a.name + ' avg (' + a.runs + ')', n: a.avgTokens, id: a.id }; })
+        .concat([{ label: 'This run', n: L.fuel, id: L.agent.id, me: true }])
+        .sort(function (a, b) { return a.n - b.n; });
+      var cmax = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
+      out.push('<div style="font-weight:600; margin-top:12px;">Compared on ' + esc(scope) + '</div>' +
+        rows.map(function (r) { return bar(r.label, r.n, cmax, r.me, r.me ? acol : alpha(colorOf(r.id), 0.5)); }).join('') +
+        (said.length ? '<div style="margin-top:8px; ' + muted + '">' + esc(said.join(' ')) + '</div>' : ''));
+    }
+    return out.join('');
+  }
+
+  // ── Building hover card ─────────────────────────────────────────────────
+  // What a building holds, which tools answer there, which agents are based
+  // there, and what the run on screen did there.
+  function landmarkTipHtml(id) {
+    var info = LM_INFO[id]; if (!info) return '';
+    var lm = id === 'hub' ? null : lmById(id);
+    var dot = lm ? lm.roof : '#9a5c8a';
+    var h = '<div style="display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700;"><span style="width:10px; height:10px; border-radius:3px; background:' + dot + ';"></span>' + esc(info.title) + '</div>' +
+      '<div style="margin-top:6px; color:#4a4238;">' + esc(info.what) + '</div>';
+    if (info.tools.length) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">TOOLS HERE</div><div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;">' +
+        info.tools.map(function (t) { return '<span style="padding:2px 8px; border-radius:999px; background:#f1e8d9; font-size:12px;">' + esc(cap2(t)) + '</span>'; }).join('') + '</div>';
+    }
+    var based = id === 'hub' ? [{ id: 'plato', name: 'Plato' }]
+      : ROSTER.filter(function (a) { return a.id !== 'plato' && a.home && lmFor(a.home.id) === id; });
+    if (based.length) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">BASED HERE</div><div style="margin-top:4px;">' +
+        based.map(function (a) { return '<span style="font-weight:600; color:' + shade(colorOf(a.id), 0.8) + ';">' + esc(a.name || cap2(a.id)) + '</span>' + (a.status === 'running' ? ' (busy)' : ''); }).join(', ') + '</div>';
+    }
+    // This run, per agent on it.
+    var S = SCN, lines = [];
+    if (S) S.lanes.forEach(function (L) {
+      var nm = '<b>' + esc(L.agent.name) + '</b>';
+      if (id === 'hub') {
+        lines.push(nm + ' picked up the task here' + (L.stepTokens && L.hubTokens ? ' and spent ' + fmtTok(L.hubTokens) + ' tokens planning' : '') + '.');
+        return;
+      }
+      var legs = L.legs.filter(function (l) { return l.lm === id; });
+      if (!legs.length) return;
+      var calls = legs.reduce(function (n, l) { return n + l.calls; }, 0);
+      var tok = legs.reduce(function (n, l) { return n + (l.tokens || 0); }, 0);
+      var reasons = [].concat.apply([], legs.map(function (l) { return l.reasons; })).slice(0, 3);
+      lines.push(nm + ': ' + calls + ' call' + (calls === 1 ? '' : 's') + (legs.length > 1 ? ' over ' + legs.length + ' visits' : '') +
+        (L.stepTokens ? ' · ' + fmtTok(tok) + ' tokens' : '') + (legs.some(function (l) { return l.err; }) ? ' · <span style="color:#a8642a;">a call failed</span>' : '') +
+        reasons.map(function (r) { return '<div style="color:#6f665a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">· ' + esc(r) + '</div>'; }).join(''));
+    });
+    if (S) {
+      h += '<div style="margin-top:10px; font-size:11px; font-weight:700; letter-spacing:.06em; color:#8a8174;">' + (S.live ? 'THIS RUN SO FAR' : 'IN THIS RUN') + '</div>' +
+        '<div style="margin-top:4px;">' + (lines.length ? lines.join('<div style="height:6px;"></div>') : '<span style="color:#8a8174;">Not visited.</span>') + '</div>';
+    }
+    return h;
+  }
+  var tipPinned = null;
+  function onMapHover(id, x, y, tap) {
+    var tip = $('amTip');
+    if (tap) tipPinned = id && id !== tipPinned ? id : null;
+    else if (tipPinned) return; // a tapped card stays until the next tap
+    var show = tap ? tipPinned : id;
+    if (!show) { tip.style.display = 'none'; return; }
+    tip.innerHTML = landmarkTipHtml(show);
+    tip.style.display = 'block';
+    var app = $('amApp'), W = app.clientWidth - map.panelW(), Hh = app.clientHeight;
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = x + 18 + tw > W - 8 ? x - tw - 18 : x + 18;
+    tip.style.left = Math.max(8, Math.min(left, W - tw - 8)) + 'px';
+    tip.style.top = Math.max(8, Math.min(y - 20, Hh - th - 8)) + 'px';
+  }
+
+  // ── API plumbing ────────────────────────────────────────────────────────
+  function apiBase() { return location.protocol.indexOf('http') === 0 ? location.origin : 'http://localhost:3000'; }
+  // The token lives beside the user, not inside it (see auth_session.js): only
+  // an old remembered session carries `token` on the user object, so reading
+  // that alone left a signed-in tab stuck on the demo with every panel saying
+  // "Sign in".
+  function getToken() {
+    try {
+      var tok = sessionStorage.getItem('finchat_token') || localStorage.getItem('finchat_token') || localStorage.getItem('finchat_jwt');
+      if (tok) return tok;
+      var raw = sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session'); var s = raw ? JSON.parse(raw) : null; return (s && s.token) || null;
+    } catch (e) { return null; }
+  }
+  function authGet(path) {
+    var tok = getToken();
+    return fetch(apiBase() + path, { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+  function loadTrace(id) {
+    return authGet('/api/executions/' + encodeURIComponent(id) + '/trace').then(function (d) {
+      if (!d.trace) throw new Error('empty trace');
+      d.trace.executionId = d.trace.executionId || id;
+      return d.trace;
+    });
+  }
+  function setUrl(id, raceId) {
+    try {
+      var p = new URLSearchParams(location.search); p.delete('demo'); p.delete('execution'); p.delete('race');
+      if (raceId) p.set('race', raceId); else if (id) p.set('execution', id);
+      history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+    } catch (e) { /* cosmetic */ }
+  }
+
+  var toastTimer = null;
+  function toast(html, ms) {
+    var el = $('amToast'); el.innerHTML = html; el.style.display = 'block';
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.style.display = 'none'; }, ms || 4200);
+  }
+
+  function showRun(id, opts) {
+    return loadTrace(id).then(function (tr) {
+      setScenario(scenarioFromTrace(tr), opts);
+      setUrl(id);
+    });
+  }
+  function showLatest() {
+    if (!getToken()) { setScenario(demoScenario()); return Promise.resolve(); }
+    return authGet('/api/executions/list/recent?limit=1').then(function (d) {
+      var run = d && d.executions && d.executions[0];
+      if (!run) throw new Error('no runs');
+      if (run.race_id) return showRace(run.race_id);
+      race = null;
+      return showRun(run.execution_id);
+    }).catch(function () { setScenario(demoScenario()); setUrl(null); });
+  }
+
+  // ── Ask: the question bar sends to Plato, who routes it ──────────────────
+  // With Race on, Plato fields 2–3 agents instead (POST /api/executions/race)
+  // and every lane streams onto the same map.
+  var raceMode = false;
+  function setRaceMode(on) {
+    raceMode = !!on;
+    var b = $('amRaceTog');
+    b.setAttribute('aria-pressed', String(raceMode));
+    b.style.background = raceMode ? '#fbe4d3' : 'transparent';
+    b.style.borderColor = raceMode ? '#f2ab76' : '#e2d8c8';
+    b.style.color = raceMode ? '#b4531c' : '#6f665a';
+    $('amDraft').placeholder = raceMode ? 'Race: Plato sends 2–3 agents at this question…' : (tidyQ(SCN && SCN.question) || 'Ask the agents anything…');
+  }
+  function ask() {
+    var input = $('amDraft'), msg = input.value.trim();
+    if (!msg) { input.focus(); return; }
+    if (!getToken()) { toast('Sign in to ask the agents. <a href="finchat_login.html">Go to login →</a>', 6000); return; }
+    input.value = ''; pendingAsk = true; mode = 'live';
+    $('amQ').textContent = msg;
+    renderPanel();
+    var racing = raceMode;
+    fetch(apiBase() + (racing ? '/api/executions/race' : '/api/ai-chat/send'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getToken() },
+      body: JSON.stringify(racing ? { question: msg } : { persona: 'plato', message: msg, web: true })
+    }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.error || ('HTTP ' + r.status)); });
+      if (racing) return r.json().then(function (d) {
+        // The lanes may already be streaming; attach Plato's field breakdown.
+        raceRouting[d.raceId] = d.routing || null;
+        if (race && race.raceId === d.raceId) { race.routing = d.routing || null; pushRace(); }
+      });
+    }).catch(function (e) {
+      pendingAsk = false; renderPanel();
+      toast('Could not send that question: ' + esc(e.message), 6000);
+    });
+    // Watchdog: if no run starts streaming, say so instead of spinning forever.
+    setTimeout(function () { if (pendingAsk) { pendingAsk = false; renderPanel(); toast('Plato answered without routing to the map. Try <b>Live Run</b> to load the newest run.', 6000); } }, 25000);
+  }
+
+  // ── Live streaming ──────────────────────────────────────────────────────
+  // Pulses from the EventBus→Socket.IO bridge accumulate into trace-shaped
+  // objects (the SAME contract as /trace); every pulse re-derives the scenario
+  // so each car drives to its new stop as it happens. A single run follows one
+  // execution; a race (pulses sharing a raceId) keeps one object per lane. On
+  // completion the persisted traces replace them.
+  var live = null, watchingId = null;
+  var race = null, raceRouting = {};
+  // Reflection (the 'verified' pulse) lands a few seconds after 'done'. Until
+  // then a just-finished run reads "Verifying", not "Not verified".
+  var verifyWait = {};
+  function fmtInput(v) {
+    if (v == null) return '';
+    if (typeof v === 'string') return v.length > 120 ? v.slice(0, 119) + '…' : v;
+    try { var s = JSON.stringify(v); return s === '{}' ? '' : (s.length > 120 ? s.slice(0, 119) + '…' : s); } catch (e) { return ''; }
+  }
+  function newLiveTrace(p) {
+    var a = p.agent || {};
+    return {
+      executionId: p.executionId, question: p.question || '', live: true,
+      agent: { id: a.id, name: a.name || cap2(a.id || 'agent'), role: a.role || '', fuel: 0, fuelCap: a.fuelCap || 15 },
+      districts: [], buildings: [], waypoints: [], fog: [], sources: []
+    };
+  }
+  function ensureBuilding(tr, b) {
+    if (!b || !b.buildingId) return;
+    if (!tr.districts.some(function (d) { return d.id === b.district; })) tr.districts.push({ id: b.district, name: b.districtName || b.district });
+    if (!tr.buildings.some(function (x) { return x.id === b.buildingId; })) tr.buildings.push({ id: b.buildingId, label: b.label, district: b.district, districtName: b.districtName, kind: b.kind || 'concept' });
+  }
+  // Fold one pulse into a trace-shaped object. Returns true when the map should redraw.
+  function accumulate(tr, p) {
+    if (p.type === 'tool_end') {
+      ensureBuilding(tr, p.building);
+      tr.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), atMs: p.atMs, offRoad: !!p.error });
+      if (p.error) tr.fog.push({ name: (p.building ? p.building.label : p.tool) + ' returned nothing', state: 'unknown' });
+      if (p.fuel != null) tr.agent.fuel = p.fuel;
+      return true;
+    }
+    if (p.type === 'tool_start') { ensureBuilding(tr, p.building); return false; }
+    if (p.type === 'step') {
+      // Each step pulse follows one reasoning turn and carries the running
+      // total; the difference is that turn's cost, charged where the car stands.
+      if (p.tokensUsed != null) {
+        var spent = p.tokensUsed - (tr.tokSeen || 0); tr.tokSeen = p.tokensUsed;
+        var wps = tr.waypoints, here = wps.length ? wps[wps.length - 1].buildingId : null;
+        if (spent > 0) wps.push({ buildingId: here, phase: 'think', tokens: spent, atMs: p.atMs });
+      }
+      if (p.fuel != null) { tr.agent.fuel = p.fuel; return true; }
+      return false;
+    }
+    if (p.type === 'error') { tr.fog.push({ name: 'Run error', state: 'unknown' }); return true; }
+    if (p.type === 'done') {
+      if (p.fuel != null) tr.agent.fuel = p.fuel;
+      tr.durationMs = p.atMs || null; tr.live = false;
+      tr.verification = { verified: false, reason: p.completionReason || 'natural' };
+      if ((p.completionReason || 'natural') === 'natural') {
+        verifyWait[tr.executionId] = Date.now() + 20000;
+        setTimeout(renderPanel, 20100);
+      }
+      return true;
+    }
+    return false;
+  }
+  // The stream says what the agent does from here on; where it was and what it
+  // was doing before this task (and how its spend compares) come from the
+  // server's trace, fetched once as the run starts.
+  function fillContext(tr, redraw) {
+    loadTrace(tr.executionId).then(function (full) {
+      tr.before = full.before || null; tr.comparison = full.comparison || null;
+      redraw();
+    }).catch(function () { /* the run still maps without it */ });
+  }
+  function pushLive() { setScenario(scenarioFromTrace(live), { keepT: true, keepSel: true }); }
+  function pushRace(fresh) { setScenario(scenarioFromRace(race), fresh ? {} : { keepT: true, keepSel: true }); }
+
+  function onRacePulse(p) {
+    if (p.type === 'start') {
+      if (!race || race.raceId !== p.raceId) {
+        race = { raceId: p.raceId, question: p.question || '', routing: raceRouting[p.raceId] || null, order: [], traces: {}, settled: false };
+        live = null; watchingId = null; RUN_ACTIVE = true; pendingAsk = false; mode = 'live';
+        setUrl(null, p.raceId);
+      }
+      if (!race.traces[p.executionId]) race.order.push(p.executionId);
+      var lane = race.traces[p.executionId] = newLiveTrace(p);
+      pushRace(race.order.length === 1);
+      var rr = race;
+      fillContext(lane, function () { if (race === rr && rr.traces[lane.executionId] === lane) pushRace(); });
+      return;
+    }
+    var tr = race.traces[p.executionId];
+    if (p.type === 'verified') {
+      delete verifyWait[p.executionId];
+      if (race.settled) reloadRaceLane(race, p.executionId);
+      return;
+    }
+    if (accumulate(tr, p)) pushRace();
+    if (p.type === 'done' && race.order.every(function (id) { return !race.traces[id].live; })) {
+      // Every lane is in: swap in the persisted traces and show the result.
+      RUN_ACTIVE = false;
+      var r = race;
+      setTimeout(function () { settleRace(r); }, 1500);
+    }
+  }
+  function settleRace(r) {
+    Promise.all(r.order.map(function (id) { return loadTrace(id).catch(function () { return r.traces[id]; }); })).then(function (trs) {
+      if (race !== r) return; // a newer run took over
+      trs.forEach(function (tr, i) { r.traces[r.order[i]] = tr; });
+      r.settled = true;
+      setScenario(scenarioFromRace(r), { keepSel: true, paused: true });
+    });
+  }
+  function reloadRaceLane(r, id) {
+    setTimeout(function () {
+      loadTrace(id).then(function (tr) {
+        if (race !== r) return;
+        r.traces[id] = tr;
+        setScenario(scenarioFromRace(r), { keepSel: true, keepT: true });
+        if (!map.playing) map.t = SCN.RUN;
+      }).catch(function () {});
+    }, 600);
+  }
+
+  function onPulse(p) {
+    if (!p || !p.type) return;
+    if (p.type === 'start' && p.raceId) { onRacePulse(p); return; }
+    if (race && race.traces[p.executionId]) { onRacePulse(p); return; }
+    if (p.type === 'start') {
+      race = null;
+      watchingId = p.executionId; RUN_ACTIVE = true; pendingAsk = false; mode = 'live';
+      var tr = live = newLiveTrace(p);
+      setScenario(scenarioFromTrace(live));
+      setUrl(p.executionId);
+      fillContext(tr, function () { if (live === tr) pushLive(); });
+      return;
+    }
+    if (!live || p.executionId !== watchingId) return;
+    if (p.type !== 'done' && p.type !== 'verified') { if (accumulate(live, p)) pushLive(); return; }
+    if (p.type === 'done') {
+      accumulate(live, p); RUN_ACTIVE = false;
+      pushLive();
+      var finished = watchingId;
+      setTimeout(function () {
+        loadTrace(finished).then(function (tr) {
+          if (watchingId !== finished) return; // a newer run started meanwhile
+          setScenario(scenarioFromTrace(tr), { keepT: true, keepSel: true });
+        }).catch(function () { /* keep the live-assembled view */ });
+      }, 1200);
+    } else if (p.type === 'verified') {
+      // Reflection lands after 'done' — re-read the trace so the card turns green.
+      delete verifyWait[p.executionId];
+      setTimeout(function () {
+        if (watchingId !== p.executionId) return;
+        loadTrace(p.executionId).then(function (tr) { if (watchingId === p.executionId) setScenario(scenarioFromTrace(tr), { keepT: true, keepSel: true }); }).catch(function () {});
+      }, 600);
+    }
+  }
+  function wireLiveStream() {
+    if (typeof io === 'undefined') return;
+    var tok = getToken(); if (!tok) return;
+    try {
+      var sock = io(apiBase(), { auth: { token: tok }, transports: ['websocket', 'polling'] });
+      sock.on('brain:pulse', onPulse);
+      sock.on('connect_error', function (err) { console.warn('Agent Map live: socket error ' + (err && err.message)); });
+    } catch (e) { console.warn('Agent Map live: could not connect: ' + e.message); }
+  }
+
+  // ── Past runs ───────────────────────────────────────────────────────────
+  function openPast() {
+    var box = $('amPast'), body = $('amPastBody');
+    box.style.display = 'flex';
+    var demoRow = '<div class="am-row" data-demo="1" style="display:flex; gap:12px; align-items:center; padding:10px 12px; border-radius:12px;">' +
+      '<span style="width:10px; height:10px; border-radius:999px; background:#e7824b; flex-shrink:0;"></span>' +
+      '<div style="min-width:0;"><div style="font-size:14px; font-weight:600;">Demo scenario</div><div style="font-size:12px; color:#7a7064;">FinTech trends in India · Nova</div></div></div>';
+    if (!getToken()) { body.innerHTML = demoRow + '<div style="font-size:13px; color:#7a7064; padding:10px 12px;">Sign in to replay your own runs. <a href="finchat_login.html">Go to login →</a></div>'; return; }
+    body.innerHTML = demoRow + '<div style="font-size:13px; color:#7a7064; padding:10px 12px;">Loading recent runs…</div>';
+    authGet('/api/executions/list/recent?limit=25').then(function (d) {
+      var runs = (d && d.executions) || [];
+      if (!runs.length) { body.innerHTML = demoRow + '<div style="font-size:13px; color:#7a7064; padding:10px 12px;">No runs yet. Ask a question above.</div>'; return; }
+      // Lanes of one race collapse into a single row that replays them together.
+      var seen = {}, items = [];
+      runs.forEach(function (x) {
+        if (!x.race_id) { items.push(x); return; }
+        if (seen[x.race_id]) { seen[x.race_id].lanes.push(x); return; }
+        seen[x.race_id] = { race: true, race_id: x.race_id, goal: x.goal, created_at: x.created_at, lanes: [x] };
+        items.push(seen[x.race_id]);
+      });
+      body.innerHTML = demoRow + items.map(function (x) {
+        var when = x.created_at ? new Date(x.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        if (x.race) {
+          var onR = SCN && SCN.raceId === x.race_id;
+          return '<div class="am-row" data-race="' + esc(x.race_id) + '" style="display:flex; gap:12px; align-items:flex-start; padding:10px 12px; border-radius:12px;' + (onR ? ' background:#f4eee4;' : '') + '">' +
+            '<span style="display:flex; flex-direction:column; gap:2px; margin-top:3px; flex-shrink:0;">' + x.lanes.map(function (l) { return '<span style="width:10px; height:5px; border-radius:999px; background:' + colorOf(l.assigned_agent) + ';"></span>'; }).join('') + '</span>' +
+            '<div style="min-width:0; flex:1;"><div style="font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(tidyQ(x.goal) || '(no question)') + '</div>' +
+            '<div style="font-size:12px; color:#7a7064; margin-top:2px;"><b style="color:#b4531c;">Race</b> · ' + esc(x.lanes.map(function (l) { return cap2(l.assigned_agent); }).reverse().join(' vs ')) + ' · ' + esc(when) + '</div></div></div>';
+        }
+        var id = x.assigned_agent || 'plato', st = x.completion_reason || x.current_state || '';
+        var on = SCN && SCN.execId === x.execution_id;
+        return '<div class="am-row" data-exec="' + esc(x.execution_id) + '" style="display:flex; gap:12px; align-items:flex-start; padding:10px 12px; border-radius:12px;' + (on ? ' background:#f4eee4;' : '') + '">' +
+          '<span style="width:10px; height:10px; border-radius:999px; background:' + colorOf(id) + '; margin-top:5px; flex-shrink:0;"></span>' +
+          '<div style="min-width:0; flex:1;"><div style="font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(tidyQ(x.goal) || '(no question)') + '</div>' +
+          '<div style="font-size:12px; color:#7a7064; margin-top:2px;">' + esc(cap2(id)) + ' · ' + esc(cap2(st)) + ' · ' + fmtN(x.tokens_used || 0) + ' tokens · ' + esc(when) + '</div></div></div>';
+      }).join('');
+    }).catch(function (e) { body.innerHTML = demoRow + '<div style="font-size:13px; color:#a8442a; padding:10px 12px;">Could not load runs: ' + esc(e.message) + '</div>'; });
+  }
+  function closePast() { $('amPast').style.display = 'none'; }
+
+  // Replay a finished race: find its lanes by raceId, load every trace.
+  function showRace(raceId) {
+    return authGet('/api/executions/list/recent?limit=50&race=' + encodeURIComponent(raceId)).then(function (d) {
+      var lanes = ((d && d.executions) || []).filter(function (x) { return x.race_id === raceId; })
+        .sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+      if (!lanes.length) throw new Error('race not found in your recent runs');
+      return Promise.all(lanes.map(function (x) { return loadTrace(x.execution_id); })).then(function (trs) {
+        var r = { raceId: raceId, question: lanes[0].goal || '', routing: null, order: [], traces: {}, settled: true };
+        trs.forEach(function (tr, i) { r.order.push(lanes[i].execution_id); r.traces[lanes[i].execution_id] = tr; });
+        race = r; live = null; watchingId = null; RUN_ACTIVE = false;
+        setScenario(scenarioFromRace(r));
+        setUrl(null, raceId);
+      });
+    });
+  }
+
+  // ── Leaderboard + Profiles overlays ─────────────────────────────────────
+  function segOn(onEl, offEl) {
+    onEl.style.background = '#e7824b'; onEl.style.color = '#fff';
+    offEl.style.background = 'transparent'; offEl.style.color = '#6f665a';
+  }
+  function note(msg, bad) { return '<div style="font-size:13px; color:' + (bad ? '#a8442a' : '#7a7064') + '; line-height:1.6;">' + msg + '</div>'; }
+  function openLb(scope) {
+    $('amLb').style.display = 'flex';
+    segOn(scope === 'me' ? $('amLbMine') : $('amLbGlobal'), scope === 'me' ? $('amLbGlobal') : $('amLbMine'));
+    var body = $('amLbBody');
+    if (!getToken()) { body.innerHTML = note('Sign in to see the leaderboard.'); return; }
+    body.innerHTML = note('Loading…');
+    authGet('/api/agents/leaderboard?scope=' + (scope === 'me' ? 'me' : 'global')).then(function (d) {
+      var rows = (d && d.leaderboard) || [];
+      if (!rows.length) { body.innerHTML = note('No completed runs yet. Ask the agents something, then check back.'); return; }
+      var stat = function (k, v) { return '<div style="min-width:0;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:#8a8174;">' + k + '</div><div style="font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:1px;">' + v + '</div></div>'; };
+      body.innerHTML = rows.map(function (r, i) {
+        var aid = r.agentId || r.agent || r.id, c = AGENT_COLORS[aid] || r.color || '#c67139', av = r.avatar || avatarOf(aid);
+        return '<div style="display:flex; flex-direction:column; gap:10px; padding:13px 14px; border-radius:14px; background:#fff; margin-bottom:8px; border:1px solid ' + (i === 0 ? c : '#efe6d8') + ';">' +
+          '<div style="display:flex; align-items:center; gap:12px;">' +
+            '<span style="font-size:17px; font-weight:800; width:24px; text-align:center; color:#8a8174;">' + (i + 1) + '</span>' +
+            '<div style="width:36px; height:36px; border-radius:999px; flex-shrink:0; background-color:#fff;' + (av ? " background-image:url('" + esc(av) + "');" : '') + ' background-size:cover; background-position:center; border:2px solid ' + c + ';"></div>' +
+            '<div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:700;">' + esc(r.name) + ' <span style="font-size:12px; color:#8a8174; font-weight:500;">' + esc(r.role || '') + '</span></div>' +
+            '<div style="height:6px; border-radius:999px; background:#ece5da; overflow:hidden; margin-top:6px;"><div style="height:100%; border-radius:999px; width:' + r.cognitiveScore + '%; background:' + c + ';"></div></div></div>' +
+            '<div style="text-align:right; flex-shrink:0;"><div style="font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1;">' + r.cognitiveScore + '</div><div style="font-size:10px; color:#8a8174; text-transform:uppercase; letter-spacing:.08em;">Cognitive</div></div>' +
+          '</div>' +
+          '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:8px; padding-left:36px;">' +
+            stat('Accuracy', r.accuracy + '%') + stat('Route eff', r.routeEfficiency) + stat('Avg fuel', r.avgFuel + 'k') +
+            stat('Avg time', r.avgSecs + 's') + stat('Races · W', r.races + ' · ' + r.wins) + stat('Errors', r.errorRate + '%') +
+          '</div></div>';
+      }).join('');
+    }).catch(function (e) { body.innerHTML = note('Could not load the leaderboard: ' + esc(e.message), true); });
+  }
+  function accColor(a) { return a >= 75 ? '#2e8f53' : a >= 50 ? '#b7791f' : a >= 30 ? '#d0833a' : '#b8434a'; }
+  function openPf(scope) {
+    $('amPf').style.display = 'flex';
+    segOn(scope === 'me' ? $('amPfMine') : $('amPfGlobal'), scope === 'me' ? $('amPfGlobal') : $('amPfMine'));
+    var body = $('amPfBody');
+    if (!getToken()) { body.innerHTML = note('Sign in to see profiles.'); return; }
+    body.innerHTML = note('Loading…');
+    authGet('/api/agents/profiles?scope=' + (scope === 'me' ? 'me' : 'global')).then(function (d) {
+      var data = d && d.profiles;
+      if (!data || !data.agents || !data.agents.length) { body.innerHTML = note('Not enough runs yet to profile the agents.'); return; }
+      var active = data.taskTypes.filter(function (t) { return data.agents.some(function (a) { return a.cells[t]; }); });
+      var best = active.map(function (t) {
+        var b = data.bestPerTask[t];
+        return '<div style="background:#fff; border:1px solid #efe6d8; border-radius:12px; padding:9px 12px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#8a8174;">' + esc(t) + '</div>' +
+          '<div style="font-size:13px; margin-top:2px;">' + (b ? '<b style="color:' + shade(colorOf(b.agent), 0.8) + ';">' + esc(b.name) + '</b> · ' + b.accuracy + '%' : '<span style="color:#b0a79a;">—</span>') + '</div></div>';
+      }).join('');
+      var th = 'padding:7px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#8a8174;';
+      var head = '<th style="' + th + ' text-align:left; position:sticky; left:0; background:#fffaf3;">Agent</th>' + active.map(function (t) { return '<th style="' + th + '">' + esc(t) + '</th>'; }).join('');
+      var rows = data.agents.map(function (a) {
+        var tds = active.map(function (t) {
+          var c = a.cells[t];
+          if (!c) return '<td style="padding:6px 8px; text-align:center; color:#cfc8bc;">–</td>';
+          var isBest = data.bestPerTask[t] && data.bestPerTask[t].agent === a.agent;
+          return '<td style="padding:5px 6px; text-align:center;"><div style="display:inline-block; min-width:54px; border-radius:10px; padding:4px 6px; background:#fff; border:1.5px solid ' + (isBest ? accColor(c.accuracy) : '#efe6d8') + ';">' +
+            '<div style="font-size:13px; font-weight:700; color:' + accColor(c.accuracy) + ';">' + c.accuracy + '%</div><div style="font-size:10px; color:#8a8174;">' + c.runs + ' run' + (c.runs === 1 ? '' : 's') + '</div></div></td>';
+        }).join('');
+        var col = colorOf(a.agent), av = a.avatar || avatarOf(a.agent);
+        return '<tr><td style="padding:6px 8px; position:sticky; left:0; background:#fffaf3;"><div style="display:flex; align-items:center; gap:8px;"><div style="width:26px; height:26px; border-radius:999px; flex-shrink:0; background-color:#fff;' + (av ? " background-image:url('" + esc(av) + "');" : '') + ' background-size:cover; background-position:center; border:2px solid ' + col + ';"></div><div><div style="font-size:13px; font-weight:700;">' + esc(a.name) + '</div>' +
+          (a.bestAt && a.bestAt.length ? '<div style="font-size:10px; color:#8a8174;">best at ' + esc(a.bestAt.slice(0, 3).join(', ')) + '</div>' : '') + '</div></div></td>' + tds + '</tr>';
+      }).join('');
+      body.innerHTML = '<div style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8174; margin-bottom:8px;">Best agent per task type</div>' +
+        '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:6px; margin-bottom:18px;">' + best + '</div>' +
+        '<div style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8174; margin-bottom:8px;">Accuracy by task type</div>' +
+        '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;"><thead><tr>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }).catch(function (e) { body.innerHTML = note('Could not load profiles: ' + esc(e.message), true); });
+  }
+
+  // ── Wiring ──────────────────────────────────────────────────────────────
+  function wire() {
+    $('amSend').addEventListener('click', ask);
+    $('amRaceTog').addEventListener('click', function () {
+      if (!raceMode && !getToken()) { toast('Sign in to start a race. <a href="finchat_login.html">Go to login →</a>', 6000); return; }
+      setRaceMode(!raceMode); $('amDraft').focus();
+    });
+    $('amDraft').addEventListener('keydown', function (e) { if (e.key === 'Enter') ask(); });
+    $('amReplay').addEventListener('click', function () { if (!SCN || SCN.live) return; map.t = 0; map.playing = true; renderPanel(); });
+    $('amZoomIn').addEventListener('click', function () { map.zoomBy(1.2); });
+    $('amZoomOut').addEventListener('click', function () { map.zoomBy(1 / 1.2); });
+    $('amViews').addEventListener('click', function (e) { var el = e.target.closest('[data-view]'); if (el) { map.setView(el.getAttribute('data-view')); renderModes(); } });
+    $('amModes').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-mode]'); if (!el) return;
+      if (el.getAttribute('data-mode') === 'past') {
+        if ($('amPast').style.display === 'flex') { closePast(); return; }
+        mode = 'past'; renderModes(); openPast();
+      } else {
+        mode = 'live'; closePast(); renderModes();
+        if (!RUN_ACTIVE) showLatest();
+      }
+    });
+    $('amModes').addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-mode]')) { e.preventDefault(); e.target.click(); }
+    });
+    $('amPastClose').addEventListener('click', closePast);
+    $('amPastBody').addEventListener('click', function (e) {
+      var ex = e.target.closest('[data-exec]'), dm = e.target.closest('[data-demo]'), rc = e.target.closest('[data-race]');
+      if (rc) {
+        closePast(); mode = 'past';
+        showRace(rc.getAttribute('data-race')).catch(function (er) { toast('Could not load that race: ' + esc(er.message)); });
+        return;
+      }
+      if (dm) { closePast(); mode = 'past'; setScenario(demoScenario()); setUrl(null); try { history.replaceState(null, '', location.pathname + '?demo=1'); } catch (er) {} return; }
+      if (!ex) return;
+      closePast(); mode = 'past';
+      var id = ex.getAttribute('data-exec');
+      watchingId = null; RUN_ACTIVE = false; race = null;
+      showRun(id).catch(function (er) { toast('Could not load that run: ' + esc(er.message)); });
+    });
+    $('amRouting').addEventListener('click', function (e) { var el = e.target.closest('[data-sel]'); if (el) { sel = el.getAttribute('data-sel'); map.selId = sel; whyOpen = true; renderPanel(); } });
+    // Picking a racer in Standings switches the route, fuel and verdict to its lane.
+    $('amStand').addEventListener('click', function (e) { var el = e.target.closest('[data-sel]'); if (el) { sel = el.getAttribute('data-sel'); map.selId = sel; renderPanel(); } });
+    $('amWhyLink').addEventListener('click', function () { whyOpen = !whyOpen; renderPanel(); });
+    $('amRanks').addEventListener('click', function () { openLb('global'); });
+    $('amProfiles').addEventListener('click', function () { openPf('global'); });
+    $('amLbGlobal').addEventListener('click', function () { openLb('global'); });
+    $('amLbMine').addEventListener('click', function () { openLb('me'); });
+    $('amPfGlobal').addEventListener('click', function () { openPf('global'); });
+    $('amPfMine').addEventListener('click', function () { openPf('me'); });
+    ['amLb', 'amPf'].forEach(function (id) {
+      var ov = $(id);
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.style.display = 'none'; });
+      $(id + 'Close').addEventListener('click', function () { ov.style.display = 'none'; });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      $('amLb').style.display = 'none'; $('amPf').style.display = 'none'; closePast();
+    });
+  }
+
+  function loadRoster() {
+    if (!getToken()) return Promise.resolve();
+    return authGet('/api/agents/locations').then(function (d) {
+      ROSTER = (d && d.agents) || [];
+      if (map && SCN) map.setRoster(ROSTER, SCN.demo || !ROSTER.length);
+    }).catch(function () { /* roster is an enhancement — the map works without it */ });
+  }
+
+  function init() {
+    map = new AgentMap($('amCanvas'));
+    map.onTick = renderPanel;
+    map.onHover = onMapHover;
+    wire();
+    loadRoster();
+    wireLiveStream();
+    var params = new URLSearchParams(location.search);
+    var execId = params.get('execution') || params.get('exec');
+    var raceParam = params.get('race');
+    if (raceParam) {
+      mode = 'past';
+      setScenario(demoScenario());
+      showRace(raceParam).catch(function (e) { toast('That race could not be loaded: ' + esc(e.message)); });
+    } else if (execId) {
+      mode = 'past';
+      showRun(execId).catch(function (e) {
+        console.warn('Agent Map: could not load execution ' + execId + ': ' + e.message);
+        toast('That run could not be loaded, so this is the demo.');
+        setScenario(demoScenario());
+      });
+    } else if (params.get('demo') != null) {
+      setScenario(demoScenario());
+    } else {
+      setScenario(demoScenario()); // paint immediately; real data replaces it
+      if (getToken()) showLatest();
+    }
+    // Console handle for debugging: the engine, plus the two data entry points.
+    map.applyTrace = function (tr) { race = null; setScenario(scenarioFromTrace(tr)); };
+    map.applyRace = function (question, traces) {
+      race = { raceId: 'debug', question: question, routing: null, order: [], traces: {}, settled: true };
+      traces.forEach(function (tr, i) { var id = tr.executionId || 'lane' + i; race.order.push(id); race.traces[id] = tr; });
+      setScenario(scenarioFromRace(race));
+    };
+    map.pulse = onPulse;
+    window.__am = map;
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>

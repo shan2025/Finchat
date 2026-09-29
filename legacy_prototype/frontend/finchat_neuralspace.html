@@ -292,7 +292,7 @@
     { href:'finchat_agents.html',     icon:'smart_toy',       label:'Agents' },
     { href:'finchat_dashboard.html',  icon:'dashboard',       label:'Operations' },
     { href:'finchat_neuralmap.html',  icon:'hub',             label:'Neural Map' },
-    { href:'finchat_brainmodel.html', icon:'travel_explore',  label:'Agent Map' },
+    { href:'finchat_agentmap.html', icon:'travel_explore',  label:'Agent Map' },
     { href:'finchat_mindmap.html',    icon:'schema',          label:'Mind Maps' },
     { href:'finchat_reports.html',    icon:'assessment',      label:'Reports' },
     { href:'finchat_knowledge.html',  icon:'menu_book',       label:'Knowledge' },
@@ -785,7 +785,7 @@
   }
   function openRun(mt) {
     // A meteor is a real execution — send the user to the run it stands for.
-    if (mt && mt.execId) location.href = 'finchat_brainmodel.html?execution=' + encodeURIComponent(mt.execId);
+    if (mt && mt.execId) location.href = 'finchat_agentmap.html?execution=' + encodeURIComponent(mt.execId);
   }
 
   function updateCrumb() {

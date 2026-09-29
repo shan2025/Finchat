@@ -52,9 +52,9 @@ test('the leaderboard roster is derived from personas, not hand-written', () => 
 });
 
 test('the map frontend knows every agent colour', () => {
-  const html = fs.readFileSync(path.join(FRONTEND, 'finchat_brainmodel.html'), 'utf8');
+  const html = fs.readFileSync(path.join(FRONTEND, 'finchat_agentmap.html'), 'utf8');
   const line = html.split('\n').find(l => l.includes('var AGENT_COLORS'));
-  assert.ok(line, 'finchat_brainmodel.html must still define AGENT_COLORS');
+  assert.ok(line, 'finchat_agentmap.html must still define AGENT_COLORS');
   for (const id of Object.keys(personas)) {
     assert.ok(line.includes(id + ':'), `AGENT_COLORS is missing ${id} — it will plate in the wrong colour`);
     assert.ok(line.toLowerCase().includes(agentMeta(id).color.toLowerCase()),
