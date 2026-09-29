@@ -193,7 +193,10 @@ async function findTopAgents(goal, n = 3, opts = {}) {
   const racers = (await listActiveAgents({ includeMiddleware: false }))
     .filter(a => a.type !== 'orchestrator' && RACER_IDS.has(a.agentId));
   const { taskType, ranked, weights, minRuns } = await rankForGoal(goal, racers, opts);
-  const chosen = ranked.slice(0, count);
+  // Capability is the gate here too, as in findBestAgent: an agent with no
+  // match for the question is not a contender, just a cheap lane that "wins"
+  // by doing little. The field can therefore be 1 lane, or empty.
+  const chosen = ranked.filter(r => r.cap > 0).slice(0, count);
   return {
     agents: chosen.map(r => r.agentId),
     taskType,

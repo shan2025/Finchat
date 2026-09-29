@@ -109,7 +109,17 @@ router.post('/race', requireAuth, async (req, res) => {
       const top = await findTopAgents(question, 3, { userId }); // history-aware pick
       field = top.agents; routing = top.breakdown;
     }
-    if (!field || field.length < 2) field = ['nova', 'aurelius', 'rasha'];
+    // Fewer than two agents fit the question: there is nothing to race, and
+    // padding the field with unmatched agents is what let them "win" cheaply.
+    if (!field || field.length < 2) {
+      const only = (field && field[0]) || null;
+      return res.status(422).json({
+        error: only
+          ? `Only ${only.charAt(0).toUpperCase() + only.slice(1)} fits this question, so there is no race. Ask it normally instead.`
+          : 'No specialist fits this question, so there is no race. Ask it normally and Plato will answer.',
+        agents: field || [], routing
+      });
+    }
 
     // A race costs one run per agent — guard the wallet before firing them.
     const ur = await query('SELECT token_balance, is_frozen FROM users WHERE user_id = $1', [userId]);

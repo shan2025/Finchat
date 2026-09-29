@@ -15,7 +15,7 @@
   /* ── Agent Map — a daylight isometric town. Plato sits in the Question Hub at
      the centre; every landmark is a tool district (Web & Search, News, Markets,
      Research, Operations, Portfolio, System). Agents are cars: the one on the
-     current question drives its real route, the rest circle their home blocks.
+     current question drives its real route, the rest stay parked at home.
      Ported from the Claude Design "Agent Map" handoff. ─────────────────────── */
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
@@ -174,7 +174,7 @@
     <div id="amStandWrap" style="display:none; padding:20px 16px 4px;">
       <div style="display:flex; align-items:baseline; justify-content:space-between; padding:0 6px 10px;">
         <span style="font-size:17px; font-weight:600;">Standings</span>
-        <span style="font-size:12px; color:#8a8174;" title="Clean finish first, then fewest tokens, then fastest. The same order the leaderboard uses to credit a win.">clean finish · tokens · time</span>
+        <span style="font-size:12px; color:#8a8174;" title="A clean finish (answered, inside its token budget) first, then the most findings (tool calls that came back), then fewest tokens, then fastest. The same order the leaderboard uses to credit a win.">clean finish · findings · tokens</span>
       </div>
       <div id="amStand" style="display:flex; flex-direction:column; gap:2px;"></div>
     </div>
@@ -380,7 +380,7 @@
     var bmap = {}, dname = {};
     (tr.buildings || []).forEach(function (b) { bmap[b.id] = b; });
     (tr.districts || []).forEach(function (d) { dname[d.id] = d.name; });
-    var legs = [], hubTokens = 0, answerTokens = 0, stepTokens = false;
+    var legs = [], hubTokens = 0, answerTokens = 0, stepTokens = false, evidence = {};
     (tr.waypoints || []).forEach(function (w) {
       // Reasoning turns carry what they cost. Charge each to where the agent
       // stood while thinking: the hub before its first stop, the stop it had
@@ -397,6 +397,8 @@
       if (w.phase && w.phase !== 'tool') return;
       var b = w.buildingId && bmap[w.buildingId]; if (!b) return;
       var lm = lmFor(b.district), reason = w.reason || ('Used ' + b.label);
+      // Evidence = distinct calls that came back, the same count the leaderboard ranks races by.
+      if (!w.offRoad) evidence[w.buildingId + '|' + (w.detail || reason)] = 1;
       var last = legs[legs.length - 1];
       // Consecutive stops in the same district are one visit to its landmark,
       // but every call there keeps its own reason.
@@ -420,7 +422,7 @@
       legs: legs,
       fuel: Math.round((a.fuel || 0) * 1000), fuelCap: Math.round((a.fuelCap || 15) * 1000),
       verified: !!ver.verified, reason: ver.reason || null, confidence: a.confidence || null,
-      sources: Array.isArray(tr.sources) ? tr.sources.length : 0,
+      sources: Array.isArray(tr.sources) ? tr.sources.length : 0, evidence: Object.keys(evidence).length,
       fog: (tr.fog || []).filter(function (f) { return f.state !== 'lifted'; }),
       validate: !!ver.verified, durationMs: tr.durationMs || null, live: !!tr.live, execId: tr.executionId || null
     };
@@ -472,18 +474,19 @@
     };
   }
 
-  // Race order at clock t — the same order AgentLeaderboard credits a win:
-  // clean finish first, then fewest tokens, then fastest. Lanes still running
-  // follow, by how many districts they've reached.
+  // Race order at clock t — the same order AgentLeaderboard credits a win
+  // (RACE_ORDER_SQL): a clean finish (answered, inside its own budget) first,
+  // then the most evidence, then fewest tokens, then fastest. Lanes still
+  // running follow, by how many districts they've reached.
   function standings(S, t) {
     return S.lanes.map(function (L) {
       var fin = !L.live && t >= L.end;
-      var ok = fin && (!L.reason || L.reason === 'natural');
+      var ok = fin && (!L.reason || L.reason === 'natural') && !(L.fuelCap && L.fuel > L.fuelCap);
       var visited = L.legs.filter(function (l) { return Math.min(t, laneHorizon(L)) >= l.at; }).length;
       return { L: L, fin: fin, ok: ok, visited: visited };
     }).sort(function (a, b) {
       if (a.ok !== b.ok) return a.ok ? -1 : 1;
-      if (a.ok) return (a.L.fuel - b.L.fuel) || ((a.L.durationMs || 0) - (b.L.durationMs || 0));
+      if (a.ok) return ((b.L.evidence || 0) - (a.L.evidence || 0)) || (a.L.fuel - b.L.fuel) || ((a.L.durationMs || 0) - (b.L.durationMs || 0));
       if (a.fin !== b.fin) return a.fin ? -1 : 1;
       return b.visited - a.visited;
     });
@@ -1037,7 +1040,7 @@
     });
     var busy = {};
     var cars = lanes.map(function (ln) { busy[ln.L.agent.id] = 1; return { id: ln.L.agent.id, name: (place[ln.L.agent.id] ? place[ln.L.agent.id] + '. ' : '') + ln.L.agent.name, p: ln.p }; });
-    this.loops.forEach(function (l) { if (!busy[l.id]) cars.push({ id: l.id, name: l.name, p: self.loopAt(l, sec) }); });
+    this.loops.forEach(function (l) { if (!busy[l.id]) cars.push({ id: l.id, name: l.name, p: l.parked ? self.parkAt(l) : self.loopAt(l, sec) }); });
     cars.sort(function (m, n) { return (m.p.x + m.p.y) - (n.p.x + n.p.y); });
     var tops = cars.map(function (cc) { return { cc: cc, top: self.car(g, cc.p.x, cc.p.y, colorOf(cc.id), cc.p.dx, cc.p.dy) }; });
     // Cars parked at the same stop would stack their name tags — lift each tag
@@ -1055,11 +1058,19 @@
     });
   };
 
-  // Idle agents circle their home block. Homes come from GET /api/agents/locations
-  // (the district their own tools point at); the demo uses the design's loops.
+  // A parked car sits still on its corner, nose along the road to the next one.
+  P.parkAt = function (l) {
+    var k = l.corner || 0, a = l.pts[k % l.pts.length], b = l.pts[(k + 1) % l.pts.length];
+    return { x: a[0], y: a[1], dx: b[0] - a[0], dy: b[1] - a[1] };
+  };
+
+  // Agents with nothing to do stay parked at home: movement on the map means
+  // work. Homes come from GET /api/agents/locations (the district their own
+  // tools point at). Only an agent still busy on another of your runs keeps
+  // driving its home block. Agents sharing a home park on different corners.
   P.setRoster = function (roster, demo) {
     if (demo) {
-      this.loops = DEMO_LOOPS.map(function (l) { return { id: l.id, name: cap2(l.id), pts: l.pts, period: l.period, off: l.off }; });
+      this.loops = DEMO_LOOPS.map(function (l) { return { id: l.id, name: cap2(l.id), pts: l.pts, period: l.period, off: l.off, parked: true }; });
       return;
     }
     var perHome = {};
@@ -1068,9 +1079,10 @@
       var cx = lm ? lm.x : 0, cy = lm ? lm.y : 0, key = lm ? lm.id : 'hub';
       var n = perHome[key] = (perHome[key] || 0) + 1;
       var pts = [[cx - 4, cy - 4], [cx + 4, cy - 4], [cx + 4, cy + 4], [cx - 4, cy + 4]];
+      var running = a.status === 'running';
       // An agent still on another of your runs says so on its tag.
-      var nm = (a.name || cap2(a.id)) + (a.status === 'running' ? ' · busy' : '');
-      return { id: a.id, name: nm, pts: pts, period: 13 + (n - 1) * 2, off: (n - 1) * 6.5 };
+      var nm = (a.name || cap2(a.id)) + (running ? ' · busy' : '');
+      return { id: a.id, name: nm, pts: pts, period: 13 + (n - 1) * 2, off: (n - 1) * 6.5, parked: !running, corner: (n - 1) % 4 };
     });
   };
 
@@ -1159,8 +1171,11 @@
         var tl = Math.min(t, laneHorizon(x));
         var at = x.legs.filter(function (l) { return tl >= l.at; }).pop();
         var next = x.legs.filter(function (l) { return tl < l.at; })[0];
+        var over = x.fuelCap && x.fuel > x.fuelCap;
         var status = r.fin
-          ? (r.ok ? 'Finished' : 'Stopped: ' + cap2(x.reason)) + (x.durationMs ? ' in ' + fmtSecs(x.durationMs) : '')
+          ? (r.ok ? 'Finished' : over && (!x.reason || x.reason === 'natural') ? 'Over budget, finished' : 'Stopped: ' + cap2(x.reason)) +
+            (x.durationMs ? ' in ' + fmtSecs(x.durationMs) : '') +
+            ' · ' + (x.evidence || 0) + ' finding' + (x.evidence === 1 ? '' : 's')
           : x.live ? (next ? 'Driving to ' + next.name : at ? 'At ' + at.name : 'Planning at the hub')
           : t >= x.backAt ? 'Writing the answer'
           : next ? 'Driving to ' + next.name
@@ -1462,7 +1477,11 @@
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getToken() },
       body: JSON.stringify(racing ? { question: msg } : { persona: 'plato', message: msg, web: true })
     }).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.error || ('HTTP ' + r.status)); });
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (d) {
+        var err = new Error(d.error || ('HTTP ' + r.status));
+        err.plain = r.status === 422; // "no race": a reason, not a failure
+        throw err;
+      });
       if (racing) return r.json().then(function (d) {
         // The lanes may already be streaming; attach Plato's field breakdown.
         raceRouting[d.raceId] = d.routing || null;
@@ -1470,7 +1489,7 @@
       });
     }).catch(function (e) {
       pendingAsk = false; renderPanel();
-      toast('Could not send that question: ' + esc(e.message), 6000);
+      toast(e.plain ? esc(e.message) : 'Could not send that question: ' + esc(e.message), 6000);
     });
     // Watchdog: if no run starts streaming, say so instead of spinning forever.
     setTimeout(function () { if (pendingAsk) { pendingAsk = false; renderPanel(); toast('Plato answered without routing to the map. Try <b>Live Run</b> to load the newest run.', 6000); } }, 25000);
@@ -1509,7 +1528,7 @@
   function accumulate(tr, p) {
     if (p.type === 'tool_end') {
       ensureBuilding(tr, p.building);
-      tr.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), atMs: p.atMs, offRoad: !!p.error });
+      tr.waypoints.push({ buildingId: p.building && p.building.buildingId, reason: p.error ? ('Failed: ' + p.error) : (p.why || fmtInput(p.input) || ('Used ' + (p.building ? p.building.label : p.tool))), detail: fmtInput(p.input) || null, atMs: p.atMs, offRoad: !!p.error });
       if (p.error) tr.fog.push({ name: (p.building ? p.building.label : p.tool) + ' returned nothing', state: 'unknown' });
       if (p.fuel != null) tr.agent.fuel = p.fuel;
       return true;

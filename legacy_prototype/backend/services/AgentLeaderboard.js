@@ -19,6 +19,16 @@ const ROSTER = new Set(Object.keys(personas));
 // duration so one parked execution can't blow an agent's average latency.
 const MAX_RUN_SECS = 300;
 
+// How a race is won: a clean finish (answered, and inside its own token
+// budget), then the most evidence, then fewest tokens, then fastest.
+// Cheapest-first used to crown whoever did the least — an NVDA-risk race went
+// to Rasha on one web search over Aurelius's prices + news + search. Evidence
+// = distinct successful tool calls, so data tools (prices) count, not just
+// links. The Agent Map's Standings (finchat_agentmap.html `standings`) use the
+// same order.
+const RACE_ORDER_SQL = `(completion_reason = 'natural' AND (max_tokens IS NULL OR tokens_used <= max_tokens)) DESC,
+  evidence DESC, tokens_used ASC, secs ASC`;
+
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const round = (n, d = 0) => { const m = Math.pow(10, d); return Math.round((Number(n) || 0) * m) / m; };
 
@@ -54,20 +64,21 @@ async function getLeaderboard({ userId = null } = {}) {
     GROUP BY e.assigned_agent
   `, params);
 
-  // Per-race winner: verified first, then cheapest, then fastest — a race-local
-  // ranking that does not depend on the global stats it will feed.
+  // Per-race winner — a race-local ranking that does not depend on the global
+  // stats it will feed. See RACE_ORDER_SQL for why evidence outranks cost.
   const winRes = await db.query(`
-    WITH ranked AS (
-      SELECT e.assigned_agent AS agent,
-        ROW_NUMBER() OVER (
-          PARTITION BY e.metrics->>'raceId'
-          ORDER BY (e.completion_reason = 'natural') DESC,
-                   e.tokens_used ASC,
-                   LEAST(EXTRACT(EPOCH FROM (e.updated_at - e.created_at)), ${MAX_RUN_SECS}) ASC
-        ) AS rnk
+    WITH lanes AS (
+      SELECT e.assigned_agent AS agent, e.metrics->>'raceId' AS race_id,
+        e.completion_reason, e.tokens_used, e.max_tokens,
+        LEAST(EXTRACT(EPOCH FROM (e.updated_at - e.created_at)), ${MAX_RUN_SECS}) AS secs,
+        (SELECT COUNT(DISTINCT tc.tool_name || ':' || COALESCE(tc.arguments::text, ''))
+           FROM tool_calls tc JOIN tool_results tr ON tr.call_id = tc.call_id
+          WHERE tc.execution_id = e.execution_id AND tr.error IS NULL AND tr.output IS NOT NULL) AS evidence
       FROM executions e
       WHERE e.metrics->>'raceId' IS NOT NULL
         AND e.current_state IN ('completed', 'failed') ${scope}
+    ), ranked AS (
+      SELECT agent, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY ${RACE_ORDER_SQL}) AS rnk FROM lanes
     )
     SELECT agent, COUNT(*)::int AS wins FROM ranked WHERE rnk = 1 GROUP BY agent
   `, params);
