@@ -1,6 +1,6 @@
 # Sprint AB — FinChat on Mobile Phones
 
-**Status:** Phases 1–2 committed locally 2026-09-13 (verified at 375×812, not yet deployed) · Phases 3–4 open · Phase 5 optional
+**Status:** Phases 1–2 shipped 2026-09-13 · tablets + touch (Phase 4's touch question) db3aae7 · Phase 3 installable da8dd8c 2026-09-30 · Phase 5 (store) optional — needs privacy policy + account deletion first
 **Written:** 2026-09-13
 
 ---
@@ -222,4 +222,22 @@ Layout sweeps at 375, 768, 820, 1024, 1180, 1280 and 844×390: zero document ove
 
 **Not verified:** real devices — the iOS keyboard, and rotation (the hidden Browser pane never delivers `resize`; the handler was proven by dispatching one).
 
-**Seen, not fixed:** Mind Maps' `toggleNav` has no backdrop; chat's inline sidebar lacks Neural Space and Agent Map; Neural Map's header needs ~1500px for one row (pre-existing). Phase 3 (PWA) not started.
+**Seen, not fixed:** Mind Maps' `toggleNav` has no backdrop; Neural Map's header needs ~1500px for one row (pre-existing). ~~Chat's inline sidebar lacks Neural Space and Agent Map~~ — Chat now uses `sidebar_nav.js` (cf03b24).
+
+---
+
+## 6. Phase 3 — Installable (da8dd8c, 2026-09-30)
+
+| Piece | Where |
+|---|---|
+| Manifest: standalone, start `/finchat_chat.html`, theme/background `#f7f4ed`, shortcuts (New chat, Group Chat, Reports) | `frontend/manifest.webmanifest` |
+| Icons from the favicon mascot: 192/512 rounded "any", 192/512 full-bleed maskable (head inside the 40% safe circle), 180 opaque apple-touch | `frontend/assets/icons/` (drawn with GDI+; the script is not in the repo — redraw from `assets/favicon.svg` geometry) |
+| Head tags added **as pages are served**, not written into the HTML — design-tool regens can't drop them. Also swaps each page's SVG `apple-touch-icon` (iOS ignores SVG) for the PNG | `backend/middleware/pwaHead.js`, mounted before `express.static` |
+| Worker registered on every page; page loads go to the network, `offline.html` if that fails; **nothing else cached** (stale shared JS is the bug the no-cache headers exist for). Push handlers unchanged | `frontend/pwa.js`, `frontend/sw.js` |
+| Status-bar colour follows the page background, so dark theme gets a dark bar | `frontend/pwa.js` |
+
+Verified on a local server: every page served with the manifest (test walks all of `frontend/*.html`), manifest served as `application/manifest+json`, all icons 200 `image/png`, worker active with scope `/` and controlling the page, offline page precached, signed-in Chat unchanged (no console errors, Recent loads), and with the server stopped a navigation shows the offline screen. `test/pwa.test.js` 10/10; full suite 649/649.
+
+**Not verified:** the install prompt itself and a real phone — the in-app browser can't install apps. Check on a phone after deploy: Android Chrome → menu → *Install app*; iPhone Safari → Share → *Add to Home Screen*.
+
+**Still needed before a store listing:** a privacy policy page and in-app account deletion (both stores require them; neither exists).
