@@ -168,7 +168,10 @@ const PROVIDERS = [
     name: 'ollama',
     style: 'openai',
     baseUrl: `${OLLAMA_URL}/v1/chat/completions`,
-    models: (process.env.OLLAMA_MODELS || OLLAMA_MODEL)
+    // NOT OLLAMA_MODELS: that is Ollama's own variable for its model STORAGE
+    // directory, and on a desktop that sets it the provider's only "model"
+    // became a path like E:\OllamaModels, which the daemon 404s.
+    models: (process.env.OLLAMA_CHAT_MODELS || OLLAMA_MODEL)
       .split(',').map(s => s.trim()).filter(Boolean),
     // Nothing authenticates against a local daemon. Without this the credential
     // pool resolves empty and the provider is skipped exactly like one with no
@@ -180,7 +183,7 @@ const PROVIDERS = [
     timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS) || 120000,
     // Deliberately NOT acceptsModelOverride. The `model` argument and the
     // trivial-workload hints both carry GROQ model ids ("openai/gpt-oss-20b"),
-    // which a local daemon answers 404 for. Ollama serves what OLLAMA_MODELS
+    // which a local daemon answers 404 for. Ollama serves what OLLAMA_CHAT_MODELS
     // names and nothing else.
     acceptsModelOverride: false
   }] : [])
