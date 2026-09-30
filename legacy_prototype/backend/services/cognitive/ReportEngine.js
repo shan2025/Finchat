@@ -30,7 +30,14 @@ async function gather(kind, { userId, days }) {
       query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='created' AND user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
       query(`SELECT COUNT(*)::int n FROM node_events WHERE event_type='activated' AND user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
       query(`SELECT COUNT(*)::int n FROM entity_edges WHERE user_id=$2 AND created_at > now() - ($1||' days')::interval`, [String(days), userId]),
-      query(`SELECT canonical_name, activation_count FROM entities WHERE status='active' AND user_id=$1 ORDER BY activation_count DESC LIMIT 5`, [userId])
+      // Ranked by recalls INSIDE the period, not the lifetime activation_count:
+      // lifetime totals froze the chart on whatever was recalled most in the
+      // first weeks (AAPL/TSLA at ~2,000 each) no matter what the week held.
+      query(`SELECT e.canonical_name, COUNT(*)::int AS activation_count
+             FROM node_events ne JOIN entities e ON e.entity_id = ne.entity_id
+             WHERE ne.event_type='activated' AND ne.user_id=$2 AND e.status='active'
+               AND ne.created_at > now() - ($1||' days')::interval
+             GROUP BY e.canonical_name ORDER BY activation_count DESC LIMIT 5`, [String(days), userId])
     ]);
     return { conceptsLearned: created.rows[0].n, activations: activated.rows[0].n,
       newLinks: edges.rows[0].n, mostActive: top.rows };

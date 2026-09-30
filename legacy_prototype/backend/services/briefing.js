@@ -68,12 +68,49 @@ function briefingSessionId(userId, when = new Date()) {
   return `briefing_${userId}_${briefingDayKey(when)}`;
 }
 
-const BRIEFING_GOAL = `You are producing today's **🧠 Frontier Intelligence Brief** — a premium daily executive report.
+// The giants each briefing checks, rotated so coverage moves across the whole
+// market. The goal used to name "AAPL, TSLA" outright, so three briefings a day
+// fetched those two and nothing else, and the knowledge graph learned that
+// the market *was* Apple and Tesla (both at ~2,000 recall activations, with
+// NVDA, MSFT and the rest absent). Every basket mixes US tech with non-tech
+// and Asian/Indian names so the ripple section has real links to trace. Six
+// baskets over three slots a day is a full cycle every two days.
+const GIANT_BASKETS = [
+  ['NVDA Nvidia', 'MSFT Microsoft', 'TSM TSMC', 'JPM JPMorgan', 'RELIANCE.NS Reliance', 'XOM ExxonMobil'],
+  ['AMZN Amazon', 'GOOGL Alphabet', 'ASML ASML', 'LLY Eli Lilly', 'HDFCBANK.NS HDFC Bank', 'WMT Walmart'],
+  ['META Meta', 'AVGO Broadcom', '005930.KS Samsung', 'NVO Novo Nordisk', 'TCS.NS TCS', 'BRK-B Berkshire'],
+  ['AAPL Apple', 'TSLA Tesla', 'TM Toyota', 'V Visa', 'INFY.NS Infosys', 'SHEL Shell'],
+  ['ORCL Oracle', 'AMD AMD', '0700.HK Tencent', 'UNH UnitedHealth', 'BHARTIARTL.NS Bharti Airtel', 'CAT Caterpillar'],
+  ['COST Costco', 'SAP SAP', 'BABA Alibaba', 'CVX Chevron', 'ICICIBANK.NS ICICI Bank', 'MA Mastercard']
+];
+
+/** 0/1/2 for the morning/midday/evening slot — same boundaries as briefingSlotLabel. */
+function briefingSlotIndex(when = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: BRIEFING_TZ, hour: '2-digit', hour12: false
+  }).format(when));
+  return hour < 12 ? 0 : hour < 18 ? 1 : 2;
+}
+
+/**
+ * This slot's basket. Deterministic by local day and slot, so consecutive
+ * briefings never repeat a basket and a retry of the same slot gets the same one.
+ */
+function giantsFor(when = new Date()) {
+  const day = Math.floor(Date.parse(`${briefingDayKey(when)}T00:00:00Z`) / 86400000);
+  return GIANT_BASKETS[(day * 3 + briefingSlotIndex(when)) % GIANT_BASKETS.length];
+}
+
+function buildBriefingGoal(when = new Date()) {
+  const giants = giantsFor(when);
+  const tickers = giants.map(g => g.split(' ')[0]);
+  return `You are producing today's **🧠 Frontier Intelligence Brief** — a premium daily executive report.
 
 RESEARCH PHASE — use your tools to gather REAL, CURRENT data across these domains:
 - "news" tool: AI industry headlines, earnings, partnerships, funding rounds (Bloomberg, Reuters, CNBC, TechCrunch level)
 - "crypto" tool: Bitcoin, Ethereum, Solana current prices and 24h moves
-- "stocks" tool: AAPL, TSLA, and any tickers mentioned in today's headlines
+- "stocks" tool: this briefing's giants in ONE call — {"symbols": ${JSON.stringify(tickers)}} (${giants.map(g => g.split(' ').slice(1).join(' ')).join(', ')}) — plus any tickers mentioned in today's headlines. Do not default to Apple and Tesla; cover the giants listed here.
+- "news" tool again: what is moving the biggest mover among those giants, and who it buys from, sells to, or competes with
 - "commodities" tool: Gold and oil as macro sentiment indicators
 - "paper" tool: Recent arXiv work on LLMs, agents, neuro-computation, or AI safety
 - "search" tool: Fill gaps — VC funding trends, fintech news, career/hiring market shifts
@@ -101,6 +138,15 @@ Synthesize market moves and startup funding into strategic narrative, not raw nu
 ## ₿ Crypto & Blockchain (if relevant data found)
 Focus on structural trends (stablecoins, RWAs, DePIN, verifiable AI) not just price ticks.
 
+## 🌊 Ripple Effects
+Take the 2-3 biggest moves among today's giants and trace who ELSE they touch, the effects a reader would not think of. For each, one ### card:
+### [Giant] → [the non-obvious company, sector or group it hits]
+- **First order:** what happened to the giant itself (with the number from your tools).
+- **Second order:** the named, listed suppliers, customers, competitors or lenders exposed to it, and which direction each is pushed. Example: a hyperscaler cutting capex hits TSMC and ASML orders, then Indian IT services contracts.
+- **Third order:** the people downstream: employees and hiring, prices consumers pay, index funds and pensions that hold it, the rupee, Indian listed companies in the chain.
+*In short: [3-6 word tagline]*
+Only name companies and links you can support from what the tools returned or from well-established business relationships; say "likely" where it is inference. Explain the mechanism; never recommend buying or selling anything.
+
 ## 🎯 Key Takeaway
 One synthesizing paragraph that connects the dots across all sections — what is the overarching theme today?
 
@@ -115,7 +161,8 @@ QUALITY RULES:
 - ALWAYS include "Why it matters" after each major section.
 - Write in a confident, analytical editorial voice — like a senior intelligence analyst, not a news aggregator.
 - Cross-reference findings: if a funding round connects to an earnings report or a research paper, SAY SO.
-- Minimum 800 words, maximum 2000 words. Quality over quantity.`;
+- Minimum 800 words, maximum 2200 words. Quality over quantity.`;
+}
 
 /**
  * Sidebar title for a briefing conversation, e.g. "📰 Daily News — 13 Aug 2026".
@@ -213,7 +260,7 @@ async function runMorningBriefing({ userId = 'system', requestedAt = null, force
     }
 
     const result = await route({
-      goal: BRIEFING_GOAL,
+      goal: buildBriefingGoal(),
       userId,
       // Tag the execution so attempts are findable by _recentlyRun above, the
       // way mission runs are tagged `mission_<id>`. Without this the briefing's
@@ -356,6 +403,6 @@ async function runMorningBriefing({ userId = 'system', requestedAt = null, force
 
 module.exports = {
   runMorningBriefing, briefingSessionTitle, briefingSlotLabel,
-  briefingSessionId, briefingDayKey, BRIEFING_GOAL,
+  briefingSessionId, briefingDayKey, buildBriefingGoal, giantsFor, GIANT_BASKETS,
   _recentlyRun, MIN_INTERVAL_HOURS, DELIVERY_GRACE_MINUTES
 };
