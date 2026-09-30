@@ -91,6 +91,13 @@ router.all('/tick', async (req, res) => {
     }
   })();
 
+  // The daily Telegram newsletter rides the same heartbeat, for the same reason
+  // (the mission path returns early on most ticks). It sends nothing until
+  // NEWSLETTER_HOUR_IST and at most once per user per IST day.
+  require('../services/newsletter').runDueNewsletters()
+    .then(r => { if (r && r.results && r.results.length) console.log(`📰 [Cron] Newsletters: ${r.results.map(x => x.status).join(', ')}`); })
+    .catch(err => console.error('❌ [Cron] Newsletter run failed:', err.message));
+
   let claimed;
   try {
     const result = await query(`
@@ -249,6 +256,10 @@ function backgroundJob(label, run) {
 
 router.all('/dream', backgroundJob('dream cycle',
   () => require('../services/cognitive/MemoryEngine').dreamAllUsers()));
+
+// Send any daily newsletters that are due now (normally /tick does this).
+router.all('/newsletter', backgroundJob('daily newsletter',
+  () => require('../services/newsletter').runDueNewsletters()));
 
 router.all('/digest', backgroundJob('dream digest',
   () => require('../services/cognitive/DreamDigest').runNightlyDigest({})));

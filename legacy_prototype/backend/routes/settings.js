@@ -136,6 +136,35 @@ router.post('/notifications/test', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/settings/telegram/newsletter ── send today's newsletter now ──
+// Builds the daily issue from the last 24h of briefings and mission reports and
+// sends it as a PDF to the linked chat. Replaces today's scheduled issue, so the
+// cron tick will not send a second one. Takes ~30-60s (one editor call + PDF).
+router.post('/telegram/newsletter', requireAuth, async (req, res) => {
+  try {
+    const { sendNewsletter } = require('../services/newsletter');
+    const r = await sendNewsletter(req.user.id, { force: true });
+    const code = r.status === 'sent' ? 200 : r.status === 'failed' ? 502 : 409;
+    res.status(code).json(r);
+  } catch (err) {
+    console.error('Newsletter send error:', err);
+    res.status(500).json({ error: 'Failed to send newsletter', detail: err.message });
+  }
+});
+
+// ── GET /api/settings/telegram/newsletter ── recent issues ──
+router.get('/telegram/newsletter', requireAuth, async (req, res) => {
+  try {
+    const r = await query(`
+      SELECT day, status, detail, title, source_count, pages, bytes, sent_at
+      FROM newsletters WHERE user_id = $1 ORDER BY day DESC LIMIT 14`, [req.user.id]);
+    const { HOUR_IST } = require('../services/newsletter');
+    res.json({ hourIst: HOUR_IST, issues: r.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load newsletters' });
+  }
+});
+
 // ── POST /api/settings/telegram/start-link ── begin auto-link ──
 // Returns a t.me deep link the user taps; pressing Start sends /start <code>
 // to the bot, which the poll endpoint below matches to capture their chat_id.

@@ -220,6 +220,31 @@ async function sendTelegram(chatId, text, { html = false, silent = false } = {})
   return { status: 'sent' };
 }
 
+// A file (the daily newsletter PDF) with an HTML caption. Telegram accepts
+// documents up to 50 MB from a bot; an issue is ~30-60 KB. A caption Telegram
+// rejects as markup (400) is retried as plain text rather than losing the file.
+async function sendTelegramDocument(chatId, buffer, filename, captionHtml, { silent = false } = {}) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
+  const FormData = require('form-data');
+  const post = (caption, html) => {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('document', buffer, { filename, contentType: 'application/pdf' });
+    if (caption) form.append('caption', caption);
+    if (caption && html) form.append('parse_mode', 'HTML');
+    if (silent) form.append('disable_notification', 'true');
+    return axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendDocument`, form,
+      { headers: form.getHeaders(), timeout: 60000, maxBodyLength: 60 * 1024 * 1024 });
+  };
+  try {
+    await post(captionHtml, true);
+  } catch (err) {
+    if (!(err.response && err.response.status === 400)) throw err;
+    await post(String(captionHtml || '').replace(/<[^>]+>/g, ''), false);
+  }
+  return { status: 'sent' };
+}
+
 // What Telegram gets for a notification: a short reviewed card, sent loudly,
 // quietly, or held in the app. See services/telegramEditor.js for why.
 async function deliverTelegram(chatId, n) {
@@ -365,6 +390,8 @@ module.exports = {
   sendWhatsApp,
   sendSMS,
   sendTelegram,
+  sendTelegramDocument,
+  logDelivery,
   sendPush,
   getTelegramBotInfo,
   telegramGetUpdates
