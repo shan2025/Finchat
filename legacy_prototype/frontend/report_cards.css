@@ -144,7 +144,7 @@
 .rc-toc li {
   display: flex; gap: 12px; align-items: baseline;
   padding: 8px 0; border-top: 1px solid var(--rc-edge);
-  font: 500 17px/1.25 var(--rc-serif); color: var(--rc-ink);
+  font: 500 14.5px/1.4 var(--rc-sans); color: var(--rc-ink);
 }
 .rc-toc li:last-child { border-bottom: 1px solid var(--rc-edge); }
 .rc-toc li span { font: 500 10px/1 var(--rc-mono); color: var(--rc-gold); flex-shrink: 0; }

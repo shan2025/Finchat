@@ -72,6 +72,10 @@
   var BOLD_SOURCES_RE = /^\s*\*\*\s*(sources|references|citations|further reading)\s*:?\s*\*\*\s*:?\s*$/i;
   var WHY_RE = /^\s*(?:[-*]\s*)?\*\*\s*why it matters\s*[:—–-]?\s*\*\*\s*[:—–-]?\s*/i;
   var TAG_RE = /^\s*[*_]*\s*(?:in short|tagline|in a line|one line)\s*[:—–-]\s*(.+?)\s*[*_]*\s*$/i;
+  // A sentence where the model narrates its own failed fetch ("the Reuters
+  // feed failed to resolve (`getaddrinfo ENOTFOUND`)…"). Plumbing, not news:
+  // the whole sentence is dropped from the card.
+  var ERROR_SENTENCE_RE = /[^.!?\n]*\b(?:getaddrinfo|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT)\b[^.!?\n]*[.!?]?[ \t]*/g;
 
   function isReport(text) {
     if (!text || text.length < 900) return false;
@@ -85,7 +89,7 @@
   }
 
   function parse(text) {
-    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    var lines = String(text || '').replace(/\r\n?/g, '\n').replace(ERROR_SENTENCE_RE, '').split('\n');
     var refs = [];
     var body = [];
     lines.forEach(function (ln) {
@@ -272,7 +276,7 @@
       }
     });
 
-    var plain = md(text, refs);
+    var plain = md(String(text || '').replace(ERROR_SENTENCE_RE, ''), refs);
     var docName = [d.title || 'Report', d.date].filter(Boolean).join(' - ');
     return '<div class="rc-root" data-rc-root data-rc-name="' + esc(docName) + '">' +
       '<div class="rc-track" tabindex="0" aria-label="' + esc(d.title || 'Report') + ', ' + n + ' cards">' + out.join('') + '</div>' +

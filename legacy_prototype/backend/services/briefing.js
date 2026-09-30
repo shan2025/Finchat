@@ -111,6 +111,7 @@ One synthesizing paragraph that connects the dots across all sections — what i
 QUALITY RULES:
 - NEVER list raw tool output. Every data point must be contextualized with analysis.
 - NEVER fabricate URLs, numbers, or quotes. Only report what tools returned.
+- NEVER mention tool failures, error codes (e.g. ENOTFOUND, timeouts), hostnames, or how the research was done. If a source could not be reached, leave it out silently and write from what did come back.
 - ALWAYS include "Why it matters" after each major section.
 - Write in a confident, analytical editorial voice — like a senior intelligence analyst, not a news aggregator.
 - Cross-reference findings: if a funding round connects to an earnings report or a research paper, SAY SO.
