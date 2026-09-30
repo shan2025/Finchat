@@ -523,6 +523,11 @@
       <input id="knowledgeSearch" class="w-full" placeholder="Search system knowledge…" type="text" autocomplete="off" style="padding:10px 14px 10px 40px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13.5px; outline:none;">
     </div>
 
+    <!-- Branch: a new chat that carries this one as context -->
+    <button id="branchBtn" onclick="branchFromChat()" class="fc-icon shrink-0" title="Branch — start a new chat with this one as context" style="width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+      <span class="material-symbols-outlined text-[20px]">call_split</span>
+    </button>
+
     <!-- Turn the open conversation into a mind map -->
     <button id="mindMapBtn" onclick="mindMapFromChat()" class="fc-icon shrink-0" title="Build a mind map from this conversation" style="width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
       <span class="material-symbols-outlined text-[20px]">account_tree</span>
@@ -595,6 +600,9 @@
               <span class="material-symbols-outlined text-[20px]">attach_file</span>
             </button>
             <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
+            <button id="ctxBtn" class="fc-tool" onclick="window.fcChatContext && fcChatContext.toggle()" title="Add another chat as context (Ctrl+K)" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">add_link</span>
+            </button>
             <button class="fc-tool fc-tool-wide" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
               <span class="material-symbols-outlined text-[20px]">mic</span>
             </button>
@@ -641,6 +649,7 @@
     <script src="mascot_nap.js"></script>
     <script src="study_blocks.js"></script>
     <script src="report_cards.js"></script>
+    <script src="chat_context.js"></script>
     <script src="car_road_anim.js?v=minimal_v7"></script>
 
 
@@ -1222,6 +1231,7 @@
       // Drop the session id so the next send opens a brand-new Supabase session
       // (it will appear in Recents after the first message).
       if (typeof personaSessions === 'object' && personaSessions) delete personaSessions[activePersona];
+      if (window.fcChatContext) fcChatContext.clear();
       const mi = document.getElementById('msgInput');
       if (mi) { mi.value = ''; mi.style.height = '40px'; mi.focus(); }
       if (typeof loadRecentSessions === 'function') loadRecentSessions();
@@ -1472,8 +1482,10 @@
         msgs.innerHTML = personaHistories[personaId];
       } else {
         delete personaSessions[personaId];
+        if (window.fcChatContext) fcChatContext.clear(personaId);
         msgs.innerHTML = renderHeroHTML(personaId) + '<div class="date-divider"><span>Today</span></div>';
       }
+      if (window.fcChatContext) fcChatContext.render();  // this agent's chips
       msgs.scrollTop = 999999;
       updatePersonaBarActive();
       const mi = document.getElementById('msgInput');
@@ -1665,6 +1677,7 @@
             ${av}<span class="sbn-truncate" style="flex:1; min-width:0;">${escHtml(s.title)}</span>
             <button type="button" class="sbn-rmore" data-act="more" title="Conversation actions" aria-label="Conversation actions"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>
             <span class="sbn-ract">
+              <button data-act="branch" title="Branch — new chat with this one as context"><span class="material-symbols-outlined" style="font-size:14px">call_split</span></button>
               <button data-act="mindmap" title="Build a mind map from this conversation"><span class="material-symbols-outlined" style="font-size:14px">account_tree</span></button>
               <button data-act="copy" title="Copy conversation text"><span class="material-symbols-outlined" style="font-size:14px">content_copy</span></button>
               <button data-act="rename" title="Rename conversation"><span class="material-symbols-outlined" style="font-size:14px">edit</span></button>
@@ -1697,6 +1710,7 @@
           else if (b.dataset.act === 'delete') deleteSession(a.dataset.session);
           else if (b.dataset.act === 'copy') copyConversation(a.dataset.session);
           else if (b.dataset.act === 'mindmap') mindMapFromChat(a.dataset.session);
+          else if (b.dataset.act === 'branch') branchFromChat(a.dataset.session, a.dataset.persona, a.dataset.title);
         };
       });
       // Once per page — the list itself is repainted often. Kept on the
@@ -1926,6 +1940,34 @@
       renderRecents: () => loadRecentSessions()
     };
 
+    // Other chats as context (chat_context.js): Ctrl+K picker + composer chips.
+    // Links are per agent tab, like personaSessions.
+    if (window.fcChatContext) {
+      fcChatContext.init({
+        apiUrl: API_URL,
+        getToken: () => _session?.token,
+        getKey: () => activePersona,
+        getSessionId: () => personaSessions[activePersona],
+        personas: PERSONAS,
+        esc: escHtml,
+        toast: (m, t) => showToast(m, t)
+      });
+    }
+
+    // Branch: a fresh chat (same agent) that carries the given conversation —
+    // or the open one — as context. The original stays untouched.
+    function branchFromChat(sessionId, personaId, title) {
+      const sid = sessionId || personaSessions[activePersona];
+      if (!sid) { showToast('Nothing to branch yet — send a message first', 'warn'); return; }
+      const pid = PERSONAS[personaId] ? personaId : activePersona;
+      const row = document.querySelector(`#sbnRecent [data-session="${CSS.escape(sid)}"]`);
+      const name = title || row?.dataset.title || 'Previous conversation';
+      if (pid !== activePersona) switchChat(pid);
+      newChat();
+      if (window.fcChatContext) fcChatContext.set([{ sessionId: sid, title: name, persona: pid }]);
+      showToast(`Branched — this chat carries “${name}” as context`, 'info');
+    }
+
     // Open a specific past conversation (from the Recent list or a ?session= deep link).
     async function openSession(sessionId, personaId) {
       const token = _session?.token;
@@ -1938,6 +1980,7 @@
         delete personaHistories[pid];       // force a clean re-render below
         switchChat(pid);
         personaSessions[pid] = sessionId;   // future sends continue THIS session
+        if (window.fcChatContext) fcChatContext.set(data.contextSessions || [], pid);
         renderHistoryMessages(data.messages, pid);
         // Update active highlight in-DOM instead of re-fetching all sessions
         document.querySelectorAll('#sbnRecent [data-session]').forEach(a => {
@@ -2682,7 +2725,10 @@
             sessionId: personaSessions[activePersona] || undefined,
             web: !!window.webAccess,
             study: !!window.studyMode,
-            attachments: uploadedAttachments && uploadedAttachments.length ? uploadedAttachments : undefined
+            attachments: uploadedAttachments && uploadedAttachments.length ? uploadedAttachments : undefined,
+            // Linked chats (Ctrl+K). Omitted if the picker failed to load, so
+            // the server keeps whatever links the conversation already has.
+            contextSessions: window.fcChatContext ? fcChatContext.ids() : undefined
           };
 
           const res = await fetch(`${API_URL}/api/ai-chat/send`, {
@@ -2709,6 +2755,8 @@
             renderMessage('BOT', data.error || 'Failed to get response', errProof, errFraud, null);
           } else {
             personaSessions[activePersona] = data.sessionId;
+            // The server's list is what the agent actually read (drops deleted chats).
+            if (window.fcChatContext && Array.isArray(data.contextSessions)) fcChatContext.set(data.contextSessions);
             // New conversations appear in Recents after their first message;
             // existing ones bubble to the top.
             if (typeof loadRecentSessions === 'function') loadRecentSessions();

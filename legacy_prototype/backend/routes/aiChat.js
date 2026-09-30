@@ -12,6 +12,17 @@ const { pinJSON, buildProofDocument } = require('../services/ipfs');
 const { createNotification } = require('../services/notifications');
 const multer = require('multer');
 const { extractFromUpload, persistUpload, buildAttachmentBlock } = require('../services/attachments');
+const { normalizeContextIds, formatContextBlock, loadContextChats, compactChats, getCompaction } = require('../services/chatContext');
+
+// Linked-chat compaction: the model summarises, MemoryEngine learns the result.
+// Required lazily so loading this route never drags the inference stack into tests.
+function compactionDeps() {
+  return {
+    query,
+    runInference: (...a) => require('../services/inference').runInference(...a),
+    ingest: (...a) => require('../services/cognitive/MemoryEngine').ingestChat(...a)
+  };
+}
 
 const { cached } = require('../services/microCache');
 
@@ -128,6 +139,7 @@ router.post('/send', requireAuth, async (req, res) => {
   // userMsgId/botMsgId/channelId are needed by the post-response anchoring and
   // IPFS pinning below, which runs outside this try block.
   let userProof, botProof, lastCleanResponse, userMsgId, botMsgId, channelId;
+  let contextIds = [];
   try {
     const resHistory = await query(`
       SELECT role, content FROM ai_conversations
@@ -137,9 +149,26 @@ router.post('/send', requireAuth, async (req, res) => {
     `, [activeSession, userId]);
     const history = resHistory.rows;
 
+    // Linked conversations. The client sends its current chip list; when it
+    // sends none (older clients, API callers) the stored links stand.
+    if (Array.isArray(req.body.contextSessions)) {
+      contextIds = normalizeContextIds(req.body.contextSessions, activeSession);
+    } else {
+      const stored = await query(
+        'SELECT context_sessions FROM ai_session_meta WHERE session_id = $1 AND user_id = $2',
+        [activeSession, userId]);
+      contextIds = normalizeContextIds(stored.rows[0]?.context_sessions || [], activeSession);
+    }
+    // Each linked chat rides as its compacted summary (cached; usually already
+    // warmed by the composer when the chip was added).
+    const contextChats = await compactChats(compactionDeps(),
+      await loadContextChats(query, userId, contextIds, getPersona));
+
     // Attachments: agent sees the extracted content; the stored/displayed
     // message keeps just the file names (the full extract would bloat history).
-    const goalForAgent = hasAttachments ? message + buildAttachmentBlock(attachments) : message;
+    // Linked chats ride the same way, on every turn, and are never stored.
+    const goalForAgent = (hasAttachments ? message + buildAttachmentBlock(attachments) : message) +
+      formatContextBlock(contextChats);
     const storedMessage = hasAttachments
       ? `${message}\n\n📎 Attached: ${attachments.map(a => a.name).join(', ')}`
       : message;
@@ -196,11 +225,12 @@ router.post('/send', requireAuth, async (req, res) => {
 
     // Study Mode is a property of the conversation, not the browser — remember it
     // so reopening this session anywhere comes back in card format.
+    // Same for linked chats: stored so later turns and reopens keep them.
     await query(`
-      INSERT INTO ai_session_meta (session_id, user_id, study_mode, deleted, updated_at)
-      VALUES ($1, $2, $3, false, NOW())
-      ON CONFLICT (session_id) DO UPDATE SET study_mode = $3, updated_at = NOW()
-    `, [activeSession, userId, study === true]);
+      INSERT INTO ai_session_meta (session_id, user_id, study_mode, context_sessions, deleted, updated_at)
+      VALUES ($1, $2, $3, $4::text[], false, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET study_mode = $3, context_sessions = $4::text[], updated_at = NOW()
+    `, [activeSession, userId, study === true, contextIds]);
 
     let newBalance = user.token_balance - 5;
     await query('UPDATE users SET token_balance = $1 WHERE user_id = $2', [newBalance, userId]);
@@ -306,6 +336,10 @@ router.post('/send', requireAuth, async (req, res) => {
       memoryTrace: result.memoryTrace || null,
       // Claude-style citations: the web/data sources consulted for this answer
       sources: Array.isArray(result.sources) ? result.sources : [],
+      // The linked chats the agent actually read (missing/foreign ids dropped)
+      contextSessions: contextChats.map(c => ({
+        sessionId: c.sessionId, title: c.title, persona: c.persona, summary: c.summary || null
+      })),
       fraud: fraudAlert,
       proof: {
         user: {
@@ -446,14 +480,27 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
     const persona = messages.length > 0 ? getPersona(messages[0].persona) : null;
 
     const resMeta = await query(
-      'SELECT study_mode FROM ai_session_meta WHERE session_id = $1 AND user_id = $2',
+      'SELECT study_mode, context_sessions FROM ai_session_meta WHERE session_id = $1 AND user_id = $2',
       [req.params.sessionId, req.user.id]);
+
+    // Linked chats come back with titles so the composer can restore its chips.
+    const linkedIds = normalizeContextIds(resMeta.rows[0]?.context_sessions || [], req.params.sessionId);
+    const linked = await loadContextChats(query, req.user.id, linkedIds, getPersona);
+    // Cached compactions only — reopening a chat must not trigger LLM calls.
+    if (linked.length) {
+      const comp = await query(
+        'SELECT session_id, summary FROM chat_compactions WHERE user_id = $1 AND session_id = ANY($2::text[])',
+        [req.user.id, linked.map(c => c.sessionId)]);
+      const byId = new Map(comp.rows.map(r => [r.session_id, r.summary]));
+      for (const c of linked) c.summary = byId.get(c.sessionId) || null;
+    }
 
     res.json({
       sessionId: req.params.sessionId,
       persona: persona ? { id: messages[0].persona, name: persona.name, avatar: persona.avatar } : null,
       // Sprint Z: restores the composer STUDY toggle when a study chat is reopened
       studyMode: resMeta.rows[0] ? resMeta.rows[0].study_mode === true : false,
+      contextSessions: linked.map(c => ({ sessionId: c.sessionId, title: c.title, persona: c.persona, summary: c.summary })),
       messages
     });
   } catch (err) {
@@ -464,6 +511,11 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
 
 // ── GET /api/ai-chat/sessions ──────────────────────────────────
 router.get('/sessions', requireAuth, async (req, res) => {
+  // ?q= searches titles and message text (the composer's chat-context picker);
+  // ?limit= lets that picker see past the 20 the sidebar needs.
+  const q = String(req.query.q || '').trim().slice(0, 100);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const like = q ? `%${q.replace(/[\\%_]/g, c => '\\' + c)}%` : null;
   try {
     const resSessions = await query(`
       SELECT s.session_id, s.persona, s.started_at, s.last_message_at, s.message_count,
@@ -488,9 +540,15 @@ router.get('/sessions', requireAuth, async (req, res) => {
         SELECT 1 FROM ai_session_meta d
         WHERE d.session_id = s.session_id AND d.user_id = $1 AND d.deleted = true
       )
+      AND ($3::text IS NULL
+        OR m.title ILIKE $3
+        OR EXISTS (
+          SELECT 1 FROM ai_conversations c
+          WHERE c.session_id = s.session_id AND c.user_id = $1 AND c.content ILIKE $3
+        ))
       ORDER BY s.last_message_at DESC
-      LIMIT 20
-    `, [req.user.id]);
+      LIMIT $2
+    `, [req.user.id, limit, like]);
     const sessions = resSessions.rows;
 
     // Briefings have no user message to take a title from, so without this they
@@ -523,6 +581,30 @@ router.get('/sessions', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Fetch sessions error:', err);
     res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
+// ── POST /api/ai-chat/sessions/:sessionId/compact ── compact for linking ──
+// The composer calls this the moment a chat is linked, so the summary (one or
+// more LLM calls on a long chat) is ready before the user hits send. Also
+// feeds the new summary to the knowledge graph. Cheap when already current.
+router.post('/sessions/:sessionId/compact', requireAuth, async (req, res) => {
+  try {
+    const [chat] = await loadContextChats(query, req.user.id, [req.params.sessionId], getPersona);
+    if (!chat) return res.status(404).json({ error: 'Session not found' });
+    const comp = await getCompaction(compactionDeps(), chat);
+    if (!comp) return res.status(503).json({ error: 'Could not compact this chat right now — the agent will read its latest messages instead' });
+    res.json({
+      sessionId: chat.sessionId,
+      title: chat.title,
+      summary: comp.summary,
+      turnCount: comp.turnCount,
+      cached: !!comp.cached,
+      stale: !!comp.stale
+    });
+  } catch (err) {
+    console.error('Compact session error:', err);
+    res.status(500).json({ error: 'Failed to compact conversation' });
   }
 });
 
