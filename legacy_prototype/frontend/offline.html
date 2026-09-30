@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinChat — Offline</title>
+<!-- Served by sw.js from its cache when a page can't be reached, so it must
+     not depend on anything else loading: styles are inline, fonts are system,
+     and the only image is an icon the worker precaches. -->
+<style>
+  :root { --bg:#f7f4ed; --text:#2b2118; --muted:#8a7d6a; --btn:#4a3828; --btn-ink:#f5ead8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1a1510; --text:#efe6d6; --muted:#a99e88; --btn:#c9a97f; --btn-ink:#1a1510; } }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:center;
+         padding:24px; background:var(--bg); color:var(--text);
+         font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align:center; }
+  .box { max-width:340px; }
+  img { width:88px; height:88px; border-radius:20px; }
+  h1 { font-size:22px; margin:20px 0 8px; }
+  p { font-size:15px; line-height:1.5; color:var(--muted); margin:0 0 24px; }
+  button { font:inherit; font-weight:600; font-size:15px; padding:12px 28px; min-height:44px; border:none;
+           border-radius:999px; background:var(--btn); color:var(--btn-ink); cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <img src="/assets/icons/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>FinChat needs a connection to reach your agents. It will reload by itself once you're back online.</p>
+    <button type="button" id="retry">Try again</button>
+  </div>
+  <script>
+    document.getElementById('retry').addEventListener('click', () => location.reload());
+    window.addEventListener('online', () => location.reload());
+  </script>
+</body>
+</html>

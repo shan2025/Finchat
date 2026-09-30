@@ -208,6 +208,11 @@ app.use(express.urlencoded({ extended: true }));
 // app where every navigation is a fresh document. Rename the file to bust.
 const IMMUTABLE_ASSET = /\.(png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$/i;
 
+// HTML pages go out with the installable-app tags added (manifest, home-screen
+// icon, service worker) — see middleware/pwaHead.js. Everything else falls
+// through to the static server below.
+app.use(require('./middleware/pwaHead').pwaHead(path.join(__dirname, '../frontend')));
+
 app.use(express.static(path.join(__dirname, '../frontend'), {
   setHeaders: (res, filePath) => {
     if (IMMUTABLE_ASSET.test(filePath)) {
