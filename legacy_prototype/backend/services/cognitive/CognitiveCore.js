@@ -3,6 +3,7 @@ const { buildContext } = require('./ContextBuilder');
 const { reason } = require('./ReasoningEngine');
 const { executeTool } = require('./ToolManager');
 const { plan: generatePlan } = require('./PlanningEngine');
+const { resolveStepInput } = require('./planReferences');
 const { retrieveEnrichedContext, appendToScratchpad } = require('./MemoryService');
 const { reflect } = require('./ReflectionEngine');
 const { eventBus } = require('./EventBus');
@@ -649,9 +650,15 @@ async function _runWithinStallClock({
           stored: planResult.stored
         }, planStart);
 
+        // Results of THIS plan, keyed by the planner's own step numbers, so a
+        // later step's "<URL of top article from step 1>" can be filled with the
+        // real URL step 1 returned. See planReferences.js for why that was needed.
+        const planStepResults = [];
+
         // Now execute each plan step sequentially
-        for (const step of planResult.plan.steps) {
+        for (const planned of planResult.plan.steps) {
           stepNumber++;
+          let step = planned;
 
           // Re-check budget before each plan step. Running out here used to end
           // the whole run on a placeholder string, throwing away every result
@@ -675,6 +682,25 @@ async function _runWithinStallClock({
           }
 
           if (step.action === 'tool' && step.tool) {
+            // Fill a reference to an earlier step's result before the tool sees it.
+            const ref = resolveStepInput(step, planStepResults);
+            if (ref.resolved) {
+              step = { ...step, input: ref.input };
+              await logPhase(execId, 'planning', stepNumber, { reference_resolved: ref.note, planStep: step.step }, new Date());
+            } else if (ref.unresolved) {
+              // Skipped, not sent: a description of a URL is not a URL, and calling
+              // the tool anyway only buys a guaranteed failure and a wasted Jina
+              // request. The result says why in plain words, so the synthesis pass
+              // knows this source is missing rather than silently absent.
+              await logPhase(execId, 'using_tool', stepNumber, {
+                tool: step.tool, input: step.input, error: 'unresolved_plan_reference', planStep: step.step
+              }, new Date());
+              const skipped = { error: `SKIPPED: ${ref.note}. If this source matters, call "${step.tool}" yourself with a real URL taken from the results above.` };
+              accumulatedToolResults.push({ tool: step.tool, input: step.input, result: skipped });
+              planStepResults.push({ planStep: step.step, tool: step.tool, input: step.input, result: skipped });
+              continue;
+            }
+
             // Execute the tool from the plan
             await updateState(execId, STATES.WAITING, { waitReason: WAIT_REASONS.TOOL_RESPONSE });
             const toolStart = new Date();
@@ -703,6 +729,7 @@ async function _runWithinStallClock({
                 planStep: step.step
               }, toolStart);
               accumulatedToolResults.push({ tool: step.tool, input: step.input, result: toolOut.output });
+              planStepResults.push({ planStep: step.step, tool: step.tool, input: step.input, result: toolOut.output });
             } catch (toolErr) {
               if (toolErr.name === 'ApprovalRequiredError') {
                 pendingApproval = { tool: toolErr.toolName, input: toolErr.toolInput, planStep: step.step };
