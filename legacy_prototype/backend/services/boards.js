@@ -6,11 +6,17 @@
 // everything AROUND the content — files, notes, links, share links — and those
 // reuse the same services (mindMapDocFile, linkAttach, attachments).
 //
+// A QUEUE (migration 061) is a board of kind 'queue': each column is a lane —
+// one person or team — and card order is the order of work, so the first card
+// is what they do now and the next is next. A finished task is marked done
+// (done_at) rather than deleted. Same tables, same routes, same History.
+//
 // Ownership is enforced here by always resolving a board with its user_id; a
 // board, column, card or attachment that is not the caller's is "not found".
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 
+const KINDS = new Set(['kanban', 'queue']);
 const PRIORITIES = new Set(['high', 'medium', 'low']);
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -32,6 +38,11 @@ class BoardError extends Error {
 }
 const notFound = (what) => new BoardError(404, `${what} not found`);
 const bad = (msg) => new BoardError(400, msg);
+
+/** What History calls things: a queue has lanes and tasks, a Kanban board columns and cards. */
+const nouns = (board) => (board && board.kind === 'queue'
+  ? { board: 'queue', col: 'lane', card: 'task' }
+  : { board: 'board', col: 'column', card: 'card' });
 
 // ── validation ─────────────────────────────────────────────────
 
@@ -118,11 +129,12 @@ async function requireBoard(boardId, userId, need = 'edit') {
 
 async function listBoards(userId) {
   const r = await query(`
-    SELECT b.board_id, b.title, b.description, b.updated_at, b.created_at, b.source_map_id,
+    SELECT b.board_id, b.title, b.description, b.updated_at, b.created_at, b.source_map_id, b.kind,
            CASE WHEN b.user_id = $1 THEN 'owner' ELSE m.role END AS access,
            u.name AS owner_name,
            (SELECT COUNT(*) FROM board_columns c WHERE c.board_id = b.board_id)::int AS column_count,
            (SELECT COUNT(*) FROM board_cards k WHERE k.board_id = b.board_id)::int AS card_count,
+           (SELECT COUNT(*) FROM board_cards k WHERE k.board_id = b.board_id AND k.done_at IS NOT NULL)::int AS done_count,
            (SELECT COUNT(*) FROM board_members bm WHERE bm.board_id = b.board_id)::int AS member_count
       FROM boards b
       LEFT JOIN board_members m ON m.board_id = b.board_id AND m.user_id = $1
@@ -254,13 +266,16 @@ function describeCardChange(cur, f, cols = {}) {
 
 // ── boards ─────────────────────────────────────────────────────
 
-async function createBoard(userId, { title, description, columns, origin = null, originDetails = {} } = {}) {
+async function createBoard(userId, { title, description, columns, kind, origin = null, originDetails = {} } = {}) {
+  const k = kind === undefined || kind === null || kind === '' ? 'kanban' : String(kind);
+  if (!KINDS.has(k)) throw bad('kind must be kanban or queue');
   const boardId = 'brd_' + uuidv4();
-  await query('INSERT INTO boards (board_id, user_id, title, description) VALUES ($1,$2,$3,$4)',
-    [boardId, userId, clean(title, LIMITS.title) || 'Untitled board', cleanLong(description, 2000)]);
+  await query('INSERT INTO boards (board_id, user_id, title, description, kind) VALUES ($1,$2,$3,$4,$5)',
+    [boardId, userId, clean(title, LIMITS.title) || (k === 'queue' ? 'Untitled queue' : 'Untitled board'),
+     cleanLong(description, 2000), k]);
   const names = Array.isArray(columns) && columns.length
     ? columns.map(c => clean(typeof c === 'string' ? c : c && c.title, 120)).filter(Boolean).slice(0, LIMITS.columns)
-    : ['To do', 'In progress', 'Done'];
+    : k === 'queue' ? ['Me'] : ['To do', 'In progress', 'Done'];
   // One statement: every round trip to the database costs ~125ms from here.
   if (names.length) {
     await query(`
@@ -270,21 +285,22 @@ async function createBoard(userId, { title, description, columns, origin = null,
     `, [boardId, names.map(() => 'bcl_' + uuidv4()), names,
         names.map((_, i) => COLUMN_COLORS[i % COLUMN_COLORS.length])]);
   }
-  await record(boardId, userId, 'create_board', origin || 'created the board', originDetails);
+  await record(boardId, userId, 'create_board', origin || `created the ${nouns({ kind: k }).board}`, originDetails);
   return boardId;
 }
 
 async function updateBoard(boardId, userId, { title, description }) {
   const cur = await requireBoard(boardId, userId);
-  const newTitle = title !== undefined ? (clean(title, LIMITS.title) || 'Untitled board') : null;
+  const n = nouns(cur);
+  const newTitle = title !== undefined ? (clean(title, LIMITS.title) || `Untitled ${n.board}`) : null;
   const newDesc = description !== undefined ? cleanLong(description, 2000) : null;
   await query('UPDATE boards SET title = COALESCE($2, title), description = COALESCE($3, description) WHERE board_id = $1',
     [boardId, newTitle, newDesc]);
   if (newTitle !== null && newTitle !== cur.title) {
-    await record(boardId, userId, 'rename_board', `renamed the board from ${q(cur.title)} to ${q(newTitle)}`,
+    await record(boardId, userId, 'rename_board', `renamed the ${n.board} from ${q(cur.title)} to ${q(newTitle)}`,
       { from: cur.title, to: newTitle });
   } else if (newDesc !== null && newDesc !== cur.description) {
-    await record(boardId, userId, 'edit_board', 'edited the board description', {}, { key: `boarddesc:${boardId}` });
+    await record(boardId, userId, 'edit_board', `edited the ${n.board} description`, {}, { key: `boarddesc:${boardId}` });
   }
 }
 
@@ -297,20 +313,20 @@ async function deleteBoard(boardId, userId) {
 // ── columns ────────────────────────────────────────────────────
 
 async function addColumn(boardId, userId, { title, color }) {
-  await requireBoard(boardId, userId);
+  const n = nouns(await requireBoard(boardId, userId));
   const count = await query('SELECT COUNT(*)::int AS n, COALESCE(MAX(order_index)+1,0) AS next FROM board_columns WHERE board_id = $1', [boardId]);
-  if (count.rows[0].n >= LIMITS.columns) throw bad(`A board holds at most ${LIMITS.columns} columns`);
+  if (count.rows[0].n >= LIMITS.columns) throw bad(`A ${n.board} holds at most ${LIMITS.columns} ${n.col}s`);
   const columnId = 'bcl_' + uuidv4();
-  const name = clean(title, 120) || 'New column';
+  const name = clean(title, 120) || `New ${n.col}`;
   await query('INSERT INTO board_columns (column_id, board_id, title, color, order_index) VALUES ($1,$2,$3,$4,$5)',
     [columnId, boardId, name,
      HEX.test(color || '') ? color : COLUMN_COLORS[count.rows[0].n % COLUMN_COLORS.length], count.rows[0].next]);
-  await record(boardId, userId, 'add_column', `added the column ${q(name)}`, { columnId });
+  await record(boardId, userId, 'add_column', `added the ${n.col} ${q(name)}`, { columnId });
   return columnId;
 }
 
 async function updateColumn(boardId, userId, columnId, { title, color }) {
-  await requireBoard(boardId, userId);
+  const n = nouns(await requireBoard(boardId, userId));
   if (color !== undefined && color !== null && !HEX.test(color)) throw bad('color must be #rrggbb');
   // The old title rides along from the same statement (FROM sees the row before the update).
   const r = await query(`
@@ -321,30 +337,30 @@ async function updateColumn(boardId, userId, columnId, { title, color }) {
     [columnId, boardId, title !== undefined ? (clean(title, 120) || 'Untitled') : null, color || null]);
   if (!r.rowCount) throw notFound('Column');
   const { title: now, old_title: was } = r.rows[0];
-  if (now !== was) await record(boardId, userId, 'rename_column', `renamed the column ${q(was)} to ${q(now)}`, { columnId, from: was, to: now });
+  if (now !== was) await record(boardId, userId, 'rename_column', `renamed the ${n.col} ${q(was)} to ${q(now)}`, { columnId, from: was, to: now });
   else if (color) await record(boardId, userId, 'color_column', `changed the colour of ${q(now)}`, { columnId, color });
 }
 
 async function deleteColumn(boardId, userId, columnId) {
-  await requireBoard(boardId, userId);
+  const n = nouns(await requireBoard(boardId, userId));
   const r = await query(`
     DELETE FROM board_columns WHERE column_id = $1 AND board_id = $2
     RETURNING title, (SELECT COUNT(*) FROM board_cards WHERE column_id = $1)::int AS cards`, [columnId, boardId]);
   if (!r.rowCount) throw notFound('Column');
   const { title, cards } = r.rows[0];
   await record(boardId, userId, 'delete_column',
-    `deleted the column ${q(title)}${cards ? ` and its ${cards} card${cards === 1 ? '' : 's'}` : ''}`, { columnId, title, cards });
+    `deleted the ${n.col} ${q(title)}${cards ? ` and its ${cards} ${n.card}${cards === 1 ? '' : 's'}` : ''}`, { columnId, title, cards });
 }
 
 /** Set column order from a full list of ids. Unknown ids are ignored. */
 async function orderColumns(boardId, userId, columnIds) {
-  await requireBoard(boardId, userId);
+  const n = nouns(await requireBoard(boardId, userId));
   const ids = (Array.isArray(columnIds) ? columnIds : []).filter(x => typeof x === 'string').slice(0, LIMITS.columns);
   if (!ids.length) return;
   await query(`UPDATE board_columns c SET order_index = t.i
                  FROM unnest($2::text[]) WITH ORDINALITY AS t(id, i)
                 WHERE c.column_id = t.id AND c.board_id = $1`, [boardId, ids]);
-  await record(boardId, userId, 'order_columns', 'reordered the columns', {}, { key: `colorder:${boardId}` });
+  await record(boardId, userId, 'order_columns', `reordered the ${n.col}s`, {}, { key: `colorder:${boardId}` });
 }
 
 // ── cards ──────────────────────────────────────────────────────
@@ -385,14 +401,23 @@ function cardFields(input, board) {
   return f;
 }
 
+/**
+ * A new card at the back of its column — or, with position 'front', ahead of
+ * everything still waiting there (a queue's "do this first"). The front is
+ * worked out from tasks not yet done: a finished one keeps its old slot number.
+ */
 async function addCard(boardId, userId, input = {}) {
   const board = await requireBoard(boardId, userId);
+  const words = nouns(board);
   const colTitle = await requireColumn(boardId, input.columnId);
   const n = await query('SELECT COUNT(*)::int AS n FROM board_cards WHERE board_id = $1', [boardId]);
-  if (n.rows[0].n >= LIMITS.cards) throw bad(`A board holds at most ${LIMITS.cards} cards`);
-  const f = cardFields({ title: input.title || 'Untitled card', ...input }, board);
+  if (n.rows[0].n >= LIMITS.cards) throw bad(`A ${words.board} holds at most ${LIMITS.cards} ${words.card}s`);
+  const f = cardFields({ title: input.title || `Untitled ${words.card}`, ...input }, board);
   if (f.start_date && f.end_date && f.end_date < f.start_date) throw bad('endDate is before startDate');
-  const next = await query('SELECT COALESCE(MAX(order_index)+1,0) AS next FROM board_cards WHERE column_id = $1', [input.columnId]);
+  const front = input.position === 'front';
+  const next = await query(front
+    ? 'SELECT COALESCE(MIN(order_index)-1,0) AS next FROM board_cards WHERE column_id = $1 AND done_at IS NULL'
+    : 'SELECT COALESCE(MAX(order_index)+1,0) AS next FROM board_cards WHERE column_id = $1', [input.columnId]);
   const cardId = 'bcd_' + uuidv4();
   await query(`
     INSERT INTO board_cards (card_id, board_id, column_id, title, summary, detail, tags, priority,
@@ -401,16 +426,23 @@ async function addCard(boardId, userId, input = {}) {
   `, [cardId, boardId, input.columnId, f.title, f.summary || '', f.detail || '', JSON.stringify(f.tags || []),
       f.priority || null, f.start_date || null, f.end_date || null, f.color || null, Number(next.rows[0].next) || 0]);
   await saveTags(board, f.tags);
-  await record(boardId, userId, 'add_card', `added the card ${q(f.title)} to ${colTitle}`, { cardId, columnId: input.columnId });
+  await record(boardId, userId, 'add_card', board.kind === 'queue'
+    ? (front ? `put the task ${q(f.title)} at the front of ${colTitle}'s queue` : `added the task ${q(f.title)} to ${colTitle}'s queue`)
+    : `added the card ${q(f.title)} to ${colTitle}`, { cardId, columnId: input.columnId });
   return cardId;
 }
 
+/** Any of the card fields, a move (columnId), and — on a queue — done: true | false. */
 async function updateCard(boardId, userId, cardId, input = {}) {
   const board = await requireBoard(boardId, userId);
   const cur = (await query(`SELECT k.*, c.title AS column_title FROM board_cards k
                               JOIN board_columns c ON c.column_id = k.column_id
                              WHERE k.card_id = $1 AND k.board_id = $2`, [cardId, boardId])).rows[0];
   if (!cur) throw notFound('Card');
+  if (input.done !== undefined) {
+    if (board.kind !== 'queue') throw bad('Only a queue marks tasks done — move the card to a Done column instead');
+    await setCardDone(boardId, userId, cardId, !!input.done, { board });
+  }
   const f = cardFields(input, board);
   const start = f.start_date !== undefined ? f.start_date : (cur.start_date ? isoDate(cur.start_date) : null);
   const end = f.end_date !== undefined ? f.end_date : (cur.end_date ? isoDate(cur.end_date) : null);
@@ -440,11 +472,42 @@ function isoDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * A queue task finished (done) or un-finished (put back). Finishing takes it
+ * out of the lane; putting it back puts it at the FRONT, since the usual reason
+ * is a Done pressed too early. One statement each. Already in that state — a
+ * double click, or a teammate got there first — is a quiet no-op (false).
+ */
+async function setCardDone(boardId, userId, cardId, done, { board = null } = {}) {
+  const b = board || await requireBoard(boardId, userId);
+  if (b.kind !== 'queue') throw bad('Only a queue marks tasks done — move the card to a Done column instead');
+  const r = await query(done
+    ? `UPDATE board_cards k SET done_at = now(), updated_at = now()
+        WHERE k.card_id = $1 AND k.board_id = $2 AND k.done_at IS NULL
+      RETURNING k.title, k.column_id, (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`
+    : `UPDATE board_cards k SET done_at = NULL, updated_at = now(),
+              order_index = (SELECT COALESCE(MIN(o.order_index) - 1, 0) FROM board_cards o
+                              WHERE o.column_id = k.column_id AND o.done_at IS NULL)
+        WHERE k.card_id = $1 AND k.board_id = $2 AND k.done_at IS NOT NULL
+      RETURNING k.title, k.column_id, (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`,
+    [cardId, boardId]);
+  if (!r.rowCount) {
+    const exists = await query('SELECT 1 FROM board_cards WHERE card_id = $1 AND board_id = $2', [cardId, boardId]);
+    if (!exists.rowCount) throw notFound('Card');
+    return false;
+  }
+  const { title, lane, column_id: columnId } = r.rows[0];
+  await record(boardId, userId, done ? 'done_card' : 'undone_card',
+    done ? `finished ${q(title)} from ${lane}'s queue` : `put ${q(title)} back at the front of ${lane}'s queue`,
+    { cardId, columnId });
+  return true;
+}
+
 async function deleteCard(boardId, userId, cardId) {
-  await requireBoard(boardId, userId);
+  const n = nouns(await requireBoard(boardId, userId));
   const r = await query('DELETE FROM board_cards WHERE card_id = $1 AND board_id = $2 RETURNING title', [cardId, boardId]);
   if (!r.rowCount) throw notFound('Card');
-  await record(boardId, userId, 'delete_card', `deleted the card ${q(r.rows[0].title)}`, { cardId, title: r.rows[0].title });
+  await record(boardId, userId, 'delete_card', `deleted the ${n.card} ${q(r.rows[0].title)}`, { cardId, title: r.rows[0].title });
 }
 
 /**
@@ -453,7 +516,7 @@ async function deleteCard(boardId, userId, cardId) {
  * this board and every column a column on it, or nothing is written.
  */
 async function reorderCards(boardId, userId, columns) {
-  await requireBoard(boardId, userId);
+  const board = await requireBoard(boardId, userId);
   const list = Array.isArray(columns) ? columns.slice(0, LIMITS.columns) : [];
   const ids = [], cols = [], idx = [];
   for (const c of list) {
@@ -485,11 +548,12 @@ async function reorderCards(boardId, userId, columns) {
       `moved ${q(k.title)} from ${colTitle.get(k.column_id)} to ${colTitle.get(target.get(k.card_id))}`,
       { cardId: k.card_id, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) });
   } else if (moved.length > 1) {
-    await record(boardId, userId, 'move_card', `moved ${moved.length} cards`,
+    await record(boardId, userId, 'move_card', `moved ${moved.length} ${nouns(board).card}s`,
       { cards: moved.map(k => ({ cardId: k.card_id, title: k.title, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) })) });
   } else {
     const where = colTitle.get(colSet[0]);
-    await record(boardId, userId, 'order_cards', `reordered the cards in ${where}`, {}, { key: `order:${colSet[0]}` });
+    await record(boardId, userId, 'order_cards',
+      board.kind === 'queue' ? `reordered ${where}'s queue` : `reordered the cards in ${where}`, {}, { key: `order:${colSet[0]}` });
   }
 }
 
@@ -518,6 +582,24 @@ async function insertAttachment(row) {
   await record(row.boardId, row.userId, 'attach', `${what} ${q(a.filename)}${where}`,
     { attachmentId: a.attachment_id, cardId: a.card_id || null, kind: a.kind });
   return a;
+}
+
+// Originals above this stay as extracted text only — the same cap as mind map documents.
+const DB_MAX_BYTES = Number(process.env.MIND_MAP_DOC_DB_MAX_BYTES) || 8 * 1024 * 1024;
+
+/**
+ * One uploaded file (multer's shape) onto a card, or onto the board when
+ * cardId is null: text extracted for search and the AI, the bytes kept when
+ * small enough to store. The caller has already checked access and the card.
+ */
+async function attachUpload(boardId, cardId, userId, f) {
+  const { extractFromUpload } = require('./attachments');
+  const extracted = await extractFromUpload(f);
+  return insertAttachment({
+    boardId, cardId, userId, kind: extracted.kind === 'image' ? 'image' : 'document',
+    filename: String(f.originalname || 'file').slice(0, 200), mimetype: f.mimetype || '',
+    size: f.size || 0, text: String(extracted.text || ''), data: f.buffer && f.buffer.length <= DB_MAX_BYTES ? f.buffer : null
+  });
 }
 
 /** One attachment the caller may read. `withData` pulls the bytes — only the file route asks. */
@@ -756,7 +838,11 @@ async function boardForMap(userId, mapId) {
  * editing one does not change the other.
  */
 async function toMindMap(userId, boardId) {
-  const { board, columns, cards } = await getBoard(boardId, userId);
+  const { board, columns, cards: all } = await getBoard(boardId, userId);
+  // A queue reads front to back: what is still waiting, in order, then what is done.
+  const cards = board.kind === 'queue'
+    ? [...all.filter(k => !k.done_at), ...all.filter(k => k.done_at).sort((a, b) => a.done_at - b.done_at)]
+    : all;
   // The paired map is the OWNER's. An editor gets a map of their own and the
   // pairing is left alone — otherwise one editor's click would repoint the
   // owner's "Mind map" button at a map the owner cannot open.
@@ -818,7 +904,8 @@ function mapRowsFromBoard(mapId, board, columns, cards, newId) {
         k.priority ? `Priority: ${k.priority}` : '',
         k.start_date || k.end_date
           ? `Dates: ${k.start_date ? isoDate(k.start_date) : '…'} → ${k.end_date ? isoDate(k.end_date) : '…'}` : '',
-        Array.isArray(k.tags) && k.tags.length ? `Tags: ${k.tags.map(t => t.label).join(', ')}` : ''
+        Array.isArray(k.tags) && k.tags.length ? `Tags: ${k.tags.map(t => t.label).join(', ')}` : '',
+        k.done_at ? `Done: ${isoDate(k.done_at)}` : ''
       ].filter(Boolean).join(' · ');
       rows.push({ ...row({ node_id: newId(), parent_id: colId, label: clean(k.title, 120) || 'Untitled',
         summary: clean(k.summary, 400), detail: [k.detail, facts].filter(Boolean).join('\n\n').slice(0, 1500),
@@ -858,6 +945,34 @@ Rules:
 - Priority only where it genuinely differs; use null otherwise.
 - Dates only when the user gave a timeframe or deadline. Spread the cards across the WHOLE timeframe, in a
   sensible order, starting from TODAY — never in the past, never past the deadline. Otherwise null.
+- No markdown, no HTML, no backslashes.`;
+
+// Same JSON shape as a board, so normalizePlan and the inserts are shared —
+// but "columns" are lanes (who does the work) and card order is work order.
+const QUEUE_PROMPT = `You line up work as a WORK QUEUE: one lane per person (or team), and each lane is an ORDERED list —
+the first task is what that person does NOW, the second is NEXT, then the rest in order.
+
+Respond ONLY with JSON of this exact shape:
+{"title":"<3-7 word title>",
+ "description":"<one sentence: what this queue lines up>",
+ "columns":[
+   {"title":"<person, role or team>",
+    "cards":[{"title":"<verb-first task, under 10 words>","summary":"<one line>",
+              "detail":"<optional: steps or notes>",
+              "tags":["<1-3 word area>"],"priority":"high|medium|low|null",
+              "startDate":"YYYY-MM-DD|null","endDate":"YYYY-MM-DD|null"}]}
+ ]}
+
+Rules:
+- One entry in "columns" per person, role or team the user names, using their names. If they name nobody,
+  use a single lane called "Me".
+- Lanes are WHO does the work — never stages such as To do / In progress / Done.
+- Within a lane, cards are in the ORDER they should be done: what others wait on first, then the most urgent,
+  then the rest. 2 to 10 cards per lane. Cards are concrete, doable tasks, never vague themes.
+- Tags name the workstream or area. REUSE the same tag labels across lanes so they group; at most 3 per card.
+- Priority only where it genuinely differs; use null otherwise.
+- Dates only when the user gave a timeframe or deadline: spread each lane's cards across it in order, starting
+  from TODAY — never in the past, never past the deadline. Otherwise null.
 - No markdown, no HTML, no backslashes.`;
 
 const genDate = (v) => {
@@ -1005,28 +1120,38 @@ async function readFilesForPlan(files) {
  * Build a board from a plain-language instruction ("launch plan for the POS
  * app, 6 weeks, design / backend / marketing"), from files (images, PDFs,
  * Word documents, text), or both. One planning call — plus one vision call per
- * image — then the same batched inserts as fromMindMap.
+ * image — then the same batched inserts as fromMindMap. kind 'queue' plans
+ * lanes of people with their tasks in order instead of workflow columns.
  */
-async function generateBoard(userId, instruction, { today = new Date(), image = null, files = [] } = {}) {
+async function generateBoard(userId, instruction, { today = new Date(), image = null, files = [], kind = 'kanban' } = {}) {
+  const queue = kind === 'queue';
+  if (!KINDS.has(kind || 'kanban')) throw bad('kind must be kanban or queue');
   const text = cleanLong(instruction, GEN_LIMITS.instruction);
   const all = [...(image ? [image] : []), ...(files || [])];
-  if (text.length < 3 && !all.length) throw bad('Describe what the board should plan, or add a file or image');
+  if (text.length < 3 && !all.length) {
+    throw bad(queue ? 'Say who does what, or add a file or image' : 'Describe what the board should plan, or add a file or image');
+  }
   const sources = await readFilesForPlan(all);
   const { runInference } = require('./inference');
   const iso = isoDate(today);
+  const what = queue ? 'queue' : 'board';
   const ask = [
     `TODAY: ${iso}`,
-    `WHAT TO PLAN:\n${text || 'Turn the attached files into a board.'}`,
+    `WHAT TO PLAN:\n${text || `Turn the attached files into a ${what}.`}`,
     sources.length ? 'FROM THE FILES THE USER ATTACHED:\n\n' +
       sources.map(s => `### ${s.kind}: ${s.name}${s.kind === 'IMAGE' ? ' (transcribed)' : ''}\n${s.text}`).join('\n\n') + '\n\n' +
-      'Build the board from these files. Where they already have columns, lists, phases or groups, those are the columns; ' +
-      'their items, tasks, requirements or action points are the cards, in their own words. Do not drop items, and do not ' +
+      (queue
+        ? 'Build the queue from these files. Where they name people, owners or teams, those are the lanes; ' +
+          'their tasks or action points are the cards, in their own words, in the order they should be done. '
+        : 'Build the board from these files. Where they already have columns, lists, phases or groups, those are the columns; ' +
+          'their items, tasks, requirements or action points are the cards, in their own words. ') +
+      'Do not drop items, and do not ' +
       'invent work they do not imply beyond what the user asked for above. A deadline or dates written in a file count as ' +
       "the user's timeframe. Never put sticky-note or marker colours in card text." : ''
   ].filter(Boolean).join('\n\n');
   const res = await runInference({
     messages: [
-      { role: 'system', content: BOARD_PROMPT },
+      { role: 'system', content: queue ? QUEUE_PROMPT : BOARD_PROMPT },
       { role: 'user', content: ask }
     ],
     temperature: 0.4, jsonMode: true, feature: 'board', userId
@@ -1035,16 +1160,17 @@ async function generateBoard(userId, instruction, { today = new Date(), image = 
   try {
     raw = parseJsonLoose(res.content);
   } catch (e) {
-    throw new BoardError(502, 'The AI answered with something that was not a board — try again');
+    throw new BoardError(502, `The AI answered with something that was not a ${what} — try again`);
   }
   const plan = normalizePlan(raw, text.slice(0, 60));
-  if (plan.columns.length < 2 || plan.cardCount < 1) {
-    throw new BoardError(422, 'The AI could not turn that into a board — add a little more about what you are planning');
+  // One lane is a fine queue (just your own); one column is not much of a board.
+  if (plan.columns.length < (queue ? 1 : 2) || plan.cardCount < 1) {
+    throw new BoardError(422, `The AI could not turn that into a ${what} — add a little more about ${queue ? 'who does what' : 'what you are planning'}`);
   }
 
   const boardId = await createBoard(userId, {
-    title: plan.title, description: plan.description, columns: plan.columns.map(c => c.title),
-    origin: sources.length ? `built this board with AI from ${sources.map(s => q(s.name)).join(', ')}` : 'built this board with AI',
+    title: plan.title, description: plan.description, columns: plan.columns.map(c => c.title), kind: queue ? 'queue' : 'kanban',
+    origin: sources.length ? `built this ${what} with AI from ${sources.map(s => q(s.name)).join(', ')}` : `built this ${what} with AI`,
     originDetails: { instruction: text.slice(0, 300), files: sources.map(s => s.name) }
   });
   try {
@@ -1105,11 +1231,11 @@ function parseJsonLoose(text) {
 }
 
 module.exports = {
-  TAG_COLORS, COLUMN_COLORS, LIMITS, BoardError,
+  TAG_COLORS, COLUMN_COLORS, LIMITS, KINDS, BoardError,
   listBoards, getBoard, requireBoard, createBoard, updateBoard, deleteBoard,
   addColumn, updateColumn, deleteColumn, orderColumns,
-  addCard, updateCard, deleteCard, reorderCards,
-  requireCard, insertAttachment, getAttachment, deleteAttachment, attachmentsWithData,
+  addCard, updateCard, setCardDone, deleteCard, reorderCards,
+  requireCard, insertAttachment, attachUpload, getAttachment, deleteAttachment, attachmentsWithData,
   fromMindMap, boardForMap, toMindMap, generateBoard,
   listActivity, listMembers, addMember, removeMember, joinByLink, boardStamp, record, readFilesForPlan,
   normTags, isoDate, normalizePlan, planPalette, mapRowsFromBoard, describeCardChange

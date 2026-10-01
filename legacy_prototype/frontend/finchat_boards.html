@@ -6,9 +6,14 @@
 <title>Boards | FinChat</title>
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <!--
-  Kanban boards (routes/boards.js). Full-bleed, Miro-style: a white dotted
-  canvas, floating toolbars, colour in the cards. Rendering shared with the
-  public view lives in board_ui.js / board_ui.css.
+  Kanban boards and queues (routes/boards.js). Full-bleed, Miro-style: a white
+  dotted canvas, floating toolbars, colour in the cards. Rendering shared with
+  the public view lives in board_ui.js / board_ui.css.
+
+  A queue is a board of kind 'queue', drawn as one pipe per person: the front
+  task is NOW, then NEXT, 3, 4… ?kind=queue opens the queue gallery; a queue
+  board opens in queue mode by itself. The drawer, History, Ask AI, files and
+  sharing are the board's own, shared by both kinds.
 
   Standalone page — not on the SPA router — so the canvas owns the whole
   window the way a whiteboard should. Hand-written; not design-tool managed.
@@ -22,6 +27,8 @@ body { overflow: hidden; background: #f5f6f8; }
 body[data-theme="dark"] { background: #16181d; }
 #stage { position: fixed; inset: 0; overflow: auto; padding: 84px 28px 90px 86px; }
 #zoomWrap { display: inline-block; min-width: 100%; }
+/* A queue's lanes are as wide as the window and each pipe scrolls on its own. */
+body.queue #zoomWrap { display: block; }
 .topl { position: fixed; top: 14px; left: 14px; z-index: 30; max-width: calc(100% - 28px); }
 .topr { position: fixed; top: 14px; right: 14px; z-index: 30; }
 .rail { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); z-index: 30; flex-direction: column; }
@@ -46,12 +53,17 @@ body[data-theme="dark"] { background: #16181d; }
 .tile:hover { box-shadow: var(--bx-shadow); border-color: var(--bx-line-2); }
 .tile .strip { display: flex; gap: 4px; margin-bottom: 6px; }
 .tile .strip span { height: 8px; flex: 1; border-radius: 4px; }
+.tile .lanes { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.tile .lanes div { display: flex; gap: 3px; align-items: center; }
+.tile .lanes i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.tile .lanes span { height: 8px; border-radius: 4px; }
 .tile h3 { margin: 0; font-size: 16px; }
 .tile p { margin: 0; font-size: 12.5px; color: var(--bx-muted); }
 .tile.new { border-style: dashed; align-items: center; justify-content: center; color: var(--bx-blue); font-weight: 700; box-shadow: none; }
 .tile .del { position: absolute; top: 10px; right: 10px; display: none; }
 .tile:hover .del { display: inline-flex; }
 .col-title-input { font: 700 12.5px 'Figtree', 'Inter', system-ui, sans-serif; border: 1px solid var(--bx-blue); border-radius: 7px; padding: 3px 8px; width: 170px; outline: none; }
+.bx-q-who .col-title-input { width: 100%; font-size: 14px; background: var(--bx-surface); color: var(--bx-fg); }
 .maplist { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-top: 12px; }
 .maplist button { text-align: left; border: 1px solid var(--bx-line); background: var(--bx-surface); border-radius: 10px; padding: 10px 12px;
   cursor: pointer; font: 600 14px 'Figtree', 'Inter', system-ui, sans-serif; color: var(--bx-fg); }
@@ -159,7 +171,7 @@ body[data-theme="dark"] { background: #16181d; }
 </div>
 
 <div class="bx-float topl">
-  <a class="brand" href="finchat_planning.html" title="Back to Planning"><span class="brand-dot"><span class="material-symbols-outlined" style="font-size:16px">view_kanban</span></span>Boards</a>
+  <a class="brand" href="finchat_planning.html" title="Back to Planning"><span class="brand-dot" id="brandDot"><span class="material-symbols-outlined" style="font-size:16px" id="brandIcon">view_kanban</span></span><span id="brandLabel">Boards</span></a>
   <div class="bx-sep"></div>
   <button class="bx-ibtn" id="toGallery" title="All boards"><span class="material-symbols-outlined">grid_view</span></button>
   <input class="board-title" id="boardTitle" placeholder="Untitled board" maxlength="200" hidden>
@@ -214,15 +226,15 @@ body[data-theme="dark"] { background: #16181d; }
 <!-- new board -->
 <div class="bx-modal" id="newModal">
   <div class="bx-modal-box">
-    <div class="bx-modal-title">New board</div>
+    <div class="bx-modal-title" id="newHead">New board</div>
     <div class="bx-label">Name</div>
     <input class="bx-field" id="newTitle" placeholder="e.g. Duxbe launch plan" maxlength="200">
-    <div class="bx-label">Columns</div>
+    <div class="bx-label" id="newColsLabel">Columns</div>
     <input class="bx-field" id="newCols" value="To do, In progress, Done">
-    <div class="bx-hint">Comma separated — stages like To do / Done, or groups like Restaurant, POS, Services.</div>
+    <div class="bx-hint" id="newColsHint">Comma separated — stages like To do / Done, or groups like Restaurant, POS, Services.</div>
     <div class="bx-modal-acts">
       <button class="bx-btn ghost" data-close="newModal">Cancel</button>
-      <button class="bx-btn primary" id="newCreate"><span class="material-symbols-outlined">add</span>Create board</button>
+      <button class="bx-btn primary" id="newCreate"><span class="material-symbols-outlined">add</span><span id="newCreateLabel">Create board</span></button>
     </div>
   </div>
 </div>
@@ -240,20 +252,16 @@ body[data-theme="dark"] { background: #16181d; }
 <!-- built by AI -->
 <div class="bx-modal" id="aiModal">
   <div class="bx-modal-box">
-    <div class="bx-modal-title">Ask AI to build a board</div>
-    <div class="bx-modal-sub">Say what you are planning — the goal, a deadline, the areas or people involved — and/or add files: a whiteboard photo, a PDF brief, a Word spec, notes. You get columns, cards, tags, priorities and dates you can edit.</div>
+    <div class="bx-modal-title" id="aiHead">Ask AI to build a board</div>
+    <div class="bx-modal-sub" id="aiSub">Say what you are planning — the goal, a deadline, the areas or people involved — and/or add files: a whiteboard photo, a PDF brief, a Word spec, notes. You get columns, cards, tags, priorities and dates you can edit.</div>
     <textarea class="bx-field" id="aiText" rows="4" maxlength="4000" style="margin-top:12px; resize:vertical;"
       placeholder="e.g. Launch plan for the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing"></textarea>
     <div id="aiImage"></div>
-    <div class="addrow" id="aiIdeas" style="margin-top:8px;">
-      <button class="bx-chip" data-idea="Product launch in 6 weeks with design, engineering, marketing and support">Product launch</button>
-      <button class="bx-chip" data-idea="Job search for product manager roles over the next month: applications, networking, interview prep">Job search</button>
-      <button class="bx-chip" data-idea="Study plan to learn post-quantum cryptography in 4 weeks">Study plan</button>
-    </div>
+    <div class="addrow" id="aiIdeas" style="margin-top:8px;"></div>
     <div class="bx-hint" id="aiStatus"></div>
     <div class="bx-modal-acts">
       <button class="bx-btn ghost" data-close="aiModal">Cancel</button>
-      <button class="bx-btn primary" id="aiBuild"><span class="material-symbols-outlined">auto_awesome</span>Build board</button>
+      <button class="bx-btn primary" id="aiBuild"><span class="material-symbols-outlined">auto_awesome</span><span id="aiBuildLabel">Build board</span></button>
     </div>
   </div>
 </div>
@@ -261,7 +269,7 @@ body[data-theme="dark"] { background: #16181d; }
 <!-- share -->
 <div class="bx-modal" id="shareModal">
   <div class="bx-modal-box">
-    <div class="bx-modal-title">Share this board</div>
+    <div class="bx-modal-title" id="shareHead">Share this board</div>
 
     <div class="bx-label" style="margin-top:10px">People who can edit</div>
     <div class="bx-row" id="inviteRow" style="align-items:center">
@@ -366,6 +374,79 @@ body[data-theme="dark"] { background: #16181d; }
   const cardsIn = (colId) => B.cards.filter(k => k.columnId === colId).sort((a, b) => a.order - b.order);
   const attsOf = (cardId) => B.attachments.filter(a => a.cardId === cardId);
   const cardById = (id) => B.cards.find(k => k.cardId === id);
+  // A queue lane: what is still waiting, front first, and what is done, newest first.
+  const waitingIn = (colId) => cardsIn(colId).filter(k => !k.doneAt);
+  const doneIn = (colId) => B.cards.filter(k => k.columnId === colId && k.doneAt).sort((a, b) => new Date(b.doneAt) - new Date(a.doneAt));
+  const colsSorted = () => B.columns.slice().sort((a, b) => a.order - b.order);
+
+  // ── kind: Kanban board or queue ────────────────────────────
+  // The gallery shows one kind at a time (?kind=queue for queues); an open
+  // board sets the mode from its own kind. Words, icons and examples follow.
+  let MODE = new URLSearchParams(location.search).get('kind') === 'queue' ? 'queue' : 'kanban';
+  const isQueue = () => MODE === 'queue';
+  const KIND_TEXT = {
+    kanban: {
+      brand: 'Boards', icon: 'view_kanban', gallery: 'All boards', search: 'Search cards', untitled: 'Untitled board',
+      railCard: 'Add a card', railCol: 'Add a column', menu: 'Board options',
+      newHead: 'New board', newColsLabel: 'Columns', newCols: 'To do, In progress, Done', newPlaceholder: 'e.g. Duxbe launch plan',
+      newColsHint: 'Comma separated — stages like To do / Done, or groups like Restaurant, POS, Services.', newCreate: 'Create board',
+      aiHead: 'Ask AI to build a board', aiBuild: 'Build board',
+      aiSub: 'Say what you are planning — the goal, a deadline, the areas or people involved — and/or add files: a whiteboard photo, a PDF brief, a Word spec, notes. You get columns, cards, tags, priorities and dates you can edit.',
+      aiPlaceholder: 'e.g. Launch plan for the Duxbe retail POS in 6 weeks — design, backend, sales training and marketing',
+      ideas: [
+        ['Product launch', 'Product launch in 6 weeks with design, engineering, marketing and support'],
+        ['Job search', 'Job search for product manager roles over the next month: applications, networking, interview prep'],
+        ['Study plan', 'Study plan to learn post-quantum cryptography in 4 weeks']
+      ]
+    },
+    queue: {
+      brand: 'Queues', icon: 'view_timeline', gallery: 'All queues', search: 'Search tasks', untitled: 'Untitled queue',
+      railCard: 'Add a task', railCol: 'Add a person', menu: 'Queue options',
+      newHead: 'New queue', newColsLabel: 'People', newCols: 'Me', newPlaceholder: 'e.g. Café opening — who does what',
+      newColsHint: 'Comma separated — one lane each. People, teams, or anything that works through a list.', newCreate: 'Create queue',
+      aiHead: 'Ask AI to line up a queue', aiBuild: 'Build queue',
+      aiSub: 'Say who is involved and what needs doing — a deadline helps — and/or add files: a task list, a brief, a whiteboard photo. You get a lane per person with their tasks in the order to do them.',
+      aiPlaceholder: 'e.g. Café opens in 3 weeks: Asha does the menu and suppliers, Ravi sets up the POS and Wi-Fi, I handle permits and hiring',
+      ideas: [
+        ['Team week', 'This week for a team of three: Asha on design, Ravi on the backend, Meera on sales calls'],
+        ['Café opening', 'Café opens in 3 weeks: Asha does the menu and suppliers, Ravi sets up the POS, I handle permits and hiring'],
+        ['Just me', 'My week: finish the quarterly report, prepare for two interviews, renew the car insurance, plan the trip']
+      ]
+    }
+  };
+  const T = () => KIND_TEXT[MODE];
+
+  function applyMode(kind) {
+    MODE = kind === 'queue' ? 'queue' : 'kanban';
+    const t = T();
+    document.body.classList.toggle('queue', isQueue());
+    $('brandIcon').textContent = t.icon;
+    $('brandLabel').textContent = t.brand;
+    $('toGallery').title = t.gallery;
+    $('boardMenuBtn').title = t.menu;
+    $('boardTitle').placeholder = t.untitled;
+    $('search').placeholder = t.search;
+    $('railCard').title = t.railCard;
+    $('railCol').title = t.railCol;
+    $('railCol').firstElementChild.textContent = isQueue() ? 'person_add' : 'view_column';
+    $('zoomFit').hidden = isQueue();
+    $('newHead').textContent = t.newHead;
+    $('newTitle').placeholder = t.newPlaceholder;
+    $('newColsLabel').textContent = t.newColsLabel;
+    $('newCols').value = t.newCols;
+    $('newColsHint').textContent = t.newColsHint;
+    $('newCreateLabel').textContent = t.newCreate;
+    $('aiHead').textContent = t.aiHead;
+    $('aiSub').textContent = t.aiSub;
+    $('aiText').placeholder = t.aiPlaceholder;
+    $('aiBuildLabel').textContent = t.aiBuild;
+    $('shareHead').textContent = isQueue() ? 'Share this queue' : 'Share this board';
+    $('aiIdeas').innerHTML = t.ideas.map(([label, text]) => `<button class="bx-chip" data-idea="${esc(text)}">${esc(label)}</button>`).join('');
+    // A board from a mind map is a Kanban board; the board menu is worded for both.
+    document.querySelector('[data-bm="fromMap"]').hidden = isQueue();
+    document.querySelector('[data-bm="rename"]').lastChild.textContent = isQueue() ? 'Rename queue' : 'Rename board';
+    document.querySelector('[data-bm="delete"]').lastChild.textContent = isQueue() ? 'Delete this queue' : 'Delete this board';
+  }
 
   // Files come through authenticated routes, so everything is fetched with the
   // token and handed to the page as an object URL — never a bare <img src>.
@@ -389,46 +470,61 @@ body[data-theme="dark"] { background: #16181d; }
   };
 
   // ── gallery ────────────────────────────────────────────────
-  async function showGallery() {
+  async function showGallery(kind = MODE) {
     B = null; SELECTED = null;
     closeDrawer();
-    history.replaceState(null, '', 'finchat_boards.html');
-    document.title = 'Boards | FinChat';
+    applyMode(kind);
+    const queue = isQueue();
+    history.replaceState(null, '', queue ? 'finchat_boards.html?kind=queue' : 'finchat_boards.html');
+    document.title = `${T().brand} | FinChat`;
     for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn', 'aiBtn']) $(id).hidden = true;
     setZoom(1);
     $('content').innerHTML = '<div class="bx-empty">Loading…</div>';
     try {
-      const { boards } = await api('/api/boards');
+      const { boards: all } = await api('/api/boards');
+      const boards = all.filter(b => (b.kind === 'queue') === queue);
       const mine = boards.filter(b => b.access === 'owner');
       const shared = boards.filter(b => b.access !== 'owner');
       const edited = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+      // A queue's tile is three little lanes: a dot for the person, bars for the tasks.
+      const lanesArt = (i) => `<div class="lanes">${[0, 1, 2].map(j => {
+        const c = U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length];
+        return `<div><i style="background:${U.laneAccent(c)}"></i>${[0, 1, 2].slice(0, 3 - j).map(n =>
+          `<span style="background:${c}; width:${n ? 26 : 40}px"></span>`).join('')}</div>`;
+      }).join('')}</div>`;
       const tile = (b, i) => `
         <div class="tile" data-open="${esc(b.boardId)}">
-          ${b.access === 'owner' ? `<button class="bx-ibtn del" data-delboard="${esc(b.boardId)}" title="Delete board"><span class="material-symbols-outlined">delete</span></button>` : ''}
-          <div class="strip">${[0, 1, 2, 3].map(j => `<span style="background:${U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length]}"></span>`).join('')}</div>
+          ${b.access === 'owner' ? `<button class="bx-ibtn del" data-delboard="${esc(b.boardId)}" title="Delete ${queue ? 'queue' : 'board'}"><span class="material-symbols-outlined">delete</span></button>` : ''}
+          ${queue ? lanesArt(i)
+            : `<div class="strip">${[0, 1, 2, 3].map(j => `<span style="background:${U.COLUMN_COLORS[(i + j) % U.COLUMN_COLORS.length]}"></span>`).join('')}</div>`}
           <h3>${esc(b.title)}</h3>
-          <p>${b.columnCount} columns · ${b.cardCount} cards${b.sourceMapId ? ' · <span style="color:#6631d7; font-weight:700;">has a mind map</span>' : ''}</p>
+          <p>${queue
+            ? `${plural(b.columnCount, 'person', 'people')} · ${b.cardCount - (b.doneCount || 0)} waiting${b.doneCount ? ` · ${b.doneCount} done` : ''}`
+            : `${b.columnCount} columns · ${b.cardCount} cards${b.sourceMapId ? ' · <span style="color:#6631d7; font-weight:700;">has a mind map</span>' : ''}`}</p>
           ${b.access !== 'owner' ? `<p class="shared">Shared by ${esc(b.ownerName || 'someone')} · you can edit</p>`
             : b.memberCount ? `<p class="shared">Shared with ${b.memberCount} ${b.memberCount === 1 ? 'person' : 'people'}</p>` : ''}
           <p>Edited ${esc(edited(b.updatedAt))}</p>
         </div>`;
       $('content').innerHTML = `
         <div style="max-width:1100px;">
-          <h1 style="font-size:26px; margin:6px 0 4px;">Your boards</h1>
-          <p style="margin:0 0 18px; color:var(--bx-muted);">Plan with columns and cards — attach files, Drive docs, videos and links, and share a read-only link with anyone.</p>
+          <h1 style="font-size:26px; margin:6px 0 4px;">Your ${queue ? 'queues' : 'boards'}</h1>
+          <p style="margin:0 0 18px; color:var(--bx-muted);">${queue
+            ? 'Line up what each person does now, next and later. Add to the back or jump the queue, drag to reorder or hand work over, and tick tasks off as they are done.'
+            : 'Plan with columns and cards — attach files, Drive docs, videos and links, and share a read-only link with anyone.'}</p>
           <div class="gallery">
-            <div class="tile new" data-new="1"><span class="material-symbols-outlined" style="font-size:28px">add</span>New board</div>
+            <div class="tile new" data-new="1"><span class="material-symbols-outlined" style="font-size:28px">add</span>New ${queue ? 'queue' : 'board'}</div>
             <div class="tile new" data-ai="1" style="color:#e84fa7"><span class="material-symbols-outlined" style="font-size:28px">auto_awesome</span>Ask AI to build one</div>
-            <div class="tile new" data-frommap="1" style="color:#6631d7"><span class="material-symbols-outlined" style="font-size:28px">account_tree</span>From a mind map</div>
+            ${queue ? '' : '<div class="tile new" data-frommap="1" style="color:#6631d7"><span class="material-symbols-outlined" style="font-size:28px">account_tree</span>From a mind map</div>'}
             ${mine.map(tile).join('')}
           </div>
           ${shared.length ? `
             <h2 style="font-size:19px; margin:30px 0 4px;">Shared with you</h2>
-            <p style="margin:0 0 14px; color:var(--bx-muted);">Boards other people gave you edit access to.</p>
+            <p style="margin:0 0 14px; color:var(--bx-muted);">${queue ? 'Queues' : 'Boards'} other people gave you edit access to.</p>
             <div class="gallery">${shared.map(tile).join('')}</div>` : ''}
         </div>`;
     } catch (e) {
-      $('content').innerHTML = `<div class="bx-empty"><h2>Could not load boards</h2>${esc(e.message)}</div>`;
+      $('content').innerHTML = `<div class="bx-empty"><h2>Could not load ${queue ? 'queues' : 'boards'}</h2>${esc(e.message)}</div>`;
     }
   }
 
@@ -437,8 +533,8 @@ body[data-theme="dark"] { background: #16181d; }
     const delB = t.closest('[data-delboard]');
     if (delB) {
       e.stopPropagation();
-      if (await confirmBox('Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.')) {
-        try { await del('/api/boards/' + delB.dataset.delboard); U.toast('Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
+      if (await confirmBox(...deleteWords())) {
+        try { await del('/api/boards/' + delB.dataset.delboard); U.toast(isQueue() ? 'Queue deleted' : 'Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
       }
       return;
     }
@@ -449,7 +545,10 @@ body[data-theme="dark"] { background: #16181d; }
     if (open) return openBoard(open.dataset.open);
   });
 
-  $('toGallery').addEventListener('click', showGallery);
+  $('toGallery').addEventListener('click', () => showGallery());
+  const deleteWords = () => (isQueue()
+    ? ['Delete this queue?', 'Its lanes, tasks (waiting and done), files and share links are deleted with it. This cannot be undone.']
+    : ['Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.']);
 
   // ── board ──────────────────────────────────────────────────
   async function openBoard(id, { keepSelection = false } = {}) {
@@ -460,13 +559,15 @@ body[data-theme="dark"] { background: #16181d; }
       return showGallery();
     }
     history.replaceState(null, '', '?board=' + encodeURIComponent(id));
-    document.title = `${B.board.title} | Boards`;
+    if (!keepSelection) { ADDING = null; ADD_DRAFT = ''; }
+    applyMode(B.board.kind);
+    document.title = `${B.board.title} | ${T().brand}`;
     $('boardTitle').value = B.board.title;
     for (const x of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn', 'aiBtn']) $(x).hidden = false;
     $('mapBtnLabel').textContent = B.board.sourceMapId ? 'Mind map' : 'Make mind map';
     const n = B.attachments.filter(a => !a.cardId).length;
     $('filesCount').textContent = n ? `Files (${n})` : 'Files';
-    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; HISTORY_OPEN = false; AI_OPEN = false; }
+    if (!keepSelection) { SELECTED = null; FILES_OPEN = false; HISTORY_OPEN = false; AI_OPEN = false; DONE_OPEN = null; }
     LAST_STAMP = B.board.updatedAt;
     // Editors do everything but delete the board — that and sharing stay the owner's.
     document.querySelector('[data-bm="delete"]').hidden = B.board.access !== 'owner';
@@ -474,6 +575,7 @@ body[data-theme="dark"] { background: #16181d; }
     if (AI_OPEN) openAssistant();
     else if (HISTORY_OPEN) openHistory();
     else if (FILES_OPEN) openBoardFiles();
+    else if (DONE_OPEN && B.columns.some(c => c.columnId === DONE_OPEN)) openDoneList(DONE_OPEN);
     else if (SELECTED && cardById(SELECTED)) openDrawer(SELECTED); else closeDrawer();
   }
 
@@ -486,6 +588,7 @@ body[data-theme="dark"] { background: #16181d; }
       : t.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: t.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
   };
   const ACTION_ICON = {
+    done_card: 'task_alt', undone_card: 'undo',
     create_board: 'add_box', add_card: 'note_add', update_card: 'edit', move_card: 'arrow_right_alt', delete_card: 'delete',
     add_column: 'view_column', rename_column: 'edit', color_column: 'palette', delete_column: 'delete', order_columns: 'swap_horiz',
     order_cards: 'swap_vert', attach: 'attach_file', detach: 'link_off', rename_board: 'edit', edit_board: 'edit',
@@ -497,7 +600,7 @@ body[data-theme="dark"] { background: #16181d; }
     // Already showing History (a live refresh): keep it on screen while the new
     // rows load. Coming from a card or the files panel: clear that first.
     const refreshing = HISTORY_OPEN && $('drawer').classList.contains('open');
-    HISTORY_OPEN = true; FILES_OPEN = false; AI_OPEN = false; SELECTED = null;
+    HISTORY_OPEN = true; FILES_OPEN = false; AI_OPEN = false; DONE_OPEN = null; SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     $('dWhere').textContent = `${B.board.title} › History`;
     $('dDelete').hidden = true;
@@ -531,7 +634,7 @@ body[data-theme="dark"] { background: #16181d; }
     }).join('');
     $('dBody').innerHTML = `
       <div style="font-size:20px; font-weight:800;">History</div>
-      <div class="bx-hint" style="margin-bottom:12px">Every change to this board — who made it and when. Click a change to open its card.</div>
+      <div class="bx-hint" style="margin-bottom:12px">Every change to this ${isQueue() ? 'queue' : 'board'} — who made it and when. Click a change to open its ${isQueue() ? 'task' : 'card'}.</div>
       ${rows || '<div class="bx-hint">No changes recorded yet. Changes made from now on show here.</div>'}
       ${HISTORY_MORE ? '<button class="bx-btn sm" id="hMore" style="margin-top:10px">Show older changes</button>' : ''}`;
     $('dBody').scrollTop = keep;
@@ -550,18 +653,27 @@ body[data-theme="dark"] { background: #16181d; }
   let AI_OPEN = false, AI_BUSY = false;
   const CHATS = new Map();
   const chat = () => { if (!CHATS.has(boardId())) CHATS.set(boardId(), []); return CHATS.get(boardId()); };
-  const AI_EXAMPLES = [
-    'Which High cards end this week?',
-    'Push every date in the first column by 2 days',
-    'Add a column "Blocked" and move the domain cards there',
-    'Set everything tagged Regression to Medium',
-    'Make a mind map of this board'
-  ];
+  const AI_EXAMPLES = {
+    kanban: [
+      'Which High cards end this week?',
+      'Push every date in the first column by 2 days',
+      'Add a column "Blocked" and move the domain cards there',
+      'Set everything tagged Regression to Medium',
+      'Make a mind map of this board'
+    ],
+    queue: [
+      'What is everyone doing now, and what is next?',
+      'Who has the most waiting? Move their last two tasks to whoever has the least',
+      'Put every High priority task at the front of its lane',
+      'The first person finished their current task',
+      'Add a lane for Sam with three tasks to get them started'
+    ]
+  };
 
   function openAssistant() {
     const refreshing = AI_OPEN && $('drawer').classList.contains('open');
     const draft = refreshing && $('aiMsg') ? $('aiMsg').value : '';
-    AI_OPEN = true; HISTORY_OPEN = false; FILES_OPEN = false; SELECTED = null;
+    AI_OPEN = true; HISTORY_OPEN = false; FILES_OPEN = false; DONE_OPEN = null; SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     $('dWhere').textContent = `${B.board.title} › Ask AI`;
     $('dDelete').hidden = true;
@@ -603,7 +715,9 @@ body[data-theme="dark"] { background: #16181d; }
     }
     const ops = m.ops || [];
     const list = ops.length ? `<ul class="aiops">${ops.map(o =>
-      `<li class="${o.danger ? 'danger' : ''}"><span class="material-symbols-outlined">${o.danger ? 'delete' : o.op === 'to_mind_map' ? 'account_tree' : o.op.startsWith('add') ? 'add' : 'edit'}</span>${esc(o.line)}</li>`).join('')}</ul>` : '';
+      `<li class="${o.danger ? 'danger' : ''}"><span class="material-symbols-outlined">${o.danger ? 'delete' : o.op === 'to_mind_map' ? 'account_tree'
+        : o.done === true ? 'task_alt' : o.done === false ? 'undo' : o.pos ? 'swap_horiz' : o.op.startsWith('add') ? 'add'
+          : o.attach ? 'attach_file' : 'edit'}</span>${esc(o.line)}</li>`).join('')}</ul>` : '';
     let acts = '';
     if (ops.length && m.state === 'proposed') {
       acts = `<div class="aiacts">
@@ -629,8 +743,8 @@ body[data-theme="dark"] { background: #16181d; }
         <div class="aimsgs" id="aiMsgs">
           ${msgs.length ? msgs.map(aiBubble).join('') : `
             <div style="font-size:20px; font-weight:800;">Ask AI</div>
-            <div class="bx-hint" style="margin:4px 0 12px">Tell it what to change on this board, or ask about it. It shows you every change first — nothing happens until you press Apply, and applied changes appear in History under your name.</div>
-            <div class="aiex">${AI_EXAMPLES.map(t => `<button class="bx-chip" data-aiex="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
+            <div class="bx-hint" style="margin:4px 0 12px">Tell it what to change on this ${isQueue() ? 'queue' : 'board'}, or ask about it. It shows you every change first — nothing happens until you press Apply, and applied changes appear in History under your name.</div>
+            <div class="aiex">${AI_EXAMPLES[MODE].map(t => `<button class="bx-chip" data-aiex="${esc(t)}">${esc(t)}</button>`).join('')}</div>`}
         </div>
         <div class="aicompose">
           <div class="aifiles" id="aiFiles">${AI_FILES.map((f, i) => previewOf(f)
@@ -639,7 +753,7 @@ body[data-theme="dark"] { background: #16181d; }
           <div class="airow">
             <button class="bx-ibtn" id="aiAttach" title="Attach files — images, PDF, Word, PowerPoint, Excel, text"><span class="material-symbols-outlined">attach_file</span></button>
             <button class="bx-ibtn aimic ${VOICE_STATE}" id="aiMic" title="${VOICE_STATE === 'recording' ? 'Stop and send' : 'Speak your request'}" ${VOICE_STATE === 'transcribing' ? 'disabled' : ''}><span class="material-symbols-outlined">${VOICE_STATE === 'transcribing' ? 'hourglass_top' : VOICE_STATE === 'recording' ? 'stop_circle' : 'mic'}</span></button>
-            <textarea class="bx-field" id="aiMsg" rows="2" maxlength="2000" placeholder="${VOICE_STATE === 'recording' ? 'Listening… press stop when you are done' : VOICE_STATE === 'transcribing' ? 'Turning your voice into text…' : 'e.g. Move all the Domain tests to Done'}">${esc(draft)}</textarea>
+            <textarea class="bx-field" id="aiMsg" rows="2" maxlength="2000" placeholder="${VOICE_STATE === 'recording' ? 'Listening… press stop when you are done' : VOICE_STATE === 'transcribing' ? 'Turning your voice into text…' : isQueue() ? 'e.g. Move the invoice to the front of the first lane' : 'e.g. Move all the Domain tests to Done'}">${esc(draft)}</textarea>
             <button class="bx-btn primary" id="aiSend" title="Send (Enter)" ${AI_BUSY ? 'disabled' : ''}><span class="material-symbols-outlined">send</span></button>
           </div>
           <input type="file" id="aiFileInput" multiple hidden accept="${U.PLAN_ACCEPT}">
@@ -654,7 +768,7 @@ body[data-theme="dark"] { background: #16181d; }
   async function aiAddFiles(list) {
     for (const f of [...(list || [])]) {
       if (AI_FILES.length >= U.PLAN_FILES_MAX) { U.toast(`At most ${U.PLAN_FILES_MAX} files per message`); break; }
-      try { AI_FILES.push(await U.preparePlanFile(f)); } catch (e) { U.toast(e.message); }
+      try { AI_FILES.push(await U.preparePlanFile(nameScreenshot(f))); } catch (e) { U.toast(e.message); }
     }
     if (AI_OPEN) paintAssistant($('aiMsg') ? $('aiMsg').value : '');
   }
@@ -697,8 +811,9 @@ body[data-theme="dark"] { background: #16181d; }
       } else {
         out = await post(`/api/boards/${id}/assistant`, { message: text, history });
       }
+      // The files stay with the reply: an approved change may put them on a card.
       msgs.splice(msgs.length - 1, 1, { role: 'assistant', text: out.reply, ops: out.ops || [], ask: text || files.map(f => f.name).join(', '),
-        state: (out.ops || []).length ? 'proposed' : 'none' });
+        state: (out.ops || []).length ? 'proposed' : 'none', sentFiles: files });
       // You spoke, so it answers out loud — a real voice conversation.
       if (spoken && window.FcVoice) window.FcVoice.speak(out.reply);
     } catch (e) {
@@ -718,7 +833,19 @@ body[data-theme="dark"] { background: #16181d; }
     m.state = 'applying';
     paintAssistant($('aiMsg') ? $('aiMsg').value : '');
     try {
-      const out = await post(`/api/boards/${boardId()}/assistant/apply`, { ops: m.ops, message: m.ask });
+      let out;
+      if (m.ops.some(o => o.attach && o.attach.length) && (m.sentFiles || []).length) {
+        // Multipart: the same files, in the same order, so the ops' indices find them.
+        const fd = new FormData();
+        fd.append('ops', JSON.stringify(m.ops));
+        fd.append('message', m.ask || '');
+        for (const f of m.sentFiles) fd.append('files', f, f.name || 'image');
+        const r = await fetch(`${API}/api/boards/${boardId()}/assistant/apply`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+        out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out.error || 'HTTP ' + r.status);
+      } else {
+        out = await post(`/api/boards/${boardId()}/assistant/apply`, { ops: m.ops, message: m.ask });
+      }
       Object.assign(m, { state: 'applied', applied: out.applied, failed: out.failed || [], mapId: out.mapId || null });
     } catch (e) {
       Object.assign(m, { state: 'proposed' });
@@ -768,19 +895,135 @@ body[data-theme="dark"] { background: #16181d; }
   $('dBody').addEventListener('change', (e) => {
     if (AI_OPEN && e.target.id === 'aiFileInput') { aiAddFiles(e.target.files); e.target.value = ''; }
   });
-  // Paste a screenshot, or drop files anywhere on the panel.
-  $('dBody').addEventListener('paste', (e) => {
-    if (!AI_OPEN) return;
-    const files = [...((e.clipboardData && e.clipboardData.items) || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
-    if (files.length) { e.preventDefault(); aiAddFiles(files); }
-  });
-  $('drawer').addEventListener('dragover', (e) => { if (AI_OPEN) e.preventDefault(); });
-  $('drawer').addEventListener('drop', (e) => {
-    if (!AI_OPEN) return;
-    e.preventDefault();
-    aiAddFiles(e.dataTransfer && e.dataTransfer.files);
-  });
   $('aiBtn').addEventListener('click', () => (AI_OPEN ? closeDrawer() : openAssistant()));
+
+  // ── paste and drop files ───────────────────────────────────
+  // Ctrl+V a screenshot (or any copied file), or drop files, and they go where
+  // you are working: the Ask AI message, the task being typed in a queue, the
+  // open card or task, or the board's own files. Text still pastes as text.
+  const clipFiles = (e) => [...((e.clipboardData && e.clipboardData.items) || [])]
+    .filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+  const hasFiles = (e) => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+  const drawerOpen = () => $('drawer').classList.contains('open');
+
+  /** Where a file goes from the drawer, or null when the drawer holds nothing that takes files. */
+  function drawerTarget() {
+    if (!drawerOpen()) return null;
+    if (AI_OPEN) return { ai: true };
+    if (SELECTED && cardById(SELECTED)) return { cardId: SELECTED };
+    if (FILES_OPEN) return { cardId: null };
+    return null;
+  }
+  function sendTo(target, files) {
+    if (target.ai) return aiAddFiles(files);
+    if (target.adding) return addPendingFiles(files);
+    return uploadFiles(files, target.cardId);
+  }
+
+  document.addEventListener('paste', (e) => {
+    if (!B || e.defaultPrevented || document.querySelector('.bx-modal.open')) return;
+    const files = clipFiles(e);
+    if (!files.length) return;
+    e.preventDefault();
+    const typingTask = ADDING && document.activeElement && document.activeElement.closest('.bx-q-form');
+    const target = typingTask ? { adding: true } : drawerTarget() || (ADDING ? { adding: true } : null);
+    if (target) return sendTo(target, files);
+    U.toast(isQueue() ? 'Open a task first (or start adding one), then paste to attach it' : 'Open a card first, then paste to attach it');
+  });
+
+  $('drawer').addEventListener('dragover', (e) => {
+    if (!hasFiles(e) || !drawerTarget()) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    $('drawer').classList.add('filedrop');
+  });
+  $('drawer').addEventListener('dragleave', (e) => {
+    if (!$('drawer').contains(e.relatedTarget)) $('drawer').classList.remove('filedrop');
+  });
+  $('drawer').addEventListener('drop', (e) => {
+    $('drawer').classList.remove('filedrop');
+    const target = hasFiles(e) && drawerTarget();
+    if (!target) return;
+    e.preventDefault();
+    sendTo(target, e.dataTransfer.files);
+  });
+
+  // Onto the board: a file dropped on a card is attached to it; on a queue
+  // lane (not on a task) it starts a new task there, file attached.
+  let dropMarkTimer = null;
+  const clearDropMarks = () => document.querySelectorAll('.filedrop').forEach(el => { if (el.id !== 'drawer') el.classList.remove('filedrop'); });
+  function dropTargetIn(e) {
+    const card = e.target.closest('.bx-card');
+    if (card) return { el: card, cardId: card.dataset.card };
+    const lane = isQueue() && e.target.closest('.bx-q-lane');
+    return lane ? { el: lane, laneId: lane.dataset.col } : null;
+  }
+  $('content').addEventListener('dragover', (e) => {
+    if (!B || !hasFiles(e)) return;
+    const t = dropTargetIn(e);
+    if (!t) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!t.el.classList.contains('filedrop')) { clearDropMarks(); t.el.classList.add('filedrop'); }
+    clearTimeout(dropMarkTimer);
+    dropMarkTimer = setTimeout(clearDropMarks, 150);   // dragover repeats while over it; silence means it left
+  });
+  $('content').addEventListener('drop', (e) => {
+    clearDropMarks();
+    if (!B || !hasFiles(e)) return;
+    const t = dropTargetIn(e);
+    if (!t) return;
+    e.preventDefault();
+    const files = [...e.dataTransfer.files];
+    if (t.cardId) return uploadFiles(files, t.cardId);
+    openAdd(t.laneId);
+    addPendingFiles(files);
+  });
+  // A file dropped anywhere else must not navigate away from the board.
+  window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
+
+  /** A pasted screenshot arrives as "image.png": give it a name worth keeping. */
+  function nameScreenshot(f) {
+    if (!/^image\//.test(f.type || '') || (f.name && !/^image\.\w+$/i.test(f.name))) return f;
+    const d = new Date(), p = (n) => String(n).padStart(2, '0');
+    const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    return new File([f], `Screenshot ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}.${ext}`, { type: f.type });
+  }
+  /** Ready to attach: a screenshot named, a big photo scaled down (as for the AI), anything over the server's 15 MB refused by name. */
+  async function prepareFiles(list) {
+    const ready = [];
+    for (const raw of [...(list || [])].slice(0, 6)) {
+      const f = nameScreenshot(raw);
+      try {
+        if (/^image\/(png|jpeg|webp|gif)$/.test(f.type)) ready.push(await U.preparePlanFile(f));
+        else if (f.size > 15 * 1024 * 1024) throw new Error(`${f.name} is over 15 MB`);
+        else ready.push(f);
+      } catch (err) { U.toast(err.message); }
+    }
+    return ready;
+  }
+  /** The network half: files onto a card (cardId) or the board (null). */
+  async function sendFiles(cardId, files) {
+    const fd = new FormData();
+    if (cardId) fd.append('cardId', cardId);
+    files.forEach(f => fd.append('files', f, f.name || 'file'));
+    const res = await fetch(`${API}/api/boards/${boardId()}/attachments`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
+    return body.attachments || [];
+  }
+  async function uploadFiles(list, cardId) {
+    const files = await prepareFiles(list);
+    if (!files.length) return;
+    U.toast(`Uploading ${files.length === 1 ? files[0].name : files.length + ' files'}…`);
+    try {
+      const saved = await sendFiles(cardId, files);
+      U.toast('Attached ' + saved.map(a => a.filename).join(', '));
+      await openBoard(boardId(), { keepSelection: true });
+      if (isQueue() && cardId) flash(cardId, { scroll: false });
+    } catch (err) { U.toast('Upload failed: ' + err.message); }
+  }
 
   // ── other editors' changes ─────────────────────────────────
   // No sockets for boards: a cheap stamp every 20s while the tab is visible.
@@ -790,7 +1033,7 @@ body[data-theme="dark"] { background: #16181d; }
   async function checkForChanges() {
     if (!B || document.hidden || drag || document.querySelector('.bx-modal.open')) return;
     const a = document.activeElement;
-    if (a && $('drawer').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
+    if (a && ($('drawer').contains(a) || a.closest('.bx-q-form')) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
     try {
       const s = await api(`/api/boards/${boardId()}/stamp`);
       if (!s.updatedAt || !LAST_STAMP || new Date(s.updatedAt).getTime() === new Date(LAST_STAMP).getTime()) return;
@@ -811,22 +1054,18 @@ body[data-theme="dark"] { background: #16181d; }
     FILES_OPEN = true;
     HISTORY_OPEN = false;
     AI_OPEN = false;
+    DONE_OPEN = null;
     SELECTED = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const atts = B.attachments.filter(a => !a.cardId);
-    $('dWhere').textContent = `${B.board.title} › Board files`;
+    const what = isQueue() ? 'Queue' : 'Board';
+    $('dWhere').textContent = `${B.board.title} › ${what} files`;
     $('dDelete').hidden = true;
     $('dBody').innerHTML = `
-      <div style="font-size:20px; font-weight:800;">Board files</div>
-      <div class="bx-hint" style="margin-bottom:10px">Files and links for the whole board, not one card.</div>
+      <div style="font-size:20px; font-weight:800;">${what} files</div>
+      <div class="bx-hint" style="margin-bottom:10px">Files and links for the whole ${what.toLowerCase()}, not one ${isQueue() ? 'task' : 'card'}.</div>
       <div id="dAtts">${atts.map(a => U.attachmentHTML(a, { canRemove: true })).join('') || '<div class="bx-hint" style="margin:0 0 8px">Nothing here yet.</div>'}</div>
-      <div class="addrow">
-        <button class="bx-btn sm" id="aUpload"><span class="material-symbols-outlined">upload</span>Upload</button>
-        <button class="bx-btn sm" id="aLinks"><span class="material-symbols-outlined">link</span>Paste links</button>
-        <button class="bx-btn sm" id="aDrive"><span class="material-symbols-outlined">add_to_drive</span>From Drive</button>
-        <button class="bx-btn sm" id="aNote"><span class="material-symbols-outlined">sticky_note_2</span>Note</button>
-      </div>
-      <div id="aPanel"></div>`;
+      ${addFilesHTML()}`;
     $('drawer').classList.add('open');
     $('dBody').scrollTop = keepScroll;
     wireAttachments({ cardId: null });
@@ -834,6 +1073,7 @@ body[data-theme="dark"] { background: #16181d; }
   $('filesBtn').addEventListener('click', () => (FILES_OPEN ? closeDrawer() : openBoardFiles()));
 
   function render() {
+    if (isQueue()) return renderQueue();
     const q = $('search').value.trim().toLowerCase();
     const match = (k) => !q || [k.title, k.summary, k.detail, ...(k.tags || []).map(t => t.label),
       ...attsOf(k.cardId).map(a => a.filename)].some(s => String(s || '').toLowerCase().includes(q));
@@ -868,12 +1108,228 @@ body[data-theme="dark"] { background: #16181d; }
     });
   }
 
+  // ── queue ──────────────────────────────────────────────────
+  // One pipe per lane (a person), front first: NOW, NEXT, 3, 4… ADDING is the
+  // lane whose "Add task" form is open. It survives a re-render — a refresh,
+  // the task you just added — so tasks can be typed in one after another.
+  let ADDING = null, ADD_DRAFT = '', ADD_BUSY = false;
+  let ADD_FILES = [];       // files pasted, dropped or picked for the task being typed
+  let DONE_OPEN = null;     // the lane whose Done list is in the drawer
+
+  function renderQueue() {
+    const q = $('search').value.trim().toLowerCase();
+    const match = (k) => !q || [k.title, k.summary, k.detail, ...(k.tags || []).map(t => t.label),
+      ...attsOf(k.cardId).map(a => a.filename)].some(s => String(s || '').toLowerCase().includes(q));
+    if (ADDING && !B.columns.some(c => c.columnId === ADDING)) ADDING = null;
+    // Keep what is half-typed, where focus is, and how far each pipe is scrolled.
+    const typing = document.activeElement && document.activeElement.id === 'qAddText';
+    if ($('qAddText')) ADD_DRAFT = $('qAddText').value;
+    const scrolled = new Map([...document.querySelectorAll('.bx-q-lane')].map(l => [l.dataset.col, l.querySelector('.bx-q-pipe').scrollLeft]));
+    $('content').innerHTML = `<div class="bx-queue" id="board">
+      ${colsSorted().map(c => {
+        const waiting = waitingIn(c.columnId);
+        const items = waiting.map((card, i) => ({ card, pos: i + 1 })).filter(x => match(x.card));
+        return U.laneHTML(c, items, { attsOf, waiting: waiting.length, doneCount: doneIn(c.columnId).length,
+          selected: SELECTED, editable: true, query: q, tail: addTail(c, waiting.length) });
+      }).join('')}
+      <button class="bx-q-add-lane" id="addCol"><span class="material-symbols-outlined">person_add</span>Add a person</button>
+    </div>`;
+    document.querySelectorAll('.bx-q-lane').forEach(l => { l.querySelector('.bx-q-pipe').scrollLeft = scrolled.get(l.dataset.col) || 0; });
+    if (typing && $('qAddText')) { $('qAddText').focus({ preventScroll: true }); $('qAddText').setSelectionRange(ADD_DRAFT.length, ADD_DRAFT.length); }
+    hydrateThumbs();
+  }
+
+  /** The back of a pipe: the "Add task" slot, or its form when that lane is ADDING. */
+  function addTail(c, n) {
+    const who = esc(c.title);
+    if (ADDING !== c.columnId) {
+      return `<button class="bx-q-add" data-qadd="${esc(c.columnId)}" data-tail="1"><span class="material-symbols-outlined">add</span>${
+        n ? 'Add task' : 'Add the first task'}<small>${n ? 'joins the back' : `for ${who}`}</small></button>`;
+    }
+    const files = ADD_FILES.map((f, i) => previewOf(f)
+      ? `<span class="aithumb pending"><button class="aithumb-img" data-aizoom="${esc(previewOf(f))}" title="${esc(f.name)} — click to enlarge"><img src="${esc(previewOf(f))}" alt=""></button><button class="aithumb-x" data-qunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`
+      : `<span class="aifile"><span class="material-symbols-outlined">${U.attIcon({ kind: 'document', mimetype: f.type }).icon}</span>${esc(f.name)}<button data-qunfile="${i}" title="Remove"><span class="material-symbols-outlined">close</span></button></span>`).join('');
+    return `<div class="bx-q-form" data-tail="1">
+      <input class="bx-field" id="qAddText" maxlength="200" autocomplete="off" placeholder="What's next for ${who}?" value="${esc(ADD_DRAFT)}">
+      ${files ? `<div class="aifiles" style="margin:8px 0 0">${files}</div>` : ''}
+      <div class="bx-q-form-acts">
+        <button class="bx-btn sm primary" data-qput="back"><span class="material-symbols-outlined">add</span>Add to queue</button>
+        <button class="bx-btn sm" data-qput="front" title="Jump the queue — it becomes what ${who} does now"><span class="material-symbols-outlined">bolt</span>Do first</button>
+        <span class="grow"></span>
+        <button class="bx-ibtn" data-qpick="1" title="Attach files — or paste a screenshot (Ctrl+V)" style="width:30px; height:30px"><span class="material-symbols-outlined">attach_file</span></button>
+        <button class="bx-ibtn" data-qcancel="1" title="Close (Esc)" style="width:30px; height:30px"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <input type="file" id="qAddFile" multiple hidden accept="${esc($('fileInput').accept)}">
+      <div class="bx-hint">Enter adds to the back · Shift+Enter puts it first · paste a screenshot or drop files to attach</div>
+    </div>`;
+  }
+
+  /** Files for the task being typed: shown in the form, attached once the task exists. */
+  async function addPendingFiles(list) {
+    const room = 6 - ADD_FILES.length;
+    if (room <= 0) return U.toast('At most 6 files on a new task — add more from the task itself');
+    ADD_FILES.push(...(await prepareFiles([...(list || [])].slice(0, room))));
+    render();
+    const input = $('qAddText');
+    if (input) input.focus({ preventScroll: true });
+  }
+
+  const pipeOf = (colId) => document.querySelector(`.bx-q-lane[data-col="${colId}"] .bx-q-pipe`);
+
+  function openAdd(colId) {
+    if (ADDING !== colId) { ADD_DRAFT = ''; ADD_FILES = []; }
+    ADDING = colId;
+    render();
+    const input = $('qAddText');
+    if (!input) return;
+    input.focus({ preventScroll: true });   // a plain focus() would scroll the pipe its own way
+    const pipe = pipeOf(colId);
+    if (pipe) pipe.scrollLeft = pipe.scrollWidth;
+  }
+  function closeAdd() { ADDING = null; ADD_DRAFT = ''; ADD_FILES = []; render(); }
+
+  async function addTask(position) {
+    const input = $('qAddText');
+    const files = ADD_FILES.slice();
+    // A task can be just a screenshot or a document: it is then named after the file.
+    const title = (input ? input.value.trim() : '') || (files[0] ? files[0].name.replace(/\.[^.]+$/, '') : '');
+    if (!title) { if (input) input.focus({ preventScroll: true }); return; }
+    if (ADD_BUSY) return;
+    ADD_BUSY = true;
+    const lane = ADDING;
+    try {
+      const { cardId } = await post(`/api/boards/${boardId()}/cards`, { columnId: lane, title, position });
+      ADD_DRAFT = '';
+      ADD_FILES = [];
+      if (input) input.value = '';
+      if (files.length) {
+        try { await sendFiles(cardId, files); }
+        catch (err) { U.toast(`The task was added, but its files were not: ${err.message}`); }
+      }
+      await openBoard(boardId(), { keepSelection: true });   // the form stays open for the next one
+      const pipe = pipeOf(lane);
+      if (pipe) pipe.scrollLeft = position === 'front' ? 0 : pipe.scrollWidth;
+      flash(cardId, { scroll: false });
+    } catch (e) { U.toast(e.message); } finally { ADD_BUSY = false; }
+  }
+
+  $('content').addEventListener('change', (e) => {
+    if (e.target.id !== 'qAddFile') return;
+    const files = [...(e.target.files || [])];
+    e.target.value = '';
+    if (files.length) addPendingFiles(files);
+  });
+
+  /** A short glow on a task that just moved or arrived, scrolled into view. */
+  function flash(cardId, { scroll = true } = {}) {
+    const el = document.querySelector(`.bx-q-item[data-card="${cardId}"]`);
+    if (!el) return;
+    el.classList.add('flash');
+    if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }
+
+  /** The drawer follows a change made from the board: the open task, or the open Done list. */
+  function refreshPanels() {
+    if (!$('drawer').classList.contains('open')) return;
+    if (DONE_OPEN) openDoneList(DONE_OPEN);
+    else if (SELECTED && cardById(SELECTED)) openDrawer(SELECTED);
+  }
+
+  /** Done: the task leaves the pipe (a quick lift-and-fade) and the next one becomes NOW. */
+  async function finishTask(cardId) {
+    const k = cardById(cardId);
+    if (!k || k.doneAt) return;
+    const el = document.querySelector(`.bx-q-item[data-card="${cardId}"]`);
+    const animate = el && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (el) el.classList.add('leaving');
+    try {
+      await Promise.all([
+        patch(`/api/boards/${boardId()}/cards/${cardId}`, { done: true }),
+        new Promise(r => setTimeout(r, animate ? 230 : 0))
+      ]);
+      k.doneAt = new Date().toISOString();
+      render();
+      refreshPanels();
+      const next = waitingIn(k.columnId)[0];
+      const who = (B.columns.find(c => c.columnId === k.columnId) || {}).title || 'this lane';
+      U.toast(next ? `Done ✓  Now for ${who}: “${next.title}”` : `Done ✓  ${who}'s queue is clear`);
+    } catch (e) {
+      if (el) el.classList.remove('leaving');
+      U.toast(e.message);
+    }
+  }
+
+  /** Put a waiting task at index `to` (0 = front) of its lane — the same ordered write a drag makes. */
+  async function placeTask(cardId, to) {
+    const k = cardById(cardId);
+    if (!k || k.doneAt) return;
+    const ids = waitingIn(k.columnId).map(c => c.cardId).filter(id => id !== cardId);
+    ids.splice(Math.max(0, Math.min(Number(to) || 0, ids.length)), 0, cardId);
+    ids.forEach((id, i) => { cardById(id).order = i; });
+    render();
+    flash(cardId);
+    refreshPanels();
+    try { await post(`/api/boards/${boardId()}/cards/order`, { columns: [{ columnId: k.columnId, cardIds: ids }] }); }
+    catch (e) { U.toast('Could not save the move: ' + e.message); openBoard(boardId(), { keepSelection: true }); }
+  }
+
+  /** A finished task goes back to the FRONT of its lane (the server puts it there). */
+  async function putBack(cardId) {
+    const k = cardById(cardId);
+    if (!k) return;
+    try {
+      await patch(`/api/boards/${boardId()}/cards/${cardId}`, { done: false });
+      await openBoard(boardId(), { keepSelection: true });
+      flash(cardId);
+      U.toast(`“${k.title}” is back at the front`);
+    } catch (e) { U.toast(e.message); }
+  }
+
+  function openDoneList(colId) {
+    const col = B.columns.find(c => c.columnId === colId);
+    if (!col) return closeDrawer();
+    const keep = DONE_OPEN === colId && $('drawer').classList.contains('open') ? $('dBody').scrollTop : 0;
+    DONE_OPEN = colId; HISTORY_OPEN = false; FILES_OPEN = false; AI_OPEN = false; SELECTED = null;
+    document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
+    const when = (d) => new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    const done = doneIn(colId);
+    $('dWhere').textContent = `${B.board.title} › ${col.title} › Done`;
+    $('dDelete').hidden = true;
+    $('dBody').innerHTML = `
+      <div style="font-size:20px; font-weight:800;">Done</div>
+      <div class="bx-hint" style="margin-bottom:12px">What ${esc(col.title)} has finished, newest first. Put one back and it goes to the front of the queue.</div>
+      ${done.map(k => `<div class="bx-q-donerow">
+          <span class="bx-q-check"><span class="material-symbols-outlined">check</span></span>
+          <div class="t" data-qopen="${esc(k.cardId)}" title="Open this task"><b>${esc(k.title)}</b><small>Finished ${esc(when(k.doneAt))}</small></div>
+          <button class="bx-btn sm" data-qputback="${esc(k.cardId)}"><span class="material-symbols-outlined">undo</span>Put back</button>
+        </div>`).join('') || '<div class="bx-hint">Nothing finished yet.</div>'}`;
+    $('drawer').classList.add('open');
+    $('dBody').scrollTop = keep;
+  }
+
+  // Queue buttons in the drawer: the open task's Done / move buttons, and the Done list.
+  $('dBody').addEventListener('click', (e) => {
+    if (!B || !isQueue()) return;
+    let el;
+    if ((el = e.target.closest('[data-qputback]'))) return putBack(el.dataset.qputback);
+    if ((el = e.target.closest('[data-qopen]'))) { DONE_OPEN = null; return openDrawer(el.dataset.qopen); }
+    if ((el = e.target.closest('[data-qdone]'))) return finishTask(el.dataset.qdone);
+    if ((el = e.target.closest('[data-qmove]')) && SELECTED) return placeTask(SELECTED, Number(el.dataset.qmove));
+  });
+
+  // Typing tasks in: Enter joins the back, Shift+Enter jumps the queue, Esc closes.
+  $('content').addEventListener('keydown', (e) => {
+    if (e.target.id !== 'qAddText' || e.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); addTask(e.shiftKey ? 'front' : 'back'); }
+    if (e.key === 'Escape') { e.stopPropagation(); closeAdd(); }
+  });
+
   $('search').addEventListener('input', () => B && render());
 
   // title
   $('boardTitle').addEventListener('change', async () => {
-    const title = $('boardTitle').value.trim() || 'Untitled board';
-    try { await patch('/api/boards/' + boardId(), { title }); B.board.title = title; document.title = `${title} | Boards`; }
+    const title = $('boardTitle').value.trim() || T().untitled;
+    try { await patch('/api/boards/' + boardId(), { title }); B.board.title = title; document.title = `${title} | ${T().brand}`; }
     catch (e) { U.toast(e.message); }
   });
   $('boardTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
@@ -887,6 +1343,21 @@ body[data-theme="dark"] { background: #16181d; }
     if (add) return addCard(add.dataset.addcard);
     const cm = t.closest('[data-colmenu]');
     if (cm) return openColMenu(cm.dataset.colmenu, cm);
+    // queue
+    let el;
+    if ((el = t.closest('[data-qdone]'))) return finishTask(el.dataset.qdone);
+    if ((el = t.closest('[data-qfront]'))) return placeTask(el.dataset.qfront, 0);
+    if ((el = t.closest('[data-qattach]'))) { $('fileInput').dataset.card = el.dataset.qattach; return $('fileInput').click(); }
+    if ((el = t.closest('[data-qunfile]'))) { ADD_FILES.splice(Number(el.dataset.qunfile), 1); return render(); }
+    if (t.closest('[data-qpick]')) return $('qAddFile').click();
+    if ((el = t.closest('[data-aizoom]'))) return zoomImage(el.dataset.aizoom);
+    if ((el = t.closest('[data-qadd]'))) return openAdd(el.dataset.qadd);
+    if ((el = t.closest('[data-qput]'))) return addTask(el.dataset.qput);
+    if (t.closest('[data-qcancel]')) return closeAdd();
+    if ((el = t.closest('[data-qdonelist]'))) {
+      const lane = el.dataset.qdonelist;
+      return DONE_OPEN === lane && $('drawer').classList.contains('open') ? closeDrawer() : openDoneList(lane);
+    }
   });
   $('content').addEventListener('dblclick', (e) => {
     const p = e.target.closest('[data-coltitle]');
@@ -895,7 +1366,7 @@ body[data-theme="dark"] { background: #16181d; }
 
   async function addColumn() {
     try {
-      const { columnId } = await post(`/api/boards/${boardId()}/columns`, { title: 'New column' });
+      const { columnId } = await post(`/api/boards/${boardId()}/columns`, { title: isQueue() ? 'New person' : 'New column' });
       await openBoard(boardId(), { keepSelection: true });
       const pill = document.querySelector(`[data-coltitle="${columnId}"]`);
       if (pill) { pill.scrollIntoView({ block: 'nearest', inline: 'end', behavior: 'smooth' }); renameColumnInline(columnId, pill); }
@@ -938,12 +1409,14 @@ body[data-theme="dark"] { background: #16181d; }
     const cols = B.columns.slice().sort((a, b) => a.order - b.order);
     const i = cols.findIndex(c => c.columnId === columnId);
     const m = $('colMenu');
+    const queue = isQueue();   // a queue's lanes stack, so they move up and down
     m.innerHTML = `
       <button data-cm="rename"><span class="material-symbols-outlined">edit</span>Rename</button>
       <div class="swatches">${U.COLUMN_COLORS.map(c => `<span class="sw" data-cm-color="${c}" style="background:${c}"></span>`).join('')}</div>
-      ${i > 0 ? '<button data-cm="left"><span class="material-symbols-outlined">arrow_back</span>Move left</button>' : ''}
-      ${i < cols.length - 1 ? '<button data-cm="right"><span class="material-symbols-outlined">arrow_forward</span>Move right</button>' : ''}
-      <button data-cm="delete" style="color:var(--bx-danger)"><span class="material-symbols-outlined">delete</span>Delete column</button>`;
+      ${i > 0 ? `<button data-cm="left"><span class="material-symbols-outlined">${queue ? 'arrow_upward' : 'arrow_back'}</span>${queue ? 'Move up' : 'Move left'}</button>` : ''}
+      ${i < cols.length - 1 ? `<button data-cm="right"><span class="material-symbols-outlined">${queue ? 'arrow_downward' : 'arrow_forward'}</span>${queue ? 'Move down' : 'Move right'}</button>` : ''}
+      ${queue && waitingIn(columnId).length > 1 ? '<button data-cm="reverse"><span class="material-symbols-outlined">swap_horiz</span>Reverse the order</button>' : ''}
+      <button data-cm="delete" style="color:var(--bx-danger)"><span class="material-symbols-outlined">${queue ? 'person_remove' : 'delete'}</span>${queue ? 'Remove this lane' : 'Delete column'}</button>`;
     m.dataset.col = columnId;
     placeMenu(m, anchor);
     m._handler = async (e) => {
@@ -960,9 +1433,17 @@ body[data-theme="dark"] { background: #16181d; }
           cols.forEach((c, k) => { c.order = k; });
           render();
           await post(`/api/boards/${boardId()}/columns/order`, { columnIds: cols.map(c => c.columnId) });
+        } else if (act.dataset.cm === 'reverse') {
+          const ids = waitingIn(columnId).map(k => k.cardId).reverse();
+          ids.forEach((id, k) => { cardById(id).order = k; });
+          render();
+          await post(`/api/boards/${boardId()}/cards/order`, { columns: [{ columnId, cardIds: ids }] });
         } else if (act.dataset.cm === 'delete') {
           const n = cardsIn(columnId).length;
-          if (await confirmBox(`Delete "${col.title}"?`, n ? `Its ${n} card${n === 1 ? '' : 's'} and their files are deleted too. This cannot be undone.` : 'The column is empty.')) {
+          const sure = queue
+            ? await confirmBox(`Remove ${col.title}'s lane?`, n ? `Their ${n} task${n === 1 ? '' : 's'} (waiting and done) and the files on them are deleted too. This cannot be undone.` : 'The lane is empty.', 'Remove')
+            : await confirmBox(`Delete "${col.title}"?`, n ? `Its ${n} card${n === 1 ? '' : 's'} and their files are deleted too. This cannot be undone.` : 'The column is empty.');
+          if (sure) {
             await del(`/api/boards/${boardId()}/columns/${columnId}`);
             await openBoard(boardId());
           }
@@ -993,8 +1474,8 @@ body[data-theme="dark"] { background: #16181d; }
     if (b.dataset.bm === 'rename') { $('boardTitle').focus(); $('boardTitle').select(); }
     if (b.dataset.bm === 'fromMap') openFromMap();
     if (b.dataset.bm === 'toMap') $('mapBtn').click();
-    if (b.dataset.bm === 'delete' && await confirmBox('Delete this board?', 'Its columns, cards, files and share links are deleted with it. This cannot be undone.')) {
-      try { await del('/api/boards/' + boardId()); U.toast('Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
+    if (b.dataset.bm === 'delete' && await confirmBox(...deleteWords())) {
+      try { await del('/api/boards/' + boardId()); U.toast(isQueue() ? 'Queue deleted' : 'Board deleted'); showGallery(); } catch (err) { U.toast(err.message); }
     }
   });
 
@@ -1002,17 +1483,21 @@ body[data-theme="dark"] { background: #16181d; }
   $('railCol').addEventListener('click', addColumn);
   $('railCard').addEventListener('click', () => {
     const first = B.columns.slice().sort((a, b) => a.order - b.order)[0];
-    if (first) addCard(first.columnId); else addColumn();
+    if (!first) return addColumn();
+    if (isQueue()) openAdd(first.columnId); else addCard(first.columnId);
   });
   $('railMaps').addEventListener('click', () => { location.href = 'finchat_mindmap.html'; });
 
   // ── drag and drop ──────────────────────────────────────────
   // Pointer events rather than HTML5 drag: the same code works with a mouse,
   // a pen or a finger, and the drop marker can sit exactly between two cards.
+  // A Kanban column stacks cards top to bottom; a queue's pipe lines them up
+  // left to right (data-axis="x"), and the marker stands upright between them.
   let drag = null;
   $('content').addEventListener('pointerdown', (e) => {
     const card = e.target.closest('.bx-card');
     if (!card || e.button !== 0 || !B) return;
+    if (e.target.closest('button, a, input, textarea')) return;   // a task's Done / Front buttons are clicks
     drag = { el: card, id: card.dataset.card, x: e.clientX, y: e.clientY, started: false, pointerId: e.pointerId };
   });
   window.addEventListener('pointermove', (e) => {
@@ -1040,18 +1525,30 @@ body[data-theme="dark"] { background: #16181d; }
     drag.ghost.style.display = 'none';
     const under = document.elementFromPoint(x, y);
     drag.ghost.style.display = '';
-    const col = under && under.closest('.bx-col');
+    const col = under && under.closest('.bx-col, .bx-q-lane');
+    drag.pipe = col && col.querySelector('.bx-q-pipe');
     if (!col) return;
-    const list = col.querySelector('.bx-cards');
+    const list = col.querySelector('[data-cards]');
+    const across = list.dataset.axis === 'x';
+    drag.marker.classList.toggle('x', across);
     const cards = [...list.querySelectorAll('.bx-card:not(.dragging)')];
-    const before = cards.find(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
-    if (before) list.insertBefore(drag.marker, before); else list.appendChild(drag.marker);
+    const before = cards.find(c => {
+      const r = c.getBoundingClientRect();
+      return across ? x < r.left + r.width / 2 : y < r.top + r.height / 2;
+    });
+    // Past the last card: before the pipe's "Add task" slot, if it has one.
+    list.insertBefore(drag.marker, before || list.querySelector('[data-tail]'));
   }
 
   function autoScroll(x, y) {
     const s = $('stage'), edge = 60, step = 18;
     if (x > innerWidth - edge) s.scrollLeft += step; else if (x < edge) s.scrollLeft -= step;
     if (y > innerHeight - edge) s.scrollTop += step; else if (y < edge + 40) s.scrollTop -= step;
+    // A queue's pipe scrolls on its own: nudge it near either end.
+    if (drag.pipe) {
+      const r = drag.pipe.getBoundingClientRect();
+      if (x > r.right - edge) drag.pipe.scrollLeft += step; else if (x < r.left + edge) drag.pipe.scrollLeft -= step;
+    }
   }
 
   // A touch that turns into a scroll cancels the pointer; drop the half-drag.
@@ -1080,14 +1577,16 @@ body[data-theme="dark"] { background: #16181d; }
     const ids = (colId) => [...document.querySelectorAll(`[data-cards="${colId}"] .bx-card`)].map(c => c.dataset.card);
     const payload = [...new Set([from, to])].map(columnId => ({ columnId, cardIds: ids(columnId) }));
     // Hidden (search-filtered) cards keep their place at the end of the order.
+    // A queue's finished tasks are never on screen and stay out of it.
     if ($('search').value.trim()) {
       for (const p of payload) {
-        const hidden = cardsIn(p.columnId).map(k => k.cardId).filter(id => !p.cardIds.includes(id) && id !== d.id);
+        const hidden = (isQueue() ? waitingIn : cardsIn)(p.columnId).map(k => k.cardId).filter(id => !p.cardIds.includes(id) && id !== d.id);
         p.cardIds.push(...hidden);
       }
     }
     for (const p of payload) p.cardIds.forEach((id, i) => { const k = cardById(id); k.columnId = p.columnId; k.order = i; });
     render();
+    if (isQueue()) { flash(d.id, { scroll: false }); refreshPanels(); }
     try { await post(`/api/boards/${boardId()}/cards/order`, { columns: payload }); }
     catch (e) { U.toast('Could not save the move: ' + e.message); openBoard(boardId(), { keepSelection: true }); }
   });
@@ -1125,7 +1624,9 @@ body[data-theme="dark"] { background: #16181d; }
     FILES_OPEN = false;
     HISTORY_OPEN = false;
     AI_OPEN = false;
+    DONE_OPEN = null;
     $('dDelete').hidden = false;
+    $('dDelete').title = isQueue() ? 'Delete task' : 'Delete card';
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
     const el = document.querySelector(`[data-card="${cardId}"]`);
     if (el) el.classList.add('sel');
@@ -1133,12 +1634,20 @@ body[data-theme="dark"] { background: #16181d; }
     $('dWhere').textContent = `${B.board.title} › ${col ? col.title : ''}`;
     const atts = attsOf(cardId);
     const palette = B.board.tagPalette || [];
+    // A queue task is often "do this with that file", so its files sit near the top.
+    const queue = isQueue();
+    const filesBlock = `
+      <div class="bx-label">Files &amp; links <span style="text-transform:none; letter-spacing:0; font-weight:600;">(${atts.length})</span></div>
+      <div id="dAtts">${atts.map(a => U.attachmentHTML(a, { canRemove: true })).join('') || '<div class="bx-hint" style="margin:0 0 8px">Nothing attached yet.</div>'}</div>
+      ${addFilesHTML()}`;
     $('dBody').innerHTML = `
-      <input class="bx-field bx-title-input" id="dTitle" value="${esc(k.title)}" maxlength="200" aria-label="Card title">
+      <input class="bx-field bx-title-input" id="dTitle" value="${esc(k.title)}" maxlength="200" aria-label="${queue ? 'Task' : 'Card'} title">
+      ${queue ? queueStatusHTML(k, col) : ''}
       <div class="bx-label">Summary</div>
-      <textarea class="bx-field" id="dSummary" rows="2" maxlength="600" placeholder="One or two lines shown on the card">${esc(k.summary)}</textarea>
+      <textarea class="bx-field" id="dSummary" rows="2" maxlength="600" placeholder="One or two lines shown on the ${queue ? 'task' : 'card'}">${esc(k.summary)}</textarea>
+      ${queue ? filesBlock : ''}
       <div class="bx-row">
-        <div><div class="bx-label">Column</div>
+        <div><div class="bx-label">${isQueue() ? 'Who' : 'Column'}</div>
           <select class="bx-field" id="dColumn">${B.columns.slice().sort((a, b) => a.order - b.order).map(c =>
             `<option value="${esc(c.columnId)}"${c.columnId === k.columnId ? ' selected' : ''}>${esc(c.title)}</option>`).join('')}</select></div>
         <div><div class="bx-label">Priority</div>
@@ -1155,27 +1664,46 @@ body[data-theme="dark"] { background: #16181d; }
       <div class="tagbox" id="dTags">${(k.tags || []).map(t => U.tagChip(t, { removable: true })).join('')}
         <input id="dTagInput" list="dTagList" placeholder="${(k.tags || []).length ? '' : 'Add a tag, press Enter'}" maxlength="40"></div>
       <datalist id="dTagList">${palette.map(t => `<option value="${esc(t.label)}">`).join('')}</datalist>
-      <div class="bx-label">Card colour</div>
+      <div class="bx-label">${queue ? 'Task' : 'Card'} colour</div>
       <div class="swatches" id="dColor">
         <span class="sw${!k.color ? ' on' : ''}" data-color="" title="None" style="background:var(--bx-surface-2); border-color:${!k.color ? 'var(--bx-fg)' : 'var(--bx-line-2)'}"></span>
         ${U.TAG_COLORS.map(c => `<span class="sw${k.color === c ? ' on' : ''}" data-color="${c}" style="background:${c}"></span>`).join('')}
       </div>
       <div class="bx-label">Details</div>
       <textarea class="bx-field" id="dDetail" rows="5" maxlength="4000" placeholder="Notes, acceptance criteria, anything longer">${esc(k.detail)}</textarea>
-
-      <div class="bx-label">Files &amp; links <span style="text-transform:none; letter-spacing:0; font-weight:600;">(${atts.length})</span></div>
-      <div id="dAtts">${atts.map(a => U.attachmentHTML(a, { canRemove: true })).join('') || '<div class="bx-hint" style="margin:0 0 8px">Nothing attached yet.</div>'}</div>
-      <div class="addrow">
-        <button class="bx-btn sm" id="aUpload"><span class="material-symbols-outlined">upload</span>Upload</button>
-        <button class="bx-btn sm" id="aLinks"><span class="material-symbols-outlined">link</span>Paste links</button>
-        <button class="bx-btn sm" id="aDrive"><span class="material-symbols-outlined">add_to_drive</span>From Drive</button>
-        <button class="bx-btn sm" id="aNote"><span class="material-symbols-outlined">sticky_note_2</span>Note</button>
-      </div>
-      <div id="aPanel"></div>`;
+      ${queue ? '' : filesBlock}`;
     $('drawer').classList.add('open');
     $('dBody').scrollTop = keepScroll;
     wireDrawer(k);
     if (focus && $(focus)) $(focus).focus();
+  }
+
+  /** Where a queue task sits — and the buttons that move it along or finish it. */
+  function queueStatusHTML(k, col) {
+    const lane = `--lane:${esc((col && col.color) || '#eceff3')}; --lane-ink:${U.laneAccent(col && col.color)}`;
+    const who = esc(col ? col.title : '');
+    if (k.doneAt) {
+      const when = new Date(k.doneAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+      return `<div class="bx-q-status" style="${lane}">
+        <span class="bx-q-check"><span class="material-symbols-outlined">check</span></span>
+        <span style="flex:1"><b>Done</b> · finished ${esc(when)}</span>
+        <button class="bx-btn sm" data-qputback="${esc(k.cardId)}" title="Back to the front of ${who}'s queue"><span class="material-symbols-outlined">undo</span>Put back</button>
+      </div>`;
+    }
+    const lineup = waitingIn(k.columnId);
+    const n = lineup.length, pos = lineup.findIndex(c => c.cardId === k.cardId) + 1;
+    const badge = pos === 1 ? '<span class="bx-q-badge now"><span class="material-symbols-outlined">play_arrow</span>Now</span>'
+      : pos === 2 ? '<span class="bx-q-badge next">Next</span>' : `<span class="bx-q-badge n">${pos}</span>`;
+    const what = pos === 1 ? `What ${who} is doing now` : pos === 2 ? `Next for ${who}` : `Number ${pos} in ${who}'s queue`;
+    const btn = (to, icon, label, off) => `<button class="bx-btn sm" data-qmove="${to}" ${off ? 'disabled' : ''}><span class="material-symbols-outlined">${icon}</span>${label}</button>`;
+    return `<div class="bx-q-status" style="${lane}">${badge}<span><b>${what}</b> · ${pos} of ${n}</span></div>
+      <div class="bx-q-moves">
+        <button class="bx-btn sm primary" data-qdone="${esc(k.cardId)}" style="background:#12a150; border-color:#12a150"><span class="material-symbols-outlined">check</span>Done</button>
+        ${btn(0, 'first_page', 'To the front', pos === 1)}
+        ${btn(pos - 2, 'chevron_left', 'Earlier', pos === 1)}
+        ${btn(pos, 'chevron_right', 'Later', pos === n)}
+        ${btn(n - 1, 'last_page', 'To the back', pos === n)}
+      </div>`;
   }
 
   function closeDrawer() {
@@ -1184,6 +1712,7 @@ body[data-theme="dark"] { background: #16181d; }
     FILES_OPEN = false;
     HISTORY_OPEN = false;
     AI_OPEN = false;
+    DONE_OPEN = null;
     document.querySelectorAll('.bx-card.sel').forEach(el => el.classList.remove('sel'));
   }
   $('dClose').addEventListener('click', closeDrawer);
@@ -1205,7 +1734,7 @@ body[data-theme="dark"] { background: #16181d; }
 
   function wireDrawer(k) {
     const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
-    on('dTitle', 'change', () => saveCard(k, { title: $('dTitle').value.trim() || 'Untitled card' }).then(() => { $('dWhere').textContent = $('dWhere').textContent; }));
+    on('dTitle', 'change', () => saveCard(k, { title: $('dTitle').value.trim() || (isQueue() ? 'Untitled task' : 'Untitled card') }).then(() => { $('dWhere').textContent = $('dWhere').textContent; }));
     on('dTitle', 'keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
     on('dSummary', 'change', () => saveCard(k, { summary: $('dSummary').value }));
     on('dDetail', 'change', () => saveCard(k, { detail: $('dDetail').value }));
@@ -1215,9 +1744,11 @@ body[data-theme="dark"] { background: #16181d; }
     on('dColumn', 'change', async () => {
       // A move through the select goes to the bottom of the other column, via
       // the same ordered write a drag uses.
+      // On a queue that is the back of the other person's queue.
       const to = $('dColumn').value, from = k.columnId;
-      const toIds = [...cardsIn(to).map(c => c.cardId).filter(id => id !== k.cardId), k.cardId];
-      const fromIds = cardsIn(from).map(c => c.cardId).filter(id => id !== k.cardId);
+      const lane = isQueue() && !k.doneAt ? waitingIn : cardsIn;
+      const toIds = [...lane(to).map(c => c.cardId).filter(id => id !== k.cardId), k.cardId];
+      const fromIds = lane(from).map(c => c.cardId).filter(id => id !== k.cardId);
       try {
         await post(`/api/boards/${boardId()}/cards/order`, { columns: [{ columnId: from, cardIds: fromIds }, { columnId: to, cardIds: toIds }] });
         await openBoard(boardId(), { keepSelection: true });
@@ -1243,18 +1774,39 @@ body[data-theme="dark"] { background: #16181d; }
   }
 
   /** The attachment list and the four "add" buttons — for a card, or ({cardId:null}) the board. */
+  /** The ways to add to a card's (or the board's) files: buttons, and a zone to drop or paste into. */
+  function addFilesHTML() {
+    return `<div class="addrow">
+        <button class="bx-btn sm" id="aUpload"><span class="material-symbols-outlined">upload</span>Upload</button>
+        <button class="bx-btn sm" id="aLinks"><span class="material-symbols-outlined">link</span>Paste links</button>
+        <button class="bx-btn sm" id="aDrive"><span class="material-symbols-outlined">add_to_drive</span>From Drive</button>
+        <button class="bx-btn sm" id="aNote"><span class="material-symbols-outlined">sticky_note_2</span>Note</button>
+      </div>
+      <button type="button" class="bx-imgpick-zone bx-att-zone" id="aDrop">
+        <span class="material-symbols-outlined">content_paste</span>
+        <span><b>Paste a screenshot</b> (Ctrl+V) or drop files here
+          <small>Images, PDF, Word, PowerPoint, Excel, text or CSV — or click to choose</small></span>
+      </button>
+      <div id="aPanel"></div>`;
+  }
+
   function wireAttachments(k) {
+    const pick = () => { $('fileInput').dataset.card = k.cardId || ''; $('fileInput').click(); };
     $('dAtts').addEventListener('click', (e) => attachmentAction(e, k));
-    $('aUpload').addEventListener('click', () => { $('fileInput').dataset.card = k.cardId || ''; $('fileInput').click(); });
+    $('aUpload').addEventListener('click', pick);
+    $('aDrop').addEventListener('click', pick);
     $('aLinks').addEventListener('click', () => showLinkPanel(k));
     $('aDrive').addEventListener('click', () => showDrivePanel(k));
     $('aNote').addEventListener('click', () => showNotePanel(k));
+    hydrateThumbs();   // image attachments show as pictures in the drawer too
   }
 
   $('dDelete').addEventListener('click', async () => {
     const k = cardById(SELECTED);
     if (!k) return;
-    if (!await confirmBox(`Delete "${k.title}"?`, 'The card and its attached files are deleted. This cannot be undone.')) return;
+    if (!await confirmBox(`Delete "${k.title}"?`, isQueue()
+      ? 'The task and its files are deleted. This cannot be undone — to finish a task, press Done instead.'
+      : 'The card and its attached files are deleted. This cannot be undone.')) return;
     try { await del(`/api/boards/${boardId()}/cards/${k.cardId}`); closeDrawer(); await openBoard(boardId()); }
     catch (e) { U.toast(e.message); }
   });
@@ -1276,22 +1828,11 @@ body[data-theme="dark"] { background: #16181d; }
   }
 
   // uploads
-  $('fileInput').addEventListener('change', async (e) => {
+  $('fileInput').addEventListener('change', (e) => {
     const files = [...(e.target.files || [])];
     const cardId = e.target.dataset.card;
     e.target.value = '';
-    if (!files.length) return;
-    const fd = new FormData();
-    if (cardId) fd.append('cardId', cardId);
-    files.forEach(f => fd.append('files', f));
-    U.toast(`Uploading ${files.length} file${files.length === 1 ? '' : 's'}…`);
-    try {
-      const res = await fetch(`${API}/api/boards/${boardId()}/attachments`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
-      U.toast('Attached ' + body.attachments.map(a => a.filename).join(', '));
-      await openBoard(boardId(), { keepSelection: true });
-    } catch (err) { U.toast('Upload failed: ' + err.message); }
+    if (files.length) uploadFiles(files, cardId || null);
   });
 
   function showLinkPanel(k) {
@@ -1381,7 +1922,7 @@ body[data-theme="dark"] { background: #16181d; }
   $('newCreate').addEventListener('click', async () => {
     try {
       const columns = $('newCols').value.split(',').map(s => s.trim()).filter(Boolean);
-      const { boardId: id } = await post('/api/boards', { title: $('newTitle').value.trim() || 'Untitled board', columns });
+      const { boardId: id } = await post('/api/boards', { title: $('newTitle').value.trim() || T().untitled, columns, kind: MODE });
       closeModal('newModal');
       $('newTitle').value = '';
       openBoard(id);
@@ -1417,8 +1958,9 @@ body[data-theme="dark"] { background: #16181d; }
   // ── board ⇄ mind map ───────────────────────────────────────
   $('mapBtn').addEventListener('click', async () => {
     if (!B) return;
-    if (!B.board.sourceMapId && !(await confirmBox('Make a mind map from this board?',
-      'The board becomes the centre, columns become branches and cards become nodes — files and links come along. It is a copy: the board itself is not changed.',
+    if (!B.board.sourceMapId && !(await confirmBox(`Make a mind map from this ${isQueue() ? 'queue' : 'board'}?`, isQueue()
+      ? 'The queue becomes the centre, each person a branch and their tasks its nodes, in order — files and links come along. It is a copy: the queue itself is not changed.'
+      : 'The board becomes the centre, columns become branches and cards become nodes — files and links come along. It is a copy: the board itself is not changed.',
       'Make mind map', { danger: false }))) return;
     $('mapBtn').disabled = true;
     try {
@@ -1432,6 +1974,7 @@ body[data-theme="dark"] { background: #16181d; }
   async function generateFromFiles(instruction, files) {
     const fd = new FormData();
     fd.append('instruction', instruction);
+    fd.append('kind', MODE);
     for (const f of files) fd.append('files', f, f.name || 'image');
     const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
     if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
@@ -1447,18 +1990,23 @@ body[data-theme="dark"] { background: #16181d; }
   $('aiBuild').addEventListener('click', async () => {
     const instruction = $('aiText').value.trim();
     const files = aiFiles.files;
-    if (instruction.length < 3 && !files.length) { $('aiText').focus(); return U.toast('Describe what the board should plan, or add a file'); }
+    const what = isQueue() ? 'queue' : 'board';
+    if (instruction.length < 3 && !files.length) {
+      $('aiText').focus();
+      return U.toast(isQueue() ? 'Say who does what, or add a file' : 'Describe what the board should plan, or add a file');
+    }
     $('aiBuild').disabled = true;
     $('aiStatus').textContent = files.length
-      ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and planning your board — this usually takes 20 to 60 seconds…`
-      : 'Planning your board — this usually takes 10 to 30 seconds…';
+      ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and ${isQueue() ? 'lining up your queue' : 'planning your board'} — this usually takes 20 to 60 seconds…`
+      : `${isQueue() ? 'Lining up your queue' : 'Planning your board'} — this usually takes 10 to 30 seconds…`;
     try {
-      const { boardId: id } = files.length ? await generateFromFiles(instruction, files) : await post('/api/boards/generate', { instruction });
+      const { boardId: id } = files.length ? await generateFromFiles(instruction, files)
+        : await post('/api/boards/generate', { instruction, kind: MODE });
       closeModal('aiModal');
       $('aiText').value = '';
       aiFiles.clear();
       openBoard(id);
-      U.toast('Board built — edit anything that is not right');
+      U.toast(`${what === 'queue' ? 'Queue' : 'Board'} built — edit anything that is not right`);
     } catch (err) {
       U.toast(err.message);
     } finally {

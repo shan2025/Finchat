@@ -6,11 +6,13 @@
 <title>FinChat | Planning</title>
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <!--
-  Planning — the rail's one entry for mind maps AND boards. Pick which kind of
-  plan you want, ask the AI to build one, or turn one kind into the other.
-  Mind maps (finchat_mindmap.html) and boards (finchat_boards.html) stay their
-  own pages; this is the door to both. On the SPA router: everything lives in
-  <main>, no inline on*=, every rule is scoped under .pl or the .bx board kit.
+  Planning — the rail's one entry for mind maps, boards AND queues. Pick which
+  kind of plan you want, ask the AI to build one, or turn one kind into the
+  other. Mind maps (finchat_mindmap.html) and boards (finchat_boards.html) stay
+  their own pages — a queue is a board of kind 'queue', opened on the boards
+  page (?kind=queue for the list); this is the door to all three. On the SPA
+  router: everything lives in <main>, no inline on*=, every rule is scoped
+  under .pl or the .bx board kit.
 -->
 <link rel="stylesheet" href="finchat_tw.css">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
@@ -25,7 +27,7 @@
  .pl-h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin: 6px 0 6px; color: var(--bx-fg); line-height: 1.15; }
  .pl-sub { margin: 0; font-size: 15px; color: var(--bx-fg-2); max-width: 640px; line-height: 1.55; }
 
- .pl-choices { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 28px; }
+ .pl-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; margin-top: 28px; }
  .pl-choice { display: flex; flex-direction: column; background: var(--bx-surface); border: 1px solid var(--bx-line); border-radius: 18px;
    padding: 0; text-decoration: none; color: inherit; overflow: hidden; box-shadow: 0 1px 2px rgba(20,24,36,.05);
    transition: box-shadow .15s, transform .15s, border-color .15s; }
@@ -56,7 +58,7 @@
  .pl-ai-row textarea { flex: 1; resize: vertical; min-height: 76px; }
  .pl-ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
- .pl-lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+ .pl-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; }
  .pl-lists .pl-card { margin-top: 18px; }
  .pl-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
  .pl-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bx-line); border-radius: 12px; padding: 9px 10px 9px 12px;
@@ -94,7 +96,7 @@
  <div class="pl-wrap">
   <div class="pl-eyebrow"><span class="material-symbols-outlined" style="font-size:18px">schema</span>Planning</div>
   <h1 class="pl-h1">What are you planning?</h1>
-  <p class="pl-sub">Think an idea through as a mind map, or plan the work as a Kanban board. Either one can become the other, files and links included.</p>
+  <p class="pl-sub">Think an idea through as a mind map, plan the work as a Kanban board, or line up who does what next in a queue. Maps and boards can become each other, files and links included.</p>
 
   <div class="pl-choices">
    <a class="pl-choice" href="finchat_mindmap.html" id="plGoMaps">
@@ -158,6 +160,51 @@
      <div class="pl-cta"><b style="color:#4262ff">Open boards<span class="material-symbols-outlined">arrow_forward</span></b><span class="pl-count" id="plBoardCount"></span></div>
     </div>
    </a>
+
+   <a class="pl-choice" href="finchat_boards.html?kind=queue" id="plGoQueues">
+    <div class="pl-art" aria-hidden="true">
+     <svg viewBox="0 0 360 150">
+      <g>
+       <rect x="48" y="10" width="300" height="38" rx="10" fill="#fff3a3" opacity=".75"/>
+       <circle cx="26" cy="29" r="13" fill="#9a7300" stroke="#fff3a3" stroke-width="3"/>
+       <rect x="56" y="16" width="96" height="26" rx="6" fill="#fff" stroke="#9a7300" stroke-width="1.6"/><rect x="62" y="21" width="24" height="7" rx="2" fill="#9a7300"/><rect x="62" y="32" width="64" height="4" rx="2" fill="#cfd3da"/>
+       <path d="M157 25 l5 4 -5 4" fill="none" stroke="#9a7300" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+       <rect x="168" y="16" width="74" height="26" rx="6" fill="#fff" stroke="#e3e5ea"/><rect x="174" y="21" width="18" height="7" rx="2" fill="#f2e9b8"/><rect x="174" y="32" width="50" height="4" rx="2" fill="#cfd3da"/>
+       <path d="M247 25 l5 4 -5 4" fill="none" stroke="#9a7300" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+       <rect x="258" y="16" width="62" height="26" rx="6" fill="#fff" stroke="#e3e5ea"/><rect x="264" y="21" width="8" height="7" rx="2" fill="#eceff3"/><rect x="264" y="32" width="40" height="4" rx="2" fill="#cfd3da"/>
+      </g>
+      <g>
+       <rect x="48" y="56" width="300" height="38" rx="10" fill="#c6f1d0" opacity=".75"/>
+       <circle cx="26" cy="75" r="13" fill="#0e8a44" stroke="#c6f1d0" stroke-width="3"/>
+       <rect x="56" y="62" width="96" height="26" rx="6" fill="#fff" stroke="#0e8a44" stroke-width="1.6"/><rect x="62" y="67" width="24" height="7" rx="2" fill="#0e8a44"/><rect x="62" y="78" width="54" height="4" rx="2" fill="#cfd3da"/>
+       <rect x="128" y="67" width="18" height="8" rx="2" fill="#12a150"/>
+       <path d="M157 71 l5 4 -5 4" fill="none" stroke="#0e8a44" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+       <rect x="168" y="62" width="74" height="26" rx="6" fill="#fff" stroke="#e3e5ea"/><rect x="174" y="67" width="18" height="7" rx="2" fill="#c9ecd5"/><rect x="174" y="78" width="44" height="4" rx="2" fill="#cfd3da"/>
+       <rect x="256" y="62" width="58" height="26" rx="6" fill="none" stroke="#0e8a44" stroke-dasharray="4 3" opacity=".6"/><path d="M285 70 v10 M280 75 h10" stroke="#0e8a44" stroke-width="1.6" stroke-linecap="round"/>
+      </g>
+      <g>
+       <rect x="48" y="102" width="300" height="38" rx="10" fill="#e2d6ff" opacity=".75"/>
+       <circle cx="26" cy="121" r="13" fill="#6631d7" stroke="#e2d6ff" stroke-width="3"/>
+       <rect x="56" y="108" width="96" height="26" rx="6" fill="#fff" stroke="#6631d7" stroke-width="1.6"/><rect x="62" y="113" width="24" height="7" rx="2" fill="#6631d7"/><rect x="62" y="124" width="70" height="4" rx="2" fill="#cfd3da"/>
+       <path d="M157 117 l5 4 -5 4" fill="none" stroke="#6631d7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+       <rect x="168" y="108" width="74" height="26" rx="6" fill="#fff" stroke="#e3e5ea"/><rect x="174" y="113" width="18" height="7" rx="2" fill="#e6dcfb"/><rect x="174" y="124" width="36" height="4" rx="2" fill="#cfd3da"/><rect x="214" y="123" width="20" height="6" rx="2" fill="#d62d2d"/>
+       <path d="M247 117 l5 4 -5 4" fill="none" stroke="#6631d7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+       <rect x="258" y="108" width="62" height="26" rx="6" fill="#fff" stroke="#e3e5ea"/><rect x="264" y="113" width="8" height="7" rx="2" fill="#eceff3"/><rect x="264" y="124" width="44" height="4" rx="2" fill="#cfd3da"/>
+       <path d="M325 117 l5 4 -5 4" fill="none" stroke="#6631d7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>
+      </g>
+     </svg>
+    </div>
+    <div class="pl-choice-body">
+     <h2><span class="material-symbols-outlined" style="color:#e8590c">view_timeline</span>Work queue</h2>
+     <p>Line up who does what — now, next, then later. One pipe per person, front first.</p>
+     <ul class="pl-points">
+      <li><span class="material-symbols-outlined" style="color:#e84fa7">auto_awesome</span>AI lines it up from a sentence — who does what, in order</li>
+      <li><span class="material-symbols-outlined" style="color:#fb8c00">bolt</span>Add to the back, or jump the queue with urgent work</li>
+      <li><span class="material-symbols-outlined" style="color:#12a150">task_alt</span>Drag to reorder or hand work over; tick it off when done</li>
+     </ul>
+     <div class="pl-cta"><b style="color:#e8590c">Open queues<span class="material-symbols-outlined">arrow_forward</span></b><span class="pl-count" id="plQueueCount"></span></div>
+    </div>
+   </a>
   </div>
 
   <section class="pl-card" aria-labelledby="plAiTitle">
@@ -166,6 +213,7 @@
     <div class="pl-seg" role="tablist" id="plKind">
      <button class="on" data-kind="board" role="tab" aria-selected="true"><span class="material-symbols-outlined">view_kanban</span>Kanban board</button>
      <button data-kind="map" role="tab" aria-selected="false"><span class="material-symbols-outlined">account_tree</span>Mind map</button>
+     <button data-kind="queue" role="tab" aria-selected="false"><span class="material-symbols-outlined">view_timeline</span>Queue</button>
     </div>
    </div>
    <div class="pl-ai-row">
@@ -187,6 +235,11 @@
     <h3><span class="material-symbols-outlined" style="color:#4262ff">view_kanban</span>Your boards</h3>
     <div class="bx-hint">Open one, or see it as a mind map. Conversions are copies — the original is never changed.</div>
     <div class="pl-list" id="plBoards"><div class="pl-empty">Loading…</div></div>
+   </section>
+   <section class="pl-card">
+    <h3><span class="material-symbols-outlined" style="color:#e8590c">view_timeline</span>Your queues</h3>
+    <div class="bx-hint">Open one to see what everyone is doing now and next.</div>
+    <div class="pl-list" id="plQueues"><div class="pl-empty">Loading…</div></div>
    </section>
   </div>
  </div>
@@ -219,6 +272,7 @@
   }
   const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body || {}) });
   const goMap = (id) => { location.href = 'finchat_mindmap.html?map=' + encodeURIComponent(id); };
+  // A queue is a board too; the boards page opens it as a queue by itself.
   const goBoard = (id) => { location.href = 'finchat_boards.html?board=' + encodeURIComponent(id); };
   const day = (d) => { try { return new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
 
@@ -243,10 +297,20 @@
         ['A decision', 'Should I move from growth to a product manager role?'],
         ['A market', 'The Indian fintech lending market']
       ]
+    },
+    queue: {
+      label: 'Build queue',
+      placeholder: 'Who does what, in what order? e.g. Café opens in 3 weeks — Asha does the menu and suppliers, Ravi sets up the POS, I handle permits and hiring',
+      ideas: [
+        ['Team week', 'This week for a team of three: Asha on design, Ravi on the backend, Meera on sales calls'],
+        ['Café opening', 'Café opens in 3 weeks: Asha does the menu and suppliers, Ravi sets up the POS, I handle permits and hiring'],
+        ['Support desk', 'Three support agents — Anu, Joel and Fatima — working through this week\'s customer tickets by urgency'],
+        ['Just me', 'My week: finish the quarterly report, prepare for two interviews, renew the car insurance, plan the trip']
+      ]
     }
   };
   let kind = 'board';
-  try { if (localStorage.getItem('finchat_plan_kind') === 'map') kind = 'map'; } catch (e) {}
+  try { const k = localStorage.getItem('finchat_plan_kind'); if (k === 'map' || k === 'queue') kind = k; } catch (e) {}
 
   function paintKind() {
     const k = KINDS[kind];
@@ -256,8 +320,8 @@
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     $('plAiText').placeholder = k.placeholder;
-    // Building from files is the board builder's; Mind maps has its own document flow.
-    $('plImage').hidden = kind !== 'board';
+    // Building from files is the board builder's (queues too); Mind maps has its own document flow.
+    $('plImage').hidden = kind === 'map';
     $('plAiBuildLabel').textContent = k.label;
     $('plIdeas').innerHTML = k.ideas.map(([label, text]) => `<button class="bx-chip" data-idea="${esc(text)}">${esc(label)}</button>`).join('');
   }
@@ -280,9 +344,10 @@
   const picker = window.BoardUI ? window.BoardUI.planFilesPicker($('plImage'), { pasteRoot: $('plAiText').closest('.pl-card') }) : null;
 
   /** Multipart, so no JSON Content-Type — the browser sets the boundary. */
-  async function generateFromFiles(instruction, files) {
+  async function generateFromFiles(instruction, files, boardKind) {
     const fd = new FormData();
     fd.append('instruction', instruction);
+    fd.append('kind', boardKind);
     for (const f of files) fd.append('files', f, f.name || 'image');
     const res = await fetch(API + '/api/boards/generate', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
     if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
@@ -295,20 +360,24 @@
   async function build() {
     if (building) return;
     const text = $('plAiText').value.trim();
-    const files = kind === 'board' && picker ? picker.files : [];
+    const files = kind !== 'map' && picker ? picker.files : [];
     if (text.length < 3 && !files.length) {
       $('plAiText').focus();
-      return toast(kind === 'board' ? 'Describe what the board should plan, or add a file' : 'Name a topic for the map');
+      return toast(kind === 'board' ? 'Describe what the board should plan, or add a file'
+        : kind === 'queue' ? 'Say who does what, or add a file' : 'Name a topic for the map');
     }
     building = true;
     $('plAiBuild').disabled = true;
-    $('plAiStatus').textContent = kind !== 'board'
+    const doing = kind === 'queue' ? 'lining up your queue' : 'planning your board';
+    $('plAiStatus').textContent = kind === 'map'
       ? 'Building your mind map — this usually takes 15 to 40 seconds…'
-      : files.length ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and planning your board — this usually takes 20 to 60 seconds…`
-        : 'Planning your board — this usually takes 10 to 30 seconds…';
+      : files.length ? `Reading ${files.length === 1 ? 'the file' : `${files.length} files`} and ${doing} — this usually takes 20 to 60 seconds…`
+        : `${doing[0].toUpperCase() + doing.slice(1)} — this usually takes 10 to 30 seconds…`;
     try {
-      if (kind === 'board') {
-        const out = files.length ? await generateFromFiles(text, files) : await post('/api/boards/generate', { instruction: text });
+      if (kind !== 'map') {
+        const boardKind = kind === 'queue' ? 'queue' : 'kanban';
+        const out = files.length ? await generateFromFiles(text, files, boardKind)
+          : await post('/api/boards/generate', { instruction: text, kind: boardKind });
         goBoard(out.boardId);
       } else {
         // A short line is a topic; anything longer is material to organise.
@@ -327,7 +396,7 @@
 
   // ── lists + conversions ────────────────────────────────────
   const SHOW = 6;
-  let MAPS = [], BOARDS = [];
+  let MAPS = [], BOARDS = [], QUEUES = [];
 
   function mapRow(m, boardId) {
     return `<div class="pl-row">
@@ -358,6 +427,20 @@
     </div>`;
   }
 
+  function queueRow(b) {
+    const waiting = (Number(b.cardCount) || 0) - (Number(b.doneCount) || 0);
+    return `<div class="pl-row">
+      <div class="pl-row-ico" style="background:#e8590c"><span class="material-symbols-outlined">view_timeline</span></div>
+      <div class="pl-row-main" data-openboard="${esc(b.boardId)}">
+        <div class="pl-row-title">${esc(b.title)}</div>
+        <div class="pl-row-meta">${b.columnCount} ${b.columnCount === 1 ? 'person' : 'people'} · ${waiting} waiting${
+          b.doneCount ? ` · ${b.doneCount} done` : ''} · ${esc(day(b.updatedAt))}${
+          b.access && b.access !== 'owner' ? ` · <span class="pl-pair" style="color:#0ca789">shared by ${esc(b.ownerName || 'someone')}</span>` : ''}</div>
+      </div>
+      <button class="bx-btn ghost" data-openboard="${esc(b.boardId)}"><span class="material-symbols-outlined">arrow_forward</span>Open</button>
+    </div>`;
+  }
+
   function paintLists() {
     const boardOfMap = new Map();
     for (const b of BOARDS) if (b.sourceMapId && !boardOfMap.has(b.sourceMapId)) boardOfMap.set(b.sourceMapId, b.boardId);
@@ -369,17 +452,27 @@
       ? BOARDS.slice(0, SHOW).map(boardRow).join('')
         + (BOARDS.length > SHOW ? `<a class="pl-more" href="finchat_boards.html">All ${BOARDS.length} boards →</a>` : '')
       : '<div class="pl-empty">No boards yet — ask the AI above, or turn one of your mind maps into a board.</div>';
+    $('plQueues').innerHTML = QUEUES.length
+      ? QUEUES.slice(0, SHOW).map(queueRow).join('')
+        + (QUEUES.length > SHOW ? `<a class="pl-more" href="finchat_boards.html?kind=queue">All ${QUEUES.length} queues →</a>` : '')
+      : '<div class="pl-empty">No queues yet — ask the AI above who does what, or open Queues and add people.</div>';
     $('plMapCount').textContent = MAPS.length ? `${MAPS.length} map${MAPS.length === 1 ? '' : 's'}` : '';
     $('plBoardCount').textContent = BOARDS.length ? `${BOARDS.length} board${BOARDS.length === 1 ? '' : 's'}` : '';
+    $('plQueueCount').textContent = QUEUES.length ? `${QUEUES.length} queue${QUEUES.length === 1 ? '' : 's'}` : '';
   }
 
   async function load() {
     const [maps, boards] = await Promise.allSettled([api('/api/mind-maps'), api('/api/boards')]);
     MAPS = maps.status === 'fulfilled' ? (maps.value.maps || []) : [];
-    BOARDS = boards.status === 'fulfilled' ? (boards.value.boards || []) : [];
+    const all = boards.status === 'fulfilled' ? (boards.value.boards || []) : [];
+    BOARDS = all.filter(b => b.kind !== 'queue');
+    QUEUES = all.filter(b => b.kind === 'queue');
     paintLists();
     if (maps.status === 'rejected') $('plMaps').innerHTML = `<div class="pl-empty">Could not load mind maps: ${esc(maps.reason.message)}</div>`;
-    if (boards.status === 'rejected') $('plBoards').innerHTML = `<div class="pl-empty">Could not load boards: ${esc(boards.reason.message)}</div>`;
+    if (boards.status === 'rejected') {
+      $('plBoards').innerHTML = `<div class="pl-empty">Could not load boards: ${esc(boards.reason.message)}</div>`;
+      $('plQueues').innerHTML = `<div class="pl-empty">Could not load queues: ${esc(boards.reason.message)}</div>`;
+    }
   }
 
   async function convert(btn, run, busyLabel) {

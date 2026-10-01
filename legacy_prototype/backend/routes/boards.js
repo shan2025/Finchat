@@ -1,9 +1,11 @@
-// routes/boards.js — /api/boards, Kanban boards (services/boards.js).
+// routes/boards.js — /api/boards, Kanban boards and queues (services/boards.js).
+// A queue is a board with kind 'queue': columns are lanes (people), card order
+// is work order, and PATCH {done} pops a task off its lane or puts it back.
 //
-//   GET    /                                  the caller's boards
-//   POST   /                                  {title, description?, columns?: [title]}
+//   GET    /                                  the caller's boards (each with its kind)
+//   POST   /                                  {title, description?, columns?: [title], kind?: kanban|queue}
 //   POST   /from-map                          {mapId, reuse?} → a board built from a mind map (reuse: its existing one)
-//   POST   /generate                          {instruction} or multipart {instruction?, image} → a board the AI plans
+//   POST   /generate                          {instruction, kind?} or multipart {instruction?, image, kind?} → one the AI plans
 //   POST   /:boardId/mind-map                 the board as a mind map (its paired map if it has one)
 //   GET    /:boardId                          board + columns + cards + attachments
 //   PATCH  /:boardId                          {title?, description?}
@@ -14,8 +16,9 @@
 //   DELETE /:boardId/columns/:columnId        (its cards go with it)
 //   POST   /:boardId/columns/order            {columnIds: [...]}
 //
-//   POST   /:boardId/cards                    {columnId, title, summary?, detail?, tags?, priority?, startDate?, endDate?, color?}
-//   PATCH  /:boardId/cards/:cardId            any of the above
+//   POST   /:boardId/cards                    {columnId, title, summary?, detail?, tags?, priority?, startDate?, endDate?, color?,
+//                                              position?: back|front}
+//   PATCH  /:boardId/cards/:cardId            any of the above (not position), plus done?: true|false on a queue
 //   DELETE /:boardId/cards/:cardId
 //   POST   /:boardId/cards/order              {columns: [{columnId, cardIds: [...]}]} — a drag
 //
@@ -32,7 +35,7 @@
 //   POST   /:boardId/members                  {identifier: email or username} → edit access (owner only)
 //   DELETE /:boardId/members/:userId          owner removes anyone; an editor may remove themselves
 //   POST   /:boardId/assistant                {message, history?} → {reply, ops[{…, line}]} — writes nothing
-//   POST   /:boardId/assistant/apply          {ops, message} → runs the approved ops
+//   POST   /:boardId/assistant/apply          {ops, message} → runs the approved ops (multipart + "files" when ops attach them)
 //   GET    /:boardId/activity                 ?before=ISO — who changed what, newest first
 //   GET    /:boardId/stamp                    {updatedAt, byName} — "has someone else changed it?"
 //
@@ -45,7 +48,6 @@ const multer = require('multer');
 const { requireAuth } = require('../middleware/auth');
 const Boards = require('../services/boards');
 const Assistant = require('../services/boardAssistant');
-const { extractFromUpload } = require('../services/attachments');
 const { sendDocFile, capabilities } = require('../services/cognitive/mindMapDocFile');
 const { prepareLinks, linkView } = require('../services/linkAttach');
 const { shareLinks } = require('../services/shareLinks');
@@ -53,7 +55,6 @@ const { shareLinks } = require('../services/shareLinks');
 const shares = shareLinks({ table: 'board_shares', idCol: 'board_id', prefix: 'bsh', page: 'finchat_board_share.html', roles: true });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 6 } });
-const DB_MAX_BYTES = Number(process.env.MIND_MAP_DOC_DB_MAX_BYTES) || 8 * 1024 * 1024;
 
 // ── views ──────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ function attView(a) {
 function boardView({ board, columns, cards, attachments }, { includeDocs = true } = {}) {
   return {
     board: {
-      boardId: board.board_id, title: board.title, description: board.description,
+      boardId: board.board_id, title: board.title, description: board.description, kind: board.kind || 'kanban',
       tagPalette: board.tag_palette || [], sourceMapId: board.source_map_id || null,
       // 'owner' | 'editor' for a signed-in member; absent on a public share read.
       access: board.access || undefined,
@@ -86,7 +87,8 @@ function boardView({ board, columns, cards, attachments }, { includeDocs = true 
       cardId: k.card_id, columnId: k.column_id, title: k.title, summary: k.summary, detail: k.detail,
       tags: k.tags || [], priority: k.priority, color: k.color, order: k.order_index,
       startDate: k.start_date ? Boards.isoDate(k.start_date) : null,
-      endDate: k.end_date ? Boards.isoDate(k.end_date) : null
+      endDate: k.end_date ? Boards.isoDate(k.end_date) : null,
+      doneAt: k.done_at || null
     })),
     includeDocs,
     attachments: includeDocs ? attachments.map(attView) : []
@@ -111,7 +113,7 @@ const handle = (label, fn) => async (req, res) => {
 router.get('/', requireAuth, handle('list boards', async (req, res) => {
   const rows = await Boards.listBoards(req.user.id);
   res.json({ boards: rows.map(b => ({
-    boardId: b.board_id, title: b.title, description: b.description,
+    boardId: b.board_id, title: b.title, description: b.description, kind: b.kind || 'kanban', doneCount: b.done_count || 0,
     // A shared board's source map is the owner's, not something this user can open.
     sourceMapId: b.access === 'owner' ? (b.source_map_id || null) : null,
     access: b.access, ownerName: b.access === 'owner' ? null : b.owner_name, memberCount: b.member_count,
@@ -150,7 +152,7 @@ router.post('/generate', requireAuth, (req, res, next) => {
 }, handle('build the board', async (req, res) => {
   const f = req.files || {};
   const out = await Boards.generateBoard(req.user.id, req.body?.instruction, {
-    image: (f.image && f.image[0]) || null, files: f.files || []
+    image: (f.image && f.image[0]) || null, files: f.files || [], kind: req.body?.kind || 'kanban'
   });
   res.status(201).json({ ok: true, ...out });
 }));
@@ -231,16 +233,7 @@ router.post('/:boardId/attachments', requireAuth, (req, res, next) => {
   await Boards.requireBoard(req.params.boardId, req.user.id);
   const cardId = await Boards.requireCard(req.params.boardId, req.body?.cardId || null);
   const saved = [];
-  for (const f of req.files) {
-    const extracted = await extractFromUpload(f);
-    const text = String(extracted.text || '');
-    saved.push(attView(await Boards.insertAttachment({
-      boardId: req.params.boardId, cardId, userId: req.user.id,
-      kind: extracted.kind === 'image' ? 'image' : 'document',
-      filename: String(f.originalname || 'file').slice(0, 200), mimetype: f.mimetype || '',
-      size: f.size || 0, text, data: f.buffer && f.buffer.length <= DB_MAX_BYTES ? f.buffer : null
-    })));
-  }
+  for (const f of req.files) saved.push(attView(await Boards.attachUpload(req.params.boardId, cardId, req.user.id, f)));
   res.status(201).json({ ok: true, attachments: saved });
 }));
 
@@ -358,8 +351,20 @@ router.post('/:boardId/assistant', requireAuth, (req, res, next) => {
   res.json({ ok: true, ...out });
 }));
 
-router.post('/:boardId/assistant/apply', requireAuth, handle('apply the changes', async (req, res) => {
-  const out = await Assistant.apply(req.params.boardId, req.user.id, req.body?.ops, req.body?.message);
+// JSON {ops, message}, or multipart with the message's "files" again (ops as a
+// JSON string) when an approved op attaches them to a card — ops name a file by
+// its index in that list.
+router.post('/:boardId/assistant/apply', requireAuth, (req, res, next) => {
+  planUpload.array('files', 5)(req, res, (err) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Each file must be under 15 MB.' });
+    if (err && err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ error: 'Attach at most 5 files.' });
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, handle('apply the changes', async (req, res) => {
+  let ops = req.body?.ops;
+  if (typeof ops === 'string') { try { ops = JSON.parse(ops); } catch (e) { ops = []; } }
+  const out = await Assistant.apply(req.params.boardId, req.user.id, ops, req.body?.message, { files: req.files || [] });
   res.json({ ok: true, ...out });
 }));
 

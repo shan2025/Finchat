@@ -1,4 +1,5 @@
-// board_ui.js — rendering shared by the Boards page and the shared-board page.
+// board_ui.js — rendering shared by the Boards page and the shared-board page:
+// Kanban cards, and queue lanes (a board of kind 'queue').
 //
 // Pure markup builders plus one preview helper. Anything that touches the
 // network goes through an ADAPTER the page supplies, because the two pages
@@ -102,6 +103,14 @@
    * an authenticated fetch for them.
    */
   function cardHTML(card, atts = [], { selected = false } = {}) {
+    return `<div class="bx-card${selected ? ' sel' : ''}" data-card="${esc(card.cardId)}">
+      ${card.color ? `<span class="accent" style="background:${esc(card.color)}"></span>` : ''}
+      ${cardBody(card, atts)}
+    </div>`;
+  }
+
+  /** What is inside a card — title, summary, thumbnail, chips — shared by board cards and queue tasks. */
+  function cardBody(card, atts = []) {
     const range = dateRange(card.startDate, card.endDate);
     const chips = [];
     if (range) chips.push(`<span class="bx-date"><span class="material-symbols-outlined">calendar_today</span>${esc(range)}</span>`);
@@ -126,14 +135,83 @@
     });
     if (atts.length > 3) shown.push(`<span class="bx-att-chip">+${atts.length - 3} more</span>`);
 
-    return `<div class="bx-card${selected ? ' sel' : ''}" data-card="${esc(card.cardId)}">
-      ${card.color ? `<span class="accent" style="background:${esc(card.color)}"></span>` : ''}
-      <div class="bx-card-title">${esc(card.title)}</div>
+    return `<div class="bx-card-title">${esc(card.title)}</div>
       ${card.summary ? `<div class="bx-card-sum">${esc(card.summary)}</div>` : ''}
       ${thumb}
       ${chips.length ? `<div class="bx-meta">${chips.join('')}</div>` : ''}
-      ${shown.length ? `<div class="bx-meta">${shown.join('')}</div>` : ''}
+      ${shown.length ? `<div class="bx-meta">${shown.join('')}</div>` : ''}`;
+  }
+
+  // ── queues ──────────────────────────────────────────────────
+  // A queue lane is a person and their pipe of tasks, front first: position 1
+  // is NOW, 2 is NEXT, then 3, 4… Lanes keep the board's pastel column colours;
+  // each pastel has a strong partner for the avatar, the NOW badge and arrows.
+  const LANE_ACCENTS = {
+    '#fff3a3': '#9a7300', '#ffcd9e': '#c25e00', '#c6f1d0': '#0e8a44', '#cde4ff': '#2b59c3',
+    '#e2d6ff': '#6631d7', '#ffd6ea': '#c2307a', '#d4f4f1': '#0b8a72', '#eceff3': '#5f6b7a'
+  };
+  const laneAccent = (pastel) => LANE_ACCENTS[String(pastel || '').toLowerCase()] || '#4262ff';
+  const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+
+  /** One task in a lane. `pos` is its place in the whole queue (1 = now), even when a search hides others. */
+  function queueItemHTML(card, atts = [], { pos = 1, selected = false, editable = false } = {}) {
+    const id = esc(card.cardId);
+    const badge = pos === 1 ? '<span class="bx-q-badge now"><span class="material-symbols-outlined">play_arrow</span>Now</span>'
+      : pos === 2 ? '<span class="bx-q-badge next">Next</span>'
+        : `<span class="bx-q-badge n" title="Number ${pos} in the queue">${pos}</span>`;
+    const done = `data-qdone="${id}" title="Done — take it off the queue"`;
+    const attach = `<button class="bx-q-act" data-qattach="${id}" title="Attach files — or drop them on the task"><span class="material-symbols-outlined">attach_file</span></button>`;
+    const acts = !editable ? ''
+      : pos === 1 ? `<span class="bx-q-acts">${attach}</span><button class="bx-q-done" ${done}><span class="material-symbols-outlined">check</span>Done</button>`
+        : `<span class="bx-q-acts">
+            ${attach}
+            <button class="bx-q-act" data-qfront="${id}" title="Do it now — move to the front"><span class="material-symbols-outlined">keyboard_double_arrow_left</span></button>
+            <button class="bx-q-act" ${done}><span class="material-symbols-outlined">check</span></button>
+          </span>`;
+    return `<div class="bx-card bx-q-item${pos === 1 ? ' now' : pos === 2 ? ' next' : ''}${selected ? ' sel' : ''}" data-card="${id}">
+      ${card.color ? `<span class="accent" style="background:${esc(card.color)}"></span>` : ''}
+      <div class="bx-q-top">${badge}<span class="grow"></span>${acts}</div>
+      ${cardBody(card, atts)}
     </div>`;
+  }
+
+  /**
+   * One lane: who, how many are waiting and done, then their tasks in order.
+   *   items     [{card, pos}] in queue order (a search may have dropped some)
+   *   waiting   how many tasks the lane has in all, before any search
+   *   tail      markup after the last task — the owner's "Add task" slot or form
+   *   editable  menu, Done/Front buttons and a clickable Done count
+   */
+  function laneHTML(col, items, { attsOf = () => [], waiting = items.length, doneCount = 0, selected = null,
+    editable = false, query = '', tail = '' } = {}) {
+    const id = esc(col.columnId);
+    const parts = [];
+    items.forEach(({ card, pos }, i) => {
+      if (i) parts.push('<span class="bx-q-arrow" aria-hidden="true"><span class="material-symbols-outlined">chevron_right</span></span>');
+      parts.push(queueItemHTML(card, attsOf(card.cardId), { pos, selected: card.cardId === selected, editable }));
+    });
+    if (!items.length && !tail) {
+      parts.push(`<div class="bx-q-empty">${query ? 'No matching tasks' : 'Nothing waiting'}</div>`);
+    }
+    const doneLabel = `<span class="material-symbols-outlined">task_alt</span>${doneCount} done`;
+    return `<section class="bx-q-lane" data-col="${id}" style="--lane:${esc(col.color || '#eceff3')}; --lane-ink:${laneAccent(col.color)}">
+      <div class="bx-q-head">
+        <div class="bx-q-headrow">
+          <span class="bx-q-avatar" aria-hidden="true">${esc(initials(col.title))}</span>
+          <div class="bx-q-who">
+            <span class="bx-q-name" data-coltitle="${id}"${editable ? ' title="Double-click to rename"' : ''}>${esc(col.title)}</span>
+            <span class="bx-q-count">${query ? `${items.length} of ` : ''}${waiting} waiting</span>
+          </div>
+        </div>
+        ${doneCount ? (editable
+          ? `<button class="bx-q-donechip" data-qdonelist="${id}" title="What ${esc(col.title)} has finished">${doneLabel}</button>`
+          : `<span class="bx-q-donechip">${doneLabel}</span>`) : ''}
+        ${editable ? `<button class="bx-ibtn bx-q-menu" data-colmenu="${id}" title="Lane options"><span class="material-symbols-outlined" style="font-size:18px">more_horiz</span></button>` : ''}
+      </div>
+      <div class="bx-q-pipe">
+        <div class="bx-q-items" data-cards="${id}" data-axis="x">${parts.join('')}${tail}</div>
+      </div>
+    </section>`;
   }
 
   /** One attachment row in the card drawer: icon, name, and every action it supports. */
@@ -150,9 +228,15 @@
       acts.push(`<button class="bx-btn sm" data-download="${esc(a.attachmentId)}"><span class="material-symbols-outlined">download</span>Download${a.hasOriginal ? '' : ' text'}</button>`);
     }
     if (canRemove) acts.push(`<button class="bx-btn sm ghost danger" data-remove="${esc(a.attachmentId)}" title="Remove"><span class="material-symbols-outlined">delete</span></button>`);
+    // An image shows itself; the page fills data-thumb (the owner needs an authenticated fetch).
+    const face = a.preview === 'image'
+      ? `<img class="bx-att-ico bx-att-img" alt="" data-thumb="${esc(a.attachmentId)}">`
+      : a.preview === 'image-link'
+        ? `<img class="bx-att-ico bx-att-img" alt="" loading="lazy" referrerpolicy="no-referrer" src="${esc(a.link.href)}">`
+        : `<div class="bx-att-ico" style="background:${ic.color}"><span class="material-symbols-outlined">${ic.icon}</span></div>`;
     return `<div class="bx-att" data-att="${esc(a.attachmentId)}">
       <div class="bx-att-top">
-        <div class="bx-att-ico" style="background:${ic.color}"><span class="material-symbols-outlined">${ic.icon}</span></div>
+        ${face}
         <div style="min-width:0; flex:1;">
           <div class="bx-att-name">${esc(a.filename)}</div>
           <div class="bx-att-sub">${esc(sub)}</div>
@@ -384,7 +468,8 @@
   }
 
   window.BoardUI = {
-    esc, isLight, fmtDate, dateRange, fmtSize, attIcon, tagChip, prioChip, cardHTML, attachmentHTML,
+    esc, isLight, fmtDate, dateRange, fmtSize, attIcon, tagChip, prioChip, cardHTML, cardBody, attachmentHTML,
+    queueItemHTML, laneHTML, laneAccent, initials,
     togglePreview, toast, saveResponse, planFilesPicker, preparePlanFile, PLAN_ACCEPT, PLAN_FILES_MAX, PRIORITY, TAG_COLORS, COLUMN_COLORS, youtubeId
   };
 })();
