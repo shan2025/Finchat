@@ -72,43 +72,40 @@ async function recordFromExecution(execution) {
 
 /**
  * Retrieve the top-k recipes most similar to a fresh goal, optionally scoped to an agent.
- * Falls back to recency ordering when no embedding is available.
+ *
+ * Scoped to recipes learned from this user's own executions or from runs with
+ * no user behind them: a recipe's title is the original goal, verbatim, and it
+ * is pasted into the prompt as "Previous goal: …" — so an unscoped search put
+ * one user's questions in front of another.
+ *
+ * Empty when no embedding is available. The old fallback handed back the newest
+ * recipes whatever the goal, which the model was then told to reuse.
  */
-async function findRelevant({ goal, agentId, limit = 2 } = {}) {
+async function findRelevant({ goal, agentId, userId = null, limit = 2 } = {}) {
   if (!goal) return [];
   try {
     const embedding = await generateEmbedding(goal, { purpose: 'similar' });
-    if (embedding) {
-      const vectorStr = `[${embedding.join(',')}]`;
-      const args = [vectorStr];
-      let where = 'WHERE embedding IS NOT NULL';
-      if (agentId) { args.push(agentId); where += ` AND (agent_id = $${args.length} OR agent_id IS NULL)`; }
-      args.push(limit);
-      const res = await query(`
-        SELECT recipe_id, title, goal_pattern, steps, times_reused,
-               (embedding <=> $1::vector) AS distance
-        FROM skill_recipes
-        ${where}
-        ORDER BY embedding <=> $1::vector
-        LIMIT $${args.length}
-      `, args);
-      // Keep only goals close enough to reuse a plan for. The old < 0.6 suited
-      // hash vectors (unrelated text sat near 1.0); Gemini puts even unrelated
-      // questions around 0.3, so 0.6 would let every recipe through.
-      return res.rows.filter(r => r.distance === null || r.distance < RECIPE_MAX_DISTANCE);
-    }
+    if (!embedding) return [];
 
-    // Fallback: latest per agent
-    const args = [];
-    let where = '';
-    if (agentId) { args.push(agentId); where = `WHERE agent_id = $${args.length} OR agent_id IS NULL`; }
+    const vectorStr = `[${embedding.join(',')}]`;
+    const args = [vectorStr, userId];
+    let where = `WHERE r.embedding IS NOT NULL
+        AND (x.user_id IS NULL OR x.user_id = $2)`;
+    if (agentId) { args.push(agentId); where += ` AND (r.agent_id = $${args.length} OR r.agent_id IS NULL)`; }
     args.push(limit);
     const res = await query(`
-      SELECT recipe_id, title, goal_pattern, steps, times_reused, NULL::real AS distance
-      FROM skill_recipes ${where}
-      ORDER BY created_at DESC LIMIT $${args.length}
+      SELECT r.recipe_id, r.title, r.goal_pattern, r.steps, r.times_reused,
+             (r.embedding <=> $1::vector) AS distance
+      FROM skill_recipes r
+      LEFT JOIN executions x ON x.execution_id = r.source_execution_id
+      ${where}
+      ORDER BY r.embedding <=> $1::vector
+      LIMIT $${args.length}
     `, args);
-    return res.rows;
+    // Keep only goals close enough to reuse a plan for. The old < 0.6 suited
+    // hash vectors (unrelated text sat near 1.0); Gemini puts even unrelated
+    // questions around 0.3, so 0.6 would let every recipe through.
+    return res.rows.filter(r => r.distance !== null && r.distance < RECIPE_MAX_DISTANCE);
   } catch (err) {
     console.warn(`⚠️ SkillRecipes.findRelevant failed: ${err.message}`);
     return [];

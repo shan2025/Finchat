@@ -88,7 +88,13 @@ function stub(relPath, exports) {
   stubbed.add(filename);
 }
 
-function load(repo) {
+// `embed` stands in for the provider: a vector, or null for "no provider".
+function load(repo, { embed = null } = {}) {
+  stub('axios', { post: async () => {
+    if (!embed) throw new Error('no provider in tests');
+    return { data: { embedding: { values: embed } } };
+  } });
+  stub('../services/QuotaManager', { resolveCredentials: () => [{ key: 'test-key' }] });
   stub('../repositories/MemoryRepository', { memoryRepository: repo });
   stub('../repositories/ExecutionRepository', { executionRepository: {} });
   stub('../services/redis', { setWorkingMemory: async () => {}, getWorkingMemory: async () => ({}) });
@@ -128,8 +134,42 @@ test.describe('retrieveEnrichedContext procedural memories', () => {
       },
     });
     const out = await svc.retrieveEnrichedContext({ userId: 'u1', goal: 'TSLA earnings', agentName: 'plato' });
-    assert.deepEqual(seen, [{ terms: ['tsla', 'earnings'], userId: 'u1', agentId: 'plato', limit: 3 }]);
+    // Twice the limit, so fusion has candidates to choose between.
+    assert.deepEqual(seen, [{ terms: ['tsla', 'earnings'], userId: 'u1', agentId: 'plato', limit: 6 }]);
     assert.deepEqual(out.memories, [{ type: 'procedural', content: '[Procedural Learning for plato]: TSLA earnings…', importance: 7 }]);
+  });
+
+  test('with no embedding provider, recall stays lexical', async () => {
+    const svc = load({
+      findRelevantProcedural: async () => [{ memory_id: 'a', content: 'lexical note', importance: 7 }],
+      findSimilarProcedural: async () => { throw new Error('vector search without a vector'); },
+    });
+    const out = await svc.retrieveEnrichedContext({ userId: 'u1', goal: 'TSLA earnings', agentName: 'plato' });
+    assert.deepEqual(out.memories.map(m => m.content), ['lexical note']);
+  });
+
+  test('hybrid: a note both halves find ranks first; vector-only notes are recalled too', async () => {
+    const vectorArgs = [];
+    const svc = load({
+      findRelevantProcedural: async () => [
+        { memory_id: 'lex-only', content: 'shares words', importance: 7 },
+        { memory_id: 'both', content: 'shares words and meaning', importance: 7 },
+      ],
+      findSimilarProcedural: async (args) => {
+        vectorArgs.push(args);
+        return [
+          { memory_id: 'both', content: 'shares words and meaning', importance: 7 },
+          { memory_id: 'vec-only', content: 'same idea, other words', importance: 7 },
+        ];
+      },
+    }, { embed: Array.from({ length: 768 }, (_, i) => (i % 5) - 2) });
+    const out = await svc.retrieveEnrichedContext({ userId: 'u1', goal: 'how does interest compound', agentName: 'plato' });
+    assert.deepEqual(out.memories.map(m => m.content),
+      ['shares words and meaning', 'shares words', 'same idea, other words']);
+    assert.equal(vectorArgs[0].userId, 'u1');
+    assert.equal(vectorArgs[0].agentId, 'plato');
+    assert.equal(vectorArgs[0].vector.length, 768);
+    assert.ok(vectorArgs[0].maxDistance > 0 && vectorArgs[0].maxDistance < 0.5);
   });
 
   test('no longer injects notes by recency', async () => {

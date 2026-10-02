@@ -7,8 +7,9 @@
 // vector is rewritten.
 //
 // Touches ONLY the vector columns: knowledge_embeddings.embedding (and inserts
-// one for a knowledge row that has none) and skill_recipes.embedding. No
-// content is changed or deleted.
+// one for a knowledge row that has none), skill_recipes.embedding, and — after
+// migration 063 — memories.embedding (procedural rows) and entities.embedding.
+// No content is changed or deleted.
 //
 //   node scripts/backfill_embeddings.js            dry run: counts only
 //   node scripts/backfill_embeddings.js --apply    write
@@ -106,6 +107,23 @@ async function run(db, key, { label, rows, taskType, write }) {
     await run(db, cred.key, {
       label: 'skill_recipes', rows: s.rows, taskType: 'SEMANTIC_SIMILARITY',
       write: (r, vec) => db.query('UPDATE skill_recipes SET embedding = $1::vector WHERE recipe_id = $2', [vec, r.recipe_id])
+    });
+    // Hybrid recall (migration 063). The text must match what the live code
+    // embeds — EntityGraph.embedMissingEntities and MemoryService.store — or
+    // backfilled rows land in a slightly different place than new ones.
+    const p = await db.query(`SELECT memory_id, content AS text, embedding::text AS emb FROM memories
+      WHERE memory_type = 'procedural' ORDER BY created_at`);
+    await run(db, cred.key, {
+      label: 'memories (procedural)', rows: p.rows, taskType: 'RETRIEVAL_DOCUMENT',
+      write: (r, vec) => db.query('UPDATE memories SET embedding = $1::vector WHERE memory_id = $2', [vec, r.memory_id])
+    });
+    const e = await db.query(`SELECT entity_id,
+        canonical_name || ' (' || entity_type || ')' || CASE WHEN summary <> '' THEN ': ' || summary ELSE '' END AS text,
+        embedding::text AS emb
+      FROM entities WHERE status = 'active' AND user_id IS NOT NULL ORDER BY created_at`);
+    await run(db, cred.key, {
+      label: 'entities', rows: e.rows, taskType: 'RETRIEVAL_DOCUMENT',
+      write: (r, vec) => db.query('UPDATE entities SET embedding = $1::vector WHERE entity_id = $2', [vec, r.entity_id])
     });
   } finally { await db.end(); }
   console.log(APPLY ? 'Done.' : 'Dry run only. Re-run with --apply to write.');

@@ -43,13 +43,15 @@ router.get('/nodes/:entityId', requireAuth, async (req, res) => {
       query(`
         SELECT e.edge_id, e.edge_type, e.weight, e.strength, e.confidence, e.reason,
                e.source, e.agent_id, e.activation_count, e.last_activated_at, e.updated_at,
+               e.valid_from, e.valid_to, e.invalidation_reason,
                CASE WHEN e.from_entity_id = $1 THEN 'out' ELSE 'in' END AS direction,
                n.entity_id AS other_id, n.canonical_name AS other_name, n.entity_type AS other_type
         FROM entity_edges e
         JOIN entities n ON n.entity_id = CASE WHEN e.from_entity_id = $1 THEN e.to_entity_id ELSE e.from_entity_id END
         WHERE (e.from_entity_id = $1 OR e.to_entity_id = $1) AND n.status = 'active'
-        ORDER BY e.strength DESC, e.weight DESC
-        LIMIT 30
+        -- Current facts by strength, then ended ones newest-ended first.
+        ORDER BY (e.valid_to IS NULL) DESC, e.strength DESC, e.valid_to DESC NULLS FIRST, e.weight DESC
+        LIMIT 50
       `, [entityId]),
       query(`
         SELECT event_type, detail, source_type, source_id, agent_id, created_at
@@ -80,7 +82,7 @@ router.get('/nodes/:entityId', requireAuth, async (req, res) => {
         aliases: ent.aliases || [],
         status: ent.status
       },
-      connections: edgesQ.rows.map(e => ({
+      connections: edgesQ.rows.filter(e => !e.valid_to).slice(0, 30).map(e => ({
         direction: e.direction,
         type: e.edge_type,
         reason: e.reason || '',
@@ -91,6 +93,17 @@ router.get('/nodes/:entityId', requireAuth, async (req, res) => {
         agentId: e.agent_id,
         activationCount: e.activation_count,
         lastActivatedAt: e.last_activated_at,
+        validFrom: e.valid_from,
+        other: { entityId: e.other_id, name: e.other_name, type: e.other_type }
+      })),
+      // Facts that held once and no longer do — the node's temporal record.
+      history: edgesQ.rows.filter(e => e.valid_to).map(e => ({
+        direction: e.direction,
+        type: e.edge_type,
+        reason: e.reason || '',
+        validFrom: e.valid_from,
+        validTo: e.valid_to,
+        endedBecause: e.invalidation_reason || '',
         other: { entityId: e.other_id, name: e.other_name, type: e.other_type }
       })),
       timeline: eventsQ.rows,
@@ -265,7 +278,7 @@ router.get('/cortex/:agentId', requireAuth, async (req, res) => {
         SELECT e.canonical_name AS node, COUNT(*) AS connections,
                SUM(ee.weight) AS total_weight
         FROM entities e
-        JOIN entity_edges ee ON ee.from_entity_id = e.entity_id
+        JOIN entity_edges ee ON ee.from_entity_id = e.entity_id AND ee.valid_to IS NULL
         WHERE e.owner_agent = $1 AND e.status = 'active' AND e.user_id = $2
         GROUP BY e.canonical_name
         ORDER BY total_weight DESC
@@ -722,7 +735,7 @@ router.get('/patterns', requireAuth, async (req, res) => {
         JOIN entities f ON f.entity_id = e.from_entity_id
         JOIN entities t ON t.entity_id = e.to_entity_id
         LEFT JOIN agents a ON a.agent_id = e.agent_id
-        WHERE e.edge_type = 'prefers' AND e.user_id = $1
+        WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND e.valid_to IS NULL
           AND f.status = 'active' AND t.status = 'active'
           AND ($2 = '' OR COALESCE(e.agent_id, 'unattributed') = $2)
         ORDER BY e.strength DESC, e.weight DESC
@@ -737,7 +750,7 @@ router.get('/patterns', requireAuth, async (req, res) => {
         FROM entity_edges e
         JOIN entities t ON t.entity_id = e.to_entity_id
         LEFT JOIN agents a ON a.agent_id = e.agent_id
-        WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND t.status = 'active'
+        WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND t.status = 'active' AND e.valid_to IS NULL
         GROUP BY 1, 2
         ORDER BY count DESC
       `, [req.user.id])

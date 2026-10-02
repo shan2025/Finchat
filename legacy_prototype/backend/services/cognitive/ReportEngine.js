@@ -71,7 +71,7 @@ async function gather(kind, { userId, days }) {
       SELECT t.canonical_name AS topic, t.entity_type AS type, e.strength, e.reason
       FROM entity_edges e
       JOIN entities t ON t.entity_id = e.to_entity_id
-      WHERE e.edge_type='prefers' AND e.user_id=$1 AND t.status='active'
+      WHERE e.edge_type='prefers' AND e.user_id=$1 AND t.status='active' AND e.valid_to IS NULL
       ORDER BY e.strength DESC LIMIT 15`, [userId || null]);
     return { preferences: q.rows };
   }

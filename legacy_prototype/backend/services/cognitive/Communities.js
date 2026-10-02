@@ -132,6 +132,7 @@ async function detectCommunities({ minSize = 3, name = true, userId = null } = {
     FROM entity_edges ee
     JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id IS NOT DISTINCT FROM $1
     JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id IS NOT DISTINCT FROM $1
+    WHERE ee.valid_to IS NULL
   `, [userId]);
   const adjacency = new Map(nodeIds.map(id => [id, new Map()]));
   const addEdge = (a, b, w) => {

@@ -38,7 +38,13 @@ Respond ONLY with JSON:
     {"from": "<entity name>", "to": "<entity name>",
      "type": "<related_to|part_of|uses|prefers|works_on|causes|instance_of|compares_to>",
      "reason": "<one short sentence: why this link exists>",
-     "strength": <0-1>}
+     "strength": <0-1>,
+     "valid_from": "<YYYY-MM-DD if the exchange says when this became true, else null>"}
+  ],
+  "superseded": [
+    {"fact": "<id from KNOWN FACTS, e.g. F2>",
+     "reason": "<one sentence: what in this exchange shows it is no longer true>",
+     "ended": "<YYYY-MM-DD if the exchange says when it stopped being true, else null>"}
   ],
   "contradictions": [
     {"statement": "<claim made in this exchange>",
@@ -68,7 +74,29 @@ PREFERENCES — read the USER's words only, never the assistant's:
 - Treat these as durable even when phrased about the current message — the user is
   telling you how they like to be taught.
 - Do NOT invent preferences. If the user only asked a factual question, return [].
-Return {"entities":[],"relations":[],"contradictions":[],"preferences":[]} if nothing significant.`;
+
+SUPERSEDED — facts change over time. The input may list KNOWN FACTS already
+remembered about this user, each with an id. Put a fact in "superseded" ONLY
+when this exchange plainly says it is no longer true: the user sold the stock,
+changed jobs, dropped a project, or now wants answers a different way
+("actually, give me more detail" ends "keep answers short"). A question, a
+doubt, or a new fact that can sit beside the old one does NOT end it. When a
+preference is replaced, also return the new one under "preferences".
+Usually "superseded" is empty.
+
+Return {"entities":[],"relations":[],"contradictions":[],"preferences":[],"superseded":[]} if nothing significant.`;
+
+/**
+ * A stated date, or null. Dates the model invents for "now" are fine; dates in
+ * the future, or before anyone here could have held a position, are not facts.
+ */
+function parseFactDate(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v)) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  if (d.getUTCFullYear() < 1990 || d.getTime() > Date.now() + 86400000) return null;
+  return d.toISOString();
+}
 
 function parseJsonLoose(text) {
   let cleaned = (text || '').trim();
@@ -85,11 +113,20 @@ const clamp = (v, lo, hi, fallback) => {
 // Extraction
 // ═══════════════════════════════════════════════════════════
 
-/** LLM pass over one exchange. Returns {entities, relations, contradictions}; empty on failure. */
-async function extractFromExchange(userText, aiText, { userId = null, agentId = null } = {}) {
-  const empty = { entities: [], relations: [], contradictions: [], preferences: [] };
-  const text = `USER: ${(userText || '').slice(0, 2500)}\n\nASSISTANT: ${(aiText || '').slice(0, 2500)}`;
-  if (text.length < 30) return empty;
+/**
+ * LLM pass over one exchange. Returns {entities, relations, contradictions,
+ * preferences, superseded}; empty on failure.
+ *
+ * @param {Array<{label: string, text: string}>} [opts.knownFacts] - current
+ *   facts the exchange may end; `superseded` only ever names these labels.
+ */
+async function extractFromExchange(userText, aiText, { userId = null, agentId = null, knownFacts = [] } = {}) {
+  const empty = { entities: [], relations: [], contradictions: [], preferences: [], superseded: [] };
+  const exchange = `USER: ${(userText || '').slice(0, 2500)}\n\nASSISTANT: ${(aiText || '').slice(0, 2500)}`;
+  if (exchange.length < 30) return empty;
+  const text = knownFacts.length
+    ? `KNOWN FACTS (still believed true):\n${knownFacts.map(f => `${f.label}: ${f.text}`).join('\n')}\n\n${exchange}`
+    : exchange;
   try {
     const res = await runInference({
       messages: [
@@ -123,7 +160,8 @@ async function extractFromExchange(userText, aiText, { userId = null, agentId = 
         to: r.to.trim(),
         type: RELATION_TYPES.includes(String(r.type || '').toLowerCase()) ? String(r.type).toLowerCase() : 'related_to',
         reason: typeof r.reason === 'string' ? r.reason.trim().slice(0, 300) : '',
-        strength: clamp(r.strength, 0, 1, 0.5)
+        strength: clamp(r.strength, 0, 1, 0.5),
+        validFrom: parseFactDate(r.valid_from)
       }));
     const contradictions = (Array.isArray(parsed.contradictions) ? parsed.contradictions : [])
       .filter(c => c && typeof c.statement === 'string' && c.statement.trim())
@@ -138,7 +176,18 @@ async function extractFromExchange(userText, aiText, { userId = null, agentId = 
         evidence: typeof p.evidence === 'string' ? p.evidence.trim().slice(0, 200) : '',
         confidence: clamp(p.confidence, 0, 1, 0.7)
       }));
-    return { entities, relations, contradictions, preferences };
+    // Only labels we handed over count — the model cannot close a fact by
+    // naming one it was never shown.
+    const shown = new Set(knownFacts.map(f => f.label));
+    const superseded = (Array.isArray(parsed.superseded) ? parsed.superseded : [])
+      .filter(s => s && typeof s.fact === 'string' && shown.has(s.fact.trim()))
+      .slice(0, 4)
+      .map(s => ({
+        fact: s.fact.trim(),
+        reason: typeof s.reason === 'string' ? s.reason.trim().slice(0, 300) : '',
+        endedAt: parseFactDate(s.ended)
+      }));
+    return { entities, relations, contradictions, preferences, superseded };
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.extractFromExchange failed: ${err.message}`);
     return empty;
@@ -207,6 +256,9 @@ async function upsertLivingEntity(e, ctx = {}) {
       UPDATE entities SET
         mention_count = mention_count + 1,
         last_seen_at = now(),
+        -- The vector embeds the summary; a new summary leaves it describing the
+        -- old one, so clear it for embedMissingEntities to redo.
+        embedding = CASE WHEN summary IS DISTINCT FROM $2 THEN NULL ELSE embedding END,
         summary = $2,
         importance = GREATEST(importance, $3),
         confidence = LEAST(1.0, (confidence * 0.7) + ($4 * 0.3) + 0.02),
@@ -244,34 +296,124 @@ async function upsertLivingEntity(e, ctx = {}) {
  * Add or strengthen a living edge. Manual find-then-update (the table's unique
  * constraint treats NULL user_id rows as distinct, so ON CONFLICT can't be
  * trusted to dedupe them).
+ *
+ * Only OPEN edges are reinforced. A fact that was closed and is now stated
+ * again starts a new interval, so its history reads "true, then not, then
+ * true again" instead of the old interval quietly reopening.
+ *
+ * @param {string|null} [validFrom] - ISO date the fact became true, when the
+ *   exchange said so; a new edge otherwise starts now.
  */
-async function upsertLivingEdge({ fromId, toId, edgeType, reason = '', strength = 0.5, source = 'chat', agentId = null, userId = null }) {
+async function upsertLivingEdge({ fromId, toId, edgeType, reason = '', strength = 0.5, source = 'chat', agentId = null, userId = null, validFrom = null }) {
   if (!fromId || !toId || fromId === toId) return;
   try {
+    // Prefer the row this user already owns, so adopting an ownerless one below
+    // can never collide with it on the (from, to, type, user_id) constraint.
     const existing = await query(`
       SELECT edge_id FROM entity_edges
       WHERE from_entity_id = $1 AND to_entity_id = $2 AND edge_type = $3
-      ORDER BY edge_id LIMIT 1
-    `, [fromId, toId, edgeType]);
+        AND valid_to IS NULL
+      ORDER BY (user_id IS NOT DISTINCT FROM $4) DESC, edge_id LIMIT 1
+    `, [fromId, toId, edgeType, userId]);
     if (existing.rows.length > 0) {
+      // Ownerless edges written before chat edges carried user_id are adopted
+      // the next time the same user reinforces them.
       await query(`
         UPDATE entity_edges SET
           weight = weight + 1,
           strength = LEAST(1.0, GREATEST(strength, $2) + 0.05),
           confidence = LEAST(1.0, confidence + 0.03),
           reason = CASE WHEN $3 <> '' THEN $3 ELSE reason END,
-          source = $4, agent_id = COALESCE($5, agent_id), updated_at = now()
+          source = $4, agent_id = COALESCE($5, agent_id), updated_at = now(),
+          user_id = COALESCE(user_id, $6)
         WHERE edge_id = $1
-      `, [existing.rows[0].edge_id, strength, reason, source, agentId]);
+      `, [existing.rows[0].edge_id, strength, reason, source, agentId, userId]);
     } else {
       await query(`
         INSERT INTO entity_edges (from_entity_id, to_entity_id, edge_type, weight, user_id,
-                                  strength, confidence, reason, source, agent_id, updated_at)
-        VALUES ($1, $2, $3, 1, $4, $5, 0.7, $6, $7, $8, now())
-      `, [fromId, toId, edgeType, userId, strength, reason, source, agentId]);
+                                  strength, confidence, reason, source, agent_id, updated_at, valid_from)
+        VALUES ($1, $2, $3, 1, $4, $5, 0.7, $6, $7, $8, now(), COALESCE($9::timestamptz, now()))
+      `, [fromId, toId, edgeType, userId, strength, reason, source, agentId, validFrom]);
     }
   } catch (err) {
     console.warn(`⚠️ MemoryEngine.upsertLivingEdge failed: ${err.message}`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Temporal facts — edges are true over an interval
+// ═══════════════════════════════════════════════════════════
+
+const KNOWN_FACTS_MAX = 12;
+
+/**
+ * The user's facts an exchange could end, labelled F1..Fn for the extractor:
+ * their standing preferences (always — "actually, more detail please" names
+ * no topic) plus the open edges touching nodes named in the text.
+ *
+ * @returns {Promise<Array<{label: string, edgeId: string, fromId: string, text: string}>>}
+ */
+async function currentFactsFor(text, userId) {
+  if (!userId || userId === 'system') return [];
+  try {
+    const { findAnchors } = require('./EntityGraph');
+    // Lexical anchors only: this runs on every exchange, and a fact the text
+    // does not name is one the exchange is unlikely to be ending.
+    const anchorIds = (await findAnchors(text, userId)).map(a => a.entity_id);
+    const r = await query(`
+      SELECT e.edge_id, e.from_entity_id, e.edge_type, e.reason, e.valid_from,
+             f.canonical_name AS from_name, t.canonical_name AS to_name,
+             (e.edge_type = 'prefers') AS is_pref
+      FROM entity_edges e
+      JOIN entities f ON f.entity_id = e.from_entity_id AND f.user_id = $1 AND f.status = 'active'
+      JOIN entities t ON t.entity_id = e.to_entity_id   AND t.user_id = $1 AND t.status = 'active'
+      WHERE e.valid_to IS NULL
+        AND e.edge_type <> 'co_mentioned'
+        AND (e.edge_type = 'prefers'
+             OR e.from_entity_id = ANY($2::text[]) OR e.to_entity_id = ANY($2::text[]))
+      ORDER BY is_pref DESC, e.strength DESC, e.updated_at DESC
+      LIMIT $3
+    `, [userId, anchorIds, KNOWN_FACTS_MAX]);
+    return r.rows.map((x, i) => ({
+      label: `F${i + 1}`,
+      edgeId: String(x.edge_id),
+      fromId: x.from_entity_id,
+      text: `${x.from_name} --${x.edge_type}--> ${x.to_name}` +
+        (x.reason ? `: ${String(x.reason).slice(0, 160)}` : '') +
+        (x.valid_from ? ` (since ${new Date(x.valid_from).toISOString().slice(0, 10)})` : '')
+    }));
+  } catch (err) {
+    console.warn(`⚠️ MemoryEngine.currentFactsFor failed: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Close a fact: it stays in the graph as history, and recall stops walking it.
+ * Never moves valid_to before valid_from, nor into the future.
+ *
+ * @returns {Promise<boolean>} whether an open edge was closed
+ */
+async function invalidateEdge(edgeId, { reason = '', endedAt = null, userId = null, ctx = {} } = {}) {
+  try {
+    const r = await query(`
+      UPDATE entity_edges SET
+        valid_to = GREATEST(valid_from, LEAST(now(), COALESCE($3::timestamptz, now()))),
+        invalidated_at = now(),
+        invalidation_reason = $2,
+        updated_at = now()
+      WHERE edge_id = $1 AND valid_to IS NULL
+      RETURNING from_entity_id, to_entity_id, edge_type
+    `, [edgeId, reason || '', endedAt]);
+    if (!r.rows.length) return false;
+    const e = r.rows[0];
+    await recordEvent(e.from_entity_id, 'superseded',
+      `No longer true (${e.edge_type}): ${reason || 'superseded by a later exchange.'}`, { ...ctx, userId });
+    eventBus.emit('graph:fact_superseded', { userId, edgeId: String(edgeId), edgeType: e.edge_type, reason });
+    return true;
+  } catch (err) {
+    console.warn(`⚠️ MemoryEngine.invalidateEdge failed: ${err.message}`);
+    return false;
   }
 }
 
@@ -369,6 +511,7 @@ async function getUserPreferences(userId, limit = 8) {
       FROM entity_edges e
       JOIN entities t ON t.entity_id = e.to_entity_id
       WHERE e.edge_type = 'prefers' AND e.user_id = $1 AND t.status = 'active'
+        AND e.valid_to IS NULL
       ORDER BY e.strength DESC, e.weight DESC, e.updated_at DESC
       LIMIT $2
     `, [userId, limit]);
@@ -393,15 +536,29 @@ async function getUserPreferences(userId, limit = 8) {
  */
 async function ingestChat({ userId, sessionId, agentId, userText, aiText, sourceLabel = '',
                            sourceType = 'chat', learnPreferences = true }) {
-  const report = { learned: [], linked: [], contradictions: [], preferences: [] };
-  const extracted = await extractFromExchange(userText, aiText, { userId, agentId });
+  const report = { learned: [], linked: [], contradictions: [], preferences: [], superseded: [] };
   // Document ingestion reuses this path with the file's text in the user slot;
-  // a sentence inside a PDF is not the user telling us how they want answers.
-  if (!learnPreferences) extracted.preferences = [];
+  // a sentence inside a PDF is not the user telling us how they want answers,
+  // nor that something they told us has stopped being true.
+  const knownFacts = learnPreferences ? await currentFactsFor(`${userText || ''}\n${aiText || ''}`, userId) : [];
+  const extracted = await extractFromExchange(userText, aiText, { userId, agentId, knownFacts });
+  if (!learnPreferences) { extracted.preferences = []; extracted.superseded = []; }
   if (extracted.entities.length === 0 && extracted.contradictions.length === 0
-      && extracted.preferences.length === 0) return report;
+      && extracted.preferences.length === 0 && extracted.superseded.length === 0) return report;
 
   const ctx = { sourceType, sourceId: sessionId || null, agentId: agentId || null, userId: userId || null };
+
+  // Close superseded facts FIRST, so a replacement stated in the same exchange
+  // (same nodes, same relation) opens a new interval rather than reinforcing
+  // the one being ended.
+  const factByLabel = new Map(knownFacts.map(f => [f.label, f]));
+  for (const s of extracted.superseded) {
+    const fact = factByLabel.get(s.fact);
+    if (!fact) continue;
+    if (await invalidateEdge(fact.edgeId, { reason: s.reason, endedAt: s.endedAt, userId, ctx })) {
+      report.superseded.push({ fact: fact.text, reason: s.reason });
+    }
+  }
 
   // entities → nodes (dedup happens inside upsertLivingEntity)
   const idByName = new Map();
@@ -419,13 +576,18 @@ async function ingestChat({ userId, sessionId, agentId, userText, aiText, source
     let fromId = idByName.get(r.from.toLowerCase());
     let toId = idByName.get(r.to.toLowerCase());
     // A relation may reference an entity already in the graph but not in this exchange's list.
-    if (!fromId) fromId = (await findExisting(r.from))?.entity_id;
-    if (!toId) toId = (await findExisting(r.to))?.entity_id;
+    // Scoped: unscoped, this only ever searched the ownerless graph, so a link to
+    // a node the user already had was silently dropped.
+    if (!fromId) fromId = (await findExisting(r.from, userId || null))?.entity_id;
+    if (!toId) toId = (await findExisting(r.to, userId || null))?.entity_id;
     if (!fromId || !toId) continue;
+    // Both ends are this user's nodes, so the edge is theirs too. Leaving it
+    // ownerless kept it out of per-user consolidation and every edge count.
     await upsertLivingEdge({
       fromId, toId, edgeType: r.type, reason: r.reason, strength: r.strength,
       source: 'chat', agentId: agentId || null,
-      userId: r.type === 'prefers' ? (userId || null) : null
+      userId: userId || null,
+      validFrom: r.validFrom
     });
     report.linked.push({ from: r.from, to: r.to, type: r.type });
   }
@@ -459,11 +621,18 @@ async function ingestChat({ userId, sessionId, agentId, userText, aiText, source
     }
   }
 
+  // New nodes get their vectors in the background — one batched request, and
+  // the chat that taught them is not kept waiting on it.
+  if (userId && (report.learned.some(l => l.isNew) || report.preferences.length > 0)) {
+    require('./EntityGraph').embedMissingEntities(userId).catch(() => { });
+  }
+
   eventBus.emit('memory:ingested', {
     userId, sessionId,
     learned: report.learned.length,
     linked: report.linked.length,
-    preferences: report.preferences.length
+    preferences: report.preferences.length,
+    superseded: report.superseded.length
   });
   return report;
 }
@@ -581,6 +750,7 @@ async function detectGaps({ userId = null } = {}) {
     JOIN entities f ON f.entity_id = e.from_entity_id
     JOIN entities t ON t.entity_id = e.to_entity_id
     WHERE e.from_entity_id IN (${ph}) AND e.to_entity_id IN (${ph})
+      AND e.valid_to IS NULL
     ORDER BY e.strength DESC LIMIT 80
   `, ids);
 
@@ -612,11 +782,13 @@ async function detectGaps({ userId = null } = {}) {
   const saved = [];
   for (const g of gaps) {
     try {
-      // Don't re-open a gap that's already open or was dismissed.
+      // Don't re-open a gap that's already open or was dismissed — by THIS user;
+      // one person dismissing "Solidity" must not hide it from everyone else.
       const dupe = await query(`
         SELECT 1 FROM graph_insights
-        WHERE kind = 'gap' AND LOWER(title) = LOWER($1) AND status IN ('open', 'dismissed') LIMIT 1
-      `, [`Missing concept: ${g.concept}`]);
+        WHERE kind = 'gap' AND LOWER(title) = LOWER($1) AND status IN ('open', 'dismissed')
+          AND user_id IS NOT DISTINCT FROM $2 LIMIT 1
+      `, [`Missing concept: ${g.concept}`, userId]);
       if (dupe.rows.length > 0) continue;
       const id = `ins_${randomUUID().slice(0, 12)}`;
       await query(`
@@ -695,6 +867,9 @@ async function foldEdges(client, dir, survivor, loser) {
         AND s.${dir} = $1 AND s.${other} = l.${other}
         AND s.edge_type = l.edge_type
         AND s.user_id IS NOT DISTINCT FROM l.user_id
+        -- Uniqueness covers open edges only, so only two open edges collide.
+        -- A closed edge is history of its own interval and moves over as is.
+        AND s.valid_to IS NULL AND l.valid_to IS NULL
       RETURNING l.edge_id
     )
     DELETE FROM entity_edges WHERE edge_id IN (SELECT edge_id FROM folded)
@@ -756,6 +931,7 @@ async function consolidateGraph(userId = null) {
   const decayed = await query(`
     UPDATE entity_edges SET strength = GREATEST(0.05, strength * 0.9)
     WHERE COALESCE(last_activated_at, updated_at) < now() - interval '14 days' AND strength > 0.05
+      AND valid_to IS NULL
       AND ($1::text IS NULL OR user_id = $1)
     RETURNING edge_id
   `, [userId]);
@@ -764,6 +940,7 @@ async function consolidateGraph(userId = null) {
   const strengthened = await query(`
     UPDATE entity_edges SET strength = LEAST(1.0, strength + 0.05)
     WHERE last_activated_at > now() - interval '1 day'
+      AND valid_to IS NULL
       AND ($1::text IS NULL OR user_id = $1)
     RETURNING edge_id
   `, [userId]);
@@ -803,6 +980,17 @@ async function dream({ userId = null, consolidation = null, nameCommunities = tr
 
   const gaps = await detectGaps({ userId });
 
+  // Catch the graph's vectors up: nodes from before vectors were kept, and
+  // ones whose summary changed since. Batched, so a sweep is a few requests.
+  let embedded = 0;
+  if (userId) {
+    try {
+      embedded = await require('./EntityGraph').embedMissingEntities(userId, 100);
+    } catch (err) {
+      console.warn(`⚠️ MemoryEngine.dream embedding sweep failed: ${err.message}`);
+    }
+  }
+
   // Re-cluster the consolidated graph into named neighborhoods (Stage 4b).
   let communities = [];
   try {
@@ -826,6 +1014,7 @@ async function dream({ userId = null, consolidation = null, nameCommunities = tr
     edgesStrengthened,
     gapsFound: gaps.length,
     gaps: gaps.map(g => g.concept),
+    nodesEmbedded: embedded,
     communities: communities.length,
     communityLabels: communities.map(c => c.label)
   };
@@ -912,6 +1101,9 @@ module.exports = {
   findExisting,
   upsertLivingEntity,
   upsertLivingEdge,
+  currentFactsFor,
+  invalidateEdge,
+  parseFactDate,
   userNode,
   recordPreference,
   getUserPreferences

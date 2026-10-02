@@ -100,7 +100,17 @@ test.describe('memories writes', () => {
       content: 'c', metadata: { agentId: 'nova' }, importance: 7,
     });
     assert.deepEqual(q.calls[0].params,
-      ['mem_1', 'u1', 'semantic', 'c', '{"agentId":"nova"}', 7]);
+      ['mem_1', 'u1', 'semantic', 'c', '{"agentId":"nova"}', 7, null]);
+  });
+
+  test('insertMemory stores an embedding as a pgvector literal', async () => {
+    const q = fakeQuery();
+    const repo = createMemoryRepository({ query: q });
+    await repo.insertMemory({
+      memoryId: 'm', userId: 'u', memoryType: 'procedural', content: 'c', importance: 7, embedding: [0.5, -0.25],
+    });
+    assert.equal(q.calls[0].params[6], '[0.5,-0.25]');
+    assert.match(q.calls[0].normalised, /\$7::vector/);
   });
 
   test('insertMemory tolerates missing metadata', async () => {

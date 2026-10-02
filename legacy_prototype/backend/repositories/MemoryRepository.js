@@ -38,11 +38,13 @@ function createMemoryRepository({ query } = {}) {
         [userId]);
     },
 
-    async insertMemory({ memoryId, userId, memoryType, content, metadata, importance }) {
+    /** @param {number[]|null} [embedding] - stored for hybrid recall when given. */
+    async insertMemory({ memoryId, userId, memoryType, content, metadata, importance, embedding = null }) {
       await run(
-        `INSERT INTO memories (memory_id, user_id, memory_type, content, metadata, importance)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [memoryId, userId, memoryType, content, JSON.stringify(metadata || {}), importance]);
+        `INSERT INTO memories (memory_id, user_id, memory_type, content, metadata, importance, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::vector)`,
+        [memoryId, userId, memoryType, content, JSON.stringify(metadata || {}), importance,
+          embedding ? `[${embedding.join(',')}]` : null]);
     },
 
     /**
@@ -126,6 +128,30 @@ function createMemoryRepository({ query } = {}) {
                    (m.metadata->>'agentId' = $3) DESC NULLS LAST, m.created_at DESC
           LIMIT $4`,
         [terms, userId, agentId || 'global', limit]);
+      return res.rows;
+    },
+
+    /**
+     * The vector half of hybrid procedural recall: same scope and exclusions as
+     * findRelevantProcedural, ranked by cosine distance and cut at maxDistance
+     * so a note is only returned when it is actually about the goal.
+     *
+     * @param {{ vector: number[], userId?: string|null, agentId?: string|null, maxDistance: number, limit?: number }} opts
+     */
+    async findSimilarProcedural({ vector, userId = null, agentId = null, maxDistance, limit = 3 } = {}) {
+      if (!Array.isArray(vector) || vector.length === 0) return [];
+      const res = await run(
+        `SELECT m.*, (m.embedding <=> $1::vector) AS distance
+           FROM memories m
+          WHERE m.memory_type = 'procedural'
+            AND m.embedding IS NOT NULL
+            AND m.content NOT LIKE '%Reflection parsing failed%'
+            AND (m.user_id = $2
+              OR (m.user_id = m.metadata->>'agentId' AND m.metadata->>'agentId' IN ($3, 'global')))
+            AND (m.embedding <=> $1::vector) < $4
+          ORDER BY m.embedding <=> $1::vector
+          LIMIT $5`,
+        [`[${vector.join(',')}]`, userId, agentId || 'global', maxDistance, limit]);
       return res.rows;
     },
 

@@ -123,13 +123,17 @@ async function upsertEntity({ name, type, userId = null, ownerAgent = null }) {
 
 /**
  * Add or strengthen a typed edge between two entities.
+ *
+ * Uniqueness covers open edges only (entity_edges_open_unique), so the conflict
+ * target repeats the index predicate: a co-mention that was closed in the past
+ * starts a new interval instead of reviving the old row.
  */
 async function upsertEdge({ fromId, toId, edgeType, userId = null, executionId = null }) {
   if (!fromId || !toId || fromId === toId) return;
   await query(`
     INSERT INTO entity_edges (from_entity_id, to_entity_id, edge_type, weight, user_id, context_execution_id, updated_at)
     VALUES ($1, $2, $3, 1, $4, $5, now())
-    ON CONFLICT (from_entity_id, to_entity_id, edge_type, user_id) DO UPDATE
+    ON CONFLICT (from_entity_id, to_entity_id, edge_type, user_id) WHERE valid_to IS NULL DO UPDATE
       SET weight = entity_edges.weight + 1,
           context_execution_id = EXCLUDED.context_execution_id,
           updated_at = now()
@@ -184,7 +188,113 @@ async function ingestExecution(execution) {
     }
   }
 
+  // Vectors for any node this run created, in the background.
+  if (userId && ids.length > 0) embedMissingEntities(userId).catch(() => { });
+
   return ids;
+}
+
+/** Lowercased words joined by single spaces — the form anchors are matched in. */
+function wordsOf(text) {
+  return String(text || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ');
+}
+
+const MAX_ANCHORS = 6;
+
+/**
+ * The user's nodes a text is about: named outright (lexical) or close in
+ * meaning (vector), fused by rank. A node in both lists ranks first; each list
+ * is gated on its own so neither half can add an unrelated node.
+ *
+ * @returns {Promise<Array<{entity_id, canonical_name, entity_type, matchedBy: string[]}>>}
+ */
+async function findAnchors(text, userId, queryVector = null) {
+  const { fuseRanked, toVectorLiteral, VECTOR_MAX_DISTANCE } = require('./HybridSearch');
+
+  // Whole-word match on both sides normalised to space-separated words. A plain
+  // substring test anchored "ETH" in "method", "SOL" in "solution" and "OP" in
+  // "operation", so the walk started from nodes the user never mentioned. The
+  // normalised name holds only letters, digits and spaces, so it carries no
+  // LIKE wildcards of its own.
+  const words = ` ${wordsOf(text)} `;
+  const lexical = query(`
+    SELECT entity_id, canonical_name, entity_type
+    FROM (
+      SELECT entity_id, canonical_name, entity_type, mention_count,
+             btrim(regexp_replace(lower(canonical_name), '[^[:alnum:]]+', ' ', 'g')) AS norm
+      FROM entities
+      WHERE status = 'active'
+        AND user_id IS NOT DISTINCT FROM $2
+    ) e
+    WHERE length(norm) >= 2
+      AND $1 LIKE '% ' || norm || ' %'
+    ORDER BY mention_count DESC
+    LIMIT ${MAX_ANCHORS}
+  `, [words, userId]);
+
+  // Preferences are replayed into every prompt on their own, and the user's own
+  // node is close to everything they say; neither is a topic to walk from.
+  const semantic = queryVector ? query(`
+    SELECT entity_id, canonical_name, entity_type
+    FROM entities
+    WHERE status = 'active'
+      AND user_id IS NOT DISTINCT FROM $2
+      AND embedding IS NOT NULL
+      AND entity_type <> 'preference'
+      AND entity_id NOT LIKE 'ent_user_%'
+      AND (embedding <=> $1::vector) < $3
+    ORDER BY embedding <=> $1::vector
+    LIMIT ${MAX_ANCHORS}
+  `, [toVectorLiteral(queryVector), userId, VECTOR_MAX_DISTANCE]) : { rows: [] };
+
+  // The vector half is an addition: if it fails (column not migrated, bad
+  // vector) the anchors named outright still stand.
+  const [lex, sem] = await Promise.all([
+    lexical,
+    Promise.resolve(semantic).catch((err) => {
+      console.warn(`⚠️ EntityGraph: semantic anchors skipped: ${err.message}`);
+      return { rows: [] };
+    })
+  ]);
+  return fuseRanked(
+    [{ name: 'lexical', items: lex.rows }, { name: 'vector', items: sem.rows }],
+    { key: (r) => r.entity_id, limit: MAX_ANCHORS }
+  );
+}
+
+/**
+ * Give this user's newest-unembedded nodes a vector, in one batched request.
+ * Called after ingestion (fire-and-forget) and from the dream cycle, so the
+ * graph catches up on its own — including rows written before vectors were
+ * kept, and nodes whose summary changed (that clears the vector).
+ *
+ * @returns {Promise<number>} nodes embedded
+ */
+async function embedMissingEntities(userId, limit = 24) {
+  if (!userId) return 0;
+  const res = await query(`
+    SELECT entity_id, canonical_name, entity_type, summary
+    FROM entities
+    WHERE status = 'active' AND user_id = $1 AND embedding IS NULL
+    ORDER BY importance DESC, mention_count DESC
+    LIMIT $2
+  `, [userId, limit]);
+  if (res.rows.length === 0) return 0;
+
+  const { generateEmbeddings } = require('./MemoryService');
+  const { toVectorLiteral } = require('./HybridSearch');
+  const vectors = await generateEmbeddings(
+    res.rows.map(r => `${r.canonical_name} (${r.entity_type})${r.summary ? `: ${r.summary}` : ''}`),
+    { purpose: 'document' });
+
+  let written = 0;
+  for (let i = 0; i < res.rows.length; i++) {
+    if (!vectors[i]) continue;
+    await query(`UPDATE entities SET embedding = $2::vector WHERE entity_id = $1`,
+      [res.rows[i].entity_id, toVectorLiteral(vectors[i])]);
+    written++;
+  }
+  return written;
 }
 
 /**
@@ -198,30 +308,40 @@ async function ingestExecution(execution) {
  * @param {string|null} userId    - Owner scope. Only this user's graph is walked;
  *                                  without it an agent could recall another user's
  *                                  topics as if they were this user's memory.
- * Returns [{entity_id, name, type, viaEdge, weight}], anchors first.
+ * @param {object} [opts]
+ * @param {number[]|null} [opts.queryVector] - the text embedded for retrieval.
+ *   Adds anchors close in meaning ("crypto" → Bitcoin) to the ones named
+ *   outright; null keeps anchoring lexical.
+ * @param {Date|string|null} [opts.asOf] - walk the facts that were true at this
+ *   moment instead of the ones true now.
+ * Returns [{entity_id, name, type, viaEdge, weight}], anchors first. viaEdge is
+ * 'anchor' for a node named in the text, 'similar' for one found by meaning.
  */
-async function findRelatedForText(text, limit = 8, agentName = null, userId = null) {
+async function findRelatedForText(text, limit = 8, agentName = null, userId = null, { queryVector = null, asOf = null } = {}) {
   if (!text) return [];
 
-  const anchors = await query(`
-    SELECT entity_id, canonical_name, entity_type
-    FROM entities
-    WHERE $1 ILIKE '%' || canonical_name || '%'
-      AND status = 'active'
-      AND user_id IS NOT DISTINCT FROM $2
-    ORDER BY mention_count DESC
-    LIMIT 6
-  `, [text, userId]);
-  if (anchors.rows.length === 0) return [];
+  const anchorRows = await findAnchors(text, userId, queryVector);
+  if (anchorRows.length === 0) return [];
 
-  const anchorIds = anchors.rows.map(r => r.entity_id);
+  const anchorIds = anchorRows.map(r => r.entity_id);
   const N = anchorIds.length;
-  // Params: $1..$N = anchorIds, $N+1 = agentName, $N+2 = limit, $N+3 = userId
+  // Params: $1..$N = anchorIds, $N+1 = agentName, $N+2 = limit, $N+3 = userId, $N+4 = asOf
   const inList  = anchorIds.map((_, i) => `$${i + 1}`).join(',');
   const agentP  = `$${N + 1}`;
   const limitP  = `$${N + 2}`;
   const userP   = `$${N + 3}`;
   const params  = [...anchorIds, agentName, Math.max(1, Math.min(20, limit)), userId];
+  // Only facts that hold at the moment asked about: still open now, or open
+  // across `asOf`. A closed edge is history — walking it would recall "prefers
+  // short answers" after the user said they want detail.
+  let validAt;
+  if (asOf) {
+    params.push(new Date(asOf).toISOString());
+    const asOfP = `$${N + 4}::timestamptz`;
+    validAt = (a) => `${a}.valid_from <= ${asOfP} AND (${a}.valid_to IS NULL OR ${a}.valid_to > ${asOfP})`;
+  } else {
+    validAt = (a) => `${a}.valid_to IS NULL`;
+  }
 
   // 2-hop CTE:
   //   hop1 score = strength × confidence × weight  (falls back gracefully when
@@ -238,6 +358,7 @@ async function findRelatedForText(text, limit = 8, agentName = null, userId = nu
       JOIN entities e ON e.entity_id = ee.to_entity_id
       WHERE ee.from_entity_id IN (${inList})
         AND ee.to_entity_id   NOT IN (${inList})
+        AND ${validAt('ee')}
         AND e.status = 'active'
         AND e.user_id IS NOT DISTINCT FROM ${userP}
     ),
@@ -249,18 +370,22 @@ async function findRelatedForText(text, limit = 8, agentName = null, userId = nu
       JOIN entity_edges ee2 ON ee2.from_entity_id = h1.entity_id
       JOIN entities e ON e.entity_id = ee2.to_entity_id
       WHERE ee2.to_entity_id NOT IN (${inList})
+        AND ${validAt('ee2')}
         AND e.status = 'active'
         AND e.user_id IS NOT DISTINCT FROM ${userP}
     ),
+    -- One row per node: grouping by via as well listed a node reached over two
+    -- edge types twice, each with half its score. The strongest path names it.
     ranked AS (
-      SELECT entity_id, canonical_name, entity_type, via,
+      SELECT entity_id, canonical_name, entity_type,
+             (array_agg(via ORDER BY score * boost DESC))[1] AS via,
              SUM(score * boost) AS total_score
       FROM (
         SELECT entity_id, canonical_name, entity_type, via, score, boost FROM hop1
         UNION ALL
         SELECT entity_id, canonical_name, entity_type, via, score, boost FROM hop2
       ) t
-      GROUP BY entity_id, canonical_name, entity_type, via
+      GROUP BY entity_id, canonical_name, entity_type
     )
     SELECT entity_id, canonical_name, entity_type, via, total_score
     FROM ranked
@@ -271,11 +396,11 @@ async function findRelatedForText(text, limit = 8, agentName = null, userId = nu
   // Anchors first (concepts named in the text), then scored neighbors.
   // entity_id rides along so retrieval can *activate* these nodes.
   return [
-    ...anchors.rows.map(r => ({
+    ...anchorRows.map(r => ({
       entity_id: r.entity_id,
       name: r.canonical_name,
       type: r.entity_type,
-      viaEdge: 'anchor',
+      viaEdge: r.matchedBy.includes('lexical') ? 'anchor' : 'similar',
       weight: 99
     })),
     ...related.rows.map(r => ({
@@ -293,5 +418,8 @@ module.exports = {
   upsertEntity,
   upsertEdge,
   ingestExecution,
-  findRelatedForText
+  findRelatedForText,
+  findAnchors,
+  embedMissingEntities,
+  wordsOf
 };

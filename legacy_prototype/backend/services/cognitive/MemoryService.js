@@ -57,9 +57,14 @@ async function store({ userId, memoryType, content, metadata = {}, importance = 
     // ignore
   }
 
+  // Procedural notes are recalled by meaning as well as by shared words, so
+  // they carry a vector. A failed embed stores the note without one: it stays
+  // reachable by the lexical half of the search.
+  const embedding = memoryType === 'procedural' ? await generateEmbedding(content) : null;
+
   const memoryId = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   await memoryRepository.insertMemory({
-    memoryId, userId: uid, memoryType, content, metadata, importance,
+    memoryId, userId: uid, memoryType, content, metadata, importance, embedding,
   });
 
   return { memoryId, memoryType, content, importance };
@@ -87,12 +92,32 @@ function goalTerms(goal, max = 32) {
 }
 
 /**
- * Procedural learnings relevant to this goal, for this user and agent. Empty
- * when nothing shares enough words with the goal: no note beats an unrelated
- * one that the model then tries to apply.
+ * Procedural learnings relevant to this goal, for this user and agent.
+ *
+ * Hybrid: notes sharing enough words with the goal, fused with notes whose
+ * vector sits within the calibrated distance of it. Either half alone may
+ * qualify a note; one both halves agree on ranks first. Empty when neither
+ * finds anything: no note beats an unrelated one that the model then tries to
+ * apply.
+ *
+ * @param {object} opts
+ * @param {number[]|null} [opts.queryVector] - the goal embedded for retrieval;
+ *   omitted or null means lexical only (no provider, or the caller had none)
  */
-async function retrieveRelevantProcedural({ goal, userId, agentId, limit = 3 } = {}) {
-  return memoryRepository.findRelevantProcedural({ terms: goalTerms(goal), userId, agentId, limit });
+async function retrieveRelevantProcedural({ goal, userId, agentId, limit = 3, queryVector = null } = {}) {
+  const { fuseRanked, VECTOR_MAX_DISTANCE } = require('./HybridSearch');
+  // Twice the limit from each side, so fusion has something to choose between.
+  const pool = limit * 2;
+  const [lexical, semantic] = await Promise.all([
+    memoryRepository.findRelevantProcedural({ terms: goalTerms(goal), userId, agentId, limit: pool }),
+    queryVector
+      ? memoryRepository.findSimilarProcedural({ vector: queryVector, userId, agentId, maxDistance: VECTOR_MAX_DISTANCE, limit: pool })
+      : []
+  ]);
+  return fuseRanked(
+    [{ name: 'lexical', items: lexical }, { name: 'vector', items: semantic }],
+    { key: (m) => m.memory_id || m.content, limit }
+  );
 }
 
 // ─── 4. Semantic Memory (Embedding-Based Retrieval) ───
@@ -173,6 +198,54 @@ async function generateEmbedding(text, { purpose = 'document' } = {}) {
   return null;
 }
 
+/**
+ * Embed several texts in one request. Same contract as generateEmbedding, per
+ * item: a unit-length vector, or null where the text was empty or the provider
+ * failed. The array is always as long as `texts`.
+ *
+ * Gemini takes up to 100 texts per batchEmbedContents call, which is what keeps
+ * embedding every new graph node from costing one HTTP round-trip per node.
+ *
+ * @param {string[]} texts
+ * @param {{ purpose?: 'document'|'query'|'similar' }} [opts]
+ */
+async function generateEmbeddings(texts, { purpose = 'document' } = {}) {
+  const inputs = (texts || []).map((t) => String(t || '').slice(0, 8000));
+  const out = inputs.map(() => null);
+  const live = inputs.map((t, i) => [t, i]).filter(([t]) => t.trim());
+  if (live.length === 0) return out;
+
+  const { provider, model, dimension } = embeddingsConfig;
+  if (provider !== 'gemini') {
+    for (const [t, i] of live) out[i] = await generateEmbedding(t, { purpose });
+    return out;
+  }
+
+  const { resolveCredentials } = require('../QuotaManager');
+  const cred = resolveCredentials('gemini')[0];
+  if (!cred) { warnOnce('gemini', 'no GEMINI_API_KEY configured'); return out; }
+  const taskType = GEMINI_TASK[purpose] || GEMINI_TASK.document;
+  for (let start = 0; start < live.length; start += 100) {
+    const chunk = live.slice(start, start + 100);
+    try {
+      const res = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`,
+        { requests: chunk.map(([t]) => ({ model: `models/${model}`, content: { parts: [{ text: t }] }, taskType, outputDimensionality: dimension })) },
+        { headers: { 'x-goog-api-key': cred.key }, timeout: 30000 }
+      );
+      const embeddings = (res.data && res.data.embeddings) || [];
+      chunk.forEach(([, i], k) => {
+        const values = embeddings[k] && embeddings[k].values;
+        out[i] = Array.isArray(values) && values.length === dimension ? l2normalize(values) : null;
+      });
+    } catch (err) {
+      const status = err.response ? err.response.status : err.code;
+      warnOnce('gemini', `${status} ${err.message}`);
+    }
+  }
+  return out;
+}
+
 async function storeWithEmbedding({ title, content, source = 'cognitive_core' }) {
   const knowledgeId = `know_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   await memoryRepository.insertKnowledge({ knowledgeId, title, content, source });
@@ -230,50 +303,61 @@ async function retrieveEnrichedContext({ userId, conversationId, goal, agentName
     }
   }
 
-  // 2. Procedural learnings that match this goal. This replaces two lookups
-  // that ignored the goal (the agent's newest 2, from any user, and this
-  // user's newest 3), which put the same notes into every turn.
-  if (goal) {
-    const procs = await retrieveRelevantProcedural({ goal, userId, agentId: agentName, limit: 3 });
-    memories.push(...procs.map(p => ({
-      type: 'procedural',
-      content: p.content,
-      importance: p.importance
-    })));
-  }
+  if (!goal) return { memories, graphContext: [], recipeHints: [] };
 
-  // 3. Sprint 5C: Graph-RAG one-hop neighbors of entities in the goal (best-effort)
-  let graphContext = [];
-  let recipeHints = [];
-  try {
-    if (goal) {
+  // The goal embedded once, for both hybrid lookups below. null (no provider)
+  // leaves each of them on its lexical half.
+  const queryVector = await generateEmbedding(goal, { purpose: 'query' });
+
+  // The three stores are independent; each one failing costs only its block.
+  const [procs, graphContext, recipeHints] = await Promise.all([
+    // 2. Procedural learnings that match this goal, by shared words or by
+    // meaning. This replaced two lookups that ignored the goal (the agent's
+    // newest 2, from any user, and this user's newest 3), which put the same
+    // notes into every turn.
+    retrieveRelevantProcedural({ goal, userId, agentId: agentName, limit: 3, queryVector })
+      .catch((e) => { console.warn(`⚠️ MemoryService: procedural recall failed: ${e.message}`); return []; }),
+
+    // 3. Graph-RAG: anchors named in (or close in meaning to) the goal, then a
+    // walk over the facts that are still true.
+    (async () => {
       const { findRelatedForText } = require('./EntityGraph');
       // userId scopes the walk to this user's own graph — without it, retrieval
       // could surface another account's topics as this user's memory.
-      graphContext = await findRelatedForText(goal, 6, agentName || null, userId || null);
-      // Cognitive Memory Engine: the nodes used to answer "light up" —
-      // fire-and-forget so retrieval latency is untouched.
-      const activatedIds = graphContext.map(g => g.entity_id).filter(Boolean);
-      if (activatedIds.length > 0) {
-        const { recordActivation } = require('./MemoryEngine');
-        recordActivation({
-          entityIds: activatedIds,
-          userId,
-          agentId: agentName || null,
-          source: 'retrieval',
-          sourceId: conversationId || null,
-          detail: goal ? `Recalled while answering: "${String(goal).slice(0, 120)}"` : ''
-        }).catch(() => { });
-      }
-    }
-  } catch (e) { /* best-effort */ }
-  try {
-    if (goal) {
+      return findRelatedForText(goal, 6, agentName || null, userId || null, { queryVector });
+    })().catch(() => []),
+
+    // 4. Skill recipes for a goal of the same shape.
+    (async () => {
       const { findRelevant, markReused } = require('./SkillRecipes');
-      recipeHints = await findRelevant({ goal, agentId: agentName, limit: 2 });
-      for (const r of recipeHints) { markReused(r.recipe_id).catch(() => { }); }
-    }
-  } catch (e) { /* best-effort */ }
+      const hits = await findRelevant({ goal, agentId: agentName, userId: userId || null, limit: 2 });
+      for (const r of hits) { markReused(r.recipe_id).catch(() => { }); }
+      return hits;
+    })().catch(() => [])
+  ]);
+
+  memories.push(...procs.map(p => ({
+    type: 'procedural',
+    content: p.content,
+    importance: p.importance
+  })));
+
+  // Cognitive Memory Engine: the nodes used to answer "light up" —
+  // fire-and-forget so retrieval latency is untouched.
+  const activatedIds = graphContext.map(g => g.entity_id).filter(Boolean);
+  if (activatedIds.length > 0) {
+    try {
+      const { recordActivation } = require('./MemoryEngine');
+      recordActivation({
+        entityIds: activatedIds,
+        userId,
+        agentId: agentName || null,
+        source: 'retrieval',
+        sourceId: conversationId || null,
+        detail: `Recalled while answering: "${String(goal).slice(0, 120)}"`
+      }).catch(() => { });
+    } catch (e) { /* best-effort */ }
+  }
 
   return { memories, graphContext, recipeHints };
 }
@@ -293,6 +377,7 @@ module.exports = {
   goalTerms,
   // Semantic memory
   generateEmbedding,
+  generateEmbeddings,
   storeWithEmbedding,
   retrieveBySimilarity,
   // Context integration

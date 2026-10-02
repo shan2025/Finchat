@@ -1008,7 +1008,9 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
   }
 
   await updateState(executionId, STATES.RUNNING);
-  await appendToScratchpad(executionId, `Resumed from wait state (${execution.wait_reason || 'human_approval'}): ${resumptionMessage}. Modified params: ${JSON.stringify(modifiedParameters)}`);
+  // Keyed by the conversation, because that is the key run() reads working
+  // memory back under. Keyed by executionId the note was written and never seen.
+  await appendToScratchpad(execution.conversation_id || executionId, `Resumed from wait state (${execution.wait_reason || 'human_approval'}): ${resumptionMessage}. Modified params: ${JSON.stringify(modifiedParameters)}`);
 
   eventBus.emit('execution:resumed', {
     executionId,
@@ -1022,7 +1024,8 @@ async function resumeExecution(executionId, { userId = 'system', modifiedParamet
   const result = await run({
     goal: `${execution.goal} (Resumed: ${resumptionMessage})`,
     userId: execution.user_id || userId,
-    conversationId: execution.session_id,
+    // executions has no session_id column; this was always undefined.
+    conversationId: execution.conversation_id || executionId,
     agentName: execution.assigned_agent || 'plato',
     approvedTools,
     budget: remainingBudget

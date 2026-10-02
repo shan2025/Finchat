@@ -272,11 +272,13 @@ router.get('/', requireAuth, async (req, res) => {
          FROM entity_edges ee
          JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1 AND ef.owner_agent = $2
          JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1 AND et.owner_agent = $2
+         WHERE ee.valid_to IS NULL
          ORDER BY ee.strength DESC, ee.weight DESC LIMIT 2000`
       : `SELECT ee.from_entity_id, ee.to_entity_id, ee.edge_type, ee.weight, ee.strength, ee.reason, ee.source
          FROM entity_edges ee
          JOIN entities ef ON ef.entity_id = ee.from_entity_id AND ef.user_id = $1
          JOIN entities et ON et.entity_id = ee.to_entity_id   AND et.user_id = $1
+         WHERE ee.valid_to IS NULL
          ORDER BY ee.strength DESC, ee.weight DESC LIMIT 400`;
     const edgesParams = agentScope ? [userId, agentScope] : [userId];
 
