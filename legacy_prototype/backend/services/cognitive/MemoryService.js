@@ -3,7 +3,7 @@
 // SQL for memories/knowledge/knowledge_embeddings lives in
 // repositories/MemoryRepository.js; the episodic read lives in
 // ExecutionRepository (it reads the `executions` table). This module keeps the
-// memory policy: id minting, the embedding fallback chain, and how the four
+// memory policy: id minting, which provider embeds, and how the four
 // stores are assembled for ContextBuilder.
 const { memoryRepository } = require('../../repositories/MemoryRepository');
 const { executionRepository } = require('../../repositories/ExecutionRepository');
@@ -78,62 +78,80 @@ async function retrieveProceduralWorkflows({ agentId, limit = 5 } = {}) {
 
 // ─── 4. Semantic Memory (Embedding-Based Retrieval) ───
 
-async function generateEmbedding(text) {
-  const { provider, model, dimension } = embeddingsConfig;
+// Gemini's task types tune the vector for how it will be compared:
+//   'document' — stored text that will be searched (a finding, a summary)
+//   'query'    — a question searching those documents
+//   'similar'  — text compared with text of the same kind (goal vs goal)
+const GEMINI_TASK = { document: 'RETRIEVAL_DOCUMENT', query: 'RETRIEVAL_QUERY', similar: 'SEMANTIC_SIMILARITY' };
 
-  if (provider === 'ollama') {
-    try {
-      const response = await axios.post(
-        `${OLLAMA_URL}/api/embeddings`,
-        { model, prompt: text },
-        { timeout: 30000 }
-      );
-      return response.data.embedding || null;
-    } catch (err) {
-      console.warn(`⚠️ MemoryService: Ollama embedding failed: ${err.message} — using deterministic fallback`);
-    }
-  } else {
-    console.warn(`⚠️ MemoryService: Unknown embedding provider "${provider}" — using deterministic fallback`);
-  }
+function l2normalize(v) {
+  let n = 0;
+  for (const x of v) n += x * x;
+  n = Math.sqrt(n);
+  return n > 0 ? v.map((x) => x / n) : v;
+}
 
-  // Deterministic fallback: generate a normalized pseudo-random vector from SHA-256 hash
-  // This ensures pgvector insertion and cosine similarity queries always work
-  return generateDeterministicEmbedding(text, dimension || 768);
+// One warning per provider per minute — a dead key would otherwise log on
+// every chat message.
+const _warnedAt = {};
+function warnOnce(provider, msg) {
+  if (Date.now() - (_warnedAt[provider] || 0) < 60000) return;
+  _warnedAt[provider] = Date.now();
+  console.warn(`⚠️ MemoryService: ${provider} embedding failed: ${msg} — storing without a vector`);
 }
 
 /**
- * Generate a deterministic normalized vector from text using SHA-256.
- * Produces consistent embeddings for the same input text across restarts.
- * These won't have real semantic meaning, but they keep the pgvector pipeline functional.
+ * Embed text with the configured provider. Returns a unit-length vector of
+ * `dimension` floats, or null when no provider can embed right now.
+ *
+ * There is deliberately no fallback vector. The old SHA-256 stand-in looked
+ * valid to pgvector but matched only identical text, so every "similar
+ * question" search silently returned noise. A row stored without a vector is
+ * honest: it is skipped by similarity search and picked up by the backfill.
+ *
+ * @param {string} text
+ * @param {{ purpose?: 'document'|'query'|'similar' }} [opts]
  */
-function generateDeterministicEmbedding(text, dimension) {
-  const crypto = require('crypto');
-  const vector = [];
+async function generateEmbedding(text, { purpose = 'document' } = {}) {
+  const { provider, model, dimension } = embeddingsConfig;
+  const input = String(text || '').slice(0, 8000);
+  if (!input.trim()) return null;
 
-  // Generate enough hash bytes to fill the vector
-  // Each SHA-256 hash gives 32 bytes = 8 floats (4 bytes each)
-  let hashInput = text;
-  let chunkIndex = 0;
-
-  while (vector.length < dimension) {
-    const hash = crypto.createHash('sha256').update(hashInput + ':' + chunkIndex).digest();
-    // Read non-overlapping 4-byte chunks from the 32-byte hash (8 values per hash)
-    for (let i = 0; i + 3 < hash.length && vector.length < dimension; i += 4) {
-      const val = hash.readUInt32BE(i);
-      vector.push((val / 0xFFFFFFFF) * 2 - 1); // Map to [-1, 1]
+  if (provider === 'gemini') {
+    const { resolveCredentials } = require('../QuotaManager');
+    const cred = resolveCredentials('gemini')[0];
+    if (!cred) { warnOnce('gemini', 'no GEMINI_API_KEY configured'); return null; }
+    try {
+      const res = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent`,
+        { model: `models/${model}`, content: { parts: [{ text: input }] }, taskType: GEMINI_TASK[purpose] || GEMINI_TASK.document, outputDimensionality: dimension },
+        { headers: { 'x-goog-api-key': cred.key }, timeout: 15000 }
+      );
+      const values = res.data && res.data.embedding && res.data.embedding.values;
+      if (!Array.isArray(values) || values.length !== dimension) { warnOnce('gemini', `unexpected shape (${values ? values.length : 'none'})`); return null; }
+      // Below its native size Gemini's vectors are not unit length; cosine
+      // search in pgvector does not care, but every stored vector should match.
+      return l2normalize(values);
+    } catch (err) {
+      const status = err.response ? err.response.status : err.code;
+      warnOnce('gemini', `${status} ${err.message}`);
+      return null;
     }
-    chunkIndex++;
   }
 
-  // L2 normalize the vector
-  let norm = 0;
-  for (let i = 0; i < dimension; i++) norm += vector[i] * vector[i];
-  norm = Math.sqrt(norm);
-  if (norm > 0) {
-    for (let i = 0; i < dimension; i++) vector[i] /= norm;
+  if (provider === 'ollama') {
+    try {
+      const response = await axios.post(`${OLLAMA_URL}/api/embeddings`, { model, prompt: input }, { timeout: 30000 });
+      const v = response.data && response.data.embedding;
+      return Array.isArray(v) && v.length === dimension ? l2normalize(v) : null;
+    } catch (err) {
+      warnOnce('ollama', err.message);
+      return null;
+    }
   }
 
-  return vector.slice(0, dimension);
+  warnOnce(provider, `unknown provider "${provider}"`);
+  return null;
 }
 
 async function storeWithEmbedding({ title, content, source = 'cognitive_core' }) {
@@ -155,7 +173,7 @@ async function storeWithEmbedding({ title, content, source = 'cognitive_core' })
 }
 
 async function retrieveBySimilarity(queryText, limit = 3) {
-  const embedding = await generateEmbedding(queryText);
+  const embedding = await generateEmbedding(queryText, { purpose: 'query' });
   if (!embedding) {
     // No vector to search with — fall back to newest-first rather than nothing.
     return memoryRepository.findRecentKnowledge(limit);

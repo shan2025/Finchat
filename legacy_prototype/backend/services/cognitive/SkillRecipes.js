@@ -6,6 +6,11 @@
 const { query } = require('../../database');
 const { generateEmbedding } = require('./MemoryService');
 
+// Cosine distance under which two goals count as the same task. Calibrated on
+// Gemini SEMANTIC_SIMILARITY vectors: paraphrases land near 0.07, unrelated
+// questions near 0.31.
+const RECIPE_MAX_DISTANCE = 0.2;
+
 /**
  * Normalize a plan into a compact steps array. Accepts either the plan object with
  * .steps or a raw array. Trims to essential fields for future replay hints.
@@ -43,7 +48,7 @@ async function recordFromExecution(execution) {
     const title = goal.length > 80 ? goal.slice(0, 77) + '…' : goal;
     const agentId = execution.assigned_agent || null;
 
-    const embedding = await generateEmbedding(goal);
+    const embedding = await generateEmbedding(goal, { purpose: 'similar' });
     const vectorStr = embedding ? `[${embedding.join(',')}]` : null;
 
     if (vectorStr) {
@@ -72,7 +77,7 @@ async function recordFromExecution(execution) {
 async function findRelevant({ goal, agentId, limit = 2 } = {}) {
   if (!goal) return [];
   try {
-    const embedding = await generateEmbedding(goal);
+    const embedding = await generateEmbedding(goal, { purpose: 'similar' });
     if (embedding) {
       const vectorStr = `[${embedding.join(',')}]`;
       const args = [vectorStr];
@@ -87,8 +92,10 @@ async function findRelevant({ goal, agentId, limit = 2 } = {}) {
         ORDER BY embedding <=> $1::vector
         LIMIT $${args.length}
       `, args);
-      // Filter overly-distant matches; pgvector cosine distance in [0,2], keep < 0.6 as "similar"
-      return res.rows.filter(r => r.distance === null || r.distance < 0.6);
+      // Keep only goals close enough to reuse a plan for. The old < 0.6 suited
+      // hash vectors (unrelated text sat near 1.0); Gemini puts even unrelated
+      // questions around 0.3, so 0.6 would let every recipe through.
+      return res.rows.filter(r => r.distance === null || r.distance < RECIPE_MAX_DISTANCE);
     }
 
     // Fallback: latest per agent
