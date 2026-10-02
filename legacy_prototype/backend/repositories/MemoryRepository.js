@@ -79,6 +79,56 @@ function createMemoryRepository({ query } = {}) {
       return res.rows;
     },
 
+    /**
+     * Procedural learnings that share words with the goal, best match first.
+     *
+     * Lexical, not vector: `memories` has no embedding column, and every row is
+     * written at importance 7, so the old importance-then-recency order handed
+     * every turn the same newest notes whatever was asked. Postgres's english
+     * config does the stemming and drops stopwords ("what", "the"), so `terms`
+     * can be raw words.
+     *
+     * A row must match at least two distinct terms (one if the goal only has
+     * one), rising to a fifth of them for long goals, so a single shared word
+     * like "market" does not qualify a note.
+     *
+     * Scope: the user's own learnings from any agent, plus learnings from runs
+     * with no user behind them (ReflectionEngine stores those with user_id set
+     * to the agent id). Another user's learnings are never returned — their
+     * summaries quote that user's questions.
+     *
+     * @param {{ terms: string[], userId?: string|null, agentId?: string|null, limit?: number }} opts
+     */
+    async findRelevantProcedural({ terms, userId = null, agentId = null, limit = 3 } = {}) {
+      if (!Array.isArray(terms) || terms.length === 0) return [];
+      const res = await run(
+        `WITH terms AS (
+           SELECT DISTINCT plainto_tsquery('english', t)::text AS q FROM unnest($1::text[]) AS t
+         ), q AS (
+           SELECT q::tsquery AS tq FROM terms WHERE q <> ''
+         ), need AS (
+           SELECT LEAST(count(*), GREATEST(2, CEIL(count(*) * 0.2)))::int AS n FROM q
+         )
+         SELECT m.*, h.hits
+           FROM memories m
+           -- OFFSET 0 keeps the vector from being recomputed once per term.
+           CROSS JOIN LATERAL (SELECT to_tsvector('english', m.content) AS v OFFSET 0) tv
+           CROSS JOIN LATERAL (SELECT count(*)::int AS hits FROM q WHERE tv.v @@ q.tq) h
+          WHERE m.memory_type = 'procedural'
+            -- ReflectionEngine's parse-failure fallback: it quotes the goal
+            -- verbatim, so it would always rank first, and it holds no learning.
+            AND m.content NOT LIKE '%Reflection parsing failed%'
+            AND (m.user_id = $2
+              OR (m.user_id = m.metadata->>'agentId' AND m.metadata->>'agentId' IN ($3, 'global')))
+            AND h.hits > 0
+            AND h.hits >= (SELECT n FROM need)
+          ORDER BY h.hits DESC, m.importance DESC,
+                   (m.metadata->>'agentId' = $3) DESC NULLS LAST, m.created_at DESC
+          LIMIT $4`,
+        [terms, userId, agentId || 'global', limit]);
+      return res.rows;
+    },
+
     async insertKnowledge({ knowledgeId, title, content, source }) {
       await run(
         `INSERT INTO knowledge (knowledge_id, title, content, source)

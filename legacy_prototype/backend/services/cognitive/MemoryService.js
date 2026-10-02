@@ -76,6 +76,25 @@ async function retrieveProceduralWorkflows({ agentId, limit = 5 } = {}) {
   return memoryRepository.findProceduralWorkflows({ agentId, limit });
 }
 
+/**
+ * Words of a goal for lexical matching: lowercased, split on anything that is
+ * not a letter or digit, deduped. Stopwords and stemming are left to Postgres.
+ * Capped so a long mission prompt cannot build an unbounded query.
+ */
+function goalTerms(goal, max = 32) {
+  const words = String(goal || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
+  return [...new Set(words)].slice(0, max);
+}
+
+/**
+ * Procedural learnings relevant to this goal, for this user and agent. Empty
+ * when nothing shares enough words with the goal: no note beats an unrelated
+ * one that the model then tries to apply.
+ */
+async function retrieveRelevantProcedural({ goal, userId, agentId, limit = 3 } = {}) {
+  return memoryRepository.findRelevantProcedural({ terms: goalTerms(goal), userId, agentId, limit });
+}
+
 // ─── 4. Semantic Memory (Embedding-Based Retrieval) ───
 
 // Gemini's task types tune the vector for how it will be compared:
@@ -211,9 +230,11 @@ async function retrieveEnrichedContext({ userId, conversationId, goal, agentName
     }
   }
 
-  // 2. Procedural workflows from PostgreSQL
-  if (agentName) {
-    const procs = await retrieveProceduralWorkflows({ agentId: agentName, limit: 2 });
+  // 2. Procedural learnings that match this goal. This replaces two lookups
+  // that ignored the goal (the agent's newest 2, from any user, and this
+  // user's newest 3), which put the same notes into every turn.
+  if (goal) {
+    const procs = await retrieveRelevantProcedural({ goal, userId, agentId: agentName, limit: 3 });
     memories.push(...procs.map(p => ({
       type: 'procedural',
       content: p.content,
@@ -221,17 +242,7 @@ async function retrieveEnrichedContext({ userId, conversationId, goal, agentName
     })));
   }
 
-  // 3. Long-term memories from PostgreSQL
-  if (userId) {
-    const ltm = await retrieve({ userId, limit: 3 });
-    memories.push(...ltm.map(m => ({
-      type: m.memory_type,
-      content: m.content,
-      importance: m.importance
-    })));
-  }
-
-  // 4. Sprint 5C: Graph-RAG one-hop neighbors of entities in the goal (best-effort)
+  // 3. Sprint 5C: Graph-RAG one-hop neighbors of entities in the goal (best-effort)
   let graphContext = [];
   let recipeHints = [];
   try {
@@ -278,6 +289,8 @@ module.exports = {
   store,
   retrieve,
   retrieveProceduralWorkflows,
+  retrieveRelevantProcedural,
+  goalTerms,
   // Semantic memory
   generateEmbedding,
   storeWithEmbedding,

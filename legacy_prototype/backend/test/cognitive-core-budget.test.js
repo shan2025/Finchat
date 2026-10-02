@@ -127,7 +127,7 @@ const waitingRow = (over = {}) => ({
  */
 function buildCore({ reason, seed = [], planSteps = [], agentConfig = null } = {}) {
   const repo = fakeRepo(seed);
-  const calls = { reason: [], buildContext: [], executeTool: [] };
+  const calls = { reason: [], buildContext: [], executeTool: [], retrieve: [] };
 
   const mgr = realExecutionManager.createExecutionManager({ repository: repo });
   stub('../services/cognitive/ExecutionManager', {
@@ -177,7 +177,10 @@ function buildCore({ reason, seed = [], planSteps = [], agentConfig = null } = {
     async plan() { return { plan: { steps: planSteps }, stored: false }; },
   });
   stub('../services/cognitive/MemoryService', {
-    async retrieveEnrichedContext() { return { memories: [], graphContext: [], recipeHints: [] }; },
+    async retrieveEnrichedContext(args) {
+      calls.retrieve.push(args);
+      return { memories: [], graphContext: [], recipeHints: [] };
+    },
     async appendToScratchpad() {},
   });
   stub('../services/cognitive/ReflectionEngine', { async reflect() {} });
@@ -222,6 +225,15 @@ test.describe('the reasoning loop stops at its ceiling', () => {
       `stored over budget: ${row.iterations_used}/${row.max_iterations}`);
     assert.equal(h.calls.reason.length, 3, 'no reasoning turn past the ceiling');
     assert.equal(row.completion_reason, 'budget_exceeded');
+  });
+
+  test('memory is retrieved once per run, not once per turn', async () => {
+    // Its inputs are fixed for the run; retrieving per turn repeated the
+    // embedding call and re-counted recipe reuse and concept activations.
+    const h = buildCore({ reason: neverResponds() });
+    await h.core.run({ goal: 'g', userId: 'u1', budget: { maxIterations: 3 } });
+    assert.equal(h.calls.reason.length, 3);
+    assert.equal(h.calls.retrieve.length, 1);
   });
 
   test('the wrap-up turn happens inside the budget, not one turn past it', async () => {

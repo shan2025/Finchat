@@ -361,8 +361,33 @@ async function _runWithinStallClock({
 
     // Sprint X Stage 2 — explainability: which memories/graph nodes fed this answer
     const traceConcepts = new Map();
-    let traceMemories = 0, traceRecipes = 0;
 
+    // Memories + graph-hop entities + skill recipes (Phase 6 + Sprint 5C).
+    // Retrieved ONCE per execution, like the preferences above: every input is
+    // fixed for the run (goal, user, agent, conversation), so each extra loop
+    // turn only repeated the same embedding call and queries. It also
+    // re-counted: every turn bumped the recipes' times_reused and recorded
+    // another activation for the same recalled concepts.
+    const enriched = await retrieveEnrichedContext({
+      userId,
+      conversationId,
+      goal,
+      agentName,
+      limit: 5
+    });
+    for (const g of enriched.graphContext || []) {
+      if (g.entity_id && !traceConcepts.has(g.entity_id)) {
+        traceConcepts.set(g.entity_id, { entityId: g.entity_id, name: g.name, type: g.type, viaEdge: g.viaEdge });
+      }
+    }
+    const traceMemories = (enriched.memories || []).length;
+    const traceRecipes = (enriched.recipeHints || []).length;
+    if ((enriched.graphContext || []).length) {
+      brainStream.knowledge({
+        executionId: execId, userId, atMs: Date.now() - t0,
+        entities: (enriched.graphContext || []).map(g => ({ entityId: g.entity_id, name: g.name, type: g.type }))
+      });
+    }
 
     // 3. Reasoning loop — now supports tool cycling.
     //
@@ -425,28 +450,6 @@ async function _runWithinStallClock({
       // the budget instead of one turn past it.
       const lastTurn = verdict.breached || forceSynthesis || reserveEntered || toolCallsSpent ||
         verdict.details.iterations.used + 1 >= verdict.details.iterations.max;
-
-      // 3b. Retrieve memories + graph-hop entities + skill recipes for context (Phase 6 + Sprint 5C)
-      const enriched = await retrieveEnrichedContext({
-        userId,
-        conversationId,
-        goal,
-        agentName,
-        limit: 5
-      });
-      for (const g of enriched.graphContext || []) {
-        if (g.entity_id && !traceConcepts.has(g.entity_id)) {
-          traceConcepts.set(g.entity_id, { entityId: g.entity_id, name: g.name, type: g.type, viaEdge: g.viaEdge });
-        }
-      }
-      traceMemories = Math.max(traceMemories, (enriched.memories || []).length);
-      traceRecipes = Math.max(traceRecipes, (enriched.recipeHints || []).length);
-      if ((enriched.graphContext || []).length) {
-        brainStream.knowledge({
-          executionId: execId, userId, atMs: Date.now() - t0,
-          entities: (enriched.graphContext || []).map(g => ({ entityId: g.entity_id, name: g.name, type: g.type }))
-        });
-      }
 
       // 3b-bis. Contest-awareness: publish this lane's live progress and read the
       // standings, so the reasoning turn below sees where it stands against its
