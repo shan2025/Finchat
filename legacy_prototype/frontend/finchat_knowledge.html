@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -54,7 +54,7 @@
 
 <nav id="sideNav" class="hidden md:flex flex-col h-full py-8 px-4 fixed left-0 top-0 w-64 bg-primary-brown z-40 text-cream-bg"></nav>
 
-<main class="flex-1 lg:ml-64 min-h-screen">
+<main id="knowledgeMain" class="flex-1 lg:ml-64 min-h-screen">
  <div class="max-w-[1200px] mx-auto px-5 md:px-8 py-8">
 
   <!-- Header -->
@@ -176,7 +176,7 @@ function sparkline(series){
   <div id="sparkDot" class="spark-dot"></div>
   <div id="sparkTip" class="spark-tip"></div>
  </div>
- <div class="text-xs mt-1" style="color:var(--sub)"><b style="color:var(--txt)">${totalNew}</b> concepts learned · peak ${max} events/day · hover the line for a day</div>`;
+ <div class="text-xs mt-1" style="color:var(--sub)"><b style="color:var(--txt)">${totalNew}</b> concepts learned · peak ${max} events/day · ${matchMedia('(hover: none)').matches ? 'tap' : 'hover'} the line for a day</div>`;
 }
 
 const DAYNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

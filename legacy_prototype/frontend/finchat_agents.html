@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -202,7 +202,7 @@
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
+  <main id="agentsMain" class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
     <!-- Master/detail from md: the list keeps a column beside the config card
          (a portrait tablet has the full width now the rail is a drawer). On a
          phone the list is a swipeable strip — stacked, it pushed the card for
@@ -320,7 +320,12 @@
           </div>
 
           <!-- Title -->
-          <h2 class="fc-h2" id="configTitle">Agent Configuration: Plato</h2>
+          <h2 class="fc-h2 fcm-desk" id="configTitle">Agent Configuration: Plato</h2>
+          <!-- Phone: portrait, kicker and name (selectAgent fills it). -->
+          <div class="fcm-only fcm-cfg-head">
+            <img id="fcmCfgImg" src="plato_avatar.png" alt="">
+            <div><div class="fcm-cfg-kicker">Agent Configuration</div><div id="fcmCfgName" class="fcm-cfg-name">Plato</div></div>
+          </div>
 
           <!-- Risk Level Box -->
           <div class="flex flex-col">
@@ -356,7 +361,7 @@
 
           <!-- Bottom 2-Column Grid — side by side only once the card itself is
                wide (xl); beside the agent list on a tablet each half was ~200px. -->
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div id="cfgGrid" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
             <!-- Left Box: Audit Logs -->
             <div class="flex flex-col">
@@ -392,7 +397,7 @@
           </div>
 
           <!-- Action Buttons Footer -->
-          <div class="flex justify-end gap-4 mt-2 pt-4 border-t border-border-color">
+          <div id="cfgFooter" class="flex justify-end gap-4 mt-2 pt-4 border-t border-border-color">
             <button class="bg-transparent text-[#3a2e23] border border-[#3a2e23] px-6 py-2.5 rounded-xl font-bold hover:bg-[#e8dfd1] transition-all" onclick="discardChanges()">Discard</button>
             <button class="bg-[#3a2e23] text-[#efe8de] px-6 py-2.5 rounded-xl font-bold hover:bg-[#4a3828] shadow-md transition-all flex items-center gap-2" onclick="saveChanges()">
               <span>Save Changes</span>
@@ -517,8 +522,13 @@
         } else {
           card.className = "agent-card bg-cream-bg text-[#3a2e23] border border-border-color rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-[#e8dfd1] flex items-center gap-4";
         }
+        // The phone strip styles the pick from this, not from the colour classes.
+        card.classList.toggle('is-selected', a === agent);
       }
     });
+    const cfgImg = document.getElementById('fcmCfgImg');
+    if (cfgImg) cfgImg.src = agent + '_avatar.png';
+    setText('fcmCfgName', capitalized);
     // On a phone the list is a sideways strip; bring a half-hidden pick fully in.
     const picked = document.getElementById('card-' + agent);
     if (picked && !isInit && window.matchMedia('(max-width: 767px)').matches) {
@@ -656,8 +666,14 @@
   // handlers, loaded later), but still ran its own 30s poll and rendered
   // notification bodies as raw markdown. Removed rather than kept in sync.
 
-  // Load the initially-selected agent's live config + audit trail from the backend
-  selectAgent('plato', true);
+  // Load the initially-selected agent's live config + audit trail from the
+  // backend. ?agent=<id> (Operations' phone strip links here) picks the agent.
+  const wantedAgent = new URLSearchParams(location.search).get('agent');
+  selectAgent(wantedAgent && agentConfigs[wantedAgent] ? wantedAgent : 'plato', true);
+  if (wantedAgent && agentConfigs[wantedAgent]) {
+    const pickedCard = document.getElementById('card-' + wantedAgent);
+    if (pickedCard) pickedCard.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
 </script>
 <script>
   // Drawer nav on narrow screens.

@@ -504,13 +504,16 @@
   <!-- Top header (single, design: Chat.dc.html) -->
   <header id="chatHeader" class="flex items-center gap-md w-full px-lg shrink-0" style="height:70px; background:#fffaf0; border-bottom:1px solid #e7d9be; z-index:50;">
     <button id="navToggle" title="Menu" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-full shrink-0" style="border:1px solid #e3d3ba; background:#f5ead8; color:#5b4a3a;">
-      <span class="material-symbols-outlined text-[20px]">menu</span>
+      <span class="material-symbols-outlined text-[20px]">menu</span><span class="fcm-only fcm-lic"><span data-fcm-icon="menu"></span></span>
     </button>
-    <!-- Active agent identity -->
-    <div class="flex items-center gap-3 min-w-0">
+    <!-- Active agent identity. On a phone it is the agent picker's button. -->
+    <div id="chatIdentity" class="flex items-center gap-3 min-w-0" onclick="if (window.fcMobile && fcMobile.isPhone()) openAgentSheet()">
       <div id="topbarAvatar" class="rounded-full overflow-hidden flex items-center justify-center shrink-0" style="width:42px; height:42px; background:#f4eede;"><img src="plato_avatar.png" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>
       <div class="min-w-0">
-        <h2 id="topbarName" class="truncate" style="font-family:var(--serif); font-size:19px; color:#201e1d; line-height:1.15;">Plato</h2>
+        <div class="flex items-center gap-1 min-w-0">
+          <h2 id="topbarName" class="truncate" style="font-family:var(--serif); font-size:19px; color:#201e1d; line-height:1.15;">Plato</h2>
+          <span class="fcm-only fcm-chev"><span data-fcm-icon="chevronDown"></span></span>
+        </div>
         <p id="topbarDesc" class="truncate" style="font-size:12.5px; color:#8a7d6a;">Chief AI Officer & System Supervisor</p>
       </div>
     </div>
@@ -535,8 +538,8 @@
 
     <!-- Notifications -->
     <div class="relative shrink-0">
-      <button id="notifBell" onclick="toggleNotifications(event)" class="fc-icon" title="Notifications" style="position:relative; width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
-        <span class="material-symbols-outlined text-[20px]">notifications</span>
+      <button id="notifBell" data-fcm-bell onclick="toggleNotifications(event)" class="fc-icon" title="Notifications" style="position:relative; width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+        <span class="material-symbols-outlined text-[20px]">notifications</span><span class="fcm-only fcm-lic"><span data-fcm-icon="bell"></span></span>
         <span id="notifBadge" class="hidden" style="position:absolute; top:6px; right:7px; min-width:16px; height:16px; padding:0 3px; background:var(--accent-red); color:#fff; font-size:10px; font-weight:700; line-height:16px; border-radius:999px; text-align:center; border:2px solid #fffaf0;"></span>
       </button>
       <div id="notifDropdown" class="hidden absolute right-0 top-12 w-80 max-h-96 overflow-y-auto bg-cream-bg border border-border-color rounded-2xl shadow-xl z-[200]">
@@ -547,6 +550,12 @@
         <div id="notifList" class="divide-y divide-[#d6ccbc]/60"></div>
       </div>
     </div>
+
+    <!-- Phone: Branch, Mind map, Rename… for the open conversation, in a sheet
+         (the header has no room for their desktop buttons). -->
+    <button id="chatMoreBtn" type="button" class="fcm-only fc-icon shrink-0" onclick="openChatActions()" title="Conversation actions" aria-label="Conversation actions">
+      <span data-fcm-icon="more"></span>
+    </button>
 
     <!-- Settings -->
     <button id="topbarUserIcon" class="fc-icon shrink-0" title="Settings" onclick="openSettings()" style="width:42px; height:42px; border-radius:999px; border:1px solid #e3d3ba; background:#fffaf0; color:#5b4a3a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
@@ -579,11 +588,14 @@
       </div>
 
       <!-- Input Area (rounded pill composer, design: Chat.dc.html) -->
-      <div id="composerWrap" class="shrink-0" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
+      <div id="composerWrap" class="shrink-0 fcm-has-composer" style="position:relative; z-index:20; padding:14px 26px 20px; background:linear-gradient(to top,#f5ead8 60%,rgba(245,234,216,0));">
         <!-- The napping mascot perches on the composer's top edge; it sleeps
              until sendMessage() calls fcNap.bonk(). See mascot_nap.js. -->
         <div id="fcNapMascot" aria-hidden="true"></div>
         <div id="composerBox" style="max-width:860px; margin:0 auto; background:#fffaf0; border:1px solid #e3d3ba; border-radius:26px; box-shadow:0 8px 28px rgba(46,43,37,.10); transition:border-color .15s;">
+          <!-- Phone: which modes are on, since the toggles are icon-only there
+               (renderModeChips). -->
+          <div id="fcmModeChips" class="fcm-only"></div>
           <div class="attach-preview" id="attachPreview" style="border-top:none; border-radius:26px 26px 0 0;"></div>
           <textarea id="msgInput" rows="1" placeholder="Message Plato..." style="width:100%; border:none; background:transparent; resize:none; outline:none; font-family:inherit; font-size:15.5px; line-height:1.55; color:#201e1d; padding:17px 20px 4px; min-height:40px; max-height:180px;"></textarea>
           <div id="composerTools" style="display:flex; align-items:center; gap:8px; padding:8px 12px 11px;">
@@ -592,19 +604,21 @@
               <button id="agentPickerBtn" onclick="toggleAgentMenu(event)" title="Choose agent" style="display:inline-flex; align-items:center; gap:8px; padding:5px 11px 5px 5px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#201e1d; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; flex-shrink:0;">
                 <span id="agentPickerAvatar" style="width:26px; height:26px; border-radius:999px; background:#f4eede; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;"></span>
                 <span id="agentPickerName">Plato</span>
-                <span class="material-symbols-outlined text-[18px]" style="color:#8a7d6a;">expand_more</span>
+                <span class="material-symbols-outlined text-[18px]" style="color:#8a7d6a;">expand_more</span><span class="fcm-only fcm-lic"><span data-fcm-icon="chevronDown"></span></span>
               </button>
               <div id="agentMenu" style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; width:250px; background:#fffaf0; border:1px solid #e3d3ba; border-radius:16px; box-shadow:0 14px 34px rgba(46,43,37,.20); padding:6px; z-index:40;"></div>
             </div>
-            <button class="fc-tool" onclick="document.getElementById('fileInput').click()" title="Attach file" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
-              <span class="material-symbols-outlined text-[20px]">attach_file</span>
+            <button id="attachBtn" class="fc-tool" onclick="if (window.fcMobile && fcMobile.isPhone()) openAttachSheet(); else document.getElementById('fileInput').click()" title="Attach file" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">attach_file</span><span class="fcm-only fcm-lic"><span data-fcm-icon="clip"></span></span>
             </button>
             <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
+            <!-- "Take a photo" in the phone attach sheet: opens the camera. -->
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleFiles(this.files)" style="display:none;">
             <button id="ctxBtn" class="fc-tool" onclick="window.fcChatContext && fcChatContext.toggle()" title="Add another chat as context (Ctrl+K)" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
               <span class="material-symbols-outlined text-[20px]">add_link</span>
             </button>
-            <button class="fc-tool fc-tool-wide" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
-              <span class="material-symbols-outlined text-[20px]">mic</span>
+            <button id="micBtn" class="fc-tool" onclick="toggleVoiceInput()" title="Voice input" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
+              <span class="material-symbols-outlined text-[20px]">mic</span><span class="fcm-only fcm-lic"><span data-fcm-icon="mic"></span></span>
             </button>
             <button class="fc-tool fc-tool-wide" title="Upload image" onclick="document.getElementById('fileInput').click()" style="width:38px; height:38px; border-radius:999px; border:none; background:transparent; color:#8a7d6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;">
               <span class="material-symbols-outlined text-[20px]">image</span>
@@ -613,13 +627,13 @@
             <div style="flex:1;"></div>
 
             <button id="webToggle" onclick="toggleWebAccess()" title="Web access" style="display:inline-flex; align-items:center; gap:9px; padding:7px 10px 7px 13px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#8a7d6a; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; letter-spacing:.03em; transition:all .15s;">
-              <span class="material-symbols-outlined text-[16px]">language</span>
+              <span class="material-symbols-outlined text-[16px]">language</span><span class="fcm-only fcm-lic"><span data-fcm-icon="globe"></span></span>
               <span class="fc-tlabel">WEB</span>
               <span id="webTrack" style="width:34px; height:20px; border-radius:999px; background:#e0d4bd; position:relative; transition:background .16s;"><span id="webKnob" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transform:translateX(0); transition:transform .16s; box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span>
             </button>
 
             <button id="studyToggle" onclick="toggleStudyMode()" title="Study Mode — answers come back as study cards" style="display:inline-flex; align-items:center; gap:9px; padding:7px 10px 7px 13px; border-radius:999px; border:1px solid #e3d3ba; background:#f5ead8; color:#8a7d6a; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; letter-spacing:.03em; transition:all .15s;">
-              <span class="material-symbols-outlined text-[16px]">school</span>
+              <span class="material-symbols-outlined text-[16px]">school</span><span class="fcm-only fcm-lic"><span data-fcm-icon="cap"></span></span>
               <span class="fc-tlabel">STUDY</span>
               <span id="studyTrack" style="width:34px; height:20px; border-radius:999px; background:#e0d4bd; position:relative; transition:background .16s;"><span id="studyKnob" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:#fff; transform:translateX(0); transition:transform .16s; box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span>
             </button>
@@ -627,7 +641,7 @@
             <span id="govHint" style="font-size:12px; color:#a1937f; font-weight:600; white-space:nowrap;">5 tokens / message</span>
 
             <button id="sendBtn" onclick="sendMessage()" title="Send" class="fc-send" style="width:44px; height:44px; border-radius:999px; border:none; background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:background .15s;">
-              <span class="material-symbols-outlined text-[22px]">arrow_upward</span>
+              <span class="material-symbols-outlined text-[22px]">arrow_upward</span><span class="fcm-only fcm-lic"><span data-fcm-icon="arrowUp"></span></span>
             </button>
           </div>
         </div>
@@ -650,6 +664,7 @@
     <script src="study_blocks.js"></script>
     <script src="report_cards.js"></script>
     <script src="chat_context.js"></script>
+    <script src="voice_input.js"></script>
     <script src="car_road_anim.js?v=minimal_v7"></script>
 
 
@@ -1251,6 +1266,7 @@
       if (btn) btn.classList.toggle('on', window.webAccess);
       if (track) track.style.background = window.webAccess ? 'var(--accent)' : '#e0d4bd';
       if (knob) knob.style.transform = window.webAccess ? 'translateX(14px)' : 'translateX(0)';
+      renderModeChips();
     }
     function toggleWebAccess() {
       window.webAccess = !window.webAccess;
@@ -1283,6 +1299,7 @@
       if (btn) btn.classList.toggle('on', window.studyMode);
       if (track) track.style.background = window.studyMode ? 'var(--accent)' : '#e0d4bd';
       if (knob) knob.style.transform = window.studyMode ? 'translateX(14px)' : 'translateX(0)';
+      renderModeChips();
     }
     function setStudyMode(on, { silent = false } = {}) {
       // Reopening an old Feynman chat saved with study off must not unlock it.
@@ -1401,6 +1418,7 @@
     }
     function toggleAgentMenu(e) {
       if (e) e.stopPropagation();
+      if (window.fcMobile && fcMobile.isPhone()) { openAgentSheet(); return; }
       const menu = document.getElementById('agentMenu');
       if (!menu) return;
       const open = menu.style.display !== 'none';
@@ -1438,6 +1456,77 @@
       const wrap = e.target.closest && e.target.closest('.fc-agentwrap');
       if (!wrap) { const m = document.getElementById('agentMenu'); if (m) m.style.display = 'none'; }
     });
+
+    // ── Phone sheets (mobile_ui.js) ──
+    // The agent picker, the attach menu and the open conversation's actions
+    // are bottom sheets on a phone; desktop keeps its popover and buttons.
+    function openAgentSheet() {
+      fcMobile.sheet({
+        title: 'Talk to',
+        items: Object.entries(PERSONAS).map(([id, p]) => ({
+          avatar: p.avatar, label: p.name, sub: p.desc || '', on: id === activePersona,
+          onClick: () => { if (id !== activePersona) switchChat(id); }
+        }))
+      });
+    }
+    function openAttachSheet() {
+      fcMobile.actions('Add to message', [
+        { icon: 'file', label: 'Upload a file', onClick: () => document.getElementById('fileInput').click() },
+        { icon: 'camera', label: 'Take a photo', onClick: () => document.getElementById('cameraInput').click() },
+        { icon: 'link', label: 'Add a chat as context', onClick: () => window.fcChatContext && fcChatContext.toggle() }
+      ]);
+    }
+    function openChatActions() {
+      const sid = personaSessions[activePersona];
+      const row = sid && document.querySelector(`#sbnRecent [data-session="${CSS.escape(sid)}"]`);
+      const title = row?.dataset.title || (sid ? 'This conversation' : 'New chat with ' + PERSONAS[activePersona].name);
+      fcMobile.actions(title, [
+        { icon: 'split', label: 'Branch into a new chat', onClick: () => branchFromChat() },
+        { icon: 'tree', label: 'Build a mind map', onClick: () => mindMapFromChat() },
+        { icon: 'pencil', label: 'Rename', disabled: !sid, onClick: () => renameSession(sid, row?.dataset.title || '') },
+        { icon: 'copy', label: 'Copy conversation', disabled: !sid, onClick: () => copyConversation(sid) },
+        { icon: 'download', label: 'Export JSON', onClick: () => exportJSON() },
+        { icon: 'trash', label: 'Delete conversation', danger: true, disabled: !sid, onClick: () => deleteSession(sid) }
+      ]);
+    }
+    // Chips above the phone composer for the modes that are on.
+    function renderModeChips() {
+      const box = document.getElementById('fcmModeChips');
+      if (!box || !window.fcMobile) return;
+      const chips = [];
+      if (window.webAccess) chips.push(`<span class="fcm-tag fcm-tag-sage">${fcMobile.icon('globe')}Web access on</span>`);
+      if (window.studyMode) chips.push(`<span class="fcm-tag fcm-tag-accent">${fcMobile.icon('cap')}Study mode${STUDY_ALWAYS_ON.has(activePersona) ? ' · always on with ' + PERSONAS[activePersona].name : ''}</span>`);
+      box.innerHTML = chips.join('');
+      box.classList.toggle('has', chips.length > 0);
+    }
+
+    // Voice input: the mic records, the server transcribes (voice_input.js),
+    // and the words land in the composer to read over before sending.
+    let chatVoice = null;
+    function toggleVoiceInput() {
+      if (!window.FcVoice) return;
+      if (!chatVoice) {
+        const mic = document.getElementById('micBtn');
+        chatVoice = FcVoice.create({
+          token: _session?.token,
+          api: API_URL,
+          onText: (text) => {
+            const input = document.getElementById('msgInput');
+            input.value = (input.value ? input.value.trimEnd() + ' ' : '') + text;
+            input.dispatchEvent(new Event('input'));
+            input.focus();
+          },
+          onState: (state) => {
+            mic.classList.toggle('fc-rec', state === 'recording');
+            mic.classList.toggle('fc-busy', state === 'transcribing');
+            mic.title = state === 'recording' ? 'Stop and transcribe' : state === 'transcribing' ? 'Transcribing…' : 'Voice input';
+          },
+          onError: (msg) => showToast(msg, 'warn')
+        });
+      }
+      if (chatVoice.state === 'idle') showToast('Listening… tap the mic again to stop', 'info');
+      chatVoice.toggle();
+    }
 
     function switchChat(personaId) {
       // Save current chat HTML

@@ -169,11 +169,19 @@
   </header>
 
   <!-- Main Dashboard Canvas -->
-  <main class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
+  <main id="opsMain" class="flex-1 overflow-y-auto bg-[#f7f4ed] p-4 md:p-8">
     <div class="max-w-7xl mx-auto flex flex-col gap-6 md:gap-8">
 
+      <!-- Phone only (mobile_ui.css): the header's LIVE badge and Refresh,
+           which the phone app bar has no room for. -->
+      <div class="fcm-only fcm-ops-live">
+        <span class="fcm-tag fcm-tag-sage fcm-tag-live"><span class="fcm-pulse-dot"></span>LIVE PULSE</span>
+        <span style="flex:1"></span>
+        <button type="button" class="fcm-btn fcm-btn-secondary fcm-btn-sm" onclick="triggerManualRefresh(this)"><span data-fcm-icon="refresh"></span>Refresh Pulse</button>
+      </div>
+
       <!-- SYSTEM INTEGRITY STRIP -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div id="intStrip" class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-cream-bg border border-border-color rounded-2xl p-4">
           <div class="fc-kicker">Proof Chain</div>
           <div class="fc-stat text-[#3a2e23] mt-1" id="intBlocks">—</div>
@@ -195,7 +203,7 @@
       </div>
 
       <!-- KNOWLEDGE MEMORY (Graph-RAG + Skill Recipes) -->
-      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+      <div id="memCard" class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
         <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">hub</span> Knowledge Memory
@@ -231,13 +239,15 @@
       </div>
 
       <!-- SECTION 1: LIVE AGENT STATUS GRID -->
-      <div>
+      <div id="pulseSection">
         <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h2 class="text-lg font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">groups</span> Specialist Executive Team Pulse
           </h2>
           <span class="text-xs text-[#8c7a6b]">Status updated in real-time</span>
         </div>
+        <!-- Phone: a swipeable strip, one small card per agent (renderDashboard). -->
+        <div id="fcmPulse" class="fcm-only fcm-strip"></div>
 
         <!-- Column counts track the space beside the rail, not the viewport:
              from 1024px the rail takes 256px, so lg gets ~768px — four cards
@@ -252,10 +262,10 @@
       </div>
 
       <!-- SECTION 2: QUEUE & BACKGROUND METRICS AND SCHEDULES -->
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div id="queueRow" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         <!-- Queue Stats Card -->
-        <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+        <div id="queueCard" class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h3 class="text-sm font-bold uppercase tracking-wider text-[#8c7a6b] mb-4 flex items-center gap-1.5">
               <span class="material-symbols-outlined text-[18px]">memory</span> Cognitive Executions
@@ -283,7 +293,7 @@
         </div>
 
         <!-- Morning Executive Briefing Trigger Card -->
-        <div class="xl:col-span-2 bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div id="briefCard" class="xl:col-span-2 bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div class="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-[#e8dfd1] to-transparent pointer-events-none opacity-50"></div>
           <div>
             <div class="flex justify-between items-start">
@@ -299,7 +309,8 @@
           </div>
           <div class="flex flex-wrap items-center gap-3 mt-6 pt-4 border-t border-border-color">
             <button onclick="scheduleBriefing()" class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2">
-              <span class="material-symbols-outlined text-[16px] text-[#facc15]">bolt</span> Trigger Instant Executive Briefing Now
+              <span class="material-symbols-outlined text-[16px] text-[#facc15]">bolt</span><span class="fcm-only"><span data-fcm-icon="zap"></span></span>
+              <span class="fcm-desk">Trigger Instant Executive Briefing Now</span><span class="fcm-only">Trigger briefing now</span>
             </button>
           </div>
         </div>
@@ -307,7 +318,7 @@
       </div>
 
       <!-- SECTION 2.5: COUNCIL DEBATE -->
-      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+      <div id="debateCard" class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
         <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 mb-4">
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">forum</span> Council Debate
@@ -321,15 +332,16 @@
               class="flex-1 px-4 py-2.5 rounded-xl border border-border-color bg-[#f7f4ed] text-sm text-[#3a2e23] focus:outline-none focus:border-[#3a2e23]">
             <button id="debateBtn" onclick="conveneDebate()"
               class="bg-[#3a2e23] text-[#efe8de] hover:bg-[#4a3828] px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 justify-center whitespace-nowrap">
-              <span class="material-symbols-outlined text-[16px]">gavel</span> Convene Debate
+              <span class="material-symbols-outlined text-[16px]">gavel</span><span class="fcm-only"><span data-fcm-icon="gavel"></span></span> Convene Debate
             </button>
           </div>
           <div class="flex flex-wrap items-center gap-4 text-xs text-[#5c4a38]">
             <span class="font-bold text-[#8c7a6b] uppercase tracking-wider text-[10px]">Panel:</span>
-            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="aurelius" checked> Aurelius <span class="text-[#8c7a6b]">(finance)</span></label>
-            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="nova" checked> Nova <span class="text-[#8c7a6b]">(research)</span></label>
-            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="atlas"> Atlas <span class="text-[#8c7a6b]">(portfolio)</span></label>
-            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="rasha"> Rasha <span class="text-[#8c7a6b]">(career)</span></label>
+            <!-- The avatars only show on phones, where each label is a chip. -->
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="aurelius" checked><img class="fcm-only" src="aurelius_avatar.png" alt=""> Aurelius <span class="text-[#8c7a6b]">(finance)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="nova" checked><img class="fcm-only" src="nova_avatar.png" alt=""> Nova <span class="text-[#8c7a6b]">(research)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="atlas"><img class="fcm-only" src="atlas_avatar.png" alt=""> Atlas <span class="text-[#8c7a6b]">(portfolio)</span></label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" class="debate-participant accent-[#3a2e23]" value="rasha"><img class="fcm-only" src="rasha_avatar.png" alt=""> Rasha <span class="text-[#8c7a6b]">(career)</span></label>
             <span class="ml-auto text-[10px] text-[#d97706]" id="debateProgress"></span>
           </div>
           <div id="debateResult" class="hidden mt-2"></div>
@@ -337,7 +349,7 @@
       </div>
 
       <!-- SECTION 3: RECENT COGNITIVE ACTIVITY STREAM -->
-      <div class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
+      <div id="activityCard" class="bg-cream-bg border border-border-color rounded-3xl p-6 shadow-sm">
         <div class="flex justify-between items-center mb-6">
           <h3 class="text-base font-bold text-[#3a2e23] flex items-center gap-2">
             <span class="material-symbols-outlined text-[#8c7a6b]">stream</span> Live Cognitive Activity Feed
@@ -345,7 +357,10 @@
           <span class="text-xs text-[#8c7a6b]">Last 15 executions</span>
         </div>
 
-        <div class="overflow-x-auto">
+        <!-- Phone: the table as cards (renderDashboard). -->
+        <div id="fcmActivity" class="fcm-only fcm-stack"></div>
+
+        <div class="overflow-x-auto fcm-desk">
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="border-b border-border-color text-[11px] font-bold uppercase tracking-wider text-[#8c7a6b]">
@@ -566,6 +581,21 @@
       grid.innerHTML += cardHtml;
     });
 
+    // 1b. Phone: the same agents as a swipeable strip (mobile_ui.css shows it
+    // below 768px in place of the grid). A card opens that agent's settings.
+    const escP = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const strip = document.getElementById('fcmPulse');
+    if (strip) strip.innerHTML = data.agents.map(agent => {
+      const st = agent.status === 'WORKING' ? ['Working', 'fcm-tag-accent']
+        : agent.status === 'WAITING' ? ['Needs you', 'fcm-tag-accent'] : ['Online', 'fcm-tag-sage'];
+      return `<a class="fcm-agent-card" href="finchat_agents.html?agent=${encodeURIComponent(agent.id)}">
+          <span class="fcm-agent-face" style="background-color:${colors[agent.id] || '#3a2e23'}">${agentFace(agent.id)}</span>
+          <span class="fcm-agent-name">${escP(agent.name)}</span>
+          <span class="fcm-agent-role">${escP(agent.role)}</span>
+          <span class="fcm-tag ${st[1]}">${st[0]}</span>
+        </a>`;
+    }).join('');
+
     // 2. Render Queue Stats
     if (data.queueStatus) {
       document.getElementById('qActive').textContent = data.queueStatus.active || 0;
@@ -576,8 +606,10 @@
 
     // 3. Render Activity Table
     const tbody = document.getElementById('activityTableBody');
+    const feed = document.getElementById('fcmActivity');
     if (!data.recentActivity || data.recentActivity.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-[#8c7a6b]">No recent tasks recorded yet.</td></tr>`;
+      if (feed) feed.innerHTML = '<div class="fcm-note">No recent tasks recorded yet.</div>';
       return;
     }
 
@@ -616,6 +648,30 @@
         </tr>
       `;
     });
+
+    // Phone: one card per execution instead of a six-column table.
+    if (feed) {
+      const ago = (ts) => {
+        const s = Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 1000));
+        return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + 'm ago' : s < 86400 ? Math.floor(s / 3600) + 'h ago' : Math.floor(s / 86400) + 'd ago';
+      };
+      const tagFor = { completed: 'fcm-tag-sage', running: 'fcm-tag-accent', ready: 'fcm-tag-accent', waiting: 'fcm-tag-accent', failed: 'fcm-tag-danger' };
+      feed.innerHTML = data.recentActivity.map(act => {
+        const n = (act.toolsInvoked || []).length;
+        const face = avatars[act.agentId]
+          ? `<img src="${avatars[act.agentId]}" alt="">`
+          : `<span>${esc(String(act.agentId || '?').charAt(0).toUpperCase())}</span>`;
+        return `<div class="fcm-feed-card">
+            <div class="fcm-feed-top">
+              <span class="fcm-feed-face">${face}</span>
+              <span class="fcm-feed-name">${esc(act.agentId)}</span>
+              <span class="fcm-tag ${tagFor[act.state] || 'fcm-tag-neutral'}">${esc(act.state)}</span>
+            </div>
+            <div class="fcm-feed-goal">${esc(stripMd(act.goal))}</div>
+            <div class="fcm-feed-meta"><span>Tools: ${n || '—'}</span><span>Iterations: ${act.iterationsUsed ?? '—'}</span><span class="fcm-feed-time">${ago(act.updatedAt)}</span></div>
+          </div>`;
+      }).join('');
+    }
   }
 
   // Runs one briefing now. The daily 8:00 AM run is owned by the external cron
@@ -703,7 +759,8 @@
     } finally {
       window.debateRunning = false;
       btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">gavel</span> Convene Debate';
+      btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">gavel</span><span class="fcm-only"><span data-fcm-icon="gavel"></span></span> Convene Debate';
+      if (window.fcMobile) fcMobile.hydrateIcons(btn);
       document.getElementById('debateProgress').textContent = '';
     }
   }

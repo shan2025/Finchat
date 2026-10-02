@@ -10,11 +10,9 @@
   window.fetch=function(u,o){ try{ if(typeof u==='string'&&u.charAt(0)==='/') u='http://localhost:3000'+u; }catch(e){} return _f(u,o); }; } })();
 (function () {
   function init() {
-    if (!document.getElementById('notifBell')) return; // no bell on this page
     const tok = () => localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') ||
       (JSON.parse(sessionStorage.getItem('finchat_user') || 'null') || {}).token || '';
     const $ = (id) => document.getElementById(id);
-    let open = false;
 
     function timeAgo(ts) {
       const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -29,6 +27,9 @@
         const r = await fetch('/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + tok() } });
         if (!r.ok) return;
         const d = await r.json();
+        // The phone app bar (mobile_ui.js) paints its own badge from this,
+        // rather than polling the same endpoint a second time.
+        window.dispatchEvent(new CustomEvent('fc:notif-count', { detail: d.count || 0 }));
         const badge = $('notifBadge');
         if (!badge) return;
         if (d.count > 0) { badge.textContent = d.count > 99 ? '99+' : d.count; badge.classList.remove('hidden'); }
@@ -248,6 +249,31 @@
       });
     }
 
+    // Marks a notification read, then shows its report in place or goes where
+    // it points. Returns 'report', 'nav' or null (nothing to open).
+    async function activate(n) {
+      try { await fetch('/api/notifications/' + n.notification_id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+      // Report/briefing notifications carry the full body — show it in place
+      // instead of navigating to a page where only a teaser is visible.
+      if (REPORT_TYPES[n.type] && !n.link && (n.content || '').trim()) { showReport(n); return 'report'; }
+      const dest = targetFor(n);
+      if (dest) {
+        // Same page AND same query (e.g. same ?session=)? Nothing to load. If
+        // only the page matches but the query differs (a different
+        // ?session=<id>), navigate so the page picks up the new deep-link.
+        const here = location.pathname.split('/').pop() + location.search;
+        if (dest !== here) { location.href = dest; return 'nav'; }
+      }
+      return null;
+    }
+    // The phone notifications sheet lists the same items and opens them the
+    // same way, including on pages with no bell of their own.
+    window.fcNotifications.activate = activate;
+    window.fcNotifications.snippet = mdSnippet;
+
+    if (!document.getElementById('notifBell')) return; // no bell on this page
+    let open = false;
+
     async function loadList() {
       const list = $('notifList');
       if (!list) return;
@@ -273,23 +299,12 @@
 
     window.__notifClick = async function (id) {
       const n = notifCache[id];
-      try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
-      // Report/briefing notifications carry the full body — show it in place
-      // instead of navigating to a page where only a teaser is visible.
-      if (n && REPORT_TYPES[n.type] && !n.link && (n.content || '').trim()) {
-        const dd = $('notifDropdown'); if (dd) { dd.classList.add('hidden'); open = false; }
-        showReport(n);
-        await loadList(); refreshBadge();
-        return;
-      }
-      const dest = n ? targetFor(n) : null;
-      if (dest) {
-        // Same page AND same query (e.g. same ?session=)? just refresh the
-        // list instead of a pointless reload. If only the page matches but
-        // the query differs (e.g. a different ?session=<id>), we still need
-        // to navigate so the page picks up the new deep-link param.
-        const here = location.pathname.split('/').pop() + location.search;
-        if (dest !== here) { location.href = dest; return; }
+      if (!n) {
+        try { await fetch('/api/notifications/' + id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + tok() } }); } catch (e) { }
+      } else {
+        const done = await activate(n);
+        if (done === 'nav') return;
+        if (done === 'report') { const dd = $('notifDropdown'); if (dd) { dd.classList.add('hidden'); open = false; } }
       }
       await loadList(); refreshBadge();
     };
@@ -345,12 +360,12 @@
     setInterval(() => { if (!document.hidden) refreshBadge(); bindSocket(); }, 30000);
     setTimeout(bindSocket, 2000);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-
   // The bell lives inside the page's <main>, which spa_router.js replaces on a
   // client-side navigation. Re-running init() rebinds to the new element; the
   // 30s poll above is registered once per init, so the router tears the old
-  // view's timers down before calling this.
+  // view's timers down before calling this. Defined before init() first runs,
+  // which adds activate/snippet to it.
   window.fcNotifications = { init };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();

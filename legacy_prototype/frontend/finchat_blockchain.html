@@ -271,6 +271,10 @@
  refreshAll(false);
  setInterval(() => { if (!document.hidden) refreshAll(false); }, 30000); // egress guard
 </script>
+<script>
+ // Phone (mobile_ui.js): Refresh moves from the hidden page header to the app bar.
+ if (window.fcMobile) fcMobile.setActions([{ icon: 'refresh', label: 'Refresh', onClick: () => refreshAll(true) }]);
+</script>
 <script src="api_client.js"></script>
 <script src="notifications_widget.js"></script>
 <script src="sidebar_nav.js"></script>

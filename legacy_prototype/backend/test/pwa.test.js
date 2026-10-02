@@ -25,6 +25,13 @@ describe('injectPwaHead', () => {
     assert.match(head, /<script src="\/pwa\.js" defer><\/script>/);
   });
 
+  test('adds the phone layout, its script blocking so the html class lands before first paint', () => {
+    const head = injectPwaHead(page).split('</head>')[0];
+    assert.match(head, /<link rel="stylesheet" href="\/mobile_ui\.css">/);
+    assert.match(head, /<script src="\/mobile_ui\.js"><\/script>/);
+    for (const f of ['mobile_ui.css', 'mobile_ui.js']) assert.ok(fs.existsSync(path.join(FRONTEND, f)), `${f} must exist`);
+  });
+
   test('drops the SVG touch icon iOS cannot use', () => {
     assert.doesNotMatch(injectPwaHead(page), /favicon\.svg/);
     assert.strictEqual((injectPwaHead(page).match(/rel="apple-touch-icon"/g) || []).length, 1);

@@ -185,6 +185,8 @@
     '.sbn-themebtn { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border:none; border-radius:999px; background:var(--sbn-badge); color:var(--sbn-muted); cursor:pointer; padding:0; }',
     '.sbn-themebtn:hover { color:var(--sbn-fg); }',
     '@media (pointer:coarse) { .sbn-themebtn { width:40px; height:40px; } }',
+    '.sbn-close { display:none; align-items:center; justify-content:center; width:40px; height:40px; border:none; border-radius:999px; background:var(--sbn-badge); color:var(--sbn-fg); cursor:pointer; padding:0; flex-shrink:0; }',
+    '@media (max-width:1023px) { .sbn-close { display:inline-flex; } }',
     '.sbn-truncate { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }',
     // Scrollbars in the rail: the gutter is always reserved (so nothing shifts)
     // but the thumb only paints while the pointer/focus is in the rail, keeping
@@ -328,6 +330,10 @@
         '<button class="sbn-themebtn" id="sbnThemeBtn" title="Switch nav theme (espresso / cream)">' +
           '<span class="material-symbols-outlined" style="font-size:16px;">' + (navTheme === 'cream' ? 'dark_mode' : 'light_mode') + '</span>' +
         '</button>' +
+        // Drawer only (below 1024px): the backdrop was the one way to close it.
+        '<button class="sbn-close" id="sbnClose" type="button" aria-label="Close menu" title="Close menu">' +
+          '<span class="material-symbols-outlined" style="font-size:20px;">close</span>' +
+        '</button>' +
       '</div>' +
       '<div class="sbn-newwrap">' +
         '<button class="sbn-newchat" id="sbnNewChat">' +
@@ -468,6 +474,9 @@
       build();
     };
 
+    var closeBtn = document.getElementById('sbnClose');
+    if (closeBtn) closeBtn.onclick = closeDrawer;
+
     // Close the drawer when a nav link is tapped (pages bound this to the OLD
     // links before we rebuilt the sidebar). The backdrop is looked up at click
     // time, not captured here: it lives inside the page's <main>, so an SPA
@@ -558,9 +567,22 @@
       });
     }
     if (typeof cream === 'boolean') bar.classList.toggle('sbn-cream', cream);
+    // On a phone, mobile_ui.js draws the app bar (html.fcm-on) and hides the
+    // page's own header — so "no visible toggle" there is expected, not a
+    // reason to add this bar as well.
+    var phoneShell = document.documentElement.classList.contains('fcm-on') && window.innerWidth < 768;
     var pageOwnsToggle = pageToggleVisible();
     if (pageOwnsToggle) setMobileDrawer(false);
-    document.documentElement.classList.toggle('sbn-mbar-on', !pageOwnsToggle);
+    document.documentElement.classList.toggle('sbn-mbar-on', !pageOwnsToggle && !phoneShell);
+  }
+
+  // Whichever opened it — a page toggle (#navBackdrop) or a bar.
+  function closeDrawer() {
+    var nav = document.getElementById('sideNav');
+    if (nav) nav.classList.remove('open');
+    var bd = document.getElementById('navBackdrop');
+    if (bd) bd.classList.add('hidden');
+    setMobileDrawer(false);
   }
 
   // ── Short-viewport scroll cues ─────────────────────────────────────────
@@ -768,6 +790,9 @@
   // since Recent settling resizes the nav list under it.
   window.fcSidebarNav = {
     rebuild: build, syncActive: syncActive,
+    // For drawn-elsewhere toggles (mobile_ui.js's app bar, Chat's phone header).
+    openDrawer: function () { setMobileDrawer(true); },
+    closeDrawer: closeDrawer,
     recentsPainted: function () {
       var nav = document.getElementById('sideNav');
       if (nav) revealActive(nav);

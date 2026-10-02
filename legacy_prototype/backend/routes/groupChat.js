@@ -52,6 +52,8 @@ router.get('/', requireAuth, async (req, res) => {
     const groups = await query(`
       SELECT g.*,
         (SELECT COUNT(*) FROM group_chat_members m WHERE m.group_id = g.group_id AND m.member_type = 'agent') AS agent_count,
+        -- The phone group list draws each room's agents as stacked avatars.
+        (SELECT array_agg(m.member_id) FROM group_chat_members m WHERE m.group_id = g.group_id AND m.member_type = 'agent') AS agent_ids,
         (SELECT content FROM group_chat_messages msg WHERE msg.group_id = g.group_id ORDER BY created_at DESC LIMIT 1) AS last_message
       FROM group_chats g WHERE g.owner_id = $1
       ORDER BY g.updated_at DESC

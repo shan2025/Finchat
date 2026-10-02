@@ -1,6 +1,6 @@
 # Sprint AB — FinChat on Mobile Phones
 
-**Status:** Phases 1–2 shipped 2026-09-13 · tablets + touch (Phase 4's touch question) db3aae7 · Phase 3 installable da8dd8c 2026-09-30 · Phase 5 (store) optional — needs privacy policy + account deletion first
+**Status:** Phases 1–2 shipped 2026-09-13 · tablets + touch (Phase 4's touch question) db3aae7 · Phase 3 installable da8dd8c 2026-09-30 · phone redesign (§7) 2026-10-02 · Phase 5 (store) optional — needs privacy policy + account deletion first
 **Written:** 2026-09-13
 
 ---
@@ -241,3 +241,72 @@ Verified on a local server: every page served with the manifest (test walks all 
 **Not verified:** the install prompt itself and a real phone — the in-app browser can't install apps. Check on a phone after deploy: Android Chrome → menu → *Install app*; iPhone Safari → Share → *Add to Home Screen*.
 
 **Still needed before a store listing:** a privacy policy page and in-app account deletion (both stores require them; neither exists).
+
+---
+
+## 7. Phone redesign — the "Finchat Mobile" design (2026-10-02)
+
+Source: the Claude Design handoff `Finchat mobile UI redesign` (`Finchat Mobile.dc.html`,
+Organic design system: sand ground `#f5ead8`, terracotta `#c67139`, sage `#7a8a5e`,
+Caprasimo over Figtree, Lucide icons at stroke 2.75, pills and 22–32px corners).
+Phones only (below 768px); tablets and desktop are untouched.
+
+### 7.1 Where it lives
+
+| Piece | Where |
+|---|---|
+| Phone shell: app bar (menu or back · title + subtitle · page actions · bell + badge), bottom sheets, dialog, toast, notifications sheet, drawer look | `frontend/mobile_ui.js` → `window.fcMobile` |
+| All phone styling, one section per page keyed by that page's ids | `frontend/mobile_ui.css` |
+| Both injected into every page's `<head>` as it is served — like the PWA tags, so design-tool regens can't drop them | `backend/middleware/pwaHead.js` |
+| Phone-only / desktop-only markup a page carries | `.fcm-only` / `.fcm-desk` |
+
+`mobile_ui.js` sets `html.fcm-on` (and `fcm-bar-on`) synchronously in `<head>`, only on
+app pages listed in its `PAGES` table — login, signup and share pages keep their own
+designs. Every layout rule is inside the phone media query **and** keyed to that class,
+so a page whose script failed keeps its previous phone layout.
+
+### 7.2 Contracts worth knowing
+
+- **The app bar replaces each page's header** (`header:has(#navToggle)` is hidden).
+  Pages configure it with `fcMobile.setTitle / setBack / setActions`; SPA views do so
+  in their boot script — `spa_router.js` now fires `fc:navigating` before a view's
+  scripts run so the previous view's bar settings are dropped, and a view that sets
+  nothing gets its page's defaults.
+- **Neural Map keeps a slim header** (search + New node): its header *is* its
+  toolbar. The other tools sit behind the bar's ⋯, as a sheet whose rows click the
+  real buttons. **Model Lab** keeps its own header (the map name is edited there);
+  **Neural Space**, **Mind Maps** and **Boards** keep their own chrome.
+- **Bells:** any `[data-fcm-bell]` opens the notifications sheet on a phone (capture
+  phase, so a page bell's desktop dropdown never opens). `notifications_widget.js`
+  exposes `fcNotifications.activate(n)` (mark read → report modal or navigate) and
+  fires `fc:notif-count`, so the bar's badge reuses its poll instead of adding one.
+- **Sheets proxy existing buttons** (Recent row ⋯, Neural Map tools): copy / rename /
+  delete stay implemented in one place.
+- `sidebar_nav.js`: drawer close button (below 1024px), `fcSidebarNav.openDrawer /
+  closeDrawer`, and its fallback 52px bar never shows under the phone shell.
+
+### 7.3 Per screen
+
+| Screen | Phone |
+|---|---|
+| Chat | Header: menu · agent (opens "Talk to" sheet) · bell · ⋯ (Branch, Mind map, Rename, Copy, Export, Delete). Left-aligned welcome, 2-up suggestion cards. User bubbles on sand; agent replies without a bubble (name + time, text, proof hash, copy). Composer: mode chips, agent chip, attach (sheet: file / camera / chat as context), **mic now works** (voice_input.js), icon-only Web/Study, send |
+| Operations | Live pulse + Refresh row, 2×2 integrity, Knowledge Memory wells, agent strip (opens Agents `?agent=`), coloured execution wells, dark briefing card, council chips with avatars, activity as cards |
+| Agents | 112px agent strip, card header with portrait, full-width risk segments, traits before audit trail, Discard / Save |
+| Group Chat | Stacked-avatar rows (list API now returns `agent_ids`), help card, "+" in the bar; thread: back · name · members · ⋯ (task, add agent, rename, delete), sheets/dialogs instead of `prompt()`/`confirm()` |
+| Reports, Knowledge, Settings, Planning | Restyled in place to the design (chip strips, stat wells, bars, switches, segmented pills) |
+| Agent Map, Neural Space | Unchanged apart from the bar (Agent Map) — the live map is richer than the design's summary |
+
+### 7.4 Verified
+
+Mock API in the scratchpad (no production DB), 375×812: every screen above against
+the design, sheets (agent, actions, attach, notifications, tools), drawer, SPA swaps
+Reports → Knowledge → Settings (bar title follows), dark theme chips, zero document
+overflow. 1280×800: no phone markup visible, headers and rail as before (one bug found
+and fixed — the drawer's phone icons showed beside the desktop ones). `test/pwa.test.js`
+11/11; every edited inline script parses.
+
+**Not verified:** a real phone (iOS safe areas, keyboard over the composer), the mic
+on a device, a signed-in session against the real API.
+
+**Not built:** the design's in-app push banner (needs the socket on every page), and
+its simplified Agent Map / Neural Space summaries.

@@ -331,6 +331,9 @@
 
  $('hdName').textContent = SESSION_USER.name || SESSION_USER.username || 'you';
  $('hdRole').textContent = (SESSION_USER.role || 'user');
+ // Phone: the header's subtitle moves into the app bar (mobile_ui.js).
+ if (window.fcMobile) fcMobile.setTitle('Settings', 'Workspace preferences, connections and the trust record for ' +
+   (SESSION_USER.name || SESSION_USER.username || 'you') + ' · ' + (SESSION_USER.role || 'user'));
 
  // ── shared state ──
  const state = {

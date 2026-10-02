@@ -261,6 +261,9 @@
       await adoptHeadScripts(doc);
       if (token !== navToken) return;
 
+      // Before the view's scripts: shell widgets that views configure (the
+      // phone app bar) drop the previous view's settings here.
+      window.dispatchEvent(new CustomEvent('fc:navigating', { detail: { url } }));
       runViewScripts(doc);
       // Inside the tracking window: re-initialising the bell registers a 30s
       // poll, which would otherwise survive teardownView() and stack up one

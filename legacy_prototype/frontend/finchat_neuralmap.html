@@ -1593,10 +1593,14 @@ const fmtAgo = (ts) => {
  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
  return `${Math.floor(s / 86400)}d ago`;
 };
+// A fact's interval end: a calendar day reads better than "41d ago" there.
+const fmtDay = (ts) => ts
+ ? new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+ : 'now';
 
 const EVENT_ICON = {
  created: 'auto_awesome', mentioned: 'chat_bubble', activated: 'bolt',
- updated: 'edit', merged: 'merge', contradiction: 'warning'
+ updated: 'edit', merged: 'merge', contradiction: 'warning', superseded: 'history'
 };
 
 async function loadLivingProfile(n) {
@@ -1643,6 +1647,21 @@ async function loadLivingProfile(n) {
          <span class="nm-sub font-mono text-[9px]">· ${Math.round(c.strength * 100)}%</span>
         </div>
         ${c.reason ? `<div class="text-[10px] nm-sub leading-snug">${esc(c.reason)}</div>` : ''}
+       </div>`).join('')}
+     </div>
+    </div>` : ''}
+
+    ${(p.history || []).length ? `
+    <div>
+     <div class="text-[10px] font-bold tracking-widest uppercase nm-sub mb-1">No longer true</div>
+     <div class="flex flex-col gap-1 max-h-[110px] overflow-y-auto">
+      ${p.history.slice(0, 6).map(h => `
+       <div class="nm-field rounded-lg px-2 py-1.5" style="opacity: .75">
+        <div class="text-[11px]" style="color: var(--txt); text-decoration: line-through">
+         ${h.direction === 'out' ? '' : '← '}${esc(h.type.replace(/_/g, ' '))} ${esc(h.other.name)}
+        </div>
+        <div class="text-[9px] nm-sub font-mono">${fmtDay(h.validFrom)} → ${fmtDay(h.validTo)}</div>
+        ${h.endedBecause ? `<div class="text-[10px] nm-sub leading-snug">${esc(h.endedBecause)}</div>` : ''}
        </div>`).join('')}
      </div>
     </div>` : ''}
@@ -2199,6 +2218,18 @@ loop();
   a.addEventListener('click', e => { e.preventDefault(); showToast(label + ' is coming soon.'); });
  });
 })();
+</script>
+<script>
+ // Phone (mobile_ui.js): the header keeps search and New node; its other
+ // tools sit behind the app bar's "⋯". Each sheet row clicks the real button,
+ // so the tools stay wired in one place.
+ if (window.fcMobile) {
+  const NM_TOOLS = [['addDocBtn', 'file', 'Add document'], ['selectAllBtn', 'target', 'Select all nodes'], ['resetViewBtn', 'refresh', 'Reset view'],
+   ['heatmapBtn', 'flame', 'Knowledge heatmap'], ['neighborhoodsBtn', 'hub', 'Neighborhoods'], ['insightsBtn', 'sparkle', 'Insights'],
+   ['dreamBtn', 'moon', 'Consolidate memory now'], ['themeBtn', 'brain', 'Toggle map theme'], ['reloadBtn', 'history', 'Rebuild from live state']];
+  fcMobile.setActions([{ icon: 'more', label: 'Map tools', onClick: () => fcMobile.actions('Map tools',
+   NM_TOOLS.filter(([id]) => document.getElementById(id)).map(([id, icon, label]) => ({ icon, label, onClick: () => document.getElementById(id).click() }))) }]);
+ }
 </script>
 <script src="api_client.js"></script>
 <script src="notifications_widget.js"></script>

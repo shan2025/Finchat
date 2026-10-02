@@ -107,6 +107,14 @@
    <div id="groupList" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
     <div class="px-3 py-2 text-xs" style="color:var(--text3);">Loading…</div>
    </div>
+   <!-- Phone: what a group is for, under the list (the desktop empty state
+        sits in the thread pane, which a phone doesn't show with the list). -->
+   <div class="fcm-only fcm-gc-help">
+    <span class="fcm-gc-help-ic"><span data-fcm-icon="group"></span></span>
+    <div class="fcm-gc-help-title">Create a group to start a discussion</div>
+    <p>Pick which agents join the room. Ask questions, get news updates, let agents debate each other, @mention someone specific, or type <code>/task @agent your goal</code> to hand out real work.</p>
+    <button type="button" class="fcm-btn fcm-btn-primary" onclick="openCreateModal()"><span data-fcm-icon="plus"></span>New group chat</button>
+   </div>
   </aside>
 
   <!-- Chat area -->
@@ -160,12 +168,12 @@
     </div>
 
     <!-- Composer -->
-    <div id="gcComposer" class="px-5 pb-5 pt-2 shrink-0">
+    <div id="gcComposer" class="px-5 pb-5 pt-2 shrink-0 fcm-has-composer">
      <div class="flex items-end gap-2 rounded-3xl px-4 py-2.5" style="background:var(--surface); border:1px solid var(--border);">
       <textarea id="grpInput" rows="1" placeholder="Message the group — @mention an agent, or /task @agent goal…"
        class="flex-1 bg-transparent border-0 outline-none resize-none text-sm py-1.5" style="max-height:120px;"></textarea>
       <button id="grpSendBtn" onclick="sendGroupMessage()" class="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0" style="background:#8c491a;">
-       <span class="material-symbols-outlined text-[18px]">send</span>
+       <span class="material-symbols-outlined text-[18px]">send</span><span class="fcm-only"><span data-fcm-icon="arrowUp"></span></span>
       </button>
      </div>
      <div class="mt-1.5 px-2 text-[10px]" style="color:var(--text3);">
@@ -292,17 +300,24 @@
     list.innerHTML = '<div class="px-3 py-2 text-xs" style="color:var(--text3);">No groups yet — create one!</div>';
     return;
    }
+   // Phone rows lead with the room's agents as stacked avatars (.fcm-only);
+   // desktop keeps the forum icon and agent count (.fcm-desk).
+   const stack = (g) => (g.agent_ids || []).slice(0, 3)
+    .map(id => agentFace(id, 34, 'border:2px solid var(--bg);') || '').join('');
    list.innerHTML = groups.map(g => `
-    <div onclick="openGroup('${g.group_id}')" class="px-3 py-2.5 rounded-2xl cursor-pointer transition-colors"
+    <div onclick="openGroup('${g.group_id}')" class="gc-row px-3 py-2.5 rounded-2xl cursor-pointer transition-colors${activeGroup && activeGroup.group_id === g.group_id ? ' is-active' : ''}"
      style="${activeGroup && activeGroup.group_id === g.group_id ? 'background:#3a2e23; color:#efe8de;' : 'background:transparent;'}"
      onmouseover="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='rgba(0,0,0,.05)'"
      onmouseout="if(!(activeGroup&&activeGroup.group_id==='${g.group_id}'))this.style.background='transparent'">
-     <div class="flex items-center gap-2">
-      <span class="material-symbols-outlined text-[18px]">forum</span>
-      <span class="font-bold text-[13px] truncate flex-1">${esc(g.name)}</span>
-      <span class="text-[10px] opacity-70">${g.agent_count}🤖</span>
+     <span class="fcm-only gc-stack">${stack(g)}</span>
+     <div class="gc-row-text min-w-0">
+      <div class="flex items-center gap-2">
+       <span class="material-symbols-outlined text-[18px] fcm-desk">forum</span>
+       <span class="gc-row-name font-bold text-[13px] truncate flex-1">${esc(g.name)}</span>
+       <span class="text-[10px] opacity-70 fcm-desk">${g.agent_count}🤖</span>
+      </div>
+      <div class="gc-row-last text-[11px] truncate mt-0.5 opacity-70">${g.last_message ? mdLine(g.last_message) : 'No messages yet'}</div>
      </div>
-     <div class="text-[11px] truncate mt-0.5 opacity-70">${g.last_message ? mdLine(g.last_message) : 'No messages yet'}</div>
     </div>`).join('');
   } catch (e) { console.log('loadGroups failed', e); }
  }
@@ -354,7 +369,33 @@
   // task modal agent options
   document.getElementById('taskAgent').innerHTML =
    agents.map(a => `<option value="${a.member_id}">${esc(a.name)}</option>`).join('');
+  syncPhoneBar();
  }
+
+ // ── Phone app bar (mobile_ui.js) ──
+ // The list has "New group"; an open thread has a back arrow, the room's name
+ // and members, and "⋯" for the rename/delete buttons the member strip drops.
+ function syncPhoneBar() {
+  if (!window.fcMobile) return;
+  if (activeGroup && document.body.classList.contains('gc-thread')) {
+   fcMobile.setTitle(activeGroup.name, members.filter(m => m.member_type === 'agent').map(m => m.name).join(', '));
+   fcMobile.setBack(closeThread);
+   fcMobile.setActions([{ icon: 'more', label: 'Group actions', onClick: () => fcMobile.actions(activeGroup.name, [
+    { icon: 'clipboard', label: 'Assign a task', onClick: openTaskModal },
+    { icon: 'plus', label: 'Add an agent', onClick: openAddAgent },
+    { icon: 'pencil', label: 'Rename group', onClick: renameGroup },
+    { icon: 'trash', label: 'Delete group', danger: true, onClick: deleteGroup }
+   ]) }]);
+  } else {
+   fcMobile.setTitle('Group Chat', 'agents + you, one room');
+   fcMobile.setBack(null);
+   fcMobile.setActions([{ icon: 'plus', label: 'New group', primary: true, onClick: openCreateModal }]);
+  }
+ }
+ // On a phone, the design's dialog instead of the browser's own.
+ const onPhone = () => window.fcMobile && fcMobile.isPhone();
+ const askConfirm = (text, cta) => onPhone() ? fcMobile.confirm({ title: text, cta, danger: true }) : Promise.resolve(confirm(text));
+ const askPrompt = (text, value) => onPhone() ? fcMobile.prompt({ title: text, value, cta: 'Save' }) : Promise.resolve(prompt(text, value));
 
  // ── Messages ──
  function appendMessage(m) {
@@ -382,13 +423,14 @@
   const taskBadge = meta.kind === 'task_result' ? '<span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold" style="background:#dcfce7; border:1px solid #16a34a; color:#166534;">TASK RESULT</span>' : '';
   const body = DOMPurify.sanitize(marked.parse(m.content || ''), { ADD_ATTR: ['target'] });
 
-  div.className = 'flex gap-2.5 ' + (isUser ? 'flex-row-reverse' : '');
+  // gc-* classes are the phone layout's hooks (mobile_ui.css).
+  div.className = 'gc-msg ' + (isUser ? 'gc-user ' : 'gc-bot ') + 'flex gap-2.5 ' + (isUser ? 'flex-row-reverse' : '');
   div.innerHTML = `
    ${avatar}
-   <div class="max-w-[75%] min-w-0">
-    <div class="text-[11px] font-bold mb-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text2);">${esc(name)}${fallbackBadge}${taskBadge}</div>
-    <div class="px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed markdown-body" style="${isUser ? 'background:#3a2e23; color:#efe8de;' : 'background:var(--surface); border:1px solid var(--border);'}">${body}</div>
-    <div class="text-[10px] mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
+   <div class="gc-col max-w-[75%] min-w-0">
+    <div class="gc-name text-[11px] font-bold mb-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text2);">${esc(name)}${fallbackBadge}${taskBadge}</div>
+    <div class="gc-bubble px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed markdown-body" style="${isUser ? 'background:#3a2e23; color:#efe8de;' : 'background:var(--surface); border:1px solid var(--border);'}">${body}</div>
+    <div class="gc-time text-[10px] mt-0.5 ${isUser ? 'text-right' : ''}" style="color:var(--text3);">${time}
      <button class="ml-1 opacity-60 hover:opacity-100" title="Copy message" onclick="navigator.clipboard.writeText(this.closest('div').parentNode.querySelector('.markdown-body').innerText).then(()=>showToast('Message copied'))"><span class="material-symbols-outlined text-[12px] align-middle">content_copy</span></button>
     </div>
    </div>`;
@@ -435,9 +477,21 @@
   const current = members.filter(m => m.member_type === 'agent').map(m => m.member_id);
   const candidates = allAgents.filter(a => !current.includes(a.agentId));
   if (!candidates.length) { showToast('All available agents are already in this group'); return; }
+  if (onPhone()) {
+   fcMobile.sheet({ title: 'Add an agent', items: candidates.map(a => ({
+    img: AGENT_AVATARS[a.agentId] || null,
+    avatar: AGENT_AVATARS[a.agentId] ? null : '<span class="material-symbols-outlined">smart_toy</span>',
+    label: a.name, sub: (a.capabilities || []).slice(0, 3).join(', '),
+    onClick: () => addAgent(a.agentId)
+   })) });
+   return;
+  }
   const pick = prompt('Add which agent?\nAvailable: ' + candidates.map(a => a.agentId).join(', '));
   if (!pick) return;
-  const agentId = pick.trim().toLowerCase().replace(/^@/, '');
+  addAgent(pick.trim().toLowerCase().replace(/^@/, ''));
+ }
+
+ async function addAgent(agentId) {
   const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members', {
    method: 'POST', headers: AUTH, body: JSON.stringify({ agentId })
   });
@@ -446,7 +500,7 @@
  }
 
  async function removeAgent(agentId) {
-  if (!confirm('Remove ' + agentId + ' from this group?')) return;
+  if (!(await askConfirm('Remove ' + agentId + ' from this group?', 'Remove'))) return;
   const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id + '/members/' + agentId, {
    method: 'DELETE', headers: AUTH
   });
@@ -456,7 +510,7 @@
 
  async function renameGroup() {
   if (!activeGroup) return;
-  const name = prompt('Rename group:', activeGroup.name);
+  const name = await askPrompt('Rename group:', activeGroup.name);
   if (!name || !name.trim() || name.trim() === activeGroup.name) return;
   const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, {
    method: 'PATCH', headers: AUTH, body: JSON.stringify({ name: name.trim() })
@@ -470,7 +524,7 @@
  }
 
  async function deleteGroup() {
-  if (!activeGroup || !confirm('Delete this group and all its messages?')) return;
+  if (!activeGroup || !(await askConfirm('Delete this group and all its messages?', 'Delete'))) return;
   const r = await fetch(API + '/api/group-chat/' + activeGroup.group_id, { method: 'DELETE', headers: AUTH });
   if (r.ok) {
    if (socket) socket.emit('leave_group', activeGroup.group_id);
@@ -479,6 +533,7 @@
    document.getElementById('emptyState').classList.remove('hidden');
    document.body.classList.remove('gc-thread');
    history.replaceState(null, '', location.pathname);
+   syncPhoneBar();
    loadGroups();
    showToast('Group deleted');
   } else showToast('Delete failed');
@@ -493,12 +548,14 @@
   if (history.state && history.state.gcThread) { history.back(); return; }
   document.body.classList.remove('gc-thread');
   history.replaceState(null, '', location.pathname);
+  syncPhoneBar();
  }
  window.addEventListener('popstate', () => {
   const g = new URLSearchParams(location.search).get('group');
   if (!g) document.body.classList.remove('gc-thread');
   else if (!activeGroup || activeGroup.group_id !== g) openGroup(g);
   else document.body.classList.add('gc-thread');
+  syncPhoneBar();
  });
 
  // ── Create group ──
@@ -578,6 +635,7 @@
  };
 
  // ── Init ──
+ syncPhoneBar();
  loadGroups().then(() => {
   const wanted = new URLSearchParams(location.search).get('group');
   if (wanted) openGroup(wanted);
