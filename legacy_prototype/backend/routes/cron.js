@@ -98,6 +98,15 @@ router.all('/tick', async (req, res) => {
     .then(r => { if (r && r.results && r.results.length) console.log(`📰 [Cron] Newsletters: ${r.results.map(x => x.status).join(', ')}`); })
     .catch(err => console.error('❌ [Cron] Newsletter run failed:', err.message));
 
+  // Public subscribers: read the bot's new /start and /stop messages first, so
+  // someone who joined since the last tick is included, then send the general
+  // edition to whoever has not had today's. A failed read must not stop the send.
+  const bot = require('../services/telegramBot');
+  bot.pollOnce()
+    .catch(err => console.error('❌ [Cron] Telegram bot read failed:', err.message))
+    .then(() => require('../services/newsletter/public').runPublicNewsletter())
+    .catch(err => console.error('❌ [Cron] Public newsletter run failed:', err.message));
+
   let claimed;
   try {
     const result = await query(`
@@ -260,6 +269,14 @@ router.all('/dream', backgroundJob('dream cycle',
 // Send any daily newsletters that are due now (normally /tick does this).
 router.all('/newsletter', backgroundJob('daily newsletter',
   () => require('../services/newsletter').runDueNewsletters()));
+
+// Read new bot messages and send today's public edition (normally /tick does this).
+router.all('/public-newsletter', backgroundJob('public newsletter', async () => {
+  const bot = require('../services/telegramBot');
+  const read = await bot.pollOnce().catch(err => ({ error: err.message }));
+  const sent = await require('../services/newsletter/public').runPublicNewsletter();
+  return { read, sent, subscribers: await bot.subscriberStats() };
+}));
 
 router.all('/digest', backgroundJob('dream digest',
   () => require('../services/cognitive/DreamDigest').runNightlyDigest({})));

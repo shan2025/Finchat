@@ -14,6 +14,9 @@
 //
 // Opt out: add 'newsletter' to the user's muted types (Settings), or turn
 // Telegram off. NEWSLETTER_ENABLED=false stops it for everyone.
+//
+// People who pressed Start on the bot without a FinChat account get the general
+// market edition instead — see ./public.js and services/telegramBot.js.
 
 const { query } = require('../../database');
 
@@ -91,14 +94,15 @@ function fallbackIssue(sources, date) {
     `\n\n## 🎯 Key Takeaway\n\nThe full reports are in the FinChat app.`;
 }
 
-async function composeIssue(sources, { date = prettyDate(), runInference } = {}) {
+// `prompt` lets the public edition (./public.js) use its own editor brief.
+async function composeIssue(sources, { date = prettyDate(), runInference, prompt = NEWSLETTER_PROMPT } = {}) {
   require('../../../frontend/report_cards.js');
   const RC = globalThis.ReportCards;
   const infer = runInference || require('../inference').runInference;
   try {
     const res = await infer({
       messages: [
-        { role: 'system', content: NEWSLETTER_PROMPT.replace('{DATE}', date) },
+        { role: 'system', content: prompt.replace('{DATE}', date) },
         { role: 'user', content: sourcesBlock(sources) }
       ],
       temperature: 0.3,
@@ -122,7 +126,9 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function caption({ title, date, stories }) {
+// `footer` is trusted HTML appended last (the public edition's /stop hint); the
+// story list is trimmed to make room for it rather than cutting it off.
+function caption({ title, date, stories, footer = '' }) {
   const base = String(process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
   const lines = [`<b>${escapeHtml(title || 'FinChat Daily')}</b> · ${escapeHtml(date || prettyDate())}`];
   if (stories.length) {
@@ -130,7 +136,8 @@ function caption({ title, date, stories }) {
     stories.slice(0, 6).forEach((s, i) => lines.push(`${i + 1}. ${escapeHtml(s)}`));
   }
   if (/^https:\/\//i.test(base)) lines.push('', `<a href="${escapeHtml(base)}/finchat_chat.html">Open FinChat</a>`);
-  return lines.join('\n').slice(0, 1000); // Telegram caps captions at 1024
+  const tail = footer ? `\n\n${footer}` : '';
+  return lines.join('\n').slice(0, 1000 - tail.length) + tail; // Telegram caps captions at 1024
 }
 
 /**
@@ -212,4 +219,4 @@ async function runDueNewsletters({ now = new Date() } = {}) {
   return { day, results };
 }
 
-module.exports = { sendNewsletter, runDueNewsletters, composeIssue, gatherSources, istParts, caption, HOUR_IST };
+module.exports = { sendNewsletter, runDueNewsletters, composeIssue, gatherSources, istParts, prettyDate, caption, HOUR_IST };

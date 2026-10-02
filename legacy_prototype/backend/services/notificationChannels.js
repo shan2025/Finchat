@@ -223,26 +223,32 @@ async function sendTelegram(chatId, text, { html = false, silent = false } = {})
 // A file (the daily newsletter PDF) with an HTML caption. Telegram accepts
 // documents up to 50 MB from a bot; an issue is ~30-60 KB. A caption Telegram
 // rejects as markup (400) is retried as plain text rather than losing the file.
-async function sendTelegramDocument(chatId, buffer, filename, captionHtml, { silent = false } = {}) {
+// `document` is the PDF Buffer, or a Telegram file_id from an earlier send —
+// the public edition uploads once and re-sends the same file_id to everyone.
+// Returns the file_id Telegram assigned so the caller can reuse it.
+async function sendTelegramDocument(chatId, document, filename, captionHtml, { silent = false } = {}) {
   if (!process.env.TELEGRAM_BOT_TOKEN) return { status: 'unconfigured', detail: 'TELEGRAM_BOT_TOKEN not set in .env' };
   const FormData = require('form-data');
   const post = (caption, html) => {
     const form = new FormData();
     form.append('chat_id', String(chatId));
-    form.append('document', buffer, { filename, contentType: 'application/pdf' });
+    if (Buffer.isBuffer(document)) form.append('document', document, { filename, contentType: 'application/pdf' });
+    else form.append('document', String(document));
     if (caption) form.append('caption', caption);
     if (caption && html) form.append('parse_mode', 'HTML');
     if (silent) form.append('disable_notification', 'true');
     return axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendDocument`, form,
       { headers: form.getHeaders(), timeout: 60000, maxBodyLength: 60 * 1024 * 1024 });
   };
+  let res;
   try {
-    await post(captionHtml, true);
+    res = await post(captionHtml, true);
   } catch (err) {
     if (!(err.response && err.response.status === 400)) throw err;
-    await post(String(captionHtml || '').replace(/<[^>]+>/g, ''), false);
+    res = await post(String(captionHtml || '').replace(/<[^>]+>/g, ''), false);
   }
-  return { status: 'sent' };
+  const doc = res && res.data && res.data.result && res.data.result.document;
+  return { status: 'sent', fileId: (doc && doc.file_id) || null };
 }
 
 // What Telegram gets for a notification: a short reviewed card, sent loudly,

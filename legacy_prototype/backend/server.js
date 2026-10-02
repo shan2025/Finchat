@@ -519,6 +519,15 @@ server.listen(PORT, async () => {
   try { await sweepStaleExecutions(); } catch (e) { console.error('Stale-execution sweep failed:', e.message); }
   setInterval(() => sweepStaleExecutions().catch(e => console.error('Stale-execution sweep failed:', e.message)), 5 * 60 * 1000);
 
+  // Read the Telegram bot's messages (/start, /stop, link codes) while awake so
+  // replies are prompt; the cron tick covers the time this host is asleep. On
+  // by default only on Render: a local server polling the same bot would take
+  // updates meant for the deployed one. TELEGRAM_BOT_POLL=true|false overrides.
+  const botPoll = String(process.env.TELEGRAM_BOT_POLL || (process.env.RENDER ? 'true' : 'false')).toLowerCase();
+  if (botPoll === 'true') {
+    require('./services/telegramBot').startPolling(Number(process.env.TELEGRAM_BOT_POLL_SECONDS) || 30);
+  }
+
   // Missions and briefings are started by the EXTERNAL cron service calling
   // /api/cron/tick and /api/cron/briefing — see routes/cron.js. There is
   // deliberately no in-process scheduler and no worker to start: this host

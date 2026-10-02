@@ -5,8 +5,9 @@ const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const {
   getPrefs, savePrefs, channelConfigStatus, getVapidKeys,
-  getTelegramBotInfo, telegramGetUpdates
+  getTelegramBotInfo
 } = require('../services/notificationChannels');
+const telegramBot = require('../services/telegramBot');
 const wa = require('../services/whatsapp');
 const { createNotification } = require('../services/notifications');
 const userKeys = require('../services/UserKeys');
@@ -199,23 +200,13 @@ router.get('/telegram/poll', requireAuth, async (req, res) => {
     if (!entry || entry.userId !== req.user.id) {
       return res.json({ linked: false, expired: true });
     }
-    const updates = await telegramGetUpdates();
-    let chatId = null, matchedUpdateId = null;
-    for (const u of updates) {
-      const msg = u.message;
-      if (msg && typeof msg.text === 'string' && msg.text.trim() === `/start ${code}`) {
-        chatId = String(msg.chat.id);
-        matchedUpdateId = u.update_id;
-        break;
-      }
-    }
+    // services/telegramBot.js is the one reader of the bot's messages; it files
+    // "/start <code>" in telegram_link_starts, whichever process happened to read it.
+    try { await telegramBot.pollOnce(); } catch (e) { /* the code may already be filed */ }
+    const chatId = await telegramBot.takeLinkStart(code);
     if (!chatId) return res.json({ linked: false });
     await savePrefs(req.user.id, { channel_telegram: true, telegram_chat_id: chatId });
     tgLinkCodes.delete(code);
-    // Confirm/clear consumed updates so they don't linger for the next link.
-    if (matchedUpdateId != null) {
-      try { await telegramGetUpdates(matchedUpdateId + 1); } catch (e) { /* best effort */ }
-    }
     res.json({ linked: true, chatId });
   } catch (err) {
     console.error('Telegram poll error:', err);
