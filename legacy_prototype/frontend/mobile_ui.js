@@ -456,16 +456,25 @@
     if (!t) return;
     fetch(API + '/api/notifications/unread-count', { headers: { Authorization: 'Bearer ' + t } })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d && typeof d.count === 'number') { unread = d.count; paintBadges(); } })
+      .then(function (d) { if (d && typeof d.count === 'number') noteCount(d.count); })
       .catch(function () {});
   }
   // notifications_widget.js reports every badge refresh it makes; while it is
   // polling, this file doesn't poll the same endpoint a second time.
   window.addEventListener('fc:notif-count', function (e) {
     lastWidgetCount = Date.now();
-    unread = e.detail || 0;
-    paintBadges();
+    noteCount(e.detail || 0);
   });
+  // The first count is the baseline; a later rise means something arrived
+  // while the page was open, which pages without a socket only learn here.
+  var knownCount = null;
+  function noteCount(c) {
+    var rose = knownCount !== null && c > knownCount;
+    knownCount = c;
+    unread = c;
+    paintBadges();
+    if (rose) bannerLatest();
+  }
   function timeAgo(ts) {
     var s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
     if (s < 60) return 'now';
@@ -510,18 +519,13 @@
         b.onclick = function () {
           var n = items[+b.getAttribute('data-i')];
           closeSheet();
-          if (!n.is_read) { unread = Math.max(0, unread - 1); paintBadges(); }
-          if (window.fcNotifications && window.fcNotifications.activate) window.fcNotifications.activate(n);
-          else {
-            fetch(API + '/api/notifications/' + n.notification_id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }).catch(function () {});
-            if (n.link) location.href = n.link;
-          }
+          openItem(n);
         };
       });
     }
     function markAll() {
       items.forEach(function (n) { n.is_read = true; });
-      unread = 0; paintBadges(); paint();
+      unread = 0; knownCount = 0; paintBadges(); paint();
       fetch(API + '/api/notifications/read-all', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }).catch(function () {});
       toast('All caught up');
     }
@@ -529,6 +533,114 @@
       .then(function (r) { return r.ok ? r.json() : { notifications: [] }; })
       .then(function (d) { items = d.notifications || []; if (sheetState && sheetState.api === api) paint(); })
       .catch(function () { if (sheetState && sheetState.api === api) api.body.innerHTML = '<div class="fcm-empty">Could not load notifications</div>'; });
+  }
+
+  // Open one notification the way the bell does: mark it read, then show its
+  // report in place or go where it points (notifications_widget.js).
+  function openItem(n) {
+    if (!n.is_read) {
+      n.is_read = true;
+      unread = Math.max(0, unread - 1);
+      if (knownCount !== null) knownCount = Math.max(0, knownCount - 1);
+      paintBadges();
+    }
+    if (window.fcNotifications && window.fcNotifications.activate) { window.fcNotifications.activate(n); return; }
+    fetch(API + '/api/notifications/' + n.notification_id + '/read', { method: 'POST', headers: { Authorization: 'Bearer ' + token() } }).catch(function () {});
+    if (n.link) location.href = n.link;
+  }
+
+  // ── Push banner ──────────────────────────────────────────────────────────
+  // A notification that arrives while a page is open drops in from the top,
+  // as on a phone's lock screen: tap to open it, swipe up or wait to dismiss.
+  // Instant where the page has a socket (the server pushes the row as
+  // notification:new); elsewhere it comes from the badge count rising.
+  var bannerEl = null, bannerItem = null, bannerTimer = null, bannerSeen = {};
+  function ensureBanner() {
+    if (bannerEl) return;
+    bannerEl = document.createElement('div');
+    bannerEl.className = 'fcm-banner';
+    bannerEl.setAttribute('role', 'status');
+    bannerEl.setAttribute('aria-live', 'polite');
+    document.body.appendChild(bannerEl);
+    bannerEl.addEventListener('click', function () {
+      var n = bannerItem;
+      hideBanner();
+      if (n) openItem(n);
+    });
+    // Swipe up to dismiss.
+    var startY = null, dy = 0;
+    bannerEl.addEventListener('touchstart', function (e) { startY = e.touches[0].clientY; dy = 0; bannerEl.style.transition = 'none'; }, { passive: true });
+    bannerEl.addEventListener('touchmove', function (e) {
+      if (startY == null) return;
+      dy = Math.min(0, e.touches[0].clientY - startY);
+      bannerEl.style.transform = 'translateY(' + dy + 'px)';
+    }, { passive: true });
+    bannerEl.addEventListener('touchend', function () {
+      if (startY == null) return;
+      startY = null;
+      bannerEl.style.transition = '';
+      bannerEl.style.transform = '';
+      if (dy < -30) hideBanner();
+    });
+  }
+  function hideBanner() {
+    clearTimeout(bannerTimer);
+    bannerItem = null;
+    if (bannerEl) bannerEl.classList.remove('fcm-show');
+  }
+  function showBanner(n) {
+    if (!n || !n.notification_id || bannerSeen[n.notification_id]) return;
+    bannerSeen[n.notification_id] = true;
+    // Not over an open notifications sheet (the row is already in it), not
+    // for a tab nobody is looking at, and not on a desktop-width window.
+    if (!isPhone() || document.hidden) return;
+    if (sheetState && sheetState.opts.className === 'fcm-sheet-notifs') return;
+    ensureBanner();
+    // "Mission completed · Nova" reads as the design's "FinChat · Nova" over
+    // "Mission completed"; a title without a source keeps it whole.
+    var title = String(n.title || 'Notification'), from = '';
+    var cut = title.lastIndexOf(' · ');
+    if (cut > 0) { from = title.slice(cut + 3); title = title.slice(0, cut); }
+    bannerEl.innerHTML =
+      '<span class="fcm-banner-ic"><img src="/assets/favicon.svg" alt=""></span>' +
+      '<span class="fcm-banner-text">' +
+        '<span class="fcm-banner-top"><span>FinChat' + (from ? ' · ' + esc(from) : '') + '</span><span>now</span></span>' +
+        '<span class="fcm-banner-title">' + esc(title) + '</span>' +
+        (n.content ? '<span class="fcm-banner-body">' + snippet(n.content) + '</span>' : '') +
+      '</span>';
+    bannerItem = n;
+    requestAnimationFrame(function () { bannerEl.classList.add('fcm-show'); });
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(hideBanner, 6000);
+  }
+  // A pushed row: count it at once (the next poll would anyway) and show it.
+  function onPushed(n) {
+    if (!n || (n.notification_id && bannerSeen[n.notification_id])) return;
+    unread += 1;
+    if (knownCount !== null) knownCount += 1;
+    paintBadges();
+    showBanner(n);
+  }
+  // The newest notification, after the count rose with no push to explain it.
+  function bannerLatest() {
+    fetch(API + '/api/notifications?limit=1', { headers: { Authorization: 'Bearer ' + token() } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var n = d && d.notifications && d.notifications[0];
+        // Only fresh, unread items: an old one resurfacing (another tab marked
+        // something unread) is not news.
+        if (n && !n.is_read && Date.now() - new Date(n.created_at).getTime() < 15 * 60000) showBanner(n);
+      })
+      .catch(function () {});
+  }
+  // Pages open their socket in their own scripts (a global `socket`, or
+  // window.socket); bind to whichever exists, once per socket.
+  function bindPushSocket() {
+    var s = window.socket && window.socket.on ? window.socket : null;
+    try { if (!s && typeof socket !== 'undefined' && socket && socket.on) s = socket; } catch (e) {}
+    if (!s || s.__fcmBanner) return;
+    s.__fcmBanner = true;
+    s.on('notification:new', onPushed);
   }
 
   // Static page markup asks for an icon with <span data-fcm-icon="name">.
@@ -550,6 +662,10 @@
       new MutationObserver(function () { decorateDrawer(); }).observe(nav, { childList: true });
     }
     refreshCount();
+    bindPushSocket();
+    // Some pages connect their socket after load (Group Chat in its init).
+    setTimeout(bindPushSocket, 2000);
+    setTimeout(bindPushSocket, 6000);
     setInterval(function () {
       if (document.hidden || !isPhone()) return;
       if (Date.now() - lastWidgetCount < 45000) return;
@@ -589,6 +705,7 @@
     setBack: function (fn) { barTouched = true; barState.back = typeof fn === 'function' ? fn : null; paintBar(); },
     setActions: function (list) { barTouched = true; barState.actions = list || []; paintBar(); },
     openNotifications: openNotifications,
+    showBanner: showBanner,
     openDrawer: openDrawer,
     refreshCount: refreshCount
   };

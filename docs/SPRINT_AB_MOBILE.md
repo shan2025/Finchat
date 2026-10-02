@@ -308,5 +308,6 @@ and fixed — the drawer's phone icons showed beside the desktop ones). `test/pw
 **Not verified:** a real phone (iOS safe areas, keyboard over the composer), the mic
 on a device, a signed-in session against the real API.
 
-**Not built:** the design's in-app push banner (needs the socket on every page), and
-its simplified Agent Map / Neural Space summaries.
+**Push banner** (added the same day): a notification arriving while a page is open drops in from the top (tap opens it like the bell, swipe up or 6s dismisses). Instant on pages with a socket (Chat, Operations, Agents, Group Chat — the server pushes the row as `notification:new`); elsewhere it follows the badge count rising (60s poll, 30s where the bell widget polls), showing the newest item only if it is unread and under 15 minutes old. Phones only; never over the open notifications sheet or in a hidden tab.
+
+**Not built:** the design's simplified Agent Map / Neural Space summaries.
