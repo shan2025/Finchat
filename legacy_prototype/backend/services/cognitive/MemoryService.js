@@ -246,9 +246,11 @@ async function generateEmbeddings(texts, { purpose = 'document' } = {}) {
   return out;
 }
 
-async function storeWithEmbedding({ title, content, source = 'cognitive_core' }) {
+// userId owns the row. Without one it is stored but never recalled — the RAG
+// store is per-user, and an ownerless row must not be visible to everyone.
+async function storeWithEmbedding({ userId = null, title, content, source = 'cognitive_core' }) {
   const knowledgeId = `know_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  await memoryRepository.insertKnowledge({ knowledgeId, title, content, source });
+  await memoryRepository.insertKnowledge({ knowledgeId, userId, title, content, source });
 
   // The knowledge row is stored either way — an embedding failure must not lose
   // the content, it only costs similarity search on that row.
@@ -264,13 +266,14 @@ async function storeWithEmbedding({ title, content, source = 'cognitive_core' })
   return { knowledgeId, embeddingId: null, embeddingDimension: null, stored: true };
 }
 
-async function retrieveBySimilarity(queryText, limit = 3) {
+async function retrieveBySimilarity(queryText, { userId, limit = 3 } = {}) {
+  if (!userId) return [];
   const embedding = await generateEmbedding(queryText, { purpose: 'query' });
   if (!embedding) {
     // No vector to search with — fall back to newest-first rather than nothing.
-    return memoryRepository.findRecentKnowledge(limit);
+    return memoryRepository.findRecentKnowledge({ userId, limit });
   }
-  return memoryRepository.findKnowledgeBySimilarity(embedding, limit);
+  return memoryRepository.findKnowledgeBySimilarity({ vector: embedding, userId, limit });
 }
 
 // ─── 5. Context Retrieval (for ContextBuilder integration) ───

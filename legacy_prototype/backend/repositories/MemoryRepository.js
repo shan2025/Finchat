@@ -155,11 +155,15 @@ function createMemoryRepository({ query } = {}) {
       return res.rows;
     },
 
-    async insertKnowledge({ knowledgeId, title, content, source }) {
+    /**
+     * @param {string|null} userId - owner. A row without one is stored but is
+     *   never returned by recall, so pass it whenever a user is behind the run.
+     */
+    async insertKnowledge({ knowledgeId, userId = null, title, content, source }) {
       await run(
-        `INSERT INTO knowledge (knowledge_id, title, content, source)
-         VALUES ($1, $2, $3, $4)`,
-        [knowledgeId, title, content, source]);
+        `INSERT INTO knowledge (knowledge_id, user_id, title, content, source)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [knowledgeId, userId, title, content, source]);
     },
 
     /** @param {number[]} vector - raw embedding, serialised to pgvector literal here. */
@@ -170,23 +174,30 @@ function createMemoryRepository({ query } = {}) {
         [embeddingId, knowledgeId, `[${vector.join(',')}]`]);
     },
 
-    /** Fallback when no embedding could be produced (Ollama down, etc). */
-    async findRecentKnowledge(limit = 3) {
+    /**
+     * Fallback when no embedding could be produced (Ollama down, etc).
+     * Only the user's own rows; no user means no rows, never everyone's.
+     */
+    async findRecentKnowledge({ userId, limit = 3 } = {}) {
+      if (!userId) return [];
       const res = await run(
-        'SELECT * FROM knowledge ORDER BY created_at DESC LIMIT $1', [limit]);
+        'SELECT * FROM knowledge WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+        [userId, limit]);
       return res.rows;
     },
 
-    /** Cosine-distance nearest neighbours via pgvector's `<=>`. */
-    async findKnowledgeBySimilarity(vector, limit = 3) {
+    /** Cosine-distance nearest neighbours via pgvector's `<=>`, within one user's rows. */
+    async findKnowledgeBySimilarity({ vector, userId, limit = 3 } = {}) {
+      if (!userId || !Array.isArray(vector) || vector.length === 0) return [];
       const res = await run(
         `SELECT k.*, ke.embedding_id,
                 (ke.embedding <=> $1::vector) as distance
            FROM knowledge k
            JOIN knowledge_embeddings ke ON k.knowledge_id = ke.knowledge_id
+          WHERE k.user_id = $2
           ORDER BY ke.embedding <=> $1::vector
-          LIMIT $2`,
-        [`[${vector.join(',')}]`, limit]);
+          LIMIT $3`,
+        [`[${vector.join(',')}]`, userId, limit]);
       return res.rows;
     },
   };

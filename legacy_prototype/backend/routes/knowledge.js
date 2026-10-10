@@ -467,14 +467,24 @@ router.get('/memory/overview', requireAuth, async (req, res) => {
                   JOIN executions e ON e.execution_id = sr.source_execution_id
                   WHERE e.user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM memories WHERE memory_type = 'semantic' AND user_id = $1`, [req.user.id]),
-      safeScalar(`SELECT COUNT(*) FROM knowledge`),
-      safeScalar(`SELECT COUNT(*) FROM knowledge_embeddings`),
+      safeScalar(`SELECT COUNT(*) FROM knowledge WHERE user_id = $1`, [req.user.id]),
+      safeScalar(`SELECT COUNT(*) FROM knowledge_embeddings ke
+                  JOIN knowledge k ON k.knowledge_id = ke.knowledge_id
+                  WHERE k.user_id = $1`, [req.user.id]),
       safeScalar(`SELECT COUNT(*) FROM reflections r
                   JOIN executions e ON e.execution_id = r.execution_id
                   WHERE e.user_id = $1`, [req.user.id])
     ]);
 
-    const status = (n) => (n == null ? 'roadmap' : n > 0 ? 'live' : 'instrumented');
+    // null = the count query failed (table missing) → roadmap; 0 = the store
+    // exists but this user has nothing in it yet → instrumented. A store built
+    // from several counts is roadmap only when every one of them is missing —
+    // summing first turned an empty-but-real store into "roadmap".
+    const status = (...ns) => {
+      const known = ns.filter((n) => n != null);
+      if (!known.length) return 'roadmap';
+      return known.some((n) => n > 0) ? 'live' : 'instrumented';
+    };
     const num = (n) => (n == null ? 0 : n);
 
     res.json({
@@ -490,14 +500,14 @@ router.get('/memory/overview', requireAuth, async (req, res) => {
           key: 'episodic', label: 'Episodic — Experiences', icon: 'history',
           primary: num(episodicExec) + num(episodicMem), unit: 'episodes',
           detail: { completedExecutions: num(episodicExec), episodicMemories: num(episodicMem) },
-          status: status((num(episodicExec) + num(episodicMem)) || null),
+          status: status(episodicExec, episodicMem),
           blurb: 'What happened and when — past executions and recalled events.'
         },
         {
           key: 'procedural', label: 'Procedural — Know-how', icon: 'construction',
           primary: num(procedural) + num(recipes), unit: 'procedures',
           detail: { proceduralMemories: num(procedural), skillRecipes: num(recipes) },
-          status: status((num(procedural) + num(recipes)) || null),
+          status: status(procedural, recipes),
           blurb: 'Reusable workflows and skill recipes distilled from success.'
         },
         {

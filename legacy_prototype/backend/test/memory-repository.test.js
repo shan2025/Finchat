@@ -166,19 +166,37 @@ test.describe('knowledge and embeddings', () => {
     // second copy would double the payload and can silently diverge.
     const q = fakeQuery();
     const repo = createMemoryRepository({ query: q });
-    await repo.findKnowledgeBySimilarity([1, 2], 3);
-    assert.deepEqual(q.calls[0].params, ['[1,2]', 3]);
+    await repo.findKnowledgeBySimilarity({ vector: [1, 2], userId: 'u1', limit: 3 });
+    assert.deepEqual(q.calls[0].params, ['[1,2]', 'u1', 3]);
     const sql = q.calls[0].normalised;
     assert.match(sql, /\(ke\.embedding <=> \$1::vector\) as distance/);
+    assert.match(sql, /WHERE k\.user_id = \$2/);
     assert.match(sql, /ORDER BY ke\.embedding <=> \$1::vector/);
   });
 
-  test('recent-knowledge fallback takes only a limit', async () => {
+  test('recent-knowledge fallback is scoped to the user', async () => {
     const q = fakeQuery();
     const repo = createMemoryRepository({ query: q });
-    await repo.findRecentKnowledge(4);
-    assert.deepEqual(q.calls[0].params, [4]);
-    assert.match(q.calls[0].normalised, /ORDER BY created_at DESC/);
+    await repo.findRecentKnowledge({ userId: 'u1', limit: 4 });
+    assert.deepEqual(q.calls[0].params, ['u1', 4]);
+    assert.match(q.calls[0].normalised, /WHERE user_id = \$1 ORDER BY created_at DESC LIMIT \$2/);
+  });
+
+  test('knowledge reads without a user return nothing and run no query', async () => {
+    // The store is per-user: a missing id must not fall through to every row.
+    const q = fakeQuery([{ knowledge_id: 'someone_elses' }]);
+    const repo = createMemoryRepository({ query: q });
+    assert.deepEqual(await repo.findRecentKnowledge({ limit: 4 }), []);
+    assert.deepEqual(await repo.findKnowledgeBySimilarity({ vector: [1, 2] }), []);
+    assert.equal(q.calls.length, 0);
+  });
+
+  test('insertKnowledge stores the owner', async () => {
+    const q = fakeQuery();
+    const repo = createMemoryRepository({ query: q });
+    await repo.insertKnowledge({ knowledgeId: 'know_1', userId: 'u1', title: 't', content: 'c', source: 's' });
+    assert.match(q.calls[0].normalised, /\(knowledge_id, user_id, title, content, source\)/);
+    assert.deepEqual(q.calls[0].params, ['know_1', 'u1', 't', 'c', 's']);
   });
 });
 

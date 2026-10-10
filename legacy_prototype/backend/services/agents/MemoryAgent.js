@@ -30,8 +30,8 @@ class MemoryAgent extends BaseAgent {
   /**
    * Recall semantic knowledge by vector similarity.
    */
-  async recallSemantic({ queryText, limit = 3 }) {
-    return await memoryService.retrieveBySimilarity(queryText, limit);
+  async recallSemantic({ queryText, userId, limit = 3 }) {
+    return await memoryService.retrieveBySimilarity(queryText, { userId, limit });
   }
 
   /**
@@ -59,7 +59,7 @@ class MemoryAgent extends BaseAgent {
    */
   async synthesizeHistory({ userId, goal, agentName = null }) {
     const episodic = await this.recallEpisodic({ userId, limit: 3 });
-    const semantic = await this.recallSemantic({ queryText: goal, limit: 2 });
+    const semantic = await this.recallSemantic({ queryText: goal, userId, limit: 2 });
     const procedural = agentName ? await this.recallProcedural({ agentId: agentName, limit: 2 }) : [];
 
     return {

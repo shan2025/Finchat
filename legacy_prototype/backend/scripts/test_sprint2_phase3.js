@@ -52,14 +52,17 @@ async function runTests() {
   // --- TEST 3: Semantic Embedding & Similarity Search ---
   try {
     process.stdout.write('3. Semantic Embedding Storage & Similarity Search... ');
+    // knowledge rows are per-user (FK to users), so the owner must exist.
+    await require('../repositories/MemoryRepository').memoryRepository.ensureUserExists('test_s2_user');
     const storedSem = await memoryService.storeWithEmbedding({
+      userId: 'test_s2_user',
       title: 'Neuromorphic Computing Principles',
       content: 'Neuromorphic engineering mimics neuro-biological architectures present in the nervous system using spiking neural networks.'
     });
     if (!storedSem || !storedSem.stored) {
       throw new Error('Failed to store semantic entry');
     }
-    const searchRes = await memoryAgent.recallSemantic({ queryText: 'spiking neural networks and neuromorphic AI' });
+    const searchRes = await memoryAgent.recallSemantic({ queryText: 'spiking neural networks and neuromorphic AI', userId: 'test_s2_user' });
     if (!Array.isArray(searchRes) || searchRes.length === 0) {
       throw new Error('Semantic search returned empty results');
     }

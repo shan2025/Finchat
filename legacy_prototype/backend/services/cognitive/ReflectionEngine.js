@@ -90,6 +90,8 @@ async function reflect(execution) {
     try {
       const embeddingContent = `${reflectionData.summary || ''} | Insights: ${(reflectionData.learnings || []).join('; ')}`;
       await memoryService.storeWithEmbedding({
+        // The summary quotes the user's goal — it is theirs, not a shared doc.
+        userId: execution.user_id || execution.userId || null,
         title: `Execution Summary: ${(execution.goal || '').substring(0, 100)}`,
         content: embeddingContent,
         source: 'reflection_engine'

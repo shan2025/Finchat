@@ -112,6 +112,7 @@ async function runPhase6Tests() {
   try {
     process.stdout.write('4. Semantic retrieval: storeWithEmbedding + retrieveBySimilarity... ');
     const storeResult = await storeWithEmbedding({
+      userId: 'test_memory_user',
       title: 'Tesla Company Overview',
       content: 'Tesla Inc designs, develops, manufactures and sells electric vehicles and energy storage systems.',
       source: 'test_phase6'
@@ -121,7 +122,7 @@ async function runPhase6Tests() {
 
     if (storeResult.embeddingId) {
       // Embedding was stored — test similarity retrieval
-      const similar = await retrieveBySimilarity('electric car company', 3);
+      const similar = await retrieveBySimilarity('electric car company', { userId: 'test_memory_user', limit: 3 });
       if (similar.length < 1) throw new Error('No similar results found');
       console.log(`✅ OK (Stored: ${storeResult.knowledgeId}, embedding: ${storeResult.embeddingDimension}d, similar results: ${similar.length})`);
     } else {
