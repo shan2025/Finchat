@@ -93,6 +93,17 @@
   --m-shadow-lg: 0 12px 32px rgba(0, 0, 0, .55);
 }
 
+/* Pages lock body to the viewport with Tailwind's h-screen (100vh) and let
+   one inner column scroll. On a phone 100vh is the height with the browser's
+   toolbars retracted, so whatever is pinned to the bottom (Chat's composer
+   tools and Send, a group thread's composer) sat below the visible screen.
+   100dvh is the height actually showing. body.* outranks Tailwind's .h-screen,
+   which the CDN build injects after this sheet. */
+@supports (height: 100dvh) {
+  body.h-screen { height: 100dvh; }
+  body.min-h-screen { min-height: 100dvh; }
+}
+
 /* The bar, sheet and dialog parts exist at every width (built once), but are
    only ever drawn on a phone. */
 .fcm-bar { display: none; }
