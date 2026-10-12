@@ -155,8 +155,24 @@ body.queue #zoomWrap { display: block; }
   background: var(--bx-surface-2); border: 1px solid var(--bx-line); border-radius: 999px; padding: 3px 4px 3px 9px; color: var(--bx-fg-2); }
 .aifile .material-symbols-outlined { font-size: 15px; }
 .aifile button { border: none; background: none; cursor: pointer; color: var(--bx-muted); display: inline-flex; padding: 1px; }
+.guest-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #f0d860; background: #fff8d1; color: #6b5200;
+  border-radius: 999px; padding: 4px 10px 4px 8px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.guest-chip .material-symbols-outlined { font-size: 16px; }
+body[data-theme="dark"] .guest-chip { background: #3a3215; color: #f5dc7a; border-color: #6b5a1c; }
+.hrow .hundo { margin-left: auto; flex: none; align-self: center; }
+.hrow.reverted .htext { opacity: .55; }
+.htag { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; margin-left: 4px;
+  background: var(--bx-surface-2); color: var(--bx-fg-2); border: 1px solid var(--bx-line); vertical-align: 1px; }
+.htag.guest { background: #fff8d1; color: #6b5200; border-color: #f0d860; }
+body[data-theme="dark"] .htag.guest { background: #3a3215; color: #f5dc7a; border-color: #6b5a1c; }
+.guests { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+.guestrow { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bx-line); border-radius: 12px; padding: 8px 8px 8px 12px; }
+.guestrow .gmain { flex: 1; min-width: 0; }
+.guestrow .gname { font-weight: 800; font-size: 14px; }
+.guestrow .gmeta { font-size: 12px; color: var(--bx-muted); }
 @media (max-width: 640px) {
   #historyBtn span:last-child, #aiBtn span:last-child { display: none; }
+  #guestChipLabel { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
   #stage { padding: 132px 12px 80px 12px; }
   .rail { top: auto; bottom: 14px; left: 14px; transform: none; flex-direction: row; }
   .search { width: 130px; }
@@ -176,6 +192,7 @@ body.queue #zoomWrap { display: block; }
   <button class="bx-ibtn" id="toGallery" title="All boards"><span class="material-symbols-outlined">grid_view</span></button>
   <input class="board-title" id="boardTitle" placeholder="Untitled board" maxlength="200" hidden>
   <button class="bx-ibtn" id="boardMenuBtn" title="Board options" hidden><span class="material-symbols-outlined">more_horiz</span></button>
+  <button class="guest-chip" id="guestChip" title="Change the name the owner sees next to your changes" hidden><span class="material-symbols-outlined">badge</span><span id="guestChipLabel">Editing as a guest</span></button>
 </div>
 
 <div class="bx-float topr">
@@ -284,7 +301,7 @@ body.queue #zoomWrap { display: block; }
       <div class="bx-row">
         <select class="bx-field" id="shareRole">
           <option value="view">Anyone with the link can view</option>
-          <option value="edit">Anyone with the link can edit (they sign in)</option>
+          <option value="edit">Anyone with the link can edit</option>
         </select>
         <select class="bx-field" id="shareExpiry">
           <option value="">Never expires</option>
@@ -304,6 +321,19 @@ body.queue #zoomWrap { display: block; }
     <div class="bx-modal-acts">
       <button class="bx-btn ghost" id="leaveBtn" hidden style="margin-right:auto; color:var(--bx-danger)"><span class="material-symbols-outlined">logout</span>Leave board</button>
       <button class="bx-btn" data-close="shareModal">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- guest: who are you? (edit links, no account) -->
+<div class="bx-modal" id="guestModal">
+  <div class="bx-modal-box" style="width:min(420px,100%)">
+    <div class="bx-modal-title">What's your name?</div>
+    <div class="bx-modal-sub">No account needed. The owner sees your name next to the changes you make, so they know who did what. You can skip this — you will show as a numbered guest.</div>
+    <input class="bx-field" id="guestName" placeholder="e.g. Ravi" maxlength="60" autocomplete="name" style="margin-top:12px">
+    <div class="bx-modal-acts">
+      <button class="bx-btn ghost" id="guestSkip">Skip</button>
+      <button class="bx-btn primary" id="guestSave">Save and continue</button>
     </div>
   </div>
 </div>
@@ -332,17 +362,49 @@ body.queue #zoomWrap { display: block; }
   const $ = (id) => document.getElementById(id);
 
   // ── session ────────────────────────────────────────────────
+  // Two ways in: signed in (a FinChat token), or as a GUEST through an edit
+  // link — #share=<token>, sent here by finchat_board_share.html. A guest has
+  // no account: the server gives this browser a key (kept per link) and every
+  // change they make shows in History as "Guest 2", plus a name if they give one.
   const session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null');
   const TOKEN = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (session && session.token) || '';
-  if (!TOKEN) { location.href = 'finchat_login.html'; return; }
+  const SHARE = (location.hash.match(/share=([\w-]+)/) || [])[1] || null;
+  const GUEST = !!SHARE;
+  if (!TOKEN && !GUEST) { location.href = 'finchat_login.html'; return; }
   const API = location.origin;
+  const GUEST_STORE = 'finchat_board_guest:' + SHARE;
+  let GUEST_KEY = '';
+  try { GUEST_KEY = GUEST ? localStorage.getItem(GUEST_STORE) || '' : ''; } catch (e) {}
 
-  async function api(path, opts = {}) {
-    const res = await fetch(API + path, {
+  /** A guest's request goes through the edit link: /api/boards/<id>/x → /api/shared/boards/<link>/edit/x. */
+  const url = (path) => {
+    if (!GUEST) return API + path;
+    const m = path.match(/^\/api\/boards\/[^/?]+(.*)$/);
+    return `${API}/api/shared/boards/${SHARE}/edit${m ? m[1] : ''}`;
+  };
+  const authHeaders = () => (GUEST ? { 'X-Board-Guest': GUEST_KEY } : { Authorization: 'Bearer ' + TOKEN });
+
+  /** This browser becomes a guest on the link — once; the key is kept for next time. */
+  async function joinAsGuest() {
+    const res = await fetch(`${API}/api/shared/boards/${SHARE}/guest`, { method: 'POST' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { const e = new Error(body.error || 'HTTP ' + res.status); e.status = res.status; throw e; }
+    GUEST_KEY = body.key;
+    try { localStorage.setItem(GUEST_STORE, GUEST_KEY); } catch (e) {}
+  }
+
+  async function api(path, opts = {}, retried = false) {
+    if (GUEST && !GUEST_KEY) await joinAsGuest();
+    if (GUEST && opts.method && opts.method !== 'GET') await askGuestName();
+    const res = await fetch(url(path), {
       ...opts,
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN, ...(opts.headers || {}) }
+      headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) }
     });
-    if (res.status === 401) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    if (res.status === 401) {
+      // A guest key the board no longer knows (cleared, or a different link): start over as a new guest.
+      if (GUEST && !retried) { GUEST_KEY = ''; return api(path, opts, true); }
+      if (!GUEST) { location.href = 'finchat_login.html'; throw new Error('Signed out'); }
+    }
     const body = (res.headers.get('content-type') || '').includes('json') ? await res.json().catch(() => ({})) : {};
     if (!res.ok) { const e = new Error(body.error || ('HTTP ' + res.status)); e.status = res.status; e.body = body; throw e; }
     return body;
@@ -350,6 +412,50 @@ body.queue #zoomWrap { display: block; }
   const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body || {}) });
   const patch = (path, body) => api(path, { method: 'PATCH', body: JSON.stringify(body || {}) });
   const del = (path) => api(path, { method: 'DELETE' });
+
+  // ── guest: who are you? ────────────────────────────────────
+  // Asked once, just before a guest's first change — never to look. Skipping is
+  // fine: they are still "Guest 3" in History, and can add a name later.
+  let NAME_ASKED = false;
+  try { NAME_ASKED = GUEST && localStorage.getItem(GUEST_STORE + ':named') === '1'; } catch (e) {}
+  let namePrompt = null;
+  function askGuestName() {
+    if (!GUEST || NAME_ASKED) return Promise.resolve();
+    if (namePrompt) return namePrompt;
+    namePrompt = new Promise((resolve) => {
+      $('guestName').value = (B && B.guest && B.guest.name) || '';
+      $('guestModal').classList.add('open');
+      setTimeout(() => $('guestName').focus(), 30);
+      const done = async (save) => {
+        $('guestModal').classList.remove('open');
+        $('guestSave').onclick = $('guestSkip').onclick = $('guestName').onkeydown = null;
+        NAME_ASKED = true;
+        try { localStorage.setItem(GUEST_STORE + ':named', '1'); } catch (e) {}
+        if (save && $('guestName').value.trim()) await saveGuestName($('guestName').value.trim()).catch(() => {});
+        namePrompt = null;
+        resolve();
+      };
+      $('guestSave').onclick = () => done(true);
+      $('guestSkip').onclick = () => done(false);
+      $('guestName').onkeydown = (e) => { if (e.key === 'Enter') done(true); };
+    });
+    return namePrompt;
+  }
+  async function saveGuestName(name) {
+    const res = await fetch(`${API}/api/shared/boards/${SHARE}/guest`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Board-Guest': GUEST_KEY }, body: JSON.stringify({ name })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
+    if (B) B.guest = { ...(B.guest || {}), ...body };
+    paintGuestChip();
+  }
+  function paintGuestChip() {
+    const g = B && B.guest;
+    $('guestChip').hidden = !GUEST;
+    if (!GUEST) return;
+    $('guestChipLabel').textContent = g && g.number ? `You: ${g.label}` : (g && g.name ? `You: ${g.name}` : 'Editing as a guest');
+  }
 
   // ── theme ──────────────────────────────────────────────────
   function applyTheme(t) {
@@ -453,7 +559,7 @@ body.queue #zoomWrap { display: block; }
   const adapter = {
     async blobUrl(a) {
       if (blobCache.has(a.attachmentId)) return blobCache.get(a.attachmentId);
-      const res = await fetch(`${API}/api/boards/${boardId()}/attachments/${a.attachmentId}/file`, { headers: { Authorization: 'Bearer ' + TOKEN } });
+      const res = await fetch(url(`/api/boards/${boardId()}/attachments/${a.attachmentId}/file`), { headers: authHeaders() });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
       const url = URL.createObjectURL(await res.blob());
       blobCache.set(a.attachmentId, url);
@@ -463,7 +569,7 @@ body.queue #zoomWrap { display: block; }
       return (await api(`/api/boards/${boardId()}/attachments/${a.attachmentId}`)).attachment.text;
     },
     async download(a) {
-      const res = await fetch(`${API}/api/boards/${boardId()}/attachments/${a.attachmentId}/file?download=1`, { headers: { Authorization: 'Bearer ' + TOKEN } });
+      const res = await fetch(url(`/api/boards/${boardId()}/attachments/${a.attachmentId}/file?download=1`), { headers: authHeaders() });
       const name = await U.saveResponse(res, a.filename);
       U.toast('Downloading ' + name);
     }
@@ -555,10 +661,11 @@ body.queue #zoomWrap { display: block; }
     try {
       B = await api('/api/boards/' + encodeURIComponent(id));
     } catch (e) {
+      if (GUEST) return showLinkGone(e);
       U.toast('Could not open board: ' + e.message);
       return showGallery();
     }
-    history.replaceState(null, '', '?board=' + encodeURIComponent(id));
+    if (!GUEST) history.replaceState(null, '', '?board=' + encodeURIComponent(id));
     if (!keepSelection) { ADDING = null; ADD_DRAFT = ''; }
     applyMode(B.board.kind);
     document.title = `${B.board.title} | ${T().brand}`;
@@ -571,6 +678,15 @@ body.queue #zoomWrap { display: block; }
     LAST_STAMP = B.board.updatedAt;
     // Editors do everything but delete the board — that and sharing stay the owner's.
     document.querySelector('[data-bm="delete"]').hidden = B.board.access !== 'owner';
+    // A guest changes cards, columns and files — not the board itself, who it is
+    // shared with, Ask AI (the owner's credits) or mind maps.
+    if (GUEST) {
+      for (const x of ['toGallery', 'boardMenuBtn', 'shareBtn', 'mapBtn', 'aiBtn', 'railMaps']) $(x).hidden = true;
+      $('boardTitle').readOnly = true;
+      $('filesBtn').hidden = !B.includeDocs;
+      document.querySelector('.brand').removeAttribute('href');
+      paintGuestChip();
+    }
     render();
     if (AI_OPEN) openAssistant();
     else if (HISTORY_OPEN) openHistory();
@@ -593,8 +709,9 @@ body.queue #zoomWrap { display: block; }
     add_column: 'view_column', rename_column: 'edit', color_column: 'palette', delete_column: 'delete', order_columns: 'swap_horiz',
     order_cards: 'swap_vert', attach: 'attach_file', detach: 'link_off', rename_board: 'edit', edit_board: 'edit',
     add_member: 'person_add', remove_member: 'person_remove', join: 'person_add', share_link: 'add_link', revoke_link: 'link_off',
-    to_mind_map: 'account_tree', ai_edit: 'auto_awesome'
+    to_mind_map: 'account_tree', ai_edit: 'auto_awesome', revert: 'undo'
   };
+  let GUESTS = [];   // who edited through an edit link (owner and editors only)
 
   async function openHistory({ more = false } = {}) {
     // Already showing History (a live refresh): keep it on screen while the new
@@ -610,7 +727,11 @@ body.queue #zoomWrap { display: block; }
     $('drawer').classList.add('open');
     try {
       const before = more && HISTORY.length ? HISTORY[HISTORY.length - 1].at : '';
-      const { activity } = await api(`/api/boards/${boardId()}/activity${before ? '?before=' + encodeURIComponent(before) : ''}`);
+      const [{ activity }, guests] = await Promise.all([
+        api(`/api/boards/${boardId()}/activity${before ? '?before=' + encodeURIComponent(before) : ''}`),
+        GUEST || more ? null : api(`/api/boards/${boardId()}/guests`).catch(() => null)
+      ]);
+      if (guests) GUESTS = guests.guests || [];
       HISTORY = more ? HISTORY.concat(activity) : activity;
       HISTORY_MORE = activity.length === 50;
       if (HISTORY_OPEN) paintHistory();
@@ -625,23 +746,61 @@ body.queue #zoomWrap { display: block; }
       const head = d !== day ? `<div class="hday">${esc((day = d))}</div>` : '';
       const cardId = a.details && a.details.cardId;
       const live = cardId && cardById(cardId);
-      return `${head}<div class="hrow${live ? ' link' : ''}" ${live ? `data-hcard="${esc(cardId)}" title="Open this card"` : ''}>
-        <span class="avatar" style="background:${personColor(a.userId)}">${esc(initials(a.userName))}</span>
-        <div class="htext"><b>${esc(a.you ? 'You' : a.userName)}</b> ${esc(a.summary)}
+      const name = a.you ? (a.guest ? `You (${a.userName})` : 'You') : a.userName;
+      const skipped = a.action === 'revert' && a.details && (a.details.skipped || []).length;
+      return `${head}<div class="hrow${live ? ' link' : ''}${a.revertedAt ? ' reverted' : ''}" ${live ? `data-hcard="${esc(cardId)}" title="Open this card"` : ''}>
+        <span class="avatar" style="background:${personColor(a.guestId || a.userId)}">${esc(a.guest ? 'G' + a.guest.number : initials(a.userName))}</span>
+        <div class="htext"><b>${esc(name)}</b>${a.guest && !a.you ? '<span class="htag guest">no account</span>' : ''} ${esc(a.summary)}
+          ${skipped ? `<div class="bx-hint" style="margin-top:3px">Kept, because they were changed since: ${esc(a.details.skipped.join('; '))}</div>` : ''}
           <small><span class="material-symbols-outlined">${ACTION_ICON[a.action] || 'history'}</span>
-          ${esc(new Date(a.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}</small></div>
+          ${esc(new Date(a.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))}
+          ${a.revertedAt ? `· undone by ${esc(a.revertedBy || 'someone')}` : ''}</small></div>
+        ${a.undoable ? `<button class="bx-btn sm ghost hundo" data-undo="${esc(a.activityId)}" title="Undo this change"><span class="material-symbols-outlined">undo</span>Undo</button>` : ''}
       </div>`;
     }).join('');
+    const guestRows = GUESTS.filter(g => g.changes).map(g => `
+      <div class="guestrow">
+        <span class="avatar" style="background:${personColor(g.guestId)}">G${g.number}</span>
+        <div class="gmain"><div class="gname">${esc(g.label)}</div>
+          <div class="gmeta">${g.changes} change${g.changes === 1 ? '' : 's'}${g.undoable < g.changes ? ` · ${g.changes - g.undoable} already undone` : ''} · last here ${esc(dayLabel(g.lastSeen).toLowerCase())}</div></div>
+        ${g.undoable ? `<button class="bx-btn sm" data-undoguest="${esc(g.guestId)}"><span class="material-symbols-outlined">undo</span>Undo all ${g.undoable}</button>` : ''}
+      </div>`).join('');
     $('dBody').innerHTML = `
       <div style="font-size:20px; font-weight:800;">History</div>
-      <div class="bx-hint" style="margin-bottom:12px">Every change to this ${isQueue() ? 'queue' : 'board'} — who made it and when. Click a change to open its ${isQueue() ? 'task' : 'card'}.</div>
+      <div class="bx-hint" style="margin-bottom:12px">Every change to this ${isQueue() ? 'queue' : 'board'} — who made it and when. Click a change to open its ${isQueue() ? 'task' : 'card'}.${
+        GUEST ? '' : ' Undo puts back what a change replaced, and keeps anything changed since.'}</div>
+      ${guestRows ? `<div class="bx-label" style="margin-top:0">People without an account</div>
+        <div class="bx-hint">They edited through an edit link. Undo everything one of them did — changes others made since are kept.</div>
+        <div class="guests">${guestRows}</div><div class="bx-label">All changes</div>` : ''}
       ${rows || '<div class="bx-hint">No changes recorded yet. Changes made from now on show here.</div>'}
       ${HISTORY_MORE ? '<button class="bx-btn sm" id="hMore" style="margin-top:10px">Show older changes</button>' : ''}`;
     $('dBody').scrollTop = keep;
   }
+  /** Undo one change, or all of one guest's — then show the board and History as they now are. */
+  async function undo(path, confirmWords) {
+    if (confirmWords && !await confirmBox(...confirmWords, 'Undo', { danger: false })) return;
+    try {
+      const out = await post(path);
+      const n = (out.skipped || []).length;
+      U.toast(n ? `Undone — ${n} thing${n === 1 ? '' : 's'} kept because ${n === 1 ? 'it was' : 'they were'} changed since (see History)`
+        : out.undone > 1 ? `Undid ${out.undone} changes` : 'Undone');
+      await openBoard(boardId(), { keepSelection: true });
+      if (!HISTORY_OPEN) openHistory();
+    } catch (err) { U.toast(err.message); }
+  }
+
   $('dBody').addEventListener('click', (e) => {
     if (!HISTORY_OPEN) return;
     if (e.target.closest('#hMore')) return openHistory({ more: true });
+    const u = e.target.closest('[data-undo]');
+    if (u) { e.stopPropagation(); return undo(`/api/boards/${boardId()}/activity/${encodeURIComponent(u.dataset.undo)}/undo`); }
+    const ug = e.target.closest('[data-undoguest]');
+    if (ug) {
+      const g = GUESTS.find(x => x.guestId === ug.dataset.undoguest);
+      return undo(`/api/boards/${boardId()}/guests/${encodeURIComponent(ug.dataset.undoguest)}/undo`,
+        [`Undo everything ${g ? g.label : 'this guest'} did?`,
+          `${g ? g.undoable : 'Their'} change${g && g.undoable === 1 ? '' : 's'} will be undone, newest first. Anything someone else changed since stays as it is.`]);
+    }
     const r = e.target.closest('[data-hcard]');
     if (r) { HISTORY_OPEN = false; openDrawer(r.dataset.hcard); }
   });
@@ -1008,7 +1167,8 @@ body.queue #zoomWrap { display: block; }
     const fd = new FormData();
     if (cardId) fd.append('cardId', cardId);
     files.forEach(f => fd.append('files', f, f.name || 'file'));
-    const res = await fetch(`${API}/api/boards/${boardId()}/attachments`, { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + TOKEN } });
+    if (GUEST) { if (!GUEST_KEY) await joinAsGuest(); await askGuestName(); }
+    const res = await fetch(url(`/api/boards/${boardId()}/attachments`), { method: 'POST', body: fd, headers: authHeaders() });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
     return body.attachments || [];
@@ -2084,7 +2244,7 @@ body.queue #zoomWrap { display: block; }
   });
   $('shareRole').addEventListener('change', () => {
     $('shareRoleHint').textContent = $('shareRole').value === 'edit'
-      ? 'Whoever opens it signs in to FinChat and joins as an editor — their changes show in History under their name. Share it only with people you trust to edit.'
+      ? 'No account needed — they can add, edit, move and tick off straight away. Each person shows in History as a numbered guest (with their name if they give it), and you can undo any change, or everything one person did. People signed in to FinChat join under their own name.'
       : 'No FinChat account needed. It stays live: they see your changes.';
   });
 
@@ -2162,9 +2322,18 @@ body.queue #zoomWrap { display: block; }
     if ($('drawer').classList.contains('open')) closeDrawer();
   });
 
+  /** An edit link that no longer works: say so plainly, nothing else on screen. */
+  function showLinkGone(e) {
+    for (const id of ['boardTitle', 'boardMenuBtn', 'shareBtn', 'rail', 'zoombar', 'searchWrap', 'filesBtn', 'mapBtn', 'historyBtn', 'aiBtn', 'toGallery', 'guestChip']) $(id).hidden = true;
+    $('content').innerHTML = `<div class="bx-empty"><h2>This link does not work any more</h2>${esc(e && e.status === 404
+      ? 'It was turned off or has expired. Ask the person who shared it for a new one.' : (e && e.message) || '')}</div>`;
+  }
+
+  $('guestChip').addEventListener('click', () => { NAME_ASKED = false; askGuestName(); });
+
   // ── boot ───────────────────────────────────────────────────
   const want = new URLSearchParams(location.search).get('board');
-  if (want) openBoard(want); else showGallery();
+  if (GUEST) openBoard('link'); else if (want) openBoard(want); else showGallery();
 })();
 </script>
 </body>

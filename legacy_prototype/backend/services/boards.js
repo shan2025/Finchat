@@ -107,14 +107,36 @@ const ATT_COLS = `attachment_id, board_id, card_id, kind, filename, mimetype, si
   char_count, order_index, created_at, (data IS NOT NULL) AS has_data`;
 
 /**
+ * Who is acting. Every function here takes `userId` as either a signed-in
+ * user's id or a link guest — { guestId } (migration 065), resolved from an
+ * edit link by routes/sharedBoards.js, which also checks the link is live.
+ */
+const actorOf = (a) => (a && typeof a === 'object'
+  ? { userId: null, guestId: a.guestId }
+  : { userId: a || null, guestId: null });
+
+/** "Guest 2", or "Guest 2 · Ravi" once they have said who they are. */
+const guestLabel = (number, name) => `Guest ${number}${name ? ` · ${name}` : ''}`;
+
+/**
  * The board, if the caller may use it — its owner, or a member (migration 057).
  *   need 'view' | 'edit'  owner or editor (members are all editors today; the
  *                         two stay distinct so a viewer role is one line)
  *   need 'owner'          delete the board, manage people and share links
  * No access at all is 404, never 403 — a 403 would confirm the board exists.
- * The row comes back with `access` = 'owner' | 'editor'.
+ * The row comes back with `access` = 'owner' | 'editor' | 'guest'.
+ * A guest may view and edit; everything 'owner' is refused.
  */
 async function requireBoard(boardId, userId, need = 'edit') {
+  const who = actorOf(userId);
+  if (who.guestId) {
+    if (need === 'owner') throw new BoardError(403, 'Only the board owner can do that');
+    const g = await query(`SELECT b.*, 'guest' AS access FROM boards b
+                             JOIN board_guests g ON g.board_id = b.board_id
+                            WHERE b.board_id = $1 AND g.guest_id = $2`, [boardId, who.guestId]);
+    if (!g.rows[0]) throw notFound('Board');
+    return g.rows[0];
+  }
   const r = await query(`
     SELECT b.*, CASE WHEN b.user_id = $2 THEN 'owner' ELSE m.role END AS access
       FROM boards b
@@ -169,38 +191,74 @@ const q = (s) => `“${clean(s, 80)}”`;
  *
  * `key` coalesces a burst: typing in a card's description saves several times
  * a minute, and History should say "edited the description" once, not twelve
- * times. The same user repeating the same keyed change within two minutes
- * updates the last row instead of adding one.
+ * times. The same user (or guest) repeating the same keyed change within two
+ * minutes updates the last row instead of adding one — and its undo keeps the
+ * FIRST "before" and the LAST "after", so undoing the burst undoes all of it.
+ *
+ * `undo` is what services/boardRevert.js needs to put things back (see there
+ * for the shapes); null for changes that cannot be undone from History.
+ * `activityId` lets a delete file its trash under the row before it exists.
  */
-async function record(boardId, userId, action, summary, details = {}, { key = null } = {}) {
+async function record(boardId, userId, action, summary, details = {}, { key = null, undo = null, activityId = null } = {}) {
+  const who = actorOf(userId);
   await query(`
     WITH last AS (
       SELECT activity_id FROM board_activity WHERE board_id = $1 ORDER BY created_at DESC LIMIT 1
     ), upd AS (
-      UPDATE board_activity a SET summary = $5, details = $6, created_at = now()
+      UPDATE board_activity a SET summary = $5, details = $6, created_at = now(),
+             undo = CASE WHEN a.undo IS NULL OR $9::jsonb IS NULL THEN $9::jsonb
+                         ELSE a.undo || jsonb_build_object(
+                           'before', COALESCE($9::jsonb->'before', '{}'::jsonb) || COALESCE(a.undo->'before', '{}'::jsonb),
+                           'after', COALESCE(a.undo->'after', '{}'::jsonb) || COALESCE($9::jsonb->'after', '{}'::jsonb)) END
         FROM last
-       WHERE a.activity_id = last.activity_id AND a.user_id = $3 AND $7::text IS NOT NULL
+       WHERE a.activity_id = last.activity_id AND $7::text IS NOT NULL
+         AND a.user_id IS NOT DISTINCT FROM $3 AND a.guest_id IS NOT DISTINCT FROM $8
+         AND a.reverted_at IS NULL
          AND a.details->>'key' = $7 AND a.created_at > now() - interval '2 minutes'
       RETURNING a.activity_id
     ), bump AS (
       UPDATE boards SET updated_at = now() WHERE board_id = $1
     )
-    INSERT INTO board_activity (activity_id, board_id, user_id, action, summary, details)
-    SELECT $2, $1, $3, $4, $5, $6 WHERE NOT EXISTS (SELECT 1 FROM upd)
-  `, [boardId, 'bac_' + uuidv4(), userId || null, action, clean(summary, 400),
-      JSON.stringify(key ? { ...details, key } : details), key]);
+    INSERT INTO board_activity (activity_id, board_id, user_id, guest_id, action, summary, details, undo)
+    SELECT $2, $1, $3, $8, $4, $5, $6, $9 WHERE NOT EXISTS (SELECT 1 FROM upd)
+  `, [boardId, activityId || newActivityId(), who.userId, action, clean(summary, 400),
+      JSON.stringify(key ? { ...details, key } : details), key, who.guestId, undo ? JSON.stringify(undo) : null]);
 }
 
-/** Newest first; `before` (an ISO time) pages back. Any member may read it. */
+const newActivityId = () => 'bac_' + uuidv4();
+
+/**
+ * Newest first; `before` (an ISO time) pages back. Any member may read it.
+ * Each row says who made it — a user, or a guest by number and name — and
+ * whether it can still be undone.
+ */
 async function listActivity(boardId, userId, { before = null, limit = 50 } = {}) {
   await requireBoard(boardId, userId, 'view');
   const n = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const r = await query(`
-    SELECT a.activity_id, a.user_id, a.action, a.summary, a.details, a.created_at, u.name AS user_name
-      FROM board_activity a LEFT JOIN users u ON u.user_id = a.user_id
+    SELECT a.activity_id, a.user_id, a.guest_id, a.action, a.summary, a.details, a.created_at,
+           (a.undo IS NOT NULL) AS undoable, a.reverted_at,
+           u.name AS user_name, g.number AS guest_number, g.name AS guest_name, ru.name AS reverted_by_name
+      FROM board_activity a
+      LEFT JOIN users u ON u.user_id = a.user_id
+      LEFT JOIN board_guests g ON g.guest_id = a.guest_id
+      LEFT JOIN users ru ON ru.user_id = a.reverted_by
      WHERE a.board_id = $1 AND ($2::timestamptz IS NULL OR a.created_at < $2::timestamptz)
      ORDER BY a.created_at DESC LIMIT $3
   `, [boardId, before && !Number.isNaN(Date.parse(before)) ? before : null, n]);
+  return r.rows;
+}
+
+/** Every guest who has used this board's edit links, with how many changes they made and how many still stand. */
+async function listGuests(boardId, userId) {
+  await requireBoard(boardId, userId, 'view');
+  const r = await query(`
+    SELECT g.guest_id, g.number, g.name, g.created_at, g.last_seen_at,
+           COUNT(a.activity_id)::int AS changes,
+           COUNT(a.activity_id) FILTER (WHERE a.undo IS NOT NULL AND a.reverted_at IS NULL)::int AS undoable
+      FROM board_guests g LEFT JOIN board_activity a ON a.guest_id = g.guest_id
+     WHERE g.board_id = $1 AND g.number IS NOT NULL
+     GROUP BY g.guest_id ORDER BY g.number`, [boardId]);
   return r.rows;
 }
 
@@ -298,9 +356,13 @@ async function updateBoard(boardId, userId, { title, description }) {
     [boardId, newTitle, newDesc]);
   if (newTitle !== null && newTitle !== cur.title) {
     await record(boardId, userId, 'rename_board', `renamed the ${n.board} from ${q(cur.title)} to ${q(newTitle)}`,
-      { from: cur.title, to: newTitle });
+      { from: cur.title, to: newTitle },
+      { undo: { type: 'board_fields', before: { title: cur.title }, after: { title: newTitle } } });
   } else if (newDesc !== null && newDesc !== cur.description) {
-    await record(boardId, userId, 'edit_board', `edited the ${n.board} description`, {}, { key: `boarddesc:${boardId}` });
+    await record(boardId, userId, 'edit_board', `edited the ${n.board} description`, {}, {
+      key: `boarddesc:${boardId}`,
+      undo: { type: 'board_fields', before: { description: cur.description }, after: { description: newDesc } }
+    });
   }
 }
 
@@ -321,7 +383,8 @@ async function addColumn(boardId, userId, { title, color }) {
   await query('INSERT INTO board_columns (column_id, board_id, title, color, order_index) VALUES ($1,$2,$3,$4,$5)',
     [columnId, boardId, name,
      HEX.test(color || '') ? color : COLUMN_COLORS[count.rows[0].n % COLUMN_COLORS.length], count.rows[0].next]);
-  await record(boardId, userId, 'add_column', `added the ${n.col} ${q(name)}`, { columnId });
+  await record(boardId, userId, 'add_column', `added the ${n.col} ${q(name)}`, { columnId },
+    { undo: { type: 'column_added', columnId } });
   return columnId;
 }
 
@@ -331,25 +394,56 @@ async function updateColumn(boardId, userId, columnId, { title, color }) {
   // The old title rides along from the same statement (FROM sees the row before the update).
   const r = await query(`
     UPDATE board_columns c SET title = COALESCE($3, c.title), color = COALESCE($4, c.color)
-      FROM (SELECT title AS old_title FROM board_columns WHERE column_id = $1) o
+      FROM (SELECT title AS old_title, color AS old_color FROM board_columns WHERE column_id = $1) o
      WHERE c.column_id = $1 AND c.board_id = $2
-    RETURNING c.title, o.old_title`,
+    RETURNING c.title, c.color, o.old_title, o.old_color`,
     [columnId, boardId, title !== undefined ? (clean(title, 120) || 'Untitled') : null, color || null]);
   if (!r.rowCount) throw notFound('Column');
-  const { title: now, old_title: was } = r.rows[0];
-  if (now !== was) await record(boardId, userId, 'rename_column', `renamed the ${n.col} ${q(was)} to ${q(now)}`, { columnId, from: was, to: now });
-  else if (color) await record(boardId, userId, 'color_column', `changed the colour of ${q(now)}`, { columnId, color });
+  const { title: now, old_title: was, color: nowColor, old_color: wasColor } = r.rows[0];
+  const undo = { type: 'column_fields', columnId, before: { title: was, color: wasColor }, after: { title: now, color: nowColor } };
+  if (now !== was) await record(boardId, userId, 'rename_column', `renamed the ${n.col} ${q(was)} to ${q(now)}`, { columnId, from: was, to: now }, { undo });
+  else if (color && nowColor !== wasColor) await record(boardId, userId, 'color_column', `changed the colour of ${q(now)}`, { columnId, color }, { undo });
 }
 
 async function deleteColumn(boardId, userId, columnId) {
   const n = nouns(await requireBoard(boardId, userId));
+  // To the trash first — the lane, its cards and their files — so it can come back.
+  const activityId = newActivityId();
+  await trashRows(boardId, activityId, { columnIds: [columnId] });
   const r = await query(`
     DELETE FROM board_columns WHERE column_id = $1 AND board_id = $2
     RETURNING title, (SELECT COUNT(*) FROM board_cards WHERE column_id = $1)::int AS cards`, [columnId, boardId]);
-  if (!r.rowCount) throw notFound('Column');
+  if (!r.rowCount) {
+    await query('DELETE FROM board_trash WHERE activity_id = $1', [activityId]);
+    throw notFound('Column');
+  }
   const { title, cards } = r.rows[0];
   await record(boardId, userId, 'delete_column',
-    `deleted the ${n.col} ${q(title)}${cards ? ` and its ${cards} ${n.card}${cards === 1 ? '' : 's'}` : ''}`, { columnId, title, cards });
+    `deleted the ${n.col} ${q(title)}${cards ? ` and its ${cards} ${n.card}${cards === 1 ? '' : 's'}` : ''}`, { columnId, title, cards },
+    { undo: { type: 'trash' }, activityId });
+}
+
+/**
+ * Copy rows to the trash under one activity before they are deleted: whole
+ * columns (with their cards and files), single cards (with their files), or
+ * single attachments. One statement; the rows go in as to_jsonb, files and all,
+ * and come back with jsonb_populate_record (services/boardRevert.js).
+ */
+async function trashRows(boardId, activityId, { columnIds = [], cardIds = [], attachmentIds = [] }) {
+  await query(`
+    WITH cols AS (
+      SELECT * FROM board_columns WHERE board_id = $1 AND column_id = ANY($3::text[])
+    ), cards AS (
+      SELECT * FROM board_cards WHERE board_id = $1 AND (column_id = ANY($3::text[]) OR card_id = ANY($4::text[]))
+    ), atts AS (
+      SELECT * FROM board_attachments WHERE board_id = $1
+         AND (card_id IN (SELECT card_id FROM cards) OR attachment_id = ANY($5::text[]))
+    )
+    INSERT INTO board_trash (trash_id, board_id, activity_id, kind, payload)
+    SELECT 'btr_' || gen_random_uuid(), $1, $2, 'column', to_jsonb(c) FROM cols c
+    UNION ALL SELECT 'btr_' || gen_random_uuid(), $1, $2, 'card', to_jsonb(k) FROM cards k
+    UNION ALL SELECT 'btr_' || gen_random_uuid(), $1, $2, 'attachment', to_jsonb(a) FROM atts a
+  `, [boardId, activityId, columnIds, cardIds, attachmentIds]);
 }
 
 /** Set column order from a full list of ids. Unknown ids are ignored. */
@@ -357,10 +451,17 @@ async function orderColumns(boardId, userId, columnIds) {
   const n = nouns(await requireBoard(boardId, userId));
   const ids = (Array.isArray(columnIds) ? columnIds : []).filter(x => typeof x === 'string').slice(0, LIMITS.columns);
   if (!ids.length) return;
-  await query(`UPDATE board_columns c SET order_index = t.i
+  const before = await query('SELECT column_id, order_index FROM board_columns WHERE board_id = $1', [boardId]);
+  const r = await query(`UPDATE board_columns c SET order_index = t.i
                  FROM unnest($2::text[]) WITH ORDINALITY AS t(id, i)
-                WHERE c.column_id = t.id AND c.board_id = $1`, [boardId, ids]);
-  await record(boardId, userId, 'order_columns', `reordered the ${n.col}s`, {}, { key: `colorder:${boardId}` });
+                WHERE c.column_id = t.id AND c.board_id = $1
+            RETURNING c.column_id, c.order_index`, [boardId, ids]);
+  const was = Object.fromEntries(before.rows.map(c => [c.column_id, c.order_index]));
+  const now = Object.fromEntries(r.rows.map(c => [c.column_id, Number(c.order_index)]));
+  await record(boardId, userId, 'order_columns', `reordered the ${n.col}s`, {}, {
+    key: `colorder:${boardId}`,
+    undo: { type: 'column_order', before: Object.fromEntries(Object.keys(now).map(id => [id, was[id]])), after: now }
+  });
 }
 
 // ── cards ──────────────────────────────────────────────────────
@@ -428,8 +529,18 @@ async function addCard(boardId, userId, input = {}) {
   await saveTags(board, f.tags);
   await record(boardId, userId, 'add_card', board.kind === 'queue'
     ? (front ? `put the task ${q(f.title)} at the front of ${colTitle}'s queue` : `added the task ${q(f.title)} to ${colTitle}'s queue`)
-    : `added the card ${q(f.title)} to ${colTitle}`, { cardId, columnId: input.columnId });
+    : `added the card ${q(f.title)} to ${colTitle}`, { cardId, columnId: input.columnId },
+    { undo: { type: 'card_added', cardId } });
   return cardId;
+}
+
+/** A card column's value as History and undo compare it: dates as YYYY-MM-DD, times as ISO, the rest as is. */
+function cardValue(field, v) {
+  if (v === undefined || v === null) return null;
+  if (field === 'start_date' || field === 'end_date') return isoDate(v);
+  if (field === 'done_at') return new Date(v).toISOString();
+  if (field === 'order_index') return Number(v);
+  return v;
 }
 
 /** Any of the card fields, a move (columnId), and — on a queue — done: true | false. */
@@ -461,7 +572,15 @@ async function updateCard(boardId, userId, cardId, input = {}) {
   await saveTags(board, f.tags);
   const change = describeCardChange(cur, f, { from: cur.column_title, to: toColumn });
   if (change) {
-    await record(boardId, userId, 'update_card', change.summary, { cardId, changes: change.changes }, { key: change.key });
+    // Only the fields that really changed, before and after — undo puts back
+    // just those, and only where nobody has changed them again since.
+    const before = {}, after = {};
+    for (const k of keys) {
+      const was = cardValue(k, cur[k]), now = cardValue(k, f[k]);
+      if (JSON.stringify(was) !== JSON.stringify(now)) { before[k] = was; after[k] = now; }
+    }
+    await record(boardId, userId, 'update_card', change.summary, { cardId, changes: change.changes },
+      { key: change.key, undo: Object.keys(after).length ? { type: 'card_fields', cardId, before, after } : null });
   }
 }
 
@@ -481,33 +600,48 @@ function isoDate(d) {
 async function setCardDone(boardId, userId, cardId, done, { board = null } = {}) {
   const b = board || await requireBoard(boardId, userId);
   if (b.kind !== 'queue') throw bad('Only a queue marks tasks done — move the card to a Done column instead');
+  // FROM sees the row before the update, so the old done_at and slot ride back for undo.
   const r = await query(done
     ? `UPDATE board_cards k SET done_at = now(), updated_at = now()
+         FROM (SELECT done_at AS old_done, order_index AS old_order FROM board_cards WHERE card_id = $1) o
         WHERE k.card_id = $1 AND k.board_id = $2 AND k.done_at IS NULL
-      RETURNING k.title, k.column_id, (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`
+      RETURNING k.title, k.column_id, k.done_at, k.order_index, o.old_done, o.old_order,
+                (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`
     : `UPDATE board_cards k SET done_at = NULL, updated_at = now(),
-              order_index = (SELECT COALESCE(MIN(o.order_index) - 1, 0) FROM board_cards o
-                              WHERE o.column_id = k.column_id AND o.done_at IS NULL)
+              order_index = (SELECT COALESCE(MIN(x.order_index) - 1, 0) FROM board_cards x
+                              WHERE x.column_id = k.column_id AND x.done_at IS NULL)
+         FROM (SELECT done_at AS old_done, order_index AS old_order FROM board_cards WHERE card_id = $1) o
         WHERE k.card_id = $1 AND k.board_id = $2 AND k.done_at IS NOT NULL
-      RETURNING k.title, k.column_id, (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`,
+      RETURNING k.title, k.column_id, k.done_at, k.order_index, o.old_done, o.old_order,
+                (SELECT title FROM board_columns c WHERE c.column_id = k.column_id) AS lane`,
     [cardId, boardId]);
   if (!r.rowCount) {
     const exists = await query('SELECT 1 FROM board_cards WHERE card_id = $1 AND board_id = $2', [cardId, boardId]);
     if (!exists.rowCount) throw notFound('Card');
     return false;
   }
-  const { title, lane, column_id: columnId } = r.rows[0];
+  const row = r.rows[0];
+  const { title, lane, column_id: columnId } = row;
   await record(boardId, userId, done ? 'done_card' : 'undone_card',
     done ? `finished ${q(title)} from ${lane}'s queue` : `put ${q(title)} back at the front of ${lane}'s queue`,
-    { cardId, columnId });
+    { cardId, columnId },
+    { undo: { type: 'card_fields', cardId,
+      before: { done_at: cardValue('done_at', row.old_done), order_index: cardValue('order_index', row.old_order) },
+      after: { done_at: cardValue('done_at', row.done_at), order_index: cardValue('order_index', row.order_index) } } });
   return true;
 }
 
 async function deleteCard(boardId, userId, cardId) {
   const n = nouns(await requireBoard(boardId, userId));
+  const activityId = newActivityId();
+  await trashRows(boardId, activityId, { cardIds: [cardId] });
   const r = await query('DELETE FROM board_cards WHERE card_id = $1 AND board_id = $2 RETURNING title', [cardId, boardId]);
-  if (!r.rowCount) throw notFound('Card');
-  await record(boardId, userId, 'delete_card', `deleted the ${n.card} ${q(r.rows[0].title)}`, { cardId, title: r.rows[0].title });
+  if (!r.rowCount) {
+    await query('DELETE FROM board_trash WHERE activity_id = $1', [activityId]);
+    throw notFound('Card');
+  }
+  await record(boardId, userId, 'delete_card', `deleted the ${n.card} ${q(r.rows[0].title)}`, { cardId, title: r.rows[0].title },
+    { undo: { type: 'trash' }, activityId });
 }
 
 /**
@@ -529,7 +663,7 @@ async function reorderCards(boardId, userId, columns) {
   // and every column's title, so History can say "moved X from A to B".
   const [okCols, before] = await Promise.all([
     query('SELECT column_id, title FROM board_columns WHERE board_id = $1', [boardId]),
-    query('SELECT card_id, column_id, title FROM board_cards WHERE board_id = $1 AND card_id = ANY($2::text[])', [boardId, ids])
+    query('SELECT card_id, column_id, order_index, title FROM board_cards WHERE board_id = $1 AND card_id = ANY($2::text[])', [boardId, ids])
   ]);
   const colTitle = new Map(okCols.rows.map(c => [c.column_id, c.title]));
   if (!colSet.every(c => colTitle.has(c))) throw bad('a column in that move is not on this board');
@@ -541,20 +675,39 @@ async function reorderCards(boardId, userId, columns) {
   `, [boardId, ids, cols, idx]);
 
   const target = new Map(ids.map((id, i) => [id, cols[i]]));
+  const undo = positionsUndo(before.rows, ids.map((id, i) => ({ card_id: id, column_id: cols[i], order_index: idx[i] })));
   const moved = before.rows.filter(k => target.get(k.card_id) !== k.column_id);
   if (moved.length === 1) {
     const k = moved[0];
     await record(boardId, userId, 'move_card',
       `moved ${q(k.title)} from ${colTitle.get(k.column_id)} to ${colTitle.get(target.get(k.card_id))}`,
-      { cardId: k.card_id, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) });
+      { cardId: k.card_id, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) }, { undo });
   } else if (moved.length > 1) {
     await record(boardId, userId, 'move_card', `moved ${moved.length} ${nouns(board).card}s`,
-      { cards: moved.map(k => ({ cardId: k.card_id, title: k.title, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) })) });
+      { cards: moved.map(k => ({ cardId: k.card_id, title: k.title, from: colTitle.get(k.column_id), to: colTitle.get(target.get(k.card_id)) })) },
+      { undo });
   } else {
     const where = colTitle.get(colSet[0]);
     await record(boardId, userId, 'order_cards',
-      board.kind === 'queue' ? `reordered ${where}'s queue` : `reordered the cards in ${where}`, {}, { key: `order:${colSet[0]}` });
+      board.kind === 'queue' ? `reordered ${where}'s queue` : `reordered the cards in ${where}`, {}, { key: `order:${colSet[0]}`, undo });
   }
+}
+
+/**
+ * Undo for a drag: where each card that actually moved sat before and sits
+ * now, keyed by card id (so a burst of drags merges with jsonb ||). Null when
+ * nothing moved. Pure; exported for tests.
+ */
+function positionsUndo(beforeRows, afterRows) {
+  const was = new Map(beforeRows.map(k => [k.card_id, k]));
+  const before = {}, after = {};
+  for (const k of afterRows) {
+    const w = was.get(k.card_id);
+    if (!w || (w.column_id === k.column_id && Number(w.order_index) === Number(k.order_index))) continue;
+    before[k.card_id] = { column_id: w.column_id, order_index: Number(w.order_index) };
+    after[k.card_id] = { column_id: k.column_id, order_index: Number(k.order_index) };
+  }
+  return Object.keys(after).length ? { type: 'positions', before, after } : null;
 }
 
 // ── attachments ────────────────────────────────────────────────
@@ -567,12 +720,14 @@ async function requireCard(boardId, cardId) {
 }
 
 async function insertAttachment(row) {
+  // A guest's file is stored under the board owner (user_id must be a user);
+  // History still says which guest added it.
   const r = await query(`
     INSERT INTO board_attachments (attachment_id, board_id, card_id, user_id, kind, filename, mimetype,
                                    size_bytes, url, provider, extracted, char_count, data)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    SELECT $1,$2,$3,COALESCE($4, b.user_id),$5,$6,$7,$8,$9,$10,$11,$12,$13 FROM boards b WHERE b.board_id = $2
     RETURNING ${ATT_COLS}
-  `, ['bat_' + uuidv4(), row.boardId, row.cardId || null, row.userId, row.kind, row.filename, row.mimetype || '',
+  `, ['bat_' + uuidv4(), row.boardId, row.cardId || null, actorOf(row.userId).userId, row.kind, row.filename, row.mimetype || '',
       row.size || 0, row.url || null, row.provider || null, row.text || '', (row.text || '').length, row.data || null]);
   const a = r.rows[0];
   const where = row.cardId
@@ -580,7 +735,8 @@ async function insertAttachment(row) {
     : ' to the board';
   const what = a.kind === 'link' ? 'added the link' : a.kind === 'text' ? 'added the note' : 'attached';
   await record(row.boardId, row.userId, 'attach', `${what} ${q(a.filename)}${where}`,
-    { attachmentId: a.attachment_id, cardId: a.card_id || null, kind: a.kind });
+    { attachmentId: a.attachment_id, cardId: a.card_id || null, kind: a.kind },
+    { undo: { type: 'attachment_added', attachmentId: a.attachment_id } });
   return a;
 }
 
@@ -612,10 +768,16 @@ async function getAttachment(boardId, attachmentId, { withData = false } = {}) {
 
 async function deleteAttachment(boardId, userId, attachmentId) {
   await requireBoard(boardId, userId);
+  const activityId = newActivityId();
+  await trashRows(boardId, activityId, { attachmentIds: [attachmentId] });
   const r = await query('DELETE FROM board_attachments WHERE attachment_id = $1 AND board_id = $2 RETURNING filename, card_id',
     [attachmentId, boardId]);
-  if (!r.rowCount) throw notFound('Attachment');
-  await record(boardId, userId, 'detach', `removed ${q(r.rows[0].filename)}`, { attachmentId, cardId: r.rows[0].card_id || null });
+  if (!r.rowCount) {
+    await query('DELETE FROM board_trash WHERE activity_id = $1', [activityId]);
+    throw notFound('Attachment');
+  }
+  await record(boardId, userId, 'detach', `removed ${q(r.rows[0].filename)}`, { attachmentId, cardId: r.rows[0].card_id || null },
+    { undo: { type: 'trash' }, activityId });
 }
 
 // ── people ─────────────────────────────────────────────────────
@@ -704,13 +866,73 @@ async function joinByLink(boardId, userId) {
 async function boardStamp(boardId, userId) {
   await requireBoard(boardId, userId, 'view');
   const r = await query(`
-    SELECT b.updated_at, a.user_id AS by_id, u.name AS by_name
+    SELECT b.updated_at, a.user_id AS by_id, a.guest_id AS by_guest, u.name AS by_name, g.number, g.name AS guest_name
       FROM boards b
-      LEFT JOIN LATERAL (SELECT user_id FROM board_activity WHERE board_id = b.board_id ORDER BY created_at DESC LIMIT 1) a ON true
+      LEFT JOIN LATERAL (SELECT user_id, guest_id FROM board_activity WHERE board_id = b.board_id ORDER BY created_at DESC LIMIT 1) a ON true
       LEFT JOIN users u ON u.user_id = a.user_id
+      LEFT JOIN board_guests g ON g.guest_id = a.guest_id
      WHERE b.board_id = $1`, [boardId]);
   const row = r.rows[0] || {};
-  return { updatedAt: row.updated_at, byId: row.by_id || null, byName: row.by_name || null };
+  return {
+    updatedAt: row.updated_at, byId: row.by_id || null, byGuest: row.by_guest || null,
+    byName: row.by_guest ? guestLabel(row.number, row.guest_name) : (row.by_name || null)
+  };
+}
+
+// ── guests (edit links, no account) ────────────────────────────
+
+const crypto = require('crypto');
+const hashKey = (key) => crypto.createHash('sha256').update(String(key)).digest('hex');
+
+const GUESTS_PER_BOARD = 200;
+const guestView = (g) => ({ guestId: g.guest_id, number: g.number, name: g.name, label: g.number ? guestLabel(g.number, g.name) : (g.name || 'Guest') });
+
+/**
+ * A browser opening an edit link: a guest row with a random key the browser
+ * keeps (only its hash is stored). No number yet — see numberGuest.
+ */
+async function createGuest(boardId, shareId) {
+  const n = await query('SELECT COUNT(*)::int AS n FROM board_guests WHERE board_id = $1', [boardId]);
+  if (n.rows[0].n >= GUESTS_PER_BOARD) throw bad('This link has been opened by too many people — ask the owner for a new one');
+  const key = crypto.randomBytes(24).toString('base64url');
+  const r = await query(`INSERT INTO board_guests (guest_id, board_id, share_id, key_hash) VALUES ($1, $2, $3, $4)
+                         RETURNING guest_id, number, name`, ['bgu_' + uuidv4(), boardId, shareId || null, hashKey(key)]);
+  return { key, ...guestView(r.rows[0]) };
+}
+
+/** The guest a browser's key belongs to, on this board only — or null. Touches last_seen_at. */
+async function guestByKey(boardId, key) {
+  if (!key || typeof key !== 'string' || key.length > 200) return null;
+  const r = await query(`
+    UPDATE board_guests SET last_seen_at = now()
+     WHERE key_hash = $1 AND board_id = $2
+    RETURNING guest_id, number, name`, [hashKey(key), boardId]);
+  return r.rows[0] ? guestView(r.rows[0]) : null;
+}
+
+/**
+ * A guest's first change gives them the board's next number. Two guests
+ * changing things at the same moment can race for it; the unique constraint
+ * catches that and the loser takes the next one.
+ */
+async function numberGuest(guestId, boardId) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await query(`
+        UPDATE board_guests SET number = (SELECT COALESCE(MAX(number), 0) + 1 FROM board_guests WHERE board_id = $2)
+         WHERE guest_id = $1 AND number IS NULL
+        RETURNING guest_id, number, name`, [guestId, boardId]);
+      return r.rows[0] ? guestView(r.rows[0]) : null;
+    } catch (err) {
+      if (err.code !== '23505' || attempt >= 4) throw err;
+    }
+  }
+}
+
+async function renameGuest(guestId, name) {
+  const r = await query('UPDATE board_guests SET name = $2 WHERE guest_id = $1 RETURNING guest_id, number, name', [guestId, clean(name, 60)]);
+  if (!r.rowCount) throw notFound('Guest');
+  return guestView(r.rows[0]);
 }
 
 async function attachmentsWithData(boardId) {
@@ -1238,5 +1460,6 @@ module.exports = {
   requireCard, insertAttachment, attachUpload, getAttachment, deleteAttachment, attachmentsWithData,
   fromMindMap, boardForMap, toMindMap, generateBoard,
   listActivity, listMembers, addMember, removeMember, joinByLink, boardStamp, record, readFilesForPlan,
-  normTags, isoDate, normalizePlan, planPalette, mapRowsFromBoard, describeCardChange
+  listGuests, createGuest, guestByKey, numberGuest, renameGuest, guestLabel, actorOf, newActivityId,
+  normTags, isoDate, cardValue, normalizePlan, planPalette, mapRowsFromBoard, describeCardChange, positionsUndo
 };

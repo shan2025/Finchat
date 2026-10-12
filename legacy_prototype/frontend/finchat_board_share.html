@@ -14,6 +14,8 @@
   app shell — whoever opens this may have no FinChat account. Rendering is the
   owner page's own (board_ui.js), so the board looks exactly as its owner sees it
   — a queue as its pipes, one per person, showing only what is still waiting.
+  An EDIT link never stays here: it goes on to finchat_boards.html, as a
+  member when signed in, otherwise as a guest (#share=<token>, no account).
 -->
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -57,9 +59,7 @@ body.queue #zoomWrap { display: block; }
   <span class="title" id="title">Shared board</span>
   <span class="view-only" id="modeTag">View only</span>
 </div>
-<div class="bx-float topr">
-  <button class="bx-btn primary" id="editBtn" hidden title="Sign in to FinChat and edit this board"><span class="material-symbols-outlined">edit</span>Open to edit</button>
-  <div class="search-wrap"><span class="material-symbols-outlined">search</span><input class="search" id="search" placeholder="Search cards" autocomplete="off"></div>
+<div class="bx-float topr">  <div class="search-wrap"><span class="material-symbols-outlined">search</span><input class="search" id="search" placeholder="Search cards" autocomplete="off"></div>
   <button class="bx-btn ghost" id="filesBtn" hidden><span class="material-symbols-outlined">folder_open</span><span id="filesCount">Files</span></button>
   <button class="bx-ibtn" id="themeBtn" title="Dark / light"><span class="material-symbols-outlined">dark_mode</span></button>
 </div>
@@ -125,6 +125,9 @@ body.queue #zoomWrap { display: block; }
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return fail('This link is not available', body.error || 'It may have been revoked or expired.');
     B = body;
+    // An edit link goes straight to the editor: under their own name when
+    // signed in (they join as an editor), otherwise as a guest — no account.
+    if (B.role === 'edit') return openEditor();
     document.title = `${B.board.title} | FinChat`;
     $('title').textContent = B.board.title;
     if (isQueue()) {
@@ -135,39 +138,23 @@ body.queue #zoomWrap { display: block; }
     const n = B.attachments.filter(a => !a.cardId).length;
     $('filesBtn').hidden = !n;
     $('filesCount').textContent = `Files (${n})`;
-    // An edit link: offer to join. The board shown here stays read-only; the
-    // editing happens on the real board, signed in, so History has a name.
-    $('editBtn').hidden = B.role !== 'edit';
-    if (B.role === 'edit') $('modeTag').textContent = 'You can edit';
     render();
   }
 
-  $('editBtn').addEventListener('click', async () => {
+  async function openEditor() {
     let session = null;
     try { session = JSON.parse(sessionStorage.getItem('finchat_user') || localStorage.getItem('finchat_session') || 'null'); } catch (e) {}
     const auth = localStorage.getItem('finchat_token') || sessionStorage.getItem('finchat_token') || (session && session.token) || '';
-    if (!auth) {
-      // Come back here after signing in (finchat_login.html honours only this shape).
-      try { sessionStorage.setItem('finchat_after_login', 'finchat_board_share.html#' + TOKEN); } catch (e) {}
-      location.href = 'finchat_login.html';
-      return;
-    }
-    $('editBtn').disabled = true;
+    const asGuest = () => location.replace('finchat_boards.html#share=' + TOKEN);
+    if (!auth) return asGuest();
     try {
       const r = await fetch(`${API}/join`, { method: 'POST', headers: { Authorization: 'Bearer ' + auth } });
       const b = await r.json().catch(() => ({}));
-      if (r.status === 401) {
-        try { sessionStorage.setItem('finchat_after_login', 'finchat_board_share.html#' + TOKEN); } catch (e) {}
-        location.href = 'finchat_login.html';
-        return;
-      }
-      if (!r.ok) throw new Error(b.error || 'HTTP ' + r.status);
-      location.href = 'finchat_boards.html?board=' + encodeURIComponent(b.boardId);
-    } catch (e) {
-      U.toast(e.message);
-      $('editBtn').disabled = false;
-    }
-  });
+      // A stale sign-in is no reason to stop them: edit as a guest instead.
+      if (!r.ok) return asGuest();
+      location.replace('finchat_boards.html?board=' + encodeURIComponent(b.boardId));
+    } catch (e) { asGuest(); }
+  }
 
   const attsOf = (id) => B.attachments.filter(a => a.cardId === id);
   const isQueue = () => B && B.board.kind === 'queue';

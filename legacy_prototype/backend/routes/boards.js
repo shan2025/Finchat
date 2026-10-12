@@ -36,18 +36,30 @@
 //   DELETE /:boardId/members/:userId          owner removes anyone; an editor may remove themselves
 //   POST   /:boardId/assistant                {message, history?} → {reply, ops[{…, line}]} — writes nothing
 //   POST   /:boardId/assistant/apply          {ops, message} → runs the approved ops (multipart + "files" when ops attach them)
-//   GET    /:boardId/activity                 ?before=ISO — who changed what, newest first
+//   GET    /:boardId/activity                 ?before=ISO — who changed what, newest first (+ undoable, guest)
+//   POST   /:boardId/activity/:id/undo        undo one change (owner and editors)
+//   GET    /:boardId/guests                   who has edited through an edit link, numbered
+//   POST   /:boardId/guests/:guestId/undo     undo everything that guest did that still stands
 //   GET    /:boardId/stamp                    {updatedAt, byName} — "has someone else changed it?"
 //
 // Editors (migration 057) use every card/column/file route like the owner;
 // deleting the board, share links and people are the owner's alone.
+// GUESTS (migration 065) reach this router through an edit link —
+// routes/sharedBoards.js resolves the link and the guest, sets req.boardGuest
+// and passes on only the routes in GUEST_ROUTES there. Here they are just
+// another actor: actor(req) is the user's id or {guestId}.
 // A board you have no access to is 404, never 403 — a 403 would confirm it exists.
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth: requireUser } = require('../middleware/auth');
 const Boards = require('../services/boards');
 const Assistant = require('../services/boardAssistant');
+const Revert = require('../services/boardRevert');
+
+/** A guest already resolved by the edit-link router, or a signed-in user. */
+const requireAuth = (req, res, next) => (req.boardGuest ? next() : requireUser(req, res, next));
+const actor = (req) => (req.boardGuest ? { guestId: req.boardGuest.guestId } : req.user.id);
 const { sendDocFile, capabilities } = require('../services/cognitive/mindMapDocFile');
 const { prepareLinks, linkView } = require('../services/linkAttach');
 const { shareLinks } = require('../services/shareLinks');
@@ -163,7 +175,11 @@ router.post('/:boardId/mind-map', requireAuth, handle('make a mind map from the 
 }));
 
 router.get('/:boardId', requireAuth, handle('load the board', async (req, res) => {
-  res.json(boardView(await Boards.getBoard(req.params.boardId, req.user.id)));
+  const view = boardView(await Boards.getBoard(req.params.boardId, actor(req)),
+    { includeDocs: req.boardGuest ? req.boardGuest.includeDocs : true });
+  // A guest's page needs to know who it is, to say "you" and offer a name.
+  if (req.boardGuest) view.guest = { number: req.boardGuest.number, name: req.boardGuest.name, label: req.boardGuest.label };
+  res.json(view);
 }));
 
 router.patch('/:boardId', requireAuth, handle('update the board', async (req, res) => {
@@ -179,44 +195,44 @@ router.delete('/:boardId', requireAuth, handle('delete the board', async (req, r
 // ── columns ────────────────────────────────────────────────────
 
 router.post('/:boardId/columns/order', requireAuth, handle('reorder columns', async (req, res) => {
-  await Boards.orderColumns(req.params.boardId, req.user.id, req.body?.columnIds);
+  await Boards.orderColumns(req.params.boardId, actor(req), req.body?.columnIds);
   res.json({ ok: true });
 }));
 
 router.post('/:boardId/columns', requireAuth, handle('add the column', async (req, res) => {
-  const columnId = await Boards.addColumn(req.params.boardId, req.user.id, req.body || {});
+  const columnId = await Boards.addColumn(req.params.boardId, actor(req), req.body || {});
   res.status(201).json({ ok: true, columnId });
 }));
 
 router.patch('/:boardId/columns/:columnId', requireAuth, handle('update the column', async (req, res) => {
-  await Boards.updateColumn(req.params.boardId, req.user.id, req.params.columnId, req.body || {});
+  await Boards.updateColumn(req.params.boardId, actor(req), req.params.columnId, req.body || {});
   res.json({ ok: true });
 }));
 
 router.delete('/:boardId/columns/:columnId', requireAuth, handle('delete the column', async (req, res) => {
-  await Boards.deleteColumn(req.params.boardId, req.user.id, req.params.columnId);
+  await Boards.deleteColumn(req.params.boardId, actor(req), req.params.columnId);
   res.json({ ok: true });
 }));
 
 // ── cards ──────────────────────────────────────────────────────
 
 router.post('/:boardId/cards/order', requireAuth, handle('move the card', async (req, res) => {
-  await Boards.reorderCards(req.params.boardId, req.user.id, req.body?.columns);
+  await Boards.reorderCards(req.params.boardId, actor(req), req.body?.columns);
   res.json({ ok: true });
 }));
 
 router.post('/:boardId/cards', requireAuth, handle('add the card', async (req, res) => {
-  const cardId = await Boards.addCard(req.params.boardId, req.user.id, req.body || {});
+  const cardId = await Boards.addCard(req.params.boardId, actor(req), req.body || {});
   res.status(201).json({ ok: true, cardId });
 }));
 
 router.patch('/:boardId/cards/:cardId', requireAuth, handle('update the card', async (req, res) => {
-  await Boards.updateCard(req.params.boardId, req.user.id, req.params.cardId, req.body || {});
+  await Boards.updateCard(req.params.boardId, actor(req), req.params.cardId, req.body || {});
   res.json({ ok: true });
 }));
 
 router.delete('/:boardId/cards/:cardId', requireAuth, handle('delete the card', async (req, res) => {
-  await Boards.deleteCard(req.params.boardId, req.user.id, req.params.cardId);
+  await Boards.deleteCard(req.params.boardId, actor(req), req.params.cardId);
   res.json({ ok: true });
 }));
 
@@ -230,36 +246,36 @@ router.post('/:boardId/attachments', requireAuth, (req, res, next) => {
   });
 }, handle('attach the files', async (req, res) => {
   if (!req.files || !req.files.length) return res.status(400).json({ error: 'No files uploaded (field name: "files")' });
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, actor(req));
   const cardId = await Boards.requireCard(req.params.boardId, req.body?.cardId || null);
   const saved = [];
-  for (const f of req.files) saved.push(attView(await Boards.attachUpload(req.params.boardId, cardId, req.user.id, f)));
+  for (const f of req.files) saved.push(attView(await Boards.attachUpload(req.params.boardId, cardId, actor(req), f)));
   res.status(201).json({ ok: true, attachments: saved });
 }));
 
 router.post('/:boardId/attachments/text', requireAuth, handle('save the note', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, actor(req));
   const cardId = await Boards.requireCard(req.params.boardId, req.body?.cardId || null);
   const text = String(req.body?.text || '').replace(/\r\n/g, '\n').trim().slice(0, 20000);
   if (!text) return res.status(400).json({ error: 'text is required' });
   const title = String(req.body?.title || '').replace(/\s+/g, ' ').trim().slice(0, 200)
     || (text.replace(/\s+/g, ' ').slice(0, 60) + (text.length > 60 ? '…' : ''));
   const a = await Boards.insertAttachment({
-    boardId: req.params.boardId, cardId, userId: req.user.id, kind: 'text',
+    boardId: req.params.boardId, cardId, userId: actor(req), kind: 'text',
     filename: title, mimetype: 'text/plain', size: Buffer.byteLength(text, 'utf8'), text
   });
   res.status(201).json({ ok: true, attachment: attView(a) });
 }));
 
 router.post('/:boardId/attachments/links', requireAuth, handle('attach the links', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id);
+  await Boards.requireBoard(req.params.boardId, actor(req));
   const cardId = await Boards.requireCard(req.params.boardId, req.body?.cardId || null);
-  const { links, rejected } = await prepareLinks(req.user.id, { links: req.body?.links, text: req.body?.text });
+  const { links, rejected } = await prepareLinks(req.boardGuest ? null : req.user.id, { links: req.body?.links, text: req.body?.text });
   if (!links.length) return res.status(400).json({ error: 'No usable links — paste full http(s) addresses.', rejected });
   const saved = [];
   for (const l of links) {
     saved.push(attView(await Boards.insertAttachment({
-      boardId: req.params.boardId, cardId, userId: req.user.id, kind: 'link',
+      boardId: req.params.boardId, cardId, userId: actor(req), kind: 'link',
       filename: l.title, url: l.url, provider: l.provider
     })));
   }
@@ -267,14 +283,14 @@ router.post('/:boardId/attachments/links', requireAuth, handle('attach the links
 }));
 
 router.get('/:boardId/attachments/:id', requireAuth, handle('load the attachment', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id, 'view');
+  await Boards.requireBoard(req.params.boardId, actor(req), 'view');
   const a = await Boards.getAttachment(req.params.boardId, req.params.id);
   if (!a) return res.status(404).json({ error: 'Attachment not found' });
   res.json({ attachment: { ...attView(a), text: a.extracted || '' } });
 }));
 
 router.get('/:boardId/attachments/:id/file', requireAuth, handle('load the file', async (req, res) => {
-  await Boards.requireBoard(req.params.boardId, req.user.id, 'view');
+  await Boards.requireBoard(req.params.boardId, actor(req), 'view');
   const a = await Boards.getAttachment(req.params.boardId, req.params.id, { withData: true });
   if (!a) return res.status(404).json({ error: 'Attachment not found' });
   res.set('Cache-Control', 'private, max-age=3600');
@@ -284,7 +300,7 @@ router.get('/:boardId/attachments/:id/file', requireAuth, handle('load the file'
 }));
 
 router.delete('/:boardId/attachments/:id', requireAuth, handle('remove the attachment', async (req, res) => {
-  await Boards.deleteAttachment(req.params.boardId, req.user.id, req.params.id);
+  await Boards.deleteAttachment(req.params.boardId, actor(req), req.params.id);
   res.json({ ok: true });
 }));
 
@@ -371,17 +387,41 @@ router.post('/:boardId/assistant/apply', requireAuth, (req, res, next) => {
 // ── history ────────────────────────────────────────────────────
 
 router.get('/:boardId/activity', requireAuth, handle('load the history', async (req, res) => {
-  const rows = await Boards.listActivity(req.params.boardId, req.user.id, { before: req.query.before, limit: req.query.limit });
+  const rows = await Boards.listActivity(req.params.boardId, actor(req), { before: req.query.before, limit: req.query.limit });
+  const me = req.boardGuest ? { guest: req.boardGuest.guestId } : { user: req.user.id };
   res.json({ activity: rows.map(a => ({
-    activityId: a.activity_id, userId: a.user_id, userName: a.user_name || 'Someone', you: a.user_id === req.user.id,
-    action: a.action, summary: a.summary, details: a.details || {}, at: a.created_at
+    activityId: a.activity_id, userId: a.user_id, guestId: a.guest_id || null,
+    userName: a.guest_id ? Boards.guestLabel(a.guest_number, a.guest_name) : (a.user_name || 'Someone'),
+    guest: a.guest_id ? { number: a.guest_number, name: a.guest_name } : null,
+    you: a.guest_id ? a.guest_id === me.guest : (!!a.user_id && a.user_id === me.user),
+    action: a.action, summary: a.summary, details: a.details || {}, at: a.created_at,
+    // Guests cannot undo, so they are never told something can be.
+    undoable: !req.boardGuest && a.undoable && !a.reverted_at,
+    revertedAt: a.reverted_at || null, revertedBy: a.reverted_at ? (a.reverted_by_name || 'Someone') : null
   })) });
+}));
+
+router.post('/:boardId/activity/:activityId/undo', requireAuth, handle('undo that change', async (req, res) => {
+  res.json({ ok: true, ...await Revert.revertActivity(req.params.boardId, actor(req), req.params.activityId) });
+}));
+
+router.get('/:boardId/guests', requireAuth, handle('load the guests', async (req, res) => {
+  const rows = await Boards.listGuests(req.params.boardId, actor(req));
+  res.json({ guests: rows.map(g => ({
+    guestId: g.guest_id, number: g.number, name: g.name, label: Boards.guestLabel(g.number, g.name),
+    changes: g.changes, undoable: g.undoable, firstSeen: g.created_at, lastSeen: g.last_seen_at
+  })) });
+}));
+
+router.post('/:boardId/guests/:guestId/undo', requireAuth, handle('undo that guest\'s changes', async (req, res) => {
+  res.json({ ok: true, ...await Revert.revertGuest(req.params.boardId, actor(req), req.params.guestId) });
 }));
 
 router.get('/:boardId/stamp', requireAuth, handle('check the board', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const s = await Boards.boardStamp(req.params.boardId, req.user.id);
-  res.json({ updatedAt: s.updatedAt, byName: s.byName, byYou: s.byId === req.user.id });
+  const s = await Boards.boardStamp(req.params.boardId, actor(req));
+  const byYou = req.boardGuest ? s.byGuest === req.boardGuest.guestId : (!!s.byId && s.byId === req.user.id);
+  res.json({ updatedAt: s.updatedAt, byName: s.byName, byYou });
 }));
 
 module.exports = router;
