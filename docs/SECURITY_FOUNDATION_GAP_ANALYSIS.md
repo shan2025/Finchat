@@ -26,6 +26,21 @@
 > unsandboxed `child_process.exec`. **P1-6 is mostly done** — time, tool-call,
 > iteration and token budgets all landed; cost and delegation depth have not.
 > P0-2, P0-3, P0-4, P0-5, P1-7 and P1-8 remain open and unchanged.
+>
+> **Status update — 2026-11-13.** Host tools are now refused outright in
+> production (`HOST_TOOLS_ENABLED` and `NODE_ENV !== 'production'`,
+> `ToolRegistry.js`), which closes P0-1 for the deployed service.
+> **P0-2 is closed (structural half):** every tool result is wrapped in its own
+> `<tool_result tool=… trust=…>` block (a closing tag inside a result is
+> neutralised), the block is sent as a *user* turn instead of a system one,
+> and a standing rule states that block contents are data, never
+> instructions. Trust levels (`web` / `provider` / `account` / `system`) come
+> from `ToolRegistry.toolTrust`; any `web: true` tool is `web` by construction.
+> Regression test: `test/tool-output-trust-boundary.test.js`. The behavioural
+> half — the model *reporting* an embedded instruction rather than following
+> it — is prompted, not enforced; enforcement is still the permission and
+> approval gates in `ToolManager`. P0-3, P0-4, P0-5 and P1-8 remain open;
+> P1-7 is partly done (an execution can be cancelled).
 
 **Date:** 2026-08-13
 **Method:** the 30-item P0/P1/P2 list was checked line by line against the code in

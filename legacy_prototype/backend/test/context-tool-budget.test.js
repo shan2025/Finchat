@@ -17,7 +17,7 @@ describe('packToolResults', () => {
       { tool: 'news', result: 'headline one' },
       { tool: 'stock', result: { symbol: 'AAPL', price: 231.4 } }
     ], 12000);
-    assert.match(out, /\[Tool: news\] Result: headline one/);
+    assert.match(out, /<tool_result tool="news" trust="web">\nheadline one\n<\/tool_result>/);
     assert.match(out, /"symbol":"AAPL"/);
     assert.ok(!out.includes('trimmed'), 'nothing should be trimmed under budget');
   });
@@ -27,7 +27,7 @@ describe('packToolResults', () => {
       { tool: 'search', result: bulk(30000) },
       { tool: 'news', result: bulk(20000, 'y') }
     ], 12000);
-    // Allow for the per-entry "[Tool: …] Result: " labels and trim markers.
+    // Allow for the per-entry <tool_result …> envelopes and trim markers.
     assert.ok(out.length < 12000 + 500, `block was ${out.length} chars`);
   });
 
@@ -40,14 +40,14 @@ describe('packToolResults', () => {
     // Naive head-truncation of the concatenated block would lose these two.
     assert.match(out, /short but important/);
     assert.match(out, /also short/);
-    assert.match(out, /\[Tool: search\]/);
+    assert.match(out, /<tool_result tool="search"/);
   });
 
   test('every tool stays represented even at a tiny budget', () => {
     const tools = ['news', 'search', 'paper', 'reddit', 'stock'];
     const out = packToolResults(tools.map(t => ({ tool: t, result: bulk(9000) })), 1000);
     for (const t of tools) {
-      assert.match(out, new RegExp(`\\[Tool: ${t}\\]`), `${t} disappeared`);
+      assert.match(out, new RegExp(`<tool_result tool="${t}"`), `${t} disappeared`);
     }
   });
 
@@ -63,8 +63,8 @@ describe('packToolResults', () => {
       { tool: 'tiny', result: bulk(10) },
       { tool: 'huge', result: bulk(40000) }
     ], 3000);
-    const hugeLine = out.split('\n').find(l => l.startsWith('[Tool: huge]'));
-    assert.ok(hugeLine.length > 2400, `huge only got ${hugeLine.length} chars`);
+    const hugeBody = out.split('<tool_result tool="huge"')[1].split('</tool_result>')[0];
+    assert.ok(hugeBody.length > 2400, `huge only got ${hugeBody.length} chars`);
   });
 
   test('handles empty input and non-string results', () => {

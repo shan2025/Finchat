@@ -53,7 +53,10 @@ describe('prompt prefix stability', () => {
     });
     assert.ok(!first(msgs).includes('VOLATILE_RESULT'));
     assert.ok(!first(msgs).includes('VOLATILE_MEMORY'));
-    assert.match(systemText(msgs), /VOLATILE_RESULT/, 'still present, just later');
+    // Tool results travel in a user turn (the trust boundary), so look at every
+    // message after the prefix, not only the system ones.
+    const later = msgs.slice(1).map(m => m.content).join('\n');
+    assert.match(later, /VOLATILE_RESULT/, 'still present, just later');
   });
 
   test('the catalogue rendering is a run-level policy, not a per-turn decision', () => {

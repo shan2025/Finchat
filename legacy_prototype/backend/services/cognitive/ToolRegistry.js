@@ -867,6 +867,45 @@ function getToolMeta(toolName) {
   return TOOLS[toolName] || null;
 }
 
+// ── Trust level of what a tool returns ───────────────────────────
+//
+// Every tool result is DATA, never an instruction — ContextBuilder wraps each
+// one in a delimited block and says so. The trust tag on that block tells the
+// model how much to believe the CLAIMS inside it:
+//
+//   web      — text written by strangers: open-web pages, search snippets,
+//              social posts, papers, job boards, and the user's inbox (an email
+//              is third-party text too — the classic injection carrier). May
+//              contain instructions aimed at the model; report them, never obey.
+//   provider — structured numbers from a market-data API. Trust the figures as
+//              the provider's; still not an instruction.
+//   account  — the user's own stored records (portfolio, watchlist, boards,
+//              notifications, tasks). Trusted facts about the user; text fields
+//              inside (a card title, a note) can still have been pasted from
+//              anywhere.
+//   system   — host/diagnostic output.
+//
+// Default: any `web: true` tool is 'web'; anything unlisted is 'account', so a
+// new tool that forgets to declare itself is at worst over-trusted on claims
+// about the user's own data, never mistaken for an instruction source.
+const TOOL_TRUST = {
+  gmail: 'web', jobs: 'web', paper: 'web', youtube: 'web', agent_reach: 'web',
+  reddit: 'web', quora: 'web',
+  // signal and session are NOT here: they are web:true because they fold news
+  // headlines into their output, and third-party text makes the whole result 'web'.
+  stocks: 'provider', crypto: 'provider', forex: 'provider', commodities: 'provider',
+  analytics: 'provider',
+  bash: 'system', file_read: 'system', file_write: 'system', file_edit: 'system',
+  glob: 'system', diagnostics: 'system', system_status: 'system'
+};
+
+/** @returns {'web'|'provider'|'account'|'system'} */
+function toolTrust(toolName) {
+  if (TOOL_TRUST[toolName]) return TOOL_TRUST[toolName];
+  const meta = TOOLS[toolName];
+  return meta && meta.web ? 'web' : 'account';
+}
+
 // ── Host-access restrictions ─────────────────────────────────────
 // These live here rather than in ToolManager because both ToolManager (to
 // enforce them) and this module (to hide them from prompts) need them, and
@@ -1031,7 +1070,7 @@ function getToolNames() {
 }
 
 module.exports = {
-  TOOLS, getToolMeta, listTools, getToolNames,
+  TOOLS, getToolMeta, listTools, getToolNames, toolTrust, TOOL_TRUST,
   ADVANCED_SYSTEM_TOOLS, HOST_ACCESS_TOOLS, ADMIN_AGENT_ID, ALWAYS_AVAILABLE_TOOLS,
   systemToolsFor, DIAGNOSTIC_AGENT_ID, DIAGNOSTIC_READ_TOOLS, HOPPER_HOST_TOOLS,
   HOST_TOOLS_ENABLED
