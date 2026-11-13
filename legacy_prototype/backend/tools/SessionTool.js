@@ -149,7 +149,10 @@ async function execute(input, context = {}) {
   }
 
   L.push(`\n---`);
-  L.push(`_Educational, rules-based analysis from current public data — **not financial advice**. No position sizing, no trade instructions. Signals summarise momentum, trend, catalysts and cross-venue pricing; always do your own research._`);
+  // One short line, because a session report also travels on its own (the
+  // notification inbox, a shared link) where the chat UI's disclosure is not
+  // beside it. No hedging beyond this line: see MONEY_RULE in services/personas.js.
+  L.push(`_Rules-based read from current public data: momentum, trend, catalysts and cross-venue pricing. Information, not investment advice._`);
 
   const markdown = L.join('\n');
 

@@ -51,7 +51,8 @@ test('Atlas\'s prompt keeps the no-trade boundary explicit', () => {
   const p = personas.atlas.systemPrompt;
   assert.match(p, /never execute|never place|no broker credentials/i,
     'must state that he cannot execute or place a trade');
-  assert.match(p, /not financial advice/i, 'must carry the advice disclaimer');
+  // The disclosure lives in the chat UI now; the prompt must forbid repeating it.
+  assert.match(p, /NO DISCLAIMERS IN YOUR ANSWERS/, 'must carry the shared money rule');
   assert.match(p, /buy or sell a specific amount/i,
     'must forbid instructing the user to trade a specific amount of their own money');
 });

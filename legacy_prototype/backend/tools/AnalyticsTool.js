@@ -23,7 +23,9 @@ const history = require('../services/quant/history');
 const pct = (x, d = 2) => (x == null || !Number.isFinite(x) ? null : +(x * 100).toFixed(d));
 const num = (x, d = 2) => (x == null || !Number.isFinite(x) ? null : +x.toFixed(d));
 
-const DISCLAIMER = 'Computed from historical daily closes. Describes past behaviour only — not a forecast and not financial advice.';
+// What the numbers are, not a disclaimer for the model to repeat — the chat UI
+// carries the advice disclosure (see MONEY_RULE in services/personas.js).
+const BASIS = 'Computed from historical daily closes. Describes past behaviour only; it is not a forecast.';
 
 function parseInput(input) {
   if (input && typeof input === 'object') return input;
@@ -287,7 +289,7 @@ async function portfolioAnalysis({ userId, days = 90, minWeightPct = 1, riskFree
       historyUnavailable: failed.length ? failed : undefined
     },
     riskFreeRateAssumed: riskFreeRate,
-    disclaimer: DISCLAIMER
+    basis: BASIS
   };
 }
 
@@ -342,7 +344,7 @@ async function compare({ symbols = [], kind = 'crypto', days = 365, rankBy = 'so
     unranked: rows.filter((r) => r[by] == null),
     framing: `Ranked by ${by} over the past ${days} days: which of these has paid the most per unit of risk IN THAT WINDOW. It is not a prediction of which will do best next, and a different window can reverse the order — say both when you report it.`,
     riskFreeRateAssumed: riskFreeRate,
-    disclaimer: DISCLAIMER
+    basis: BASIS
   };
 }
 
@@ -377,7 +379,7 @@ async function horizon({ symbol, kind = 'crypto', exchange = null, horizons = [7
     basis: { source: h.source, days: h.days, from: h.dates[0], to: h.dates[h.dates.length - 1] },
     outcomes,
     framing: 'For every N-day window in the history, what holding for N days actually returned. This is the evidence behind a holding period, not a recommendation of one. Windows overlap, so they are not independent — a large count is not a large amount of evidence, and one bull or bear run can dominate every horizon. Past windows say nothing about the next one.',
-    disclaimer: DISCLAIMER
+    basis: BASIS
   };
 }
 
@@ -392,7 +394,7 @@ async function execute(input, context = {}) {
     if (action === 'asset') {
       if (!o.symbol) return { error: 'Give a symbol, e.g. {"action":"asset","symbol":"BTC"}.' };
       const p = await profile({ symbol: o.symbol, kind: o.kind || 'crypto', exchange: o.exchange, days: o.days || 365, riskFreeRate: rf });
-      return { action: 'asset', ...p, disclaimer: DISCLAIMER };
+      return { action: 'asset', ...p, basis: BASIS };
     }
     if (action === 'portfolio') {
       if (!context.userId || context.userId === 'system') throw new Error('Portfolio analytics needs a signed-in user.');
@@ -407,7 +409,7 @@ async function execute(input, context = {}) {
     }
     return { error: `Unknown analytics action "${action}". Use asset, portfolio, compare or horizon.` };
   } catch (err) {
-    return { action, error: err.message, disclaimer: DISCLAIMER };
+    return { action, error: err.message, basis: BASIS };
   }
 }
 

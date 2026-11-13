@@ -476,6 +476,24 @@ function buildContext({
     messages.push({ role: 'system', content: routeHint });
   }
 
+  // 3a. The trimmed-history note is a system message, so it goes here, BEFORE
+  // the first non-system turn. Every system message precedes every user and
+  // assistant turn: Gemini lifts system text out regardless of position, but
+  // stricter chat templates (Mistral's among them) reject a system message that
+  // follows a user one. This used to sit after the tool results, which was
+  // harmless only while tool results were themselves a system message.
+  const { kept: keptHistory, dropped: droppedTurns } = packHistory(conversationHistory);
+  if (droppedTurns > 0) {
+    // Say that the window was trimmed. Without this the model reads the oldest
+    // kept turn as the start of the conversation and can contradict something
+    // it agreed to earlier, which is worse than admitting the gap.
+    messages.push({
+      role: 'system',
+      content: `--- EARLIER CONVERSATION TRIMMED ---\n${droppedTurns} older message(s) are not shown. ` +
+        `If the user refers to something you cannot see, say so and ask them to restate it rather than guessing.`
+    });
+  }
+
   // 3. Tool results from previous iterations.
   //
   // A USER turn, deliberately — see the trust-boundary note above
@@ -503,18 +521,10 @@ function buildContext({
     });
   }
 
-  // 4. Conversation history, most-recent-first within a fixed budget.
-  const { kept: keptHistory, dropped: droppedTurns } = packHistory(conversationHistory);
-  if (droppedTurns > 0) {
-    // Say that the window was trimmed. Without this the model reads the oldest
-    // kept turn as the start of the conversation and can contradict something
-    // it agreed to earlier, which is worse than admitting the gap.
-    messages.push({
-      role: 'system',
-      content: `--- EARLIER CONVERSATION TRIMMED ---\n${droppedTurns} older message(s) are not shown. ` +
-        `If the user refers to something you cannot see, say so and ask them to restate it rather than guessing.`
-    });
-  }
+  // 4. Conversation history, most-recent-first within a fixed budget (packed
+  // in 3a). Two user turns in a row — the tool results, then the first history
+  // turn or the goal — are merged by inference.mergeAdjacentTurns before any
+  // provider sees them.
   for (const msg of keptHistory) {
     messages.push({ role: msg.role, content: msg.content });
   }

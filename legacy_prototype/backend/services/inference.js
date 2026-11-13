@@ -420,6 +420,39 @@ function _cachedTokensFrom(usage = {}) {
     || 0;
 }
 
+/**
+ * Merge back-to-back user turns (and back-to-back assistant turns) into one.
+ *
+ * Tool results reach the model as a user turn (the trust boundary in
+ * ContextBuilder), so the agent loop now routinely sends two user turns in a
+ * row: the results, then the goal or the first history turn. DeepSeek, Groq,
+ * Gemini and Ollama accept that; chat templates that require strict
+ * user/assistant alternation (Mistral's, and many self-hosted models) reject
+ * the request outright. Merging is lossless — the two contents are joined in
+ * order — so it is applied to every provider rather than special-cased.
+ *
+ * System messages are left exactly where they are, and so is the first one:
+ * the prompt prefix must stay byte-identical across turns for provider-side
+ * prefix caching. Multimodal (array) content is concatenated part by part.
+ */
+function mergeAdjacentTurns(messages) {
+  if (!Array.isArray(messages)) return messages;
+  const toParts = (c) => (Array.isArray(c) ? c : [{ type: 'text', text: String(c ?? '') }]);
+  const out = [];
+  for (const m of messages) {
+    const prev = out[out.length - 1];
+    if (prev && m && prev.role === m.role && (m.role === 'user' || m.role === 'assistant')) {
+      const merged = (typeof prev.content === 'string' && typeof m.content === 'string')
+        ? `${prev.content}\n\n${m.content}`
+        : [...toParts(prev.content), ...toParts(m.content)];
+      out[out.length - 1] = { ...prev, content: merged };
+      continue;
+    }
+    out.push(m);
+  }
+  return out;
+}
+
 /** Rough size of a message list, for logging and trim decisions. */
 function _payloadChars(messages) {
   return messages.reduce((n, m) => n + String(m.content || '').length, 0);
@@ -785,6 +818,9 @@ async function runInference({
   agentId = null, userId = null, onlyProvider = null, preferProvider = null
 }) {
   const _startedAt = Date.now();
+  // Once, here, so every provider below — chat-completions, Gemini and Ollama
+  // alike — gets a list it accepts. See mergeAdjacentTurns.
+  messages = mergeAdjacentTurns(messages);
 
   // BYOK harness resolution. A real user's own provider keys, and whether the
   // shared pool is still open to them, are resolved ONCE here from a 60s cache
@@ -1089,6 +1125,6 @@ async function probeProviders({ live = false, vision = false } = {}) {
 }
 
 module.exports = {
-  runInference, providerOrderFor, probeProviders,
+  runInference, providerOrderFor, probeProviders, mergeAdjacentTurns,
   WORKLOAD_ROUTES, WORKLOAD_MODEL_HINTS, IMPATIENT_WORKLOADS
 };

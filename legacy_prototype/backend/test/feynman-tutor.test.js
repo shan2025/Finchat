@@ -29,8 +29,10 @@ test('the prompt forbids teaching specifics from memory', () => {
 
 test('the prompt keeps finance lessons educational', () => {
   const p = personas.feynman.systemPrompt;
-  assert.match(p, /not financial advice/i);
   assert.match(p, /never tell the user what to buy, sell or hold/i);
+  assert.match(p, /never size a position/i);
+  // The disclosure lives in the chat UI; the tutor must not repeat it.
+  assert.match(p, /Do not add disclaimers/i);
 });
 
 test('the prompt does not claim to be the real person', () => {

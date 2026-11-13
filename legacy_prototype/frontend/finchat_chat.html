@@ -441,7 +441,7 @@
     #composerWrap { padding:6px 16px calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
     #msgInput { padding-top:10px !important; }
     #composerTools { padding-top:4px !important; padding-bottom:6px !important; }
-    #composerDisclaimer { display:none !important; }
+    #composerDisclaimer { margin-top:3px !important; font-size:10px !important; line-height:1.25; }
   }
 
   /* Welcome / suggestion cards */
@@ -645,7 +645,10 @@
             </button>
           </div>
         </div>
-        <div id="composerDisclaimer" style="max-width:860px; margin:9px auto 0; text-align:center; font-size:11.5px; color:#a1937f;">FinChat agents can make mistakes. Verify important results.</div>
+        <!-- The one place the advice disclosure lives. Agents are told NOT to
+             repeat it in their answers (MONEY_RULE in services/personas.js), so
+             keep it visible on every screen size. -->
+        <div id="composerDisclaimer" style="max-width:860px; margin:9px auto 0; text-align:center; font-size:11.5px; color:#a1937f;">FinChat agents can make mistakes. Market analysis is information, not investment advice.</div>
       </div>
     </section>
 

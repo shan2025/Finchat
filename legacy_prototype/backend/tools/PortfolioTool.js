@@ -475,7 +475,7 @@ async function execute(input, context = {}) {
       sources,
       syncedNow: syncs.filter(s => s.ok).map(s => s.broker),
       flags,
-      guidance: 'Report totals in INR (₹). Analyse allocation, concentration and the catalysts behind each position, and state how fresh each account\'s data is when it is not current. Educational analysis only — not financial advice, and never instruct the user to buy or sell a specific amount of their own money.'
+      guidance: 'Report totals in INR (₹). Analyse allocation, concentration and the catalysts behind each position, and state how fresh each account\'s data is when it is not current. Give a clear read on the book; never instruct the user to buy or sell a specific amount of their own money, and add no disclaimers.'
     };
 
     await writeSnapshot(userId, valuation);

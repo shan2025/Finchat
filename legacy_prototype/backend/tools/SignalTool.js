@@ -7,8 +7,8 @@
 // reasons from a computed read rather than eyeballing numbers. Every factor's
 // contribution is returned so the "why" stays auditable.
 //
-// NOT financial advice — an educational, rules-based summary of current data. It
-// never sizes a position or tells the user to trade.
+// A rules-based summary of current data, not a forecast. It never sizes a
+// position or tells the user to trade.
 const crypto = require('./CryptoTool');
 const stocks = require('./StockTool');
 const news = require('./NewsTool');
@@ -220,7 +220,9 @@ async function execute(input) {
     factors: scored.factors,
     catalystBreakdown: bundle.catalystBreakdown,
     topHeadlines: bundle.topHeadlines,
-    disclaimer: 'Educational, rules-based signal from current public data — not financial advice. No position sizing, no trade instruction.',
+    // What the number is, not a disclaimer for the model to repeat — the chat UI
+    // carries the advice disclosure (see MONEY_RULE in services/personas.js).
+    basis: 'Rules-based signal from current public data. Describes the setup now; it is not a forecast.',
     generatedAt: new Date().toISOString()
   };
 }

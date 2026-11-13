@@ -710,7 +710,7 @@ const TOOLS = {
   signal: {
     name: 'signal',
     web: true,
-    description: 'Compute a deterministic BULLISH/BEARISH/NEUTRAL signal for a cryptocurrency OR a stock by fusing price momentum, trend vs its 30-day average, (crypto) cross-venue agreement, and news-catalyst sentiment. Returns the signal, a confidence (low/medium/high), a score from -100 to +100, and the per-factor contributions plus catalysts behind it — the explainable "why". Use this when the user asks whether to buy/sell/hold, "is X bullish or bearish", or wants a read on where an asset is heading. Educational only, never financial advice.',
+    description: 'Compute a deterministic BULLISH/BEARISH/NEUTRAL signal for a cryptocurrency OR a stock by fusing price momentum, trend vs its 30-day average, (crypto) cross-venue agreement, and news-catalyst sentiment. Returns the signal, a confidence (low/medium/high), a score from -100 to +100, and the per-factor contributions plus catalysts behind it — the explainable "why". Use this when the user asks whether to buy/sell/hold, "is X bullish or bearish", or wants a read on where an asset is heading.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -736,7 +736,7 @@ const TOOLS = {
   session: {
     name: 'session',
     web: true,
-    description: 'Produce the user\'s "Market Intelligence Session": a ranked, sourced report over their whole watchlist (defaults to BTC/ETH/SOL if empty). For each crypto it runs the signal engine (bullish/bearish/neutral + score), ranks assets most-bullish to most-bearish, rolls up the catalysts driving the market, and returns a finished markdown report plus structured data. Use this when the user asks for a market brief/session, "what should I be watching", a portfolio-wide read, or "run my session". Optionally pass {"symbols":["BTC","ETH"]} to override the watchlist. Deliver the returned markdown; it already carries the not-financial-advice note.',
+    description: 'Produce the user\'s "Market Intelligence Session": a ranked, sourced report over their whole watchlist (defaults to BTC/ETH/SOL if empty). For each crypto it runs the signal engine (bullish/bearish/neutral + score), ranks assets most-bullish to most-bearish, rolls up the catalysts driving the market, and returns a finished markdown report plus structured data. Use this when the user asks for a market brief/session, "what should I be watching", a portfolio-wide read, or "run my session". Optionally pass {"symbols":["BTC","ETH"]} to override the watchlist. Deliver the returned markdown as it is.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -331,7 +331,7 @@ describe('Atlas is told how the accounts actually behave', () => {
     // The original Atlas contract. Gaining read access to a real account is
     // exactly when this is most likely to get quietly softened.
     assert.match(atlas, /never execute, place, route or simulate a trade/i);
-    assert.match(atlas, /not financial advice/i);
+    assert.match(atlas, /never size a position/i);
     assert.match(atlas, /buy or sell a specific amount/i);
   });
 });

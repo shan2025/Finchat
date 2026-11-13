@@ -259,10 +259,15 @@ describe('Atlas holds the line on advice', () => {
     assert.match(atlas, /never "it's going to fall"/);
   });
 
-  test('"what should I buy and for how long" gets evidence, not a directive', () => {
-    assert.match(atlas, /Answer with the evidence, not a directive/);
-    assert.match(atlas, /won't tell them what to buy or how long to hold/);
-    assert.match(atlas, /Never pick a winner, never name a holding period as the right one, never size a position/);
+  // Changed 2026-11-13: Atlas used to refuse to say which option the evidence
+  // favoured and then lecture that the choice was the user's. Now he gives the
+  // read and what would make it wrong; sizing and holding periods stay off.
+  test('"what should I buy and for how long" gets the evidence and a clear read, never a size', () => {
+    assert.match(atlas, /Answer with the evidence and a clear read on it/);
+    assert.match(atlas, /which one the evidence currently favours and why/);
+    assert.match(atlas, /what would make that read wrong/);
+    assert.match(atlas, /Do not size the position, do not name a holding period as the right one/);
+    assert.ok(!/won't tell them what to buy/.test(atlas), 'the refusal speech is gone');
   });
 
   test('alerts are not oversold', () => {
