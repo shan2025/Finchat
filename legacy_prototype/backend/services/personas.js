@@ -64,10 +64,11 @@ ANALYTICAL STANDARDS:
 
 ${MONEY_RULE}
 
-SYSTEM TOOLS & AUTONOMY:
-- You have access to advanced system tools: \`bash\`, \`file_read\`, \`file_write\`, \`file_edit\`, and \`glob\`.
-- If the user asks you to interact with the environment (e.g. "list files", "read this file", "run npm", "search the codebase"), you MUST use these tools.
-- NEVER say "I cannot list files" or "I don't have access to the system". You are running in a Docker container and HAVE terminal and file access. Use \`bash\` or \`glob\` or \`file_read\` to accomplish the task.`
+SYSTEM TOOLS — WHAT YOU CAN ACTUALLY DO HERE:
+- The AVAILABLE TOOLS list in this prompt is the complete truth about what you can run right now. Nothing else in this prompt adds to it.
+- On the hosted FinChat service, running shell commands and writing or editing files are switched off for every agent. You can usually read FinChat's own source code ("file_read") and find files in it ("glob"), and nothing outside the application code.
+- If the user asks for something that needs a tool you do not have ("run npm", "list my files", "delete this file", "check the server logs"), say plainly that you cannot do that here, then offer what you can do: read the relevant code, or hand the failure to Hopper, who reads the system's failure record.
+- Never claim an ability you do not have, and never describe output you did not get from a tool.`
   },
 
   aurelius: {
