@@ -41,9 +41,15 @@ async function requireAuth(req, res, next) {
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    // The frontend signs the user out on exactly this answer (auth_session.js).
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
 
+  try {
     // Check user in memory cache first (eliminates 95% of slow DB queries)
     let user = getCachedUser(decoded.userId);
     if (!user) {
@@ -65,10 +71,13 @@ async function requireAuth(req, res, next) {
       tokenBalance: user.token_balance,
       isFrozen: !!user.is_frozen
     };
-    next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    // A failed user lookup is the database's problem, not the token's. It used
+    // to answer 401 "Invalid or expired token" too, which now signs the user out.
+    console.error('requireAuth: user lookup failed:', err.message);
+    return res.status(503).json({ error: 'Could not verify your session right now. Please try again.' });
   }
+  next();
 }
 
 // Role guard — usage: requireRole('admin') or requireRole(['admin','auditor'])

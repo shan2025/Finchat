@@ -72,6 +72,12 @@
     // credential, and clearing it makes signing back in needlessly tedious.
   }
 
+  /** Drop the credentials but keep the Remember me choice and the prefill. */
+  function expire() {
+    TAB_KEYS.forEach(function (k) { safeRemove(sessionStorage, k); });
+    DEVICE_KEYS.forEach(function (k) { safeRemove(localStorage, k); });
+  }
+
   function wasRemembered() {
     try { return localStorage.getItem(REMEMBER_FLAG) === '1'; } catch (e) { return false; }
   }
@@ -83,7 +89,74 @@
   window.fcAuth = {
     persist: persist,
     clear: clear,
+    expire: expire,
     wasRemembered: wasRemembered,
     rememberedIdentifier: rememberedIdentifier
   };
+
+  // ── Expired sessions ─────────────────────────────────────────────────────
+  // A token lives 7 days (JWT_EXPIRES_IN), but a remembered session outlives
+  // it in localStorage and pages only check that a session EXISTS. So after a
+  // week the app still opened, and every request failed: Chat rendered the
+  // server's "Invalid or expired token" as the agent's reply. Now an expired
+  // token, or the server rejecting one, sends the user to sign in again.
+  // pwaHead.js loads this file on every page so the check runs everywhere.
+  var PUBLIC_PAGE = /(?:^|\/)(?:finchat_login|finchat_signup|offline|\w+_share)\.html$/;
+  var REJECTED = { 'Invalid or expired token': 1, 'User not found': 1 };
+  var leaving = false;
+
+  function storedToken() {
+    var slots = [[sessionStorage, 'finchat_user'], [localStorage, 'finchat_session']];
+    for (var i = 0; i < slots.length; i++) {
+      try {
+        var s = JSON.parse(slots[i][0].getItem(slots[i][1]) || 'null');
+        if (s && s.token) return s.token;
+      } catch (e) { /* malformed entry — try the next */ }
+    }
+    try { return localStorage.getItem('finchat_token') || localStorage.getItem('finchat_jwt') || ''; } catch (e) { return ''; }
+  }
+
+  function isExpired(token) {
+    try {
+      var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      var claims = JSON.parse(atob(b64));
+      return typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now();
+    } catch (e) {
+      return false; // not a JWT we can read — let the server decide
+    }
+  }
+
+  function signedOut() {
+    if (leaving) return;
+    expire();
+    if (PUBLIC_PAGE.test(location.pathname)) return;
+    leaving = true;
+    location.replace('finchat_login.html?expired=1');
+  }
+
+  var current = storedToken();
+  if (current && isExpired(current)) signedOut();
+
+  function sentBearer(input, init) {
+    var h = (init && init.headers) || (input && typeof input === 'object' && input.headers);
+    if (!h) return false;
+    var v = typeof h.get === 'function' ? h.get('Authorization') : (h.Authorization || h.authorization);
+    return typeof v === 'string' && v.indexOf('Bearer ') === 0;
+  }
+
+  if (typeof window.fetch === 'function') {
+    var nativeFetch = window.fetch;
+    window.fetch = function (input, init) {
+      var pending = nativeFetch.apply(this, arguments);
+      if (!sentBearer(input, init)) return pending;
+      return pending.then(function (res) {
+        if (res.status === 401) {
+          res.clone().json().then(function (body) {
+            if (body && REJECTED[body.error]) signedOut();
+          }, function () { /* not JSON — not ours */ });
+        }
+        return res;
+      });
+    };
+  }
 })();

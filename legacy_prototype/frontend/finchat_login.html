@@ -745,6 +745,10 @@
       // rather than resetting to unchecked on every visit.
       const remembered = window.fcAuth.wasRemembered();
       document.getElementById('rememberMe').checked = remembered;
+      // Sent here by auth_session.js when a saved session ran out.
+      if (/[?&]expired=1(?:&|$)/.test(location.search)) {
+        showBanner('loginBanner', 'Your session expired. Sign in again to continue.', 'info');
+      }
       const id = window.fcAuth.rememberedIdentifier();
       if (id) {
         document.getElementById('loginEmail').value = id;

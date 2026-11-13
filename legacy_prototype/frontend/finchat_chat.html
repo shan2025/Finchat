@@ -2655,7 +2655,7 @@
         sendBtn.disabled = false;
         sendBtn.title = 'Stop generating';
         sendBtn.style.background = '#dc2626';
-        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">stop</span>';
+        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">stop</span><span class="fcm-only fcm-lic"><span data-fcm-icon="stop"></span></span>';
         sendBtn.onclick = (e) => { e.preventDefault(); stopGenerating(); };
       } else {
         isSending = false;
@@ -2663,9 +2663,13 @@
         sendBtn.disabled = false;
         sendBtn.title = 'Send';
         sendBtn.style.background = 'var(--accent)';
-        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">arrow_upward</span>';
+        sendBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">arrow_upward</span><span class="fcm-only fcm-lic"><span data-fcm-icon="arrowUp"></span></span>';
         sendBtn.onclick = sendMessage;
       }
+      // The phone layout hides the Material glyph and draws its own icon from
+      // the data-fcm-icon slot; a rebuilt button has to be hydrated again or
+      // it is a blank circle.
+      if (window.fcMobile) fcMobile.hydrateIcons(sendBtn);
     }
     function stopGenerating() {
       if (currentAbortController) {
