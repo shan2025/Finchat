@@ -223,6 +223,13 @@ router.post('/send', requireAuth, async (req, res) => {
       VALUES ($1, $2, $3, $4, 'assistant', $5, $6)
     `, [uuidv4(), activeSession, userId, personaId, result.cleanResponse, botMsgId]);
 
+    // Tie the answer to the run that produced it, so a thumbs on this message —
+    // now or after the conversation is reopened — rates the right run. A
+    // telemetry write: never worth failing the reply over.
+    require('../services/feedback')
+      .linkMessage({ query, executionId: result.executionId, userId, messageId: botMsgId })
+      .catch(err => console.warn('feedback.linkMessage failed:', err.message));
+
     // Study Mode is a property of the conversation, not the browser — remember it
     // so reopening this session anywhere comes back in card format.
     // Same for linked chats: stored so later turns and reopens keep them.
@@ -323,6 +330,9 @@ router.post('/send', requireAuth, async (req, res) => {
         avatar: persona.avatar
       },
       response: result.cleanResponse,
+      // The run behind this answer — the chat's thumbs rate it
+      // (POST /api/executions/:id/feedback). Null for a reply no run produced.
+      executionId: result.executionId || null,
       tokenBalance: newBalance,
       tokenCost: 5,
       // Model transparency: which backend answered. fallback=true means the
@@ -475,6 +485,19 @@ router.get('/history/:sessionId', requireAuth, async (req, res) => {
         const att = byMessage.get(msgIdByConv.get(m.id));
         if (att && att.length) m.attachments = att;
       }
+
+      // Which run delivered each answer, and how the user rated it, so the
+      // thumbs come back as they were left. Answers from before runs were
+      // linked to messages simply have none, and show no thumbs.
+      try {
+        const botIds = messages.filter(m => m.role === 'assistant').map(m => msgIdByConv.get(m.id));
+        const byMsg = await require('../services/feedback')
+          .lookupByMessages({ query, userId: req.user.id, messageIds: botIds });
+        for (const m of messages) {
+          const hit = m.role === 'assistant' && byMsg.get(String(msgIdByConv.get(m.id)));
+          if (hit) { m.executionId = hit.executionId; m.rating = hit.rating; }
+        }
+      } catch (err) { console.warn('feedback lookup failed:', err.message); }
     }
 
     const persona = messages.length > 0 ? getPersona(messages[0].persona) : null;

@@ -102,9 +102,13 @@ function transitionBoost(last, candidate, weights) {
  */
 async function runRouteLearning({ windowDays = WINDOW_DAYS, smoothing = SMOOTHING } = {}) {
   // Ordered tool districts + verification per execution, within the window.
+  // A run "verified" its route when it finished cleanly AND the user did not
+  // rate the answer down. Finishing alone used to be enough, so a route that
+  // reliably produced confident wrong answers was paved like a good one.
   const res = await db.query(`
     SELECT tc.execution_id, tc.tool_name, e.goal,
-      (e.completion_reason = 'natural') AS verified
+      (e.completion_reason = 'natural'
+        AND COALESCE(e.metrics->'feedback'->>'rating', '0') <> '-1') AS verified
     FROM tool_calls tc
     JOIN executions e ON e.execution_id = tc.execution_id
     WHERE e.current_state IN ('completed', 'failed')

@@ -123,6 +123,10 @@
   @media (hover: none) {
     .msg-copy { opacity:.6; width:32px; height:32px; }
   }
+  /* Thumbs on an agent answer (rate the run behind it). A chosen thumb stays
+     visible without hover, so the user can see what they said. */
+  .msg-rate.on { opacity:1 !important; color:var(--accent); }
+  .msg-rate.on .material-symbols-outlined { font-variation-settings:'FILL' 1; }
   .msg-time { font-size:10px; color:var(--text3); font-family:var(--mono); }
   .read-receipt { font-size:11px; color:var(--text3); }
   .read-receipt.read { color:var(--accent-blue); }
@@ -1728,7 +1732,7 @@
             <span class="msg-time">${time}</span>
             <span class="hash-tag" style="opacity:0.5">${msg.hash ? msg.hash.substring(0, 8) : 'history'}</span>
             <button class="msg-copy" title="Copy message" data-copy="${encodeURIComponent(cleanContent)}"><span class="material-symbols-outlined" style="font-size:13px">content_copy</span></button>
-            ${isUser ? `<button class="msg-copy" title="Edit & resend" data-edit="${encodeURIComponent(cleanContent)}"><span class="material-symbols-outlined" style="font-size:13px">edit</span></button>` : ''}
+            ${isUser ? `<button class="msg-copy" title="Edit & resend" data-edit="${encodeURIComponent(cleanContent)}"><span class="material-symbols-outlined" style="font-size:13px">edit</span></button>` : rateButtons(msg.executionId, msg.rating)}
           </div>
         </div>
       </div>
@@ -2004,6 +2008,34 @@
     // Copy / edit buttons on individual bubbles — event delegation, so it also
     // works for messages restored from the personaHistories innerHTML cache.
     document.addEventListener('click', async (e) => {
+      // Thumbs: clicking the chosen one again clears it. The UI changes first
+      // and rolls back if the server refuses, so a slow network never makes a
+      // click feel ignored.
+      const rb = e.target.closest('.msg-rate[data-rate]');
+      if (rb) {
+        const footer = rb.closest('.msg-footer');
+        const pair = footer ? footer.querySelectorAll('.msg-rate') : [rb];
+        const was = [...pair].find(b => b.classList.contains('on'));
+        const clearing = rb.classList.contains('on');
+        const paint = (active) => pair.forEach(b => {
+          const on = b === active;
+          b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+        });
+        paint(clearing ? null : rb);
+        try {
+          const res = await fetch(`${API_URL}/api/executions/${encodeURIComponent(rb.dataset.exec)}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_session?.token}` },
+            body: JSON.stringify({ rating: clearing ? null : rb.dataset.rate })
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          if (!clearing) showToast(rb.dataset.rate === 'up' ? 'Thanks — marked helpful' : 'Thanks — marked not helpful', 'info');
+        } catch (err) {
+          paint(was || null);
+          showToast('Could not save your rating', 'warn');
+        }
+        return;
+      }
       const eb = e.target.closest('.msg-copy[data-edit]');
       if (eb) {
         const input = document.getElementById('msgInput');
@@ -2395,7 +2427,21 @@
     // ─────────────────────────────────
     // RENDER MESSAGE
     // ─────────────────────────────────
-    function renderMessage(sender, text, proof, fraud, files) {
+    // Thumbs for an agent answer. They rate the RUN behind it (the Agent Map's
+    // only quality signal — see services/feedback.js), so they appear only when
+    // the answer is tied to a run; older answers simply have none.
+    function rateButtons(executionId, rating) {
+      if (!executionId) return '';
+      const id = escHtml(String(executionId));
+      const btn = (dir, icon, title) => {
+        const on = (dir === 'up' && rating === 1) || (dir === 'down' && rating === -1);
+        return `<button class="msg-copy msg-rate${on ? ' on' : ''}" data-rate="${dir}" data-exec="${id}" aria-pressed="${on}" title="${title}">` +
+          `<span class="material-symbols-outlined" style="font-size:13px">${icon}</span></button>`;
+      };
+      return btn('up', 'thumb_up', 'Helpful') + btn('down', 'thumb_down', 'Not helpful');
+    }
+
+    function renderMessage(sender, text, proof, fraud, files, meta) {
       const isUser = sender === 'USER';
       const p = PERSONAS[activePersona];
       const wrapper = document.createElement('div');
@@ -2468,7 +2514,7 @@
           ${chainStatus}
           ${readReceipt}
           <button class="msg-copy" title="Copy message" data-copy="${encodeURIComponent(cleanText)}"><span class="material-symbols-outlined" style="font-size:13px">content_copy</span></button>
-          ${isUser ? `<button class="msg-copy" title="Edit & resend" data-edit="${encodeURIComponent(cleanText)}"><span class="material-symbols-outlined" style="font-size:13px">edit</span></button>` : ''}
+          ${isUser ? `<button class="msg-copy" title="Edit & resend" data-edit="${encodeURIComponent(cleanText)}"><span class="material-symbols-outlined" style="font-size:13px">edit</span></button>` : rateButtons(meta && meta.executionId, meta && meta.rating)}
         </div>
       </div>
     </div>
@@ -2912,7 +2958,7 @@
             const botIsCheckpoint = botProof.height > 0 && botProof.height % CHECKPOINT_INTERVAL === 0;
             const botFraud = { risk: 'LOW', reason: 'AI persona response', indicators: ['Trusted AI source'] };
             addProofCard(botProof, botFraud, botIsCheckpoint);
-            const botMsgEl = renderMessage('BOT', data.response, botProof, botFraud, null);
+            const botMsgEl = renderMessage('BOT', data.response, botProof, botFraud, null, { executionId: data.executionId });
             // Model transparency: flag replies that came from the local qwen
             // fallback instead of the Groq cloud primary.
             if (data.inference && data.inference.fallback && botMsgEl) {

@@ -228,7 +228,7 @@
       <button id="amLbClose" class="am-btn am-x" aria-label="Close">✕</button>
     </div>
     <div id="amLbBody" class="am-scroll" style="padding:14px 16px; overflow-y:auto;"></div>
-    <div class="am-ov-foot">Cognitive Score = 60% accuracy + 30% route efficiency + 10% win rate. Quality is weighted over wins by design.</div>
+    <div class="am-ov-foot">Cognitive Score = 60% useful + 30% route efficiency + 10% win rate. Useful = runs that finished × answers rated helpful in chat; until an agent has ratings, helpfulness counts as 50/50.</div>
   </div>
 </div>
 
@@ -242,7 +242,7 @@
       <button id="amPfClose" class="am-btn am-x" aria-label="Close">✕</button>
     </div>
     <div id="amPfBody" class="am-scroll" style="padding:14px 16px; overflow-y:auto;"></div>
-    <div class="am-ov-foot">Accuracy = share of runs that finished cleanly, by task type. Plato blends this history (30%) with capability match (70%) when it routes a question.</div>
+    <div class="am-ov-foot">Useful = runs that finished × answers rated helpful (thumbs in chat), by task type. Grey cells have no ratings yet and show only how often runs finished. Plato blends this history (30%) with capability match (70%) when it routes a question.</div>
   </div>
 </div>
 
@@ -443,8 +443,10 @@
     return cands.map(function (c) {
       var nm = cap2(c.agentId), pct = Math.round((Number(c.finalScore) || 0) * 100);
       var racing = !!(field && field.indexOf(c.agentId) >= 0);
-      var hist = c.hasHistory && c.history
-        ? ' Its track record on ' + (tt || 'this kind of') + ' questions: ' + c.history.accuracy + '% accuracy over ' + c.history.runs + ' runs.'
+      var h = c.history;
+      var hist = c.hasHistory && h
+        ? ' Its record on ' + (tt || 'this kind of') + ' questions: ' + h.finished + '% of ' + h.runs + ' runs finished' +
+          (h.rated ? ', and ' + h.helpful + '% of ' + h.rated + ' rated answers were helpful.' : ', with no answers rated yet.')
         : ' It has no ' + tt + ' track record yet, so this is capability alone.';
       var head;
       if (field) head = racing ? nm + ' made the field for this ' + tt + ' race at ' + pct + '% (70% capability match, 30% past results).'
@@ -1205,7 +1207,10 @@
             '<span style="font-size:14px; font-weight:600;">' + esc(r.name) + '</span>' +
             '<span style="font-size:14px; color:' + shade(c, 0.85) + ';">' + esc(r.role || '') + '</span>' +
             (r.racing ? '<span style="font-size:10px; font-weight:700; letter-spacing:.06em; padding:2px 7px; border-radius:999px; background:#fbe4d3; color:#b4531c;">RACING</span>' : '') +
-            '<span style="margin-left:auto; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;">' + (r.pct == null ? (r.racing ? '—' : 'direct') : r.pct + '%') + '</span>' +
+            // A blended routing score (70% capability, 30% history), not a
+            // probability of being right — so it is labelled "match", not "%".
+            '<span style="margin-left:auto; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums;" title="Routing score: 70% capability match, 30% past results. Not a probability.">' +
+              (r.pct == null ? (r.racing ? '—' : 'direct') : r.pct + '<span style="font-size:10px; font-weight:500; color:#8a8174;"> match</span>') + '</span>' +
           '</div>' +
           '<div style="height:6px; border-radius:999px; background:#ece5da; margin-top:8px; overflow:hidden;"><div style="height:100%; width:' + (r.pct == null ? 100 : r.pct) + '%; border-radius:999px; background:' + c + ';"></div></div>' +
         '</div>' +
@@ -1326,7 +1331,7 @@
         said.push(s);
       }
       var cheaper = others.filter(function (a) { return a.avgTokens && a.avgTokens < L.fuel; });
-      if (cheaper.length) said.push(cheaper.map(function (a) { return a.name; }).join(', ') + ' usually spend' + (cheaper.length === 1 ? 's' : '') + ' less here. Tokens aren’t the whole story, so check accuracy on Ranks too.');
+      if (cheaper.length) said.push(cheaper.map(function (a) { return a.name; }).join(', ') + ' usually spend' + (cheaper.length === 1 ? 's' : '') + ' less here. Tokens aren’t the whole story, so check usefulness on Ranks too.');
       var rows = cmp.agents.map(function (a) { return { label: a.name + ' avg (' + a.runs + ')', n: a.avgTokens, id: a.id }; })
         .concat([{ label: 'This run', n: L.fuel, id: L.agent.id, me: true }])
         .sort(function (a, b) { return a.n - b.n; });
@@ -1744,7 +1749,9 @@
             '<div style="text-align:right; flex-shrink:0;"><div style="font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1;">' + r.cognitiveScore + '</div><div style="font-size:10px; color:#8a8174; text-transform:uppercase; letter-spacing:.08em;">Cognitive</div></div>' +
           '</div>' +
           '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:8px; padding-left:36px;">' +
-            stat('Accuracy', r.accuracy + '%') + stat('Route eff', r.routeEfficiency) + stat('Avg fuel', r.avgFuel + 'k') +
+            stat('Useful', r.useful + '%') +
+            stat('Rated', r.rated ? r.helpful + '% of ' + r.rated : 'none yet') +
+            stat('Finished', r.finished + '%') + stat('Route eff', r.routeEfficiency) + stat('Avg fuel', r.avgFuel + 'k') +
             stat('Avg time', r.avgSecs + 's') + stat('Races · W', r.races + ' · ' + r.wins) + stat('Errors', r.errorRate + '%') +
           '</div></div>';
       }).join('');
@@ -1764,7 +1771,7 @@
       var best = active.map(function (t) {
         var b = data.bestPerTask[t];
         return '<div style="background:#fff; border:1px solid #efe6d8; border-radius:12px; padding:9px 12px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#8a8174;">' + esc(t) + '</div>' +
-          '<div style="font-size:13px; margin-top:2px;">' + (b ? '<b style="color:' + shade(colorOf(b.agent), 0.8) + ';">' + esc(b.name) + '</b> · ' + b.accuracy + '%' : '<span style="color:#b0a79a;">—</span>') + '</div></div>';
+          '<div style="font-size:13px; margin-top:2px;">' + (b ? '<b style="color:' + shade(colorOf(b.agent), 0.8) + ';">' + esc(b.name) + '</b> · ' + (b.rated ? b.useful + '% useful' : 'no ratings') : '<span style="color:#b0a79a;">—</span>') + '</div></div>';
       }).join('');
       var th = 'padding:7px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#8a8174;';
       var head = '<th style="' + th + ' text-align:left; position:sticky; left:0; background:#fffaf3;">Agent</th>' + active.map(function (t) { return '<th style="' + th + '">' + esc(t) + '</th>'; }).join('');
@@ -1773,8 +1780,16 @@
           var c = a.cells[t];
           if (!c) return '<td style="padding:6px 8px; text-align:center; color:#cfc8bc;">–</td>';
           var isBest = data.bestPerTask[t] && data.bestPerTask[t].agent === a.agent;
-          return '<td style="padding:5px 6px; text-align:center;"><div style="display:inline-block; min-width:54px; border-radius:10px; padding:4px 6px; background:#fff; border:1.5px solid ' + (isBest ? accColor(c.accuracy) : '#efe6d8') + ';">' +
-            '<div style="font-size:13px; font-weight:700; color:' + accColor(c.accuracy) + ';">' + c.accuracy + '%</div><div style="font-size:10px; color:#8a8174;">' + c.runs + ' run' + (c.runs === 1 ? '' : 's') + '</div></div></td>';
+          var runs = c.runs + ' run' + (c.runs === 1 ? '' : 's');
+          // Rated cells show usefulness in colour; unrated ones show only how
+          // often runs finished, in grey, so "finished" is never read as "good".
+          var main = c.rated
+            ? '<div style="font-size:13px; font-weight:700; color:' + accColor(c.useful) + ';" title="' + c.helpful + '% of ' + c.rated + ' rated answers helpful; ' + c.finished + '% finished">' + c.useful + '%</div>' +
+              '<div style="font-size:10px; color:#8a8174;">' + runs + ' · ' + c.rated + ' rated</div>'
+            : '<div style="font-size:13px; font-weight:600; color:#a39a8c;" title="No ratings yet. ' + c.finished + '% of runs finished.">' + c.finished + '% done</div>' +
+              '<div style="font-size:10px; color:#8a8174;">' + runs + ' · unrated</div>';
+          return '<td style="padding:5px 6px; text-align:center;"><div style="display:inline-block; min-width:62px; border-radius:10px; padding:4px 6px; background:#fff; border:1.5px solid ' + (isBest && c.rated ? accColor(c.useful) : '#efe6d8') + ';">' +
+            main + '</div></td>';
         }).join('');
         var col = colorOf(a.agent), av = a.avatar || avatarOf(a.agent);
         return '<tr><td style="padding:6px 8px; position:sticky; left:0; background:#fffaf3;"><div style="display:flex; align-items:center; gap:8px;"><div style="width:26px; height:26px; border-radius:999px; flex-shrink:0; background-color:#fff;' + (av ? " background-image:url('" + esc(av) + "');" : '') + ' background-size:cover; background-position:center; border:2px solid ' + col + ';"></div><div><div style="font-size:13px; font-weight:700;">' + esc(a.name) + '</div>' +
@@ -1782,7 +1797,7 @@
       }).join('');
       body.innerHTML = '<div style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8174; margin-bottom:8px;">Best agent per task type</div>' +
         '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:6px; margin-bottom:18px;">' + best + '</div>' +
-        '<div style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8174; margin-bottom:8px;">Accuracy by task type</div>' +
+        '<div style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8174; margin-bottom:8px;">Usefulness by task type</div>' +
         '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;"><thead><tr>' + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }).catch(function (e) { body.innerHTML = note('Could not load profiles: ' + esc(e.message), true); });
   }

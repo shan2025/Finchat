@@ -175,6 +175,24 @@ router.get('/:id/trace', requireAuth, async (req, res) => {
   }
 });
 
+// ── POST /api/executions/:id/feedback ────────────────────────
+// The user's thumbs on this run's answer: {"rating":"up"|"down"|null}. null
+// clears it. Owner-only — rating someone else's run is a 404, not a 403, so it
+// does not confirm the id exists. See services/feedback.js.
+router.post('/:id/feedback', requireAuth, async (req, res) => {
+  const { parseRating, setRating } = require('../services/feedback');
+  const rating = parseRating(req.body && req.body.rating);
+  if (rating === undefined) return res.status(400).json({ error: 'rating must be "up", "down" or null' });
+  try {
+    const out = await setRating({ query, executionId: req.params.id, userId: req.user.id, rating });
+    if (!out.found) return res.status(404).json({ error: 'Execution not found' });
+    res.json({ executionId: req.params.id, rating: out.rating });
+  } catch (err) {
+    console.error('Save feedback error:', err);
+    res.status(500).json({ error: 'Failed to save feedback' });
+  }
+});
+
 // ── POST /api/executions/:id/resume ──────────────────────────
 // Resume a paused execution from WAITING state (HITL Approval)
 router.post('/:id/resume', requireAuth, async (req, res) => {

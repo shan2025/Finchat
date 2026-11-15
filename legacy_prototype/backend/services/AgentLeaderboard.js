@@ -32,14 +32,42 @@ const RACE_ORDER_SQL = `(completion_reason = 'natural' AND (max_tokens IS NULL O
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const round = (n, d = 0) => { const m = Math.pow(10, d); return Math.round((Number(n) || 0) * m) / m; };
 
+// ── What "good" means here ───────────────────────────────────────────────────
+//
+// This file used to call the share of runs that ended 'natural' ACCURACY. It is
+// not: a run that finishes without an error or a budget stop can still be
+// wrong, shallow or off-topic. That number drove 60% of the Cognitive Score and
+// half of the history term in Plato's routing, so everything downstream learned
+// "who errors least" — a provider-health signal — and called it quality.
+//
+// Now there are two honest numbers:
+//   finished    — share of runs that ended cleanly (the old metric, renamed)
+//   helpfulness — the user's thumbs on the answer, stored on the run as
+//                 executions.metrics.feedback.rating (1 | -1; routes/executions.js)
+// and one combined one:
+//   useful      — finished × helpfulness: the expected share of runs that end
+//                 with an answer the user found helpful.
+//
+// Helpfulness is Laplace-smoothed, (up + 1) / (rated + 2): an agent with no
+// ratings counts as 50/50, ONE thumbs-up is 67% not 100%, and an agent cannot
+// look good by never being rated. With no ratings anywhere, ranking reduces to
+// finished-and-efficient — which is all the system genuinely knows.
+const MIN_RATED_FOR_CLAIM = 1;
+function helpfulness(up, rated) {
+  const u = Math.max(0, Number(up) || 0), n = Math.max(u, Number(rated) || 0);
+  return (u + 1) / (n + 2);
+}
+const RATED_SQL = "e.metrics->'feedback'->>'rating' IN ('1', '-1')";
+const UP_SQL = "e.metrics->'feedback'->>'rating' = '1'";
+
 /**
  * Build the global (or per-user) agent leaderboard.
  *
- * Quality (accuracy = share of runs that finished 'natural', error rate),
- * Efficiency (avg fuel, latency, tool calls, a normalised route-efficiency
- * score), and Wins (per-race, quality-then-cheapest-then-fastest) roll into a
- * single, quality-weighted Cognitive Score. Adaptability (recovery, route
- * improvement, per-task-type) is intentionally left for the profiles step.
+ * Quality (useful = finished × rated helpfulness; see the note above), Efficiency
+ * (avg fuel, latency, tool calls, a normalised route-efficiency score), and Wins
+ * (per-race, quality-then-cheapest-then-fastest) roll into a single,
+ * quality-weighted Cognitive Score. Adaptability (recovery, route improvement,
+ * per-task-type) is intentionally left for the profiles step.
  *
  * @param {object} [opts]
  * @param {string|null} [opts.userId] - scope to one user's runs; null = global
@@ -55,6 +83,8 @@ async function getLeaderboard({ userId = null } = {}) {
       COUNT(*) FILTER (WHERE e.metrics->>'raceId' IS NOT NULL)::int AS races,
       COUNT(*) FILTER (WHERE e.completion_reason = 'natural')::int AS natural_count,
       COUNT(*) FILTER (WHERE e.completion_reason = 'error' OR e.current_state = 'failed')::int AS error_count,
+      COUNT(*) FILTER (WHERE ${RATED_SQL})::int AS rated,
+      COUNT(*) FILTER (WHERE ${UP_SQL})::int AS rated_up,
       COALESCE(AVG(e.tokens_used), 0) AS avg_tokens,
       COALESCE(AVG(e.tool_calls_used), 0) AS avg_tools,
       COALESCE(AVG(LEAST(EXTRACT(EPOCH FROM (e.updated_at - e.created_at)), ${MAX_RUN_SECS})), 0) AS avg_secs
@@ -90,10 +120,15 @@ async function getLeaderboard({ userId = null } = {}) {
     const runs = r.runs || 0;
     const avgFuel = (Number(r.avg_tokens) || 0) / 1000;
     const avgSecs = Number(r.avg_secs) || 0;
+    const finished = runs ? r.natural_count / runs : 0;
+    const rated = r.rated || 0, ratedUp = r.rated_up || 0;
     return {
       agent: r.agent, races: r.races || 0, runs,
       wins: wins[r.agent] || 0,
-      accuracy: runs ? round(100 * r.natural_count / runs, 1) : 0,
+      finished: round(100 * finished, 1),
+      rated, ratedUp,
+      helpful: rated >= MIN_RATED_FOR_CLAIM ? round(100 * ratedUp / rated, 0) : null,
+      useful: round(100 * finished * helpfulness(ratedUp, rated), 1),
       errorRate: runs ? round(100 * r.error_count / runs, 1) : 0,
       avgFuel: round(avgFuel, 1),
       avgSecs: round(avgSecs, 1),
@@ -109,43 +144,30 @@ async function getLeaderboard({ userId = null } = {}) {
   for (const r of rows) {
     r.routeEfficiency = round(clamp(100 - (0.6 * norm(r._fuel, fuels) + 0.4 * norm(r._secs, secs)) * 100, 0, 100), 0);
     r.winRate = r.races ? round(100 * r.wins / r.races, 0) : 0;
-    // Quality-weighted: accuracy dominates, efficiency matters, wins are a light
-    // bonus (deliberately NOT the primary metric).
-    r.cognitiveScore = round(clamp(0.6 * r.accuracy + 0.3 * r.routeEfficiency + 0.1 * r.winRate, 0, 100), 0);
+    // Quality-weighted: usefulness dominates, efficiency matters, wins are a
+    // light bonus (deliberately NOT the primary metric).
+    r.cognitiveScore = round(clamp(0.6 * r.useful + 0.3 * r.routeEfficiency + 0.1 * r.winRate, 0, 100), 0);
     const m = agentMeta(r.agent);
     r.name = m.name; r.role = m.role; r.color = m.color; r.avatar = m.avatar;
     delete r._fuel; delete r._secs;
   }
 
-  rows.sort((a, b) => b.cognitiveScore - a.cognitiveScore || b.accuracy - a.accuracy);
+  rows.sort((a, b) => b.cognitiveScore - a.cognitiveScore || b.useful - a.useful);
   return rows;
 }
 
 // ── Agent performance profiles by task type ─────────────────────────────────
 // Classify each question into a domain so we can see WHERE each agent is strong
-// ("Nova is more accurate on research; Aurelius is faster on markets"). This is
-// the substrate for Plato eventually selecting agents on history, not just
-// capability matching. Keyword classification on the goal — first match wins,
-// ordered most-specific first.
-const TASK_TYPES = ['markets', 'research', 'news', 'compliance', 'risk', 'portfolio', 'general'];
-const TASK_MATCHERS = [
-  ['markets', /\b(stock|stocks|price|prices|ticker|crypto|bitcoin|ethereum|solana|forex|currency|commodit|gold|oil|equit|trading|shares?|valuation|earnings|market)\b/i],
-  ['research', /\b(research|paper|papers|arxiv|study|studies|academic|literature|whitepaper|deep dive|explain|how does|what is)\b/i],
-  ['news', /\b(news|headline|latest|today|announce|update|recent|breaking|happening|this week)\b/i],
-  ['compliance', /\b(complian|regulat|\brule|legal|\blaw\b|audit|disclosure|suitab|govern|policy)\b/i],
-  ['risk', /\b(risks?|exposure|drawdown|volatil|hedge|downside|stress|defaults?|credit)\b/i],
-  ['portfolio', /\b(portfolio|holding|allocation|watchlist|position|rebalanc|diversif|client)\b/i]
-];
-function classifyTask(goal) {
-  const g = String(goal || '');
-  for (const [t, re] of TASK_MATCHERS) if (re.test(g)) return t;
-  return 'general';
-}
+// ("Nova is most useful on research; Aurelius is faster on markets"). This is
+// the substrate for Plato selecting agents on history, not just capability
+// matching. The classifier is shared by everything that buckets runs — routing,
+// profiles, route yield and learned routes — so it lives in its own module.
+const { classifyTask, TASK_TYPES } = require('./cognitive/taskClassifier');
 
 /**
- * Per-agent, per-task-type performance. Returns each agent's accuracy/fuel/time
- * per domain, the best agent for each task type (min sample), and which task
- * types each agent leads.
+ * Per-agent, per-task-type performance. Returns each agent's usefulness,
+ * finished rate, ratings, fuel and time per domain, the best agent for each task
+ * type (min sample), and which task types each agent leads.
  * @param {object} [opts]
  * @param {string|null} [opts.userId]
  */
@@ -154,6 +176,7 @@ async function getAgentProfiles({ userId = null } = {}) {
   const params = userId ? [userId] : [];
   const res = await db.query(`
     SELECT e.assigned_agent AS agent, e.goal, e.tokens_used, e.completion_reason,
+      e.metrics->'feedback'->>'rating' AS rating,
       LEAST(EXTRACT(EPOCH FROM (e.updated_at - e.created_at)), ${MAX_RUN_SECS}) AS secs
     FROM executions e
     WHERE e.assigned_agent = ANY($${params.length + 1})
@@ -161,14 +184,16 @@ async function getAgentProfiles({ userId = null } = {}) {
     ORDER BY e.created_at DESC LIMIT 4000
   `, [...params, [...ROSTER]]);
 
-  const cells = {}; // agent -> task -> {runs, natural, errored, fuel, secs}
+  const cells = {}; // agent -> task -> {runs, natural, errored, rated, up, fuel, secs}
   for (const r of res.rows) {
     const t = classifyTask(r.goal);
     const A = cells[r.agent] || (cells[r.agent] = {});
-    const c = A[t] || (A[t] = { runs: 0, natural: 0, errored: 0, fuel: 0, secs: 0 });
+    const c = A[t] || (A[t] = { runs: 0, natural: 0, errored: 0, rated: 0, up: 0, fuel: 0, secs: 0 });
     c.runs++;
     if (r.completion_reason === 'natural') c.natural++;
     if (r.completion_reason === 'error') c.errored++;
+    if (r.rating === '1' || r.rating === '-1') c.rated++;
+    if (r.rating === '1') c.up++;
     c.fuel += Number(r.tokens_used) || 0; c.secs += Number(r.secs) || 0;
   }
 
@@ -176,9 +201,14 @@ async function getAgentProfiles({ userId = null } = {}) {
     const m = agentMeta(id), A = cells[id], out = {};
     for (const t of Object.keys(A)) {
       const c = A[t];
+      const finished = c.natural / c.runs;
       out[t] = {
         runs: c.runs,
-        accuracy: round(100 * c.natural / c.runs, 0),
+        finished: round(100 * finished, 0),
+        rated: c.rated,
+        ratedUp: c.up,
+        helpful: c.rated >= MIN_RATED_FOR_CLAIM ? round(100 * c.up / c.rated, 0) : null,
+        useful: round(100 * finished * helpfulness(c.up, c.rated), 0),
         errorRate: round(100 * c.errored / c.runs, 0),
         avgFuel: round(c.fuel / c.runs / 1000, 1),
         avgSecs: round(c.secs / c.runs, 1)
@@ -193,11 +223,11 @@ async function getAgentProfiles({ userId = null } = {}) {
     let best = null;
     for (const a of agents) {
       const c = a.cells[t];
-      if (c && c.runs >= MIN && (!best || c.accuracy > best.accuracy || (c.accuracy === best.accuracy && c.avgFuel < best.avgFuel))) {
-        best = { agent: a.agent, name: a.name, color: a.color, accuracy: c.accuracy, runs: c.runs };
+      if (c && c.runs >= MIN && (!best || c.useful > best.useful || (c.useful === best.useful && c.avgFuel < best.avgFuel))) {
+        best = { agent: a.agent, name: a.name, color: a.color, useful: c.useful, rated: c.rated, runs: c.runs, avgFuel: c.avgFuel };
       }
     }
-    if (best) bestPerTask[t] = best;
+    if (best) { delete best.avgFuel; bestPerTask[t] = best; }
   }
   for (const a of agents) a.bestAt = TASK_TYPES.filter(t => bestPerTask[t] && bestPerTask[t].agent === a.agent);
 
@@ -216,9 +246,12 @@ function getProfilesCached({ userId = null } = {}) {
 //   completed runs for this task type), otherwise final = capNorm so agents
 //   without enough history route exactly as before (capability only).
 //
-// histNorm = 0.5·accuracy + 0.25·reliability + 0.25·efficiency, each 0..1.
-// Efficiency is normalised across the candidates that HAVE history (lower fuel/
-// time is better), so it is comparative rather than absolute.
+// histNorm = 0.5·helpfulness + 0.25·finished + 0.25·efficiency, each 0..1.
+// Helpfulness is the smoothed thumbs ratio (see helpfulness()): with no ratings
+// it is 0.5 for every agent, so it cannot reorder them and the choice rests on
+// finishing and efficiency — the history term no longer claims a quality it has
+// no evidence for. Efficiency is normalised across the candidates that HAVE
+// history (lower fuel/time is better), so it is comparative, not absolute.
 //
 // @param {object} opts
 // @param {Array<{agentId:string, cap:number}>} opts.candidates
@@ -251,11 +284,18 @@ function blendAgentScores({ candidates, profilesByAgent = {}, taskType, minRuns 
     const cell = cellFor(c.agentId);
     let histNorm = null, history = null;
     if (cell) {
-      const accuracy = clamp((cell.accuracy || 0) / 100, 0, 1);
-      const reliability = clamp((100 - (cell.errorRate || 0)) / 100, 0, 1);
+      const rated = Number(cell.rated) || 0, up = Number(cell.ratedUp) || 0;
+      const helpful = helpfulness(up, rated);
+      const finished = clamp((cell.finished || 0) / 100, 0, 1);
       const efficiency = clamp((normLowerBetter(cell.avgFuel || 0, fuels) + normLowerBetter(cell.avgSecs || 0, secs)) / 2, 0, 1);
-      histNorm = clamp(0.5 * accuracy + 0.25 * reliability + 0.25 * efficiency, 0, 1);
-      history = { runs: cell.runs, accuracy: cell.accuracy, reliability: round(100 - (cell.errorRate || 0)), efficiency: round(efficiency * 100), score: round(histNorm, 3) };
+      histNorm = clamp(0.5 * helpful + 0.25 * finished + 0.25 * efficiency, 0, 1);
+      history = {
+        runs: cell.runs, rated,
+        helpful: rated >= MIN_RATED_FOR_CLAIM ? round(100 * up / rated) : null,
+        finished: round(cell.finished || 0),
+        efficiency: round(efficiency * 100),
+        score: round(histNorm, 3)
+      };
     }
     const finalScore = cell ? (capWeight * capNorm + histWeight * histNorm) : capNorm;
     return { agentId: c.agentId, cap, capNorm: round(capNorm, 3), hasHistory: !!cell, history, finalScore: round(finalScore, 4) };
@@ -266,4 +306,7 @@ function blendAgentScores({ candidates, profilesByAgent = {}, taskType, minRuns 
   return rows;
 }
 
-module.exports = { getLeaderboard, getAgentProfiles, getProfilesCached, classifyTask, blendAgentScores };
+module.exports = {
+  getLeaderboard, getAgentProfiles, getProfilesCached, classifyTask, blendAgentScores,
+  helpfulness, TASK_TYPES
+};

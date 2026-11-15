@@ -756,6 +756,7 @@ html:not(.fcm-on) .fcm-only { display: none !important; }
   }
   html.fcm-on .msg-copy { width: 32px !important; height: 32px !important; border-radius: 50% !important; opacity: 1 !important; color: var(--m-ink-3) !important; }
   html.fcm-on .msg-copy .material-symbols-outlined { font-size: 15px !important; }
+  html.fcm-on .msg-rate.on { color: var(--m-accent-700) !important; background: var(--m-accent-100) !important; }
   html.fcm-on .date-divider span { font-size: 11px; color: var(--m-ink-3); }
 
   /* Welcome: left-aligned, two suggestion cards a row. */
