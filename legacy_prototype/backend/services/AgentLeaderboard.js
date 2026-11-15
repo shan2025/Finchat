@@ -57,6 +57,11 @@ function helpfulness(up, rated) {
   const u = Math.max(0, Number(up) || 0), n = Math.max(u, Number(rated) || 0);
   return (u + 1) / (n + 2);
 }
+// `accuracy` is still sent, with its ORIGINAL meaning (= finished), for pages
+// that were loaded before a deploy and are still open: they read row.accuracy
+// and cell.accuracy, and without it printed "undefined%" in every cell. New
+// pages read finished / useful and ignore it. Safe to drop once no client
+// older than 2026-11-15 can be open — i.e. any later deploy.
 const RATED_SQL = "e.metrics->'feedback'->>'rating' IN ('1', '-1')";
 const UP_SQL = "e.metrics->'feedback'->>'rating' = '1'";
 
@@ -126,6 +131,7 @@ async function getLeaderboard({ userId = null } = {}) {
       agent: r.agent, races: r.races || 0, runs,
       wins: wins[r.agent] || 0,
       finished: round(100 * finished, 1),
+      accuracy: round(100 * finished, 1), // legacy alias, see RATED_SQL note
       rated, ratedUp,
       helpful: rated >= MIN_RATED_FOR_CLAIM ? round(100 * ratedUp / rated, 0) : null,
       useful: round(100 * finished * helpfulness(ratedUp, rated), 1),
@@ -205,6 +211,7 @@ async function getAgentProfiles({ userId = null } = {}) {
       out[t] = {
         runs: c.runs,
         finished: round(100 * finished, 0),
+        accuracy: round(100 * finished, 0), // legacy alias, see RATED_SQL note
         rated: c.rated,
         ratedUp: c.up,
         helpful: c.rated >= MIN_RATED_FOR_CLAIM ? round(100 * c.up / c.rated, 0) : null,
@@ -224,7 +231,8 @@ async function getAgentProfiles({ userId = null } = {}) {
     for (const a of agents) {
       const c = a.cells[t];
       if (c && c.runs >= MIN && (!best || c.useful > best.useful || (c.useful === best.useful && c.avgFuel < best.avgFuel))) {
-        best = { agent: a.agent, name: a.name, color: a.color, useful: c.useful, rated: c.rated, runs: c.runs, avgFuel: c.avgFuel };
+        best = { agent: a.agent, name: a.name, color: a.color, useful: c.useful, rated: c.rated, runs: c.runs, avgFuel: c.avgFuel,
+          accuracy: c.finished }; // legacy alias, see RATED_SQL note
       }
     }
     if (best) { delete best.avgFuel; bestPerTask[t] = best; }

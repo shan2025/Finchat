@@ -445,8 +445,8 @@
       var racing = !!(field && field.indexOf(c.agentId) >= 0);
       var h = c.history;
       var hist = c.hasHistory && h
-        ? ' Its record on ' + (tt || 'this kind of') + ' questions: ' + h.finished + '% of ' + h.runs + ' runs finished' +
-          (h.rated ? ', and ' + h.helpful + '% of ' + h.rated + ' rated answers were helpful.' : ', with no answers rated yet.')
+        ? ' Its record on ' + (tt || 'this kind of') + ' questions: ' + pct(h.finished) + ' of ' + h.runs + ' runs finished' +
+          (h.rated ? ', and ' + pct(h.helpful) + ' of ' + h.rated + ' rated answers were helpful.' : ', with no answers rated yet.')
         : ' It has no ' + tt + ' track record yet, so this is capability alone.';
       var head;
       if (field) head = racing ? nm + ' made the field for this ' + tt + ' race at ' + pct + '% (70% capability match, 30% past results).'
@@ -1749,15 +1749,19 @@
             '<div style="text-align:right; flex-shrink:0;"><div style="font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1;">' + r.cognitiveScore + '</div><div style="font-size:10px; color:#8a8174; text-transform:uppercase; letter-spacing:.08em;">Cognitive</div></div>' +
           '</div>' +
           '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:8px; padding-left:36px;">' +
-            stat('Useful', r.useful + '%') +
-            stat('Rated', r.rated ? r.helpful + '% of ' + r.rated : 'none yet') +
-            stat('Finished', r.finished + '%') + stat('Route eff', r.routeEfficiency) + stat('Avg fuel', r.avgFuel + 'k') +
+            stat('Useful', pct(r.useful)) +
+            stat('Rated', r.rated ? pct(r.helpful) + ' of ' + r.rated : 'none yet') +
+            stat('Finished', pct(r.finished)) + stat('Route eff', r.routeEfficiency) + stat('Avg fuel', r.avgFuel + 'k') +
             stat('Avg time', r.avgSecs + 's') + stat('Races · W', r.races + ' · ' + r.wins) + stat('Errors', r.errorRate + '%') +
           '</div></div>';
       }).join('');
     }).catch(function (e) { body.innerHTML = note('Could not load the leaderboard: ' + esc(e.message), true); });
   }
   function accColor(a) { return a >= 75 ? '#2e8f53' : a >= 50 ? '#b7791f' : a >= 30 ? '#d0833a' : '#b8434a'; }
+  // A percentage, or a dash when the server did not send the number. A page
+  // left open across a deploy can meet a response shaped for a newer (or
+  // older) version; that must read "—", never "undefined%".
+  function pct(v) { var n = Number(v); return (v == null || v === '' || !isFinite(n)) ? '—' : n + '%'; }
   function openPf(scope) {
     $('amPf').style.display = 'flex';
     segOn(scope === 'me' ? $('amPfMine') : $('amPfGlobal'), scope === 'me' ? $('amPfGlobal') : $('amPfMine'));
@@ -1771,7 +1775,7 @@
       var best = active.map(function (t) {
         var b = data.bestPerTask[t];
         return '<div style="background:#fff; border:1px solid #efe6d8; border-radius:12px; padding:9px 12px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#8a8174;">' + esc(t) + '</div>' +
-          '<div style="font-size:13px; margin-top:2px;">' + (b ? '<b style="color:' + shade(colorOf(b.agent), 0.8) + ';">' + esc(b.name) + '</b> · ' + (b.rated ? b.useful + '% useful' : 'no ratings') : '<span style="color:#b0a79a;">—</span>') + '</div></div>';
+          '<div style="font-size:13px; margin-top:2px;">' + (b ? '<b style="color:' + shade(colorOf(b.agent), 0.8) + ';">' + esc(b.name) + '</b> · ' + (b.rated ? pct(b.useful) + ' useful' : 'no ratings') : '<span style="color:#b0a79a;">—</span>') + '</div></div>';
       }).join('');
       var th = 'padding:7px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#8a8174;';
       var head = '<th style="' + th + ' text-align:left; position:sticky; left:0; background:#fffaf3;">Agent</th>' + active.map(function (t) { return '<th style="' + th + '">' + esc(t) + '</th>'; }).join('');
@@ -1784,9 +1788,9 @@
           // Rated cells show usefulness in colour; unrated ones show only how
           // often runs finished, in grey, so "finished" is never read as "good".
           var main = c.rated
-            ? '<div style="font-size:13px; font-weight:700; color:' + accColor(c.useful) + ';" title="' + c.helpful + '% of ' + c.rated + ' rated answers helpful; ' + c.finished + '% finished">' + c.useful + '%</div>' +
+            ? '<div style="font-size:13px; font-weight:700; color:' + accColor(c.useful) + ';" title="' + pct(c.helpful) + ' of ' + c.rated + ' rated answers helpful; ' + pct(c.finished) + ' finished">' + pct(c.useful) + '</div>' +
               '<div style="font-size:10px; color:#8a8174;">' + runs + ' · ' + c.rated + ' rated</div>'
-            : '<div style="font-size:13px; font-weight:600; color:#a39a8c;" title="No ratings yet. ' + c.finished + '% of runs finished.">' + c.finished + '% done</div>' +
+            : '<div style="font-size:13px; font-weight:600; color:#a39a8c;" title="No ratings yet. ' + pct(c.finished) + ' of runs finished.">' + pct(c.finished) + ' done</div>' +
               '<div style="font-size:10px; color:#8a8174;">' + runs + ' · unrated</div>';
           return '<td style="padding:5px 6px; text-align:center;"><div style="display:inline-block; min-width:62px; border-radius:10px; padding:4px 6px; background:#fff; border:1.5px solid ' + (isBest && c.rated ? accColor(c.useful) : '#efe6d8') + ';">' +
             main + '</div></td>';
